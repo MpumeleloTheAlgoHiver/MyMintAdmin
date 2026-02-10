@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mint dashboard </title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      overflow: hidden;
+    }
+        
+    .gradient-bg {
+      background: linear-gradient(to bottom right, #f1f5f9, #dbeafe, #fae8ff);
+    }
+        
+    .backdrop-blur {
+      backdrop-filter: blur(12px);
+    }
+        
+    .chart-gradient {
+      background: linear-gradient(to bottom right, #f8fafc, rgba(219, 234, 254, 0.3), rgba(250, 232, 255, 0.2));
+    }
+        
+    .dot-pattern {
+      background-image: radial-gradient(circle at 2px 2px, rgba(148, 163, 184, 0.05) 1px, transparent 0);
+      background-size: 32px 32px;
+    }
+        
+    .premium-gradient {
+      background: linear-gradient(to bottom right, #e2e8f0, #cbd5e1);
+    }
+        
+    .bar-animation {
+      animation: barGrow 0.6s ease-out;
+    }
+        
+    @keyframes barGrow {
+      from {
+        height: 0;
+      }
+    }
+
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 75px;
+      height: 100vh;
+      background: rgba(255, 255, 255, 0.86);
+      backdrop-filter: blur(8px);
+      border-right: 1px solid #e8defa;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 0;
+      z-index: 1000;
+    }
+
+    .sidebar-logo {
+      width: 45px;
+      height: 45px;
+      background: linear-gradient(135deg, #9f67ff 0%, #7c3aed 58%, #5b21b6 100%);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 40px;
+      cursor: pointer;
+      box-shadow: 0 10px 20px rgba(92, 37, 173, 0.28);
+    }
+
+    .sidebar-logo svg {
+      width: 24px;
+      height: 24px;
+      fill: #ffffff;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      width: 100%;
+      padding: 0 15px;
+    }
+
+    .nav-icon {
+      width: 45px;
+      height: 45px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .nav-icon svg {
+      width: 22px;
+      height: 22px;
+      fill: #9ca3af;
+      transition: fill 0.3s ease;
+    }
+
+    .nav-icon:hover {
+      background: #f3f4f6;
+    }
+
+    .nav-icon:hover svg {
+      fill: #374151;
+    }
+
+    .nav-icon.active {
+      background: #f3f4f6;
+    }
+
+    .nav-icon.active svg {
+      fill: #374151;
+    }
+
+    .main-content {
+      margin-left: 75px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .top-nav {
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e8defa;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .top-search {
+      flex: 1;
+      max-width: 520px;
+      position: relative;
+    }
+
+    .top-search input {
+      width: 100%;
+      height: 42px;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      background: #f9fafb;
+      padding: 0 14px;
+      font-size: 0.9rem;
+      color: #111827;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .top-search input:focus {
+      border-color: #7c3aed;
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+      background: #ffffff;
+    }
+
+    .top-nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .signout-btn {
+      padding: 8px 14px;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
+      color: #374151;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .signout-btn:hover {
+      background: #f9fafb;
+      border-color: #d1d5db;
+    }
+
+    .dashboard-shell {
+      flex: 1;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body class="gradient-bg min-h-screen">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <svg viewBox="0 0 24 24">
+        <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+      </svg>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a class="nav-icon active" href="/dashboard.html" aria-label="Dashboard">
+        <svg viewBox="0 0 24 24">
+          <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+        </svg>
+      </a>
+
+      <a class="nav-icon" href="/index.html" aria-label="Profiles">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 12c1.66 0 3-1.34 3-3S13.66 6 12 6 9 7.34 9 9s1.34 3 3 3zm0 2c-2.22 0-6 1.11-6 3.33V19h12v-1.67C18 15.11 14.22 14 12 14z"/>
+        </svg>
+      </a>
+
+      <a class="nav-icon" href="#" aria-label="Settings">
+        <svg viewBox="0 0 24 24">
+          <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.11-.2-.36-.28-.58-.2l-2.39.96c-.5-.38-1.05-.7-1.66-.94l-.36-2.54A.488.488 0 0 0 14.9 2h-3.8c-.24 0-.44.17-.48.4l-.36 2.54c-.61.24-1.16.56-1.66.94l-2.39-.96a.5.5 0 0 0-.58.2L3.7 8.44c-.11.21-.06.48.12.62l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.62l1.92 3.32c.11.2.36.28.58.2l2.39-.96c.5.38 1.05.7 1.66.94l.36 2.54c.04.23.24.4.48.4h3.8c.24 0 .44-.17.48-.4l.36-2.54c.61-.24 1.16-.56 1.66-.94l2.39.96c.22.08.47 0 .58-.2l1.92-3.32a.5.5 0 0 0-.12-.62l-2.03-1.58zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5S10.07 8.5 12 8.5s3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/>
+        </svg>
+      </a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <div class="top-nav">
+      <div class="top-search">
+        <input type="search" placeholder="Search dashboard..." aria-label="Search dashboard">
+      </div>
+      <div class="top-nav-actions">
+        <button class="signout-btn" id="signOutBtn">Sign out</button>
+      </div>
+    </div>
+
+    <div class="dashboard-shell">
+      <div class="max-w-7xl mx-auto px-5 py-5">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <!-- Left Column - Income Tracker & Let's Connect -->
+      <div class="lg:col-span-2 space-y-4">
+        <!-- Strategies Card -->
+        <div class="bg-white rounded-3xl p-6 shadow-sm">
+          <div class="flex items-start justify-between mb-4">
+            <div>
+              <div class="flex items-center gap-3 mb-2">
+                <div class="p-2 bg-slate-100 rounded-lg">
+                  <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                </div>
+                <h2 class="text-2xl font-semibold text-slate-800">Strategies</h2>
+              </div>
+              <p class="text-slate-500 text-sm">
+                Live strategies pulled from your database.
+              </p>
+            </div>
+          </div>
+
+          <div class="space-y-3" id="strategiesList"></div>
+        </div>
+
+        <!-- Featured Strategies Card -->
+        <div class="bg-white rounded-3xl p-6 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold text-slate-800">Featured strategies</h2>
+            <span class="text-xs text-slate-500" id="featuredCount">0 featured</span>
+          </div>
+
+          <div class="space-y-3" id="featuredStrategies"></div>
+        </div>
+      </div>
+
+      <!-- Right Column - Projects & Proposal Progress -->
+      <div class="space-y-4">
+        <!-- Top Performing Holdings -->
+        <div class="bg-white rounded-3xl p-5 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold text-slate-800">Top performing holdings</h2>
+            <span class="text-xs text-slate-500" id="topHoldingsCount">0 holdings</span>
+          </div>
+
+          <div class="space-y-3" id="topHoldingsList"></div>
+        </div>
+
+        <!-- All Strategies -->
+        <div class="bg-white rounded-3xl p-5 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold text-slate-800">All strategies</h2>
+            <span class="text-xs text-slate-500" id="totalCount">0 total</span>
+          </div>
+
+          <div class="space-y-3" id="allStrategiesList"></div>
+        </div>
+
+        <!-- Strategy Insights -->
+        <div class="premium-gradient rounded-3xl p-5 shadow-sm relative overflow-hidden">
+          <div class="absolute inset-0 opacity-10">
+            <div class="absolute top-0 right-0 w-40 h-40 bg-white rounded-full -mr-20 -mt-20"></div>
+            <div class="absolute bottom-0 left-0 w-32 h-32 bg-white rounded-full -ml-16 -mb-16"></div>
+          </div>
+          <div class="relative z-10">
+            <h3 class="text-xl font-semibold text-slate-800 mb-2">Strategy insights</h3>
+            <p class="text-sm text-slate-600 mb-4">
+              Snapshot based on your current strategy catalog.
+            </p>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <p class="text-xs text-slate-500">Total strategies</p>
+                <p class="text-2xl font-semibold text-slate-800" id="statTotal">0</p>
+              </div>
+              <div>
+                <p class="text-xs text-slate-500">Featured</p>
+                <p class="text-2xl font-semibold text-slate-800" id="statFeatured">0</p>
+              </div>
+              <div>
+                <p class="text-xs text-slate-500">Public</p>
+                <p class="text-2xl font-semibold text-slate-800" id="statPublic">0</p>
+              </div>
+              <div>
+                <p class="text-xs text-slate-500">Avg min investment</p>
+                <p class="text-2xl font-semibold text-slate-800" id="statAvgMin">-</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Risk Breakdown -->
+        <div class="bg-white rounded-3xl p-5 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold text-slate-800">Risk breakdown</h2>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="border border-slate-200 rounded-2xl p-3">
+              <p class="text-xs text-slate-500">Low risk</p>
+              <p class="text-2xl font-semibold text-slate-800" id="riskLow">0</p>
+            </div>
+            <div class="border border-slate-200 rounded-2xl p-3">
+              <p class="text-xs text-slate-500">Medium risk</p>
+              <p class="text-2xl font-semibold text-slate-800" id="riskMedium">0</p>
+            </div>
+            <div class="border border-slate-200 rounded-2xl p-3">
+              <p class="text-xs text-slate-500">High risk</p>
+              <p class="text-2xl font-semibold text-slate-800" id="riskHigh">0</p>
+            </div>
+            <div class="border border-slate-200 rounded-2xl p-3">
+              <p class="text-xs text-slate-500">Unspecified</p>
+              <p class="text-2xl font-semibold text-slate-800" id="riskUnknown">0</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+  </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const strategiesList = document.getElementById('strategiesList');
+    const featuredStrategies = document.getElementById('featuredStrategies');
+    const allStrategiesList = document.getElementById('allStrategiesList');
+    const featuredCount = document.getElementById('featuredCount');
+    const totalCount = document.getElementById('totalCount');
+    const topHoldingsList = document.getElementById('topHoldingsList');
+    const topHoldingsCount = document.getElementById('topHoldingsCount');
+    const statTotal = document.getElementById('statTotal');
+    const statFeatured = document.getElementById('statFeatured');
+    const statPublic = document.getElementById('statPublic');
+    const statAvgMin = document.getElementById('statAvgMin');
+    const riskLow = document.getElementById('riskLow');
+    const riskMedium = document.getElementById('riskMedium');
+    const riskHigh = document.getElementById('riskHigh');
+    const riskUnknown = document.getElementById('riskUnknown');
+
+    const formatCurrency = (value, currency = 'ZAR') => {
+      if (value === null || value === undefined) return 'No minimum';
+      const numeric = Number(value);
+      if (Number.isNaN(numeric) || numeric === 0) return 'No minimum';
+      try {
+        return new Intl.NumberFormat('en-ZA', {
+          style: 'currency',
+          currency,
+          maximumFractionDigits: 0
+        }).format(numeric);
+      } catch (error) {
+        return `${numeric.toLocaleString()} ${currency}`;
+      }
+    };
+
+    const formatCompactCurrency = (value) => {
+      if (value === null || value === undefined) return 'Not available';
+      const numeric = Number(value);
+      if (Number.isNaN(numeric) || numeric === 0) return 'Not available';
+      try {
+        return `$${new Intl.NumberFormat('en', {
+          notation: 'compact',
+          maximumFractionDigits: 1
+        }).format(numeric)}`;
+      } catch (error) {
+        return `$${numeric.toLocaleString()}`;
+      }
+    };
+
+    const normalizeWebsite = (value) => {
+      if (!value) return '';
+      return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+    };
+
+    const riskBadgeClass = (risk) => {
+      switch (risk) {
+        case 'low':
+          return 'bg-emerald-100 text-emerald-700';
+        case 'medium':
+          return 'bg-amber-100 text-amber-700';
+        case 'high':
+          return 'bg-rose-100 text-rose-700';
+        default:
+          return 'bg-slate-100 text-slate-600';
+      }
+    };
+
+    const renderStrategyItem = (strategy) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'border border-slate-200 rounded-2xl p-3 flex items-start justify-between gap-3';
+
+      const name = strategy.short_name || strategy.name || 'Untitled strategy';
+      const description = strategy.description || strategy.objective || 'No description provided.';
+      const sector = strategy.sector ? `• ${strategy.sector}` : '';
+      const risk = (strategy.risk_level || 'unspecified').toLowerCase();
+      const minInvestment = formatCurrency(strategy.min_investment, strategy.base_currency || 'ZAR');
+
+      wrapper.innerHTML = `
+        <div>
+          <p class="font-medium text-slate-800">${name}</p>
+          <p class="text-xs text-slate-500 mt-1">${description}</p>
+          <p class="text-xs text-slate-400 mt-1">${strategy.base_currency || 'ZAR'} ${sector}</p>
+        </div>
+        <div class="flex flex-col items-end gap-2">
+          <span class="px-2 py-0.5 text-xs rounded-full ${riskBadgeClass(risk)}">${risk}</span>
+          <span class="text-xs text-slate-500">${minInvestment}</span>
+        </div>
+      `;
+
+      return wrapper;
+    };
+
+    const renderList = (container, items, emptyMessage) => {
+      if (!container) return;
+      container.innerHTML = '';
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-sm text-slate-500';
+        empty.textContent = emptyMessage;
+        container.appendChild(empty);
+        return;
+      }
+      items.forEach(item => container.appendChild(renderStrategyItem(item)));
+    };
+
+    const renderHoldingCard = (security) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'border border-slate-200 rounded-2xl p-3';
+
+      const name = security.name || 'Unnamed holding';
+      const symbol = security.symbol || 'N/A';
+      const description = security.description || 'No description provided.';
+      const website = security.website || '';
+      const marketCap = formatCompactCurrency(security.market_cap);
+      const logoUrl = security.logo_url || '';
+      const websiteLink = normalizeWebsite(website);
+
+      wrapper.innerHTML = `
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden flex items-center justify-center text-slate-600 text-xs font-semibold" data-logo>
+              ${logoUrl ? `<img src="${logoUrl}" alt="${name} logo" class="w-full h-full object-contain" />` : symbol.slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <p class="font-medium text-slate-800">${name}</p>
+              <p class="text-xs text-slate-500">$${symbol}</p>
+            </div>
+          </div>
+          <button class="text-slate-400 hover:text-slate-600 transition" type="button" aria-label="Toggle details">
+            <svg class="w-4 h-4 transition-transform" viewBox="0 0 20 20" fill="currentColor" data-chevron>
+              <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd" />
+            </svg>
+          </button>
+        </div>
+        <div class="mt-3 text-sm text-slate-600 hidden" data-details>
+          <p class="mb-2">${description}</p>
+          <p class="text-xs text-slate-500"><span class="font-semibold text-slate-700">Market cap:</span> ${marketCap}</p>
+          <p class="text-xs text-slate-500"><span class="font-semibold text-slate-700">Website:</span> ${websiteLink ? `<a class=\"text-indigo-600 hover:text-indigo-700\" href=\"${websiteLink}\" target=\"_blank\" rel=\"noopener\">${website}</a>` : 'Not available'}</p>
+        </div>
+      `;
+
+      const toggleButton = wrapper.querySelector('button');
+      const details = wrapper.querySelector('[data-details]');
+      const chevron = wrapper.querySelector('[data-chevron]');
+      if (toggleButton && details) {
+        toggleButton.addEventListener('click', () => {
+          const isHidden = details.classList.toggle('hidden');
+          if (chevron) {
+            chevron.classList.toggle('rotate-180', !isHidden);
+          }
+        });
+      }
+
+      const logoContainer = wrapper.querySelector('[data-logo]');
+      const logoImage = wrapper.querySelector('img');
+      if (logoImage && logoContainer) {
+        logoImage.addEventListener('error', () => {
+          logoContainer.innerHTML = symbol.slice(0, 2).toUpperCase();
+        });
+      }
+
+      return wrapper;
+    };
+
+    const renderHoldings = (items) => {
+      if (!topHoldingsList) return;
+      topHoldingsList.innerHTML = '';
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-sm text-slate-500';
+        empty.textContent = 'No holdings available.';
+        topHoldingsList.appendChild(empty);
+      } else {
+        items.forEach(item => topHoldingsList.appendChild(renderHoldingCard(item)));
+      }
+
+      if (topHoldingsCount) {
+        topHoldingsCount.textContent = `${items.length} holdings`;
+      }
+    };
+
+    const updateStats = (strategies) => {
+      const total = strategies.length;
+      const featured = strategies.filter(item => item.is_featured).length;
+      const publicCount = strategies.filter(item => item.is_public).length;
+      const avgCurrency = strategies.find(item => item.base_currency)?.base_currency || 'ZAR';
+      const avgMin = total
+        ? strategies.reduce((sum, item) => sum + Number(item.min_investment || 0), 0) / total
+        : 0;
+
+      const riskCounts = strategies.reduce(
+        (acc, item) => {
+          const risk = (item.risk_level || 'unspecified').toLowerCase();
+          if (risk === 'low') acc.low += 1;
+          else if (risk === 'medium') acc.medium += 1;
+          else if (risk === 'high') acc.high += 1;
+          else acc.unknown += 1;
+          return acc;
+        },
+        { low: 0, medium: 0, high: 0, unknown: 0 }
+      );
+
+      if (statTotal) statTotal.textContent = total.toString();
+      if (statFeatured) statFeatured.textContent = featured.toString();
+      if (statPublic) statPublic.textContent = publicCount.toString();
+      if (statAvgMin) statAvgMin.textContent = formatCurrency(avgMin, avgCurrency);
+      if (riskLow) riskLow.textContent = riskCounts.low.toString();
+      if (riskMedium) riskMedium.textContent = riskCounts.medium.toString();
+      if (riskHigh) riskHigh.textContent = riskCounts.high.toString();
+      if (riskUnknown) riskUnknown.textContent = riskCounts.unknown.toString();
+      if (featuredCount) featuredCount.textContent = `${featured} featured`;
+      if (totalCount) totalCount.textContent = `${total} total`;
+    };
+
+    const loadStrategies = async () => {
+      const { data, error } = await supabaseClient
+        .from('strategies')
+        .select('id, name, short_name, description, objective, risk_level, sector, min_investment, base_currency, is_featured, is_public, status')
+        .eq('is_public', true)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Strategies load error:', error);
+        renderList(strategiesList, [], 'Unable to load strategies.');
+        renderList(featuredStrategies, [], 'No featured strategies available.');
+        renderList(allStrategiesList, [], 'No strategies found.');
+        return;
+      }
+
+      const strategies = data || [];
+      const featured = strategies.filter(item => item.is_featured);
+
+      renderList(strategiesList, strategies.slice(0, 4), 'No strategies found.');
+      renderList(featuredStrategies, featured.slice(0, 3), 'No featured strategies yet.');
+      renderList(allStrategiesList, strategies.slice(0, 4), 'No strategies available.');
+      updateStats(strategies);
+    };
+
+    const loadTopHoldings = async () => {
+      const { data, error } = await supabaseClient
+        .from('securities')
+        .select('id, name, symbol, logo_url, description, market_cap, website, created_at, is_active')
+        .eq('is_active', true)
+        .order('created_at', { ascending: true })
+        .limit(3);
+
+      if (error) {
+        console.error('Holdings load error:', error);
+        renderHoldings([]);
+        return;
+      }
+
+      renderHoldings(data || []);
+    };
+
+    const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
+
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const requireSession = async () => {
+      const { data } = await supabaseClient.auth.getSession();
+      if (!data.session) {
+        window.location.href = '/signin.html';
+        return false;
+      }
+      return true;
+    };
+
+    const signOutBtn = document.getElementById('signOutBtn');
+    if (signOutBtn) {
+      signOutBtn.addEventListener('click', async () => {
+        await supabaseClient.auth.signOut();
+        window.location.href = '/signin.html';
+      });
+    }
+
+    // Initialize everything on page load
+    window.addEventListener('DOMContentLoaded', function() {
+      requireSession();
+      loadStrategies();
+      loadTopHoldings();
+    });
+  </script>
+</body>
+</html>

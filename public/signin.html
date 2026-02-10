@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mint CRM - Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f8f9fa;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #111827;
+      padding: 24px;
+    }
+
+    .auth-card {
+      width: 100%;
+      max-width: 440px;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 18px;
+      padding: 36px 32px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+
+    .brand-mark {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 1.1rem;
+      letter-spacing: 0.5px;
+    }
+
+    .brand-text h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.7rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .brand-text p {
+      color: #6b7280;
+      font-size: 0.95rem;
+    }
+
+    .form-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .form-subtitle {
+      color: #6b7280;
+      font-size: 0.9rem;
+      margin-bottom: 22px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      font-size: 0.9rem;
+      color: #374151;
+      font-weight: 500;
+    }
+
+    .form-group input {
+      height: 44px;
+      padding: 0 14px;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .form-group input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    }
+
+    .primary-btn {
+      width: 100%;
+      height: 46px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .primary-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 20px rgba(59, 130, 246, 0.2);
+    }
+
+    .error-text {
+      margin-top: 14px;
+      color: #dc2626;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    .status-text {
+      margin-top: 14px;
+      color: #16a34a;
+      font-size: 0.9rem;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-card">
+    <div class="brand">
+      <div class="brand-mark">MC</div>
+      <div class="brand-text">
+        <h1>Mint CRM</h1>
+        <p>Welcome back</p>
+      </div>
+    </div>
+
+    <div class="form-title">Sign in</div>
+    <div class="form-subtitle">Use your account credentials to continue.</div>
+
+    <form id="signInForm">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" placeholder="name@company.com" required />
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" placeholder="••••••••" required />
+      </div>
+      <button class="primary-btn" type="submit">Sign in</button>
+    </form>
+
+    <div class="error-text" id="errorText"></div>
+    <div class="status-text" id="statusText"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
+
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const form = document.getElementById('signInForm');
+    const errorText = document.getElementById('errorText');
+    const statusText = document.getElementById('statusText');
+
+    const showError = (message) => {
+      errorText.textContent = message;
+      errorText.style.display = 'block';
+      statusText.style.display = 'none';
+    };
+
+    const showStatus = (message) => {
+      statusText.textContent = message;
+      statusText.style.display = 'block';
+      errorText.style.display = 'none';
+    };
+
+    const redirectToApp = () => {
+      window.location.href = '/index.html';
+    };
+
+    const checkSession = async () => {
+      const { data } = await supabaseClient.auth.getSession();
+      if (data.session) {
+        redirectToApp();
+      }
+    };
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const email = form.email.value.trim();
+      const password = form.password.value.trim();
+
+      if (!email || !password) {
+        showError('Please enter your email and password.');
+        return;
+      }
+
+      showStatus('Signing in...');
+      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) {
+        showError(error.message || 'Unable to sign in.');
+        return;
+      }
+
+      redirectToApp();
+    });
+
+    checkSession();
+  </script>
+</body>
+</html>
