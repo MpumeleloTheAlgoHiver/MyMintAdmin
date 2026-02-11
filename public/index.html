@@ -30,10 +30,7 @@
 
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background:
-        radial-gradient(circle at 92% 8%, #efe7ff 0%, rgba(239, 231, 255, 0) 38%),
-        radial-gradient(circle at 10% 88%, #f3ebff 0%, rgba(243, 235, 255, 0) 36%),
-        var(--bg);
+      background: #f5f6fa;
       min-height: 100vh;
       overflow-x: hidden;
       color: var(--text);
@@ -83,14 +80,13 @@
     .sidebar-logo {
       width: 45px;
       height: 45px;
-      background: linear-gradient(135deg, #9f67ff 0%, var(--primary) 58%, var(--primary-strong) 100%);
+      background: var(--primary);
       border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
       margin-bottom: 40px;
       cursor: pointer;
-      box-shadow: 0 10px 20px rgba(92, 37, 173, 0.28);
     }
 
     .sidebar-logo svg {
@@ -129,18 +125,7 @@
       transition: fill 0.3s ease;
     }
 
-    .nav-icon:hover {
-      background: #f3f4f6;
-    }
-
-    .nav-icon:hover svg {
-      fill: #374151;
-    }
-
-    .nav-icon.active {
-      background: #f3f4f6;
-    }
-
+    .nav-icon:hover svg,
     .nav-icon.active svg {
       fill: #374151;
     }
