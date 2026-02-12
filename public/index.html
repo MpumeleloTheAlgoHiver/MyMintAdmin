@@ -702,6 +702,348 @@
       border-color: #d1d5db;
     }
 
+    .pack-details-btn {
+      padding: 8px 16px;
+      background: transparent;
+      border: 1px solid #e5e7eb;
+      border-radius: 20px;
+      color: #6b7280;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: 600;
+    }
+
+    .pack-details-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background: #f9fafb;
+      color: #9ca3af;
+    }
+
+    .pack-details-btn:not(:disabled):hover {
+      background: #f9fafb;
+      border-color: #d1d5db;
+    }
+
+    .pack-details-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+    }
+
+    .pack-details-view {
+      display: none;
+      padding: 25px;
+    }
+
+    .pack-details-view.active {
+      display: block;
+    }
+
+    .pack-details-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 16px;
+      background: #ffffff;
+      margin-bottom: 16px;
+    }
+
+    .pack-details-card.purple {
+      border-color: #ddd6fe;
+      background: linear-gradient(180deg, #faf5ff 0%, #ffffff 100%);
+      box-shadow: 0 10px 24px rgba(91, 33, 182, 0.08);
+    }
+
+    .pack-details-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 12px;
+    }
+
+    .pack-hero {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+      padding: 12px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #ede9fe 0%, #f5f3ff 100%);
+      border: 1px solid #ddd6fe;
+    }
+
+    .pack-hero-title {
+      font-size: 1.02rem;
+      color: #4c1d95;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .pack-hero-subtitle {
+      font-size: 0.82rem;
+      color: #6d28d9;
+    }
+
+    .pack-download-btn {
+      border: 1px solid #c4b5fd;
+      background: #ffffff;
+      color: #5b21b6;
+      font-size: 0.78rem;
+      font-weight: 700;
+      border-radius: 10px;
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .pack-download-btn:hover {
+      background: #f5f3ff;
+      border-color: #a78bfa;
+    }
+
+    .pack-badge {
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      border: 1px solid #c4b5fd;
+      color: #5b21b6;
+      background: #f5f3ff;
+      white-space: nowrap;
+    }
+
+    .pack-kv-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 16px;
+    }
+
+    .pack-kv-item {
+      border: 1px solid #ede9fe;
+      border-radius: 12px;
+      padding: 10px;
+      background: #ffffff;
+    }
+
+    .pack-kv-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #6d28d9;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+
+    .pack-kv-value {
+      font-size: 0.86rem;
+      color: #1f2937;
+      font-weight: 600;
+      word-break: break-word;
+    }
+
+    .pack-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .pack-list-item {
+      border: 1px solid #ede9fe;
+      border-radius: 12px;
+      padding: 12px;
+      background: #ffffff;
+    }
+
+    .pack-list-title {
+      color: #4c1d95;
+      font-size: 0.88rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .pack-list-meta {
+      color: #6b7280;
+      font-size: 0.79rem;
+      line-height: 1.45;
+    }
+
+    .pack-empty {
+      color: #6b7280;
+      font-size: 0.86rem;
+      padding: 8px 2px;
+    }
+
+    .pack-complete-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .pack-section-card {
+      border: 1px solid #e9d5ff;
+      border-radius: 12px;
+      background: #ffffff;
+      padding: 12px;
+    }
+
+    .pack-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      width: 100%;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      padding: 0;
+      margin-bottom: 8px;
+      text-align: left;
+    }
+
+    .pack-section-caret {
+      color: #7c3aed;
+      font-size: 0.8rem;
+      font-weight: 700;
+      transition: transform 0.2s ease;
+    }
+
+    .pack-section-card.collapsed .pack-section-caret {
+      transform: rotate(-90deg);
+    }
+
+    .pack-section-body {
+      display: block;
+    }
+
+    .pack-section-card.collapsed .pack-section-body {
+      display: none;
+    }
+
+    .pack-section-title {
+      font-size: 0.82rem;
+      color: #4c1d95;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 8px;
+    }
+
+    .pack-section-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .pack-section-grid.info-scroll {
+      max-height: 192px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .pack-line {
+      border-bottom: 1px dashed #ede9fe;
+      padding-bottom: 6px;
+    }
+
+    .pack-line:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .pack-line-label {
+      font-size: 0.72rem;
+      color: #7c3aed;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .pack-line-value {
+      font-size: 0.82rem;
+      color: #1f2937;
+      word-break: break-word;
+    }
+
+    .pack-sections-controls {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .pack-sections-controls button {
+      border: 1px solid #ddd6fe;
+      border-radius: 8px;
+      background: #fff;
+      color: #5b21b6;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+
+    .pack-sections-controls button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .pack-sections-page {
+      font-size: 0.76rem;
+      color: #6b7280;
+      font-weight: 600;
+      min-width: 78px;
+      text-align: center;
+    }
+
+    .pack-details-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px 20px;
+    }
+
+    .pack-details-field {
+      font-size: 0.85rem;
+      color: #111827;
+    }
+
+    .pack-details-label {
+      display: block;
+      font-size: 0.75rem;
+      color: #5b21b6;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+
+    .pack-details-block {
+      border-left: 3px solid #5b21b6;
+      padding-left: 12px;
+      margin-top: 10px;
+      font-size: 0.85rem;
+      color: #111827;
+    }
+
+    @media screen and (max-width: 768px) {
+      .pack-details-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .pack-kv-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .pack-complete-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .filter-count {
       margin-left: 5px;
       opacity: 0.8;
@@ -830,6 +1172,43 @@
       top: 5px;
       color: #9ca3af;
       font-size: 0.85rem;
+    }
+
+    .timeline-table-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 8px;
+    }
+
+    .timeline-table-wrap {
+      overflow-x: auto;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .timeline-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 560px;
+    }
+
+    .timeline-table th,
+    .timeline-table td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid #f3f4f6;
+      font-size: 0.78rem;
+      white-space: nowrap;
+    }
+
+    .timeline-table th {
+      background: #f9fafb;
+      color: #6b7280;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
     /* Holdings Cards */
@@ -1423,6 +1802,9 @@
                   <button class="filter-tab" data-view="holdings">
                     Current holdings
                   </button>
+                  <button class="pack-details-btn" type="button" data-pack-details data-view="pack-details" disabled>
+                    Pack details
+                  </button>
                 </div>
 
                 <div class="timeline history-view">
@@ -1648,6 +2030,15 @@
                     </div>
                   </div>
                 </div>
+
+                <div class="pack-details-view" data-pack-details-view>
+                  <div class="pack-details-card">
+                    <div class="pack-details-title">Pack details</div>
+                    <div class="pack-details-grid" id="packDetailsGrid"></div>
+                  </div>
+                  <div class="pack-details-card" id="packDetailsDocs"></div>
+                  <div class="pack-details-card" id="packDetailsReview"></div>
+                </div>
               </div>
             </div>
             </div>
@@ -1689,6 +2080,8 @@
     </div>
   </div>
 
+
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
@@ -1703,6 +2096,12 @@
     const searchInput = document.querySelector('.top-search input');
     let allProfiles = [];
     let allKycMap = {};
+    const onboardingMap = {};
+    const packDetailsRowMap = {};
+    const allocationsByUserMap = {};
+    const holdingsByUserMap = {};
+    const securitiesByIdMap = {};
+    const PACK_SECTIONS_PAGE_SIZE = 4;
 
     const getInitials = (name = '') => {
       const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -1729,6 +2128,7 @@
     const imageModalClose = document.getElementById('imageModalClose');
     let activeInspectionId = null;
     let activeImages = [];
+    const packJsonMap = {};
 
     const openPhoneModal = (item) => {
       activePhoneItem = item;
@@ -1815,6 +2215,557 @@
       if (imageList) imageList.innerHTML = '';
     };
 
+    const formatFieldValue = (value) => {
+      if (value === null || value === undefined || value === '') return 'Not provided';
+      if (Array.isArray(value)) return value.join(', ');
+      if (typeof value === 'object') return JSON.stringify(value);
+      return String(value);
+    };
+
+    const formatRelativeTime = (value) => {
+      if (!value) return 'Date unavailable';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const minute = 60 * 1000;
+      const hour = 60 * minute;
+      const day = 24 * hour;
+
+      if (diffMs < minute) return 'Just now';
+      if (diffMs < hour) return `${Math.floor(diffMs / minute)} min ago`;
+      if (diffMs < day) return `${Math.floor(diffMs / hour)} hours ago`;
+      if (diffMs < day * 7) return `${Math.floor(diffMs / day)} days ago`;
+      return date.toLocaleString();
+    };
+
+    const escapeHtml = (value) => String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    const formatNumber = (value, digits = 2) => {
+      if (value === null || value === undefined || value === '') return '-';
+      const parsed = Number(value);
+      if (Number.isNaN(parsed)) return String(value);
+      return parsed.toLocaleString(undefined, {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits
+      });
+    };
+
+    const getLatestTimestamp = (rows = []) => {
+      let latest = null;
+      rows.forEach((row) => {
+        const candidate = row?.updated_at || row?.created_at || row?.as_of_date;
+        if (!candidate) return;
+        if (!latest || new Date(candidate).getTime() > new Date(latest).getTime()) {
+          latest = candidate;
+        }
+      });
+      return latest;
+    };
+
+    const buildAllocationsTableHtml = (rows = []) => {
+      const body = rows.map(row => `
+        <tr>
+          <td>${escapeHtml(row.asset_class || '-')}</td>
+          <td>${formatNumber(row.weight, 2)}%</td>
+          <td>R ${formatNumber(row.value, 2)}</td>
+          <td>${escapeHtml(row.as_of_date || '-')}</td>
+        </tr>
+      `).join('');
+
+      return `
+        <div class="timeline-table-title">Allocations</div>
+        <div class="timeline-table-wrap">
+          <table class="timeline-table">
+            <thead>
+              <tr>
+                <th>Asset class</th>
+                <th>Weight</th>
+                <th>Value</th>
+                <th>As of</th>
+              </tr>
+            </thead>
+            <tbody>${body}</tbody>
+          </table>
+        </div>
+      `;
+    };
+
+    const buildHoldingsTableHtml = (rows = []) => {
+      const body = rows.map(row => {
+        const security = securitiesByIdMap[row.security_id] || {};
+        const label = security.symbol || security.name || row.security_id || '-';
+        return `
+          <tr>
+            <td>${escapeHtml(label)}</td>
+            <td>${formatNumber(row.quantity, 2)}</td>
+            <td>R ${formatNumber(row.avg_fill, 2)}</td>
+            <td>R ${formatNumber(row.market_value, 2)}</td>
+            <td>R ${formatNumber(row.unrealized_pnl, 2)}</td>
+            <td>${escapeHtml(row.Status || '-')}</td>
+            <td>${escapeHtml(row.as_of_date || '-')}</td>
+          </tr>
+        `;
+      }).join('');
+
+      return `
+        <div class="timeline-table-title">Holdings</div>
+        <div class="timeline-table-wrap">
+          <table class="timeline-table">
+            <thead>
+              <tr>
+                <th>Security</th>
+                <th>Quantity</th>
+                <th>Avg fill</th>
+                <th>Market value</th>
+                <th>Unrealized PnL</th>
+                <th>Status</th>
+                <th>As of</th>
+              </tr>
+            </thead>
+            <tbody>${body}</tbody>
+          </table>
+        </div>
+      `;
+    };
+
+    const buildTimelineItemHtml = ({ title, meta, time, details, blue = false }) => `
+      <div class="timeline-item">
+        <div class="timeline-icon${blue ? ' blue' : ''}">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14l-4-4 1.41-1.41L11 13.17l4.59-4.58L17 10l-6 6z"/>
+          </svg>
+        </div>
+        <div class="timeline-content">
+          <div class="timeline-title">${title}</div>
+          ${details ? `
+            <div class="timeline-details-toggle">Show data ˅</div>
+            <div class="timeline-details" style="display: none;">
+              <div class="timeline-details-content">${details}</div>
+            </div>
+          ` : ''}
+          <div class="timeline-meta">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
+            ${meta}
+          </div>
+          <div class="timeline-time">${time}</div>
+        </div>
+      </div>
+    `;
+
+    const renderHistoryForItem = (item, profile, kycEntry, onboardingRow, packRow) => {
+      const historyView = item?.querySelector('.history-view');
+      if (!historyView) return;
+
+      const events = [];
+      const userAllocations = allocationsByUserMap[profile?.id] || [];
+      const userHoldings = holdingsByUserMap[profile?.id] || [];
+
+      if (profile?.created_at) {
+        events.push({
+          at: profile.created_at,
+          title: 'Profile created',
+          meta: 'System',
+          details: `UID: ${profile.id || 'N/A'}`,
+          blue: true
+        });
+      }
+
+      if (kycEntry?.status) {
+        events.push({
+          at: onboardingRow?.updated_at || onboardingRow?.created_at || profile?.created_at,
+          title: `KYC status updated to ${kycEntry.status}`,
+          meta: onboardingRow?.sumsub_external_user_id ? 'Sumsub sync' : 'KYC workflow',
+          details: onboardingRow?.sumsub_external_user_id ? `External user id: ${onboardingRow.sumsub_external_user_id}` : '',
+          blue: /approved|completed|verified/i.test(kycEntry.status)
+        });
+      }
+
+      if (packRow?.pack_details || packJsonMap[profile?.id]) {
+        events.push({
+          at: packRow?.updated_at || packRow?.created_at || new Date().toISOString(),
+          title: 'Pack details available',
+          meta: 'Saved to user_onboarding_pack_details',
+          details: 'Pack JSON has been fetched and stored for this user.',
+          blue: true
+        });
+      }
+
+      if (profile?.phone_number) {
+        events.push({
+          at: profile?.updated_at || profile?.created_at,
+          title: 'Contact phone on file',
+          meta: 'Profile details',
+          details: profile.phone_number,
+          blue: false
+        });
+      }
+
+      if (userAllocations.length) {
+        events.push({
+          at: getLatestTimestamp(userAllocations) || profile?.updated_at || profile?.created_at,
+          title: `Allocations snapshot (${userAllocations.length})`,
+          meta: 'allocations table',
+          details: buildAllocationsTableHtml(userAllocations),
+          blue: true
+        });
+      }
+
+      if (userHoldings.length) {
+        events.push({
+          at: getLatestTimestamp(userHoldings) || profile?.updated_at || profile?.created_at,
+          title: `Holdings snapshot (${userHoldings.length})`,
+          meta: 'stock_holdings table',
+          details: buildHoldingsTableHtml(userHoldings),
+          blue: true
+        });
+      }
+
+      const sorted = events
+        .filter(event => event.at)
+        .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+      if (!sorted.length) {
+        historyView.innerHTML = `
+          <h2 class="timeline-header">History</h2>
+          <div class="timeline-item">
+            <div class="timeline-content">
+              <div class="timeline-title">No history available for this user yet.</div>
+              <div class="timeline-time">-</div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      historyView.innerHTML = `
+        <h2 class="timeline-header">History</h2>
+        ${sorted.map(event => buildTimelineItemHtml({
+          title: event.title,
+          meta: event.meta,
+          time: formatRelativeTime(event.at),
+          details: event.details,
+          blue: event.blue
+        })).join('')}
+      `;
+    };
+
+    const setPackDetailsEnabled = (item, enabled) => {
+      if (!item) return;
+      const btn = item.querySelector('[data-pack-details]');
+      if (btn) btn.disabled = !enabled;
+    };
+
+    const pickPackValue = (source, paths = []) => {
+      for (const path of paths) {
+        const parts = path.split('.');
+        let current = source;
+        for (const part of parts) {
+          if (current === null || current === undefined) {
+            current = undefined;
+            break;
+          }
+          current = current[part];
+        }
+        if (current !== undefined && current !== null && current !== '') {
+          return current;
+        }
+      }
+      return null;
+    };
+
+    const toPrettyLabel = (key = '') => String(key)
+      .replace(/_/g, ' ')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, char => char.toUpperCase());
+
+    const normalizeDocuments = (pack = {}) => {
+      const directDocuments = pickPackValue(pack, ['documents', 'docs', 'documentSet.items']);
+      if (Array.isArray(directDocuments)) return directDocuments;
+
+      const reviews = pickPackValue(pack, ['review.reviewResult.reviewAnswer', 'review']) || null;
+      const fallback = pickPackValue(pack, ['requiredIdDocs.docSets', 'requiredIdDocs']) || null;
+
+      if (Array.isArray(fallback)) {
+        return fallback.flatMap((entry) => {
+          if (Array.isArray(entry?.items)) return entry.items;
+          return [entry];
+        });
+      }
+
+      if (reviews && typeof reviews === 'object') {
+        return Object.entries(reviews).map(([key, value]) => ({
+          type: key,
+          value
+        }));
+      }
+
+      return [];
+    };
+
+    const flattenPackEntries = (value, path = [], acc = []) => {
+      if (value === null || value === undefined) {
+        if (path.length) acc.push({ path, value: '-' });
+        return acc;
+      }
+
+      if (Array.isArray(value)) {
+        if (!value.length) {
+          acc.push({ path, value: '[]' });
+          return acc;
+        }
+        value.forEach((item, index) => {
+          flattenPackEntries(item, [...path, `[${index}]`], acc);
+        });
+        return acc;
+      }
+
+      if (typeof value === 'object') {
+        const entries = Object.entries(value);
+        if (!entries.length) {
+          acc.push({ path, value: '{}' });
+          return acc;
+        }
+        entries.forEach(([key, nested]) => {
+          flattenPackEntries(nested, [...path, key], acc);
+        });
+        return acc;
+      }
+
+      acc.push({ path, value });
+      return acc;
+    };
+
+    const formatPackPrimitive = (value) => {
+      if (value === null || value === undefined || value === '') return '-';
+      if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+      return formatFieldValue(value);
+    };
+
+    const getPackLeafLabel = (segments = []) => {
+      const nonIndexSegments = segments.filter(segment => !String(segment).startsWith('['));
+      const target = nonIndexSegments[nonIndexSegments.length - 1] || segments[segments.length - 1] || 'Value';
+      return toPrettyLabel(String(target).replace(/\[\d+\]/g, 'Item'));
+    };
+
+    const buildCompletePackSections = (pack = {}) => {
+      const flattened = flattenPackEntries(pack);
+      const hiddenRootSections = new Set([
+        'id',
+        'key',
+        'lang',
+        'type',
+        'notes',
+        'agreement',
+        'review',
+        'creationinfo',
+        'requirediddocs'
+      ]);
+      const grouped = flattened.reduce((acc, entry) => {
+        const [root = 'General', ...rest] = entry.path;
+        const normalizedRoot = String(root || '').toLowerCase();
+        if (hiddenRootSections.has(normalizedRoot)) return acc;
+        if (!acc[root]) acc[root] = [];
+        acc[root].push({
+          label: rest.length ? getPackLeafLabel(rest) : toPrettyLabel(root),
+          value: formatPackPrimitive(entry.value)
+        });
+        return acc;
+      }, {});
+
+      return Object.entries(grouped).map(([section, rows]) => ({
+        key: String(section || 'general').toLowerCase(),
+        title: toPrettyLabel(section),
+        rows
+      }));
+    };
+
+    const renderPackSectionRows = (sectionRows = []) => sectionRows.map((row) => `
+      <div class="pack-line">
+        <div class="pack-line-label">${escapeHtml(row.label)}</div>
+        <div class="pack-line-value">${escapeHtml(String(row.value))}</div>
+      </div>
+    `).join('');
+
+    const renderPackSectionCards = (container, page = 0) => {
+      const sections = container?.__packSections || [];
+      const sectionsGrid = container?.querySelector('[data-pack-sections-grid]');
+      const pageLabel = container?.querySelector('[data-pack-sections-page]');
+      const prevBtn = container?.querySelector('[data-pack-sections-prev]');
+      const nextBtn = container?.querySelector('[data-pack-sections-next]');
+      if (!sectionsGrid || !pageLabel || !prevBtn || !nextBtn) return;
+
+      const totalPages = Math.max(1, Math.ceil(sections.length / PACK_SECTIONS_PAGE_SIZE));
+      const safePage = Math.max(0, Math.min(page, totalPages - 1));
+      container.__packSectionsPage = safePage;
+
+      const start = safePage * PACK_SECTIONS_PAGE_SIZE;
+      const visible = sections.slice(start, start + PACK_SECTIONS_PAGE_SIZE);
+
+      sectionsGrid.innerHTML = visible.map((section, index) => {
+        const absoluteIndex = start + index;
+        const isInfoSection = section.key === 'info';
+        return `
+          <div class="pack-section-card" data-pack-section-index="${absoluteIndex}">
+            <button class="pack-section-header pack-section-toggle" type="button" data-pack-section-toggle aria-expanded="true">
+              <div class="pack-section-title">${escapeHtml(section.title)}</div>
+              <span class="pack-section-caret">▾</span>
+            </button>
+            <div class="pack-section-body">
+              <div class="pack-section-grid${isInfoSection ? ' info-scroll' : ''}">
+                ${renderPackSectionRows(section.rows)}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      pageLabel.textContent = `Page ${safePage + 1} / ${totalPages}`;
+      prevBtn.disabled = safePage <= 0;
+      nextBtn.disabled = safePage >= totalPages - 1;
+    };
+
+    const downloadPackPdf = (pack, sections = []) => {
+      const JsPdf = window.jspdf?.jsPDF;
+      if (!JsPdf || !pack) return;
+
+      const doc = new JsPdf({ unit: 'pt', format: 'a4' });
+      const left = 48;
+      const maxWidth = 500;
+      const bottom = 790;
+      let y = 50;
+
+      const addBlock = (text, size = 10, gap = 14) => {
+        doc.setFontSize(size);
+        const lines = doc.splitTextToSize(String(text), maxWidth);
+        if (y + (lines.length * gap) > bottom) {
+          doc.addPage();
+          y = 50;
+        }
+        doc.text(lines, left, y);
+        y += (lines.length * gap) + 4;
+      };
+
+      addBlock('MyMint Admin — Verification Pack Report', 14, 16);
+      addBlock(`Generated: ${new Date().toLocaleString()}`, 9, 12);
+      addBlock(`Applicant ID: ${formatPackPrimitive(pickPackValue(pack, ['id', 'applicantId']))}`, 10, 14);
+      addBlock(`External user ID: ${formatPackPrimitive(pickPackValue(pack, ['externalUserId']))}`, 10, 14);
+      addBlock(`Review status: ${formatPackPrimitive(pickPackValue(pack, ['review.reviewStatus', 'reviewStatus', 'status']))}`, 10, 14);
+      y += 8;
+
+      sections.forEach((section) => {
+        addBlock(section.title, 12, 15);
+        section.rows.forEach((row) => {
+          addBlock(`${row.label}: ${row.value}`, 9, 12);
+        });
+        y += 6;
+      });
+
+      const filenameBase = formatPackPrimitive(pickPackValue(pack, ['externalUserId', 'id', 'applicantId']))
+        .toString()
+        .replace(/[^a-zA-Z0-9_-]/g, '_') || 'user';
+      doc.save(`pack-report-${filenameBase}.pdf`);
+    };
+
+    const renderPackDetails = (container, packJson) => {
+      if (!container) return;
+      const packDetailsGrid = container.querySelector('#packDetailsGrid');
+      const packDetailsDocs = container.querySelector('#packDetailsDocs');
+      const packDetailsReview = container.querySelector('#packDetailsReview');
+      if (!packDetailsGrid || !packDetailsDocs || !packDetailsReview) return;
+
+      let resolvedPack = packJson;
+      if (typeof resolvedPack === 'string') {
+        try {
+          resolvedPack = JSON.parse(resolvedPack);
+        } catch (error) {
+          console.error('Pack details parse error:', error);
+        }
+      }
+
+      if (!resolvedPack) {
+        container.__activePackDetails = null;
+        container.__packSections = [];
+        container.__packSectionsPage = 0;
+        packDetailsGrid.innerHTML = '<div class="pack-details-field">No pack details available for this user.</div>';
+        packDetailsDocs.innerHTML = '';
+        packDetailsReview.innerHTML = '';
+        return;
+      }
+
+      const applicantId = pickPackValue(resolvedPack, ['id', 'applicantId', 'applicant.id']);
+      const externalUserId = pickPackValue(resolvedPack, ['externalUserId', 'external_user_id']);
+      const reviewStatus = pickPackValue(resolvedPack, ['review.status', 'reviewStatus', 'status']);
+      const reviewAnswer = pickPackValue(resolvedPack, ['review.result.reviewAnswer', 'review.reviewAnswer', 'reviewAnswer']);
+      const createdAt = pickPackValue(resolvedPack, ['createdAt', 'created_at']);
+      const country = pickPackValue(resolvedPack, ['country', 'info.country', 'fixedInfo.country']);
+      const email = pickPackValue(resolvedPack, ['email', 'info.email', 'fixedInfo.email']);
+      const fullName = pickPackValue(resolvedPack, ['fullName', 'info.fullName', 'fixedInfo.fullName', 'info.firstName']);
+      const completeSections = buildCompletePackSections(resolvedPack);
+
+      container.__activePackDetails = resolvedPack;
+      container.__packSections = completeSections;
+      container.__packSectionsPage = 0;
+
+      const overviewPairs = [
+        ['Applicant ID', applicantId],
+        ['External user ID', externalUserId],
+        ['Review status', reviewStatus],
+        ['Decision', reviewAnswer],
+        ['Created', createdAt ? new Date(createdAt).toLocaleString() : null],
+        ['Country', country],
+        ['Contact', email],
+        ['Name', fullName],
+      ].filter(([, value]) => value !== null && value !== undefined && value !== '');
+
+      const overviewHtml = overviewPairs.map(([label, value]) => `
+        <div class="pack-kv-item">
+          <div class="pack-kv-label">${escapeHtml(label)}</div>
+          <div class="pack-kv-value">${escapeHtml(formatFieldValue(value))}</div>
+        </div>
+      `).join('');
+
+      packDetailsGrid.innerHTML = `
+        <div class="pack-details-card purple">
+          <div class="pack-hero">
+            <div>
+              <div class="pack-hero-title">Verification pack summary</div>
+              <div class="pack-hero-subtitle">Complete record from user_onboarding_pack_details</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" class="pack-download-btn" data-pack-download>Download PDF</button>
+              <div class="pack-badge">${escapeHtml(String(reviewStatus || 'Pending'))}</div>
+            </div>
+          </div>
+          <div class="pack-kv-grid">${overviewHtml || '<div class="pack-empty">No summary fields available.</div>'}</div>
+          <div class="pack-complete-grid" data-pack-sections-grid></div>
+          <div class="pack-sections-controls">
+            <button type="button" data-pack-sections-prev>Prev</button>
+            <div class="pack-sections-page" data-pack-sections-page>Page 1 / 1</div>
+            <button type="button" data-pack-sections-next>Next</button>
+          </div>
+        </div>
+      `;
+
+      renderPackSectionCards(container, 0);
+
+      packDetailsDocs.classList.remove('purple');
+      packDetailsReview.classList.remove('purple');
+      packDetailsDocs.style.display = 'none';
+      packDetailsReview.style.display = 'none';
+      packDetailsDocs.innerHTML = '';
+      packDetailsReview.innerHTML = '';
+    };
+
     const renderProfiles = (profiles = [], kycMap = {}) => {
       if (!profilesList || !profileTemplate) return;
       profilesList.innerHTML = '';
@@ -1868,6 +2819,13 @@
           clone.dataset.externalUserId = kycEntry.externalUserId;
         }
 
+        renderHistoryForItem(clone, profile, kycEntry, onboardingMap[profile.id], packDetailsRowMap[profile.id]);
+
+        if (packJsonMap[profile.id]) {
+          const packBtn = clone.querySelector('[data-pack-details]');
+          if (packBtn) packBtn.disabled = false;
+        }
+
         profilesList.appendChild(clone);
       });
     };
@@ -1889,6 +2847,12 @@
     };
 
     const loadProfiles = async () => {
+      Object.keys(onboardingMap).forEach(key => delete onboardingMap[key]);
+      Object.keys(packDetailsRowMap).forEach(key => delete packDetailsRowMap[key]);
+      Object.keys(allocationsByUserMap).forEach(key => delete allocationsByUserMap[key]);
+      Object.keys(holdingsByUserMap).forEach(key => delete holdingsByUserMap[key]);
+      Object.keys(securitiesByIdMap).forEach(key => delete securitiesByIdMap[key]);
+
       const { data, error } = await supabaseClient
         .from(PROFILES_TABLE)
         .select('*')
@@ -1906,7 +2870,7 @@
       if (userIds.length) {
         const { data: onboarding, error: onboardingError } = await supabaseClient
           .from('user_onboarding')
-          .select('user_id, kyc_status, sumsub_external_user_id')
+          .select('*')
           .in('user_id', userIds);
 
         if (!onboardingError && onboarding) {
@@ -1915,8 +2879,63 @@
               status: row.kyc_status || 'Not initiated',
               externalUserId: row.sumsub_external_user_id || ''
             };
+            onboardingMap[row.user_id] = row;
             return acc;
           }, {});
+        }
+
+        const { data: packRows, error: packError } = await supabaseClient
+          .from('user_onboarding_pack_details')
+          .select('*')
+          .in('user_id', userIds);
+
+        if (!packError && packRows) {
+          packRows.forEach(row => {
+            packDetailsRowMap[row.user_id] = row;
+            if (row.user_id && row.pack_details) {
+              packJsonMap[row.user_id] = row.pack_details;
+            }
+          });
+        }
+
+        const { data: allocationsRows, error: allocationsError } = await supabaseClient
+          .from('allocations')
+          .select('user_id, asset_class, weight, value, as_of_date, created_at, updated_at')
+          .in('user_id', userIds)
+          .order('updated_at', { ascending: false });
+
+        if (!allocationsError && allocationsRows) {
+          allocationsRows.forEach((row) => {
+            if (!allocationsByUserMap[row.user_id]) allocationsByUserMap[row.user_id] = [];
+            allocationsByUserMap[row.user_id].push(row);
+          });
+        }
+
+        const { data: holdingsRows, error: holdingsError } = await supabaseClient
+          .from('stock_holdings')
+          .select('user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, Status, as_of_date, created_at, updated_at')
+          .in('user_id', userIds)
+          .order('updated_at', { ascending: false });
+
+        if (!holdingsError && holdingsRows) {
+          holdingsRows.forEach((row) => {
+            if (!holdingsByUserMap[row.user_id]) holdingsByUserMap[row.user_id] = [];
+            holdingsByUserMap[row.user_id].push(row);
+          });
+
+          const securityIds = [...new Set(holdingsRows.map(row => row.security_id).filter(Boolean))];
+          if (securityIds.length) {
+            const { data: securityRows, error: securitiesError } = await supabaseClient
+              .from('securities')
+              .select('id, symbol, name')
+              .in('id', securityIds);
+
+            if (!securitiesError && securityRows) {
+              securityRows.forEach((security) => {
+                securitiesByIdMap[security.id] = security;
+              });
+            }
+          }
         }
       }
 
@@ -1992,6 +3011,41 @@
 
 
     document.addEventListener('click', (event) => {
+      const packDownloadBtn = event.target.closest('[data-pack-download]');
+      if (packDownloadBtn) {
+        const container = packDownloadBtn.closest('.tabs-container');
+        const pack = container?.__activePackDetails;
+        const sections = container?.__packSections || [];
+        if (!pack) return;
+        downloadPackPdf(pack, sections);
+        return;
+      }
+
+      const prevSectionsBtn = event.target.closest('[data-pack-sections-prev]');
+      if (prevSectionsBtn) {
+        const container = prevSectionsBtn.closest('.tabs-container');
+        const currentPage = Number(container?.__packSectionsPage || 0);
+        renderPackSectionCards(container, currentPage - 1);
+        return;
+      }
+
+      const nextSectionsBtn = event.target.closest('[data-pack-sections-next]');
+      if (nextSectionsBtn) {
+        const container = nextSectionsBtn.closest('.tabs-container');
+        const currentPage = Number(container?.__packSectionsPage || 0);
+        renderPackSectionCards(container, currentPage + 1);
+        return;
+      }
+
+      const packSectionToggle = event.target.closest('[data-pack-section-toggle]');
+      if (packSectionToggle) {
+        const card = packSectionToggle.closest('.pack-section-card');
+        if (!card) return;
+        const isCollapsed = card.classList.toggle('collapsed');
+        packSectionToggle.setAttribute('aria-expanded', String(!isCollapsed));
+        return;
+      }
+
       const tab = event.target.closest('.tab');
       if (tab) {
         const header = tab.closest('.tabs-header');
@@ -2011,6 +3065,28 @@
             .then(json => {
               console.log('Sumsub applicant:', json);
               downloadJson(json, `sumsub-${externalUserId}.json`);
+              if (item?.dataset?.profileId) {
+                packJsonMap[item.dataset.profileId] = json;
+                packDetailsRowMap[item.dataset.profileId] = {
+                  ...(packDetailsRowMap[item.dataset.profileId] || {}),
+                  user_id: item.dataset.profileId,
+                  pack_details: json,
+                  updated_at: new Date().toISOString()
+                };
+              }
+              setPackDetailsEnabled(item, true);
+              const currentProfile = allProfiles.find(profile => String(profile.id) === String(item?.dataset?.profileId));
+              if (currentProfile) {
+                renderHistoryForItem(item, currentProfile, allKycMap[item.dataset.profileId] || {}, onboardingMap[item.dataset.profileId], packDetailsRowMap[item.dataset.profileId]);
+              }
+              if (item?.dataset?.profileId) {
+                supabaseClient
+                  .from('user_onboarding_pack_details')
+                  .upsert({ user_id: item.dataset.profileId, pack_details: json }, { onConflict: 'user_id' })
+                  .then(({ error }) => {
+                    if (error) console.error('Pack details save error:', error);
+                  });
+              }
             })
             .catch(err => console.error('Sumsub error:', err));
         }
@@ -2051,23 +3127,58 @@
         }
       }
 
-      const filterTab = event.target.closest('.filter-tab');
+      const filterTab = event.target.closest('.filter-tab, [data-pack-details]');
       if (filterTab) {
         const filterGroup = filterTab.closest('.filter-tabs');
         if (!filterGroup) return;
-        filterGroup.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+        filterGroup.querySelectorAll('.filter-tab, [data-pack-details]').forEach(t => t.classList.remove('active'));
         filterTab.classList.add('active');
 
         const container = filterTab.closest('.tabs-container');
         if (!container) return;
         const historyView = container.querySelector('.history-view');
         const holdingsView = container.querySelector('.holdings-view');
+        const packDetailsView = container.querySelector('[data-pack-details-view]');
         const view = filterTab.getAttribute('data-view');
         if (historyView) {
-          historyView.style.display = view === 'holdings' ? 'none' : 'block';
+          historyView.style.display = view === 'history' ? 'block' : 'none';
         }
         if (holdingsView) {
           holdingsView.classList.toggle('active', view === 'holdings');
+        }
+        if (packDetailsView) {
+          packDetailsView.classList.toggle('active', view === 'pack-details');
+        }
+
+        if (view === 'pack-details') {
+          const item = filterTab.closest('.simple-item');
+          const profileId = item?.dataset?.profileId;
+          const packJson = profileId ? packJsonMap[profileId] : null;
+          if (packJson) {
+            renderPackDetails(container, packJson);
+          } else if (profileId) {
+            supabaseClient
+              .from('user_onboarding_pack_details')
+              .select('pack_details')
+              .eq('user_id', profileId)
+              .single()
+              .then(({ data, error }) => {
+                if (error) {
+                  console.error('Pack details load error:', error);
+                  renderPackDetails(container, null);
+                  return;
+                }
+                if (data?.pack_details) {
+                  packJsonMap[profileId] = data.pack_details;
+                  renderPackDetails(container, data.pack_details);
+                } else {
+                  renderPackDetails(container, null);
+                }
+              });
+          } else {
+            renderPackDetails(container, null);
+          }
+          return;
         }
 
         if (view === 'holdings') {
@@ -2111,6 +3222,15 @@
         if (!item) return;
         openPhoneModal(item);
       }
+
+      const packDetailsBtn = event.target.closest('[data-pack-details]');
+      if (packDetailsBtn) {
+        const item = packDetailsBtn.closest('.simple-item');
+        const container = packDetailsBtn.closest('.tabs-container');
+        if (!item?.dataset?.profileId) return;
+        const packJson = packJsonMap[item.dataset.profileId];
+        renderPackDetails(container, packJson);
+      }
     });
 
     if (phoneModalClose) phoneModalClose.addEventListener('click', closePhoneModal);
@@ -2127,6 +3247,7 @@
         if (event.target === imageModal) closeImageModal();
       });
     }
+
 
     if (phoneModalSave) {
       phoneModalSave.addEventListener('click', async () => {
