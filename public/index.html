@@ -167,6 +167,7 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      order: 2;
       border: 1px solid var(--border);
       background: var(--surface);
       color: var(--text-muted);
@@ -191,6 +192,7 @@
       align-items: center;
       flex-wrap: wrap;
       gap: 10px;
+      order: 1;
     }
 
     .quick-filter-pill {
@@ -1831,11 +1833,6 @@
       <div class="simple-view-header">
         <h2 class="simple-view-title">Profiles</h2>
         <div class="user-count-wrap">
-          <button class="user-count-badge" id="userCountBadge" type="button" aria-live="polite" aria-atomic="true">
-            <span class="user-count-dot" aria-hidden="true"></span>
-            <span class="user-count-number" id="userCount">0</span>
-            <span id="userCountLabel">users</span>
-          </button>
           <div class="quick-filter-row" aria-label="User filters">
             <button class="quick-filter-pill active" type="button" data-kyc-pill="all">All</button>
             <button class="quick-filter-pill" type="button" data-kyc-pill="completed">Completed</button>
@@ -1850,6 +1847,11 @@
               </div>
             </div>
           </div>
+          <button class="user-count-badge" id="userCountBadge" type="button" aria-live="polite" aria-atomic="true">
+            <span class="user-count-dot" aria-hidden="true"></span>
+            <span class="user-count-number" id="userCount">0</span>
+            <span id="userCountLabel">users</span>
+          </button>
         </div>
       </div>
       <div class="simple-list" id="profilesList"></div>
@@ -2253,7 +2255,7 @@
         <div class="image-list" id="imageList"></div>
       </div>
       <div class="modal-actions">
-        <small>Tip: View a document first to enable downloads.</small>
+        <small>Tip: You can preview or download any document directly.</small>
       </div>
     </div>
   </div>
@@ -2351,7 +2353,7 @@
             <small>${fileType}${addedDate ? ` • ${addedDate}` : ''}</small>
           </span>
           <span class="image-actions">
-            <button type="button" data-action="download" disabled>Download</button>
+            <button type="button" data-action="download">Download</button>
           </span>
         `;
 
@@ -2383,7 +2385,6 @@
               const imageUrl = URL.createObjectURL(imageBlob);
               window.open(imageUrl, '_blank', 'noopener');
               setTimeout(() => URL.revokeObjectURL(imageUrl), 15000);
-              if (downloadButton) downloadButton.disabled = false;
             })
             .catch((error) => {
               console.error('Sumsub image error:', error);
