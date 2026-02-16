@@ -3064,6 +3064,11 @@
       const country = pickPackValue(resolvedPack, ['country', 'info.country', 'fixedInfo.country']);
       const email = pickPackValue(resolvedPack, ['email', 'info.email', 'fixedInfo.email']);
       const fullName = pickPackValue(resolvedPack, ['fullName', 'info.fullName', 'fixedInfo.fullName', 'info.firstName']);
+      const profileId = container.closest('.simple-item')?.dataset?.profileId;
+      const effectiveKyc = profileId
+        ? getEffectiveKycState(profileId, allKycMap[profileId]?.status || 'Not initiated')
+        : null;
+      const badgeLabel = effectiveKyc?.completed ? 'Completed' : String(reviewStatus || 'Pending');
       const completeSections = buildCompletePackSections(resolvedPack);
 
       container.__activePackDetails = resolvedPack;
@@ -3097,7 +3102,7 @@
             </div>
             <div style="display:flex; align-items:center; gap:8px;">
               <button type="button" class="pack-download-btn" data-pack-download>Download PDF</button>
-              <div class="pack-badge">${escapeHtml(String(reviewStatus || 'Pending'))}</div>
+              <div class="pack-badge">${escapeHtml(badgeLabel)}</div>
             </div>
           </div>
           <div class="pack-kv-grid">${overviewHtml || '<div class="pack-empty">No summary fields available.</div>'}</div>
