@@ -159,6 +159,8 @@
       display: inline-flex;
       align-items: center;
       justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
     }
 
     .user-count-badge {
@@ -184,76 +186,83 @@
       color: var(--text);
     }
 
-    .user-filter-panel {
-      position: absolute;
-      right: 0;
-      top: calc(100% + 10px);
-      width: min(360px, 72vw);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      background: var(--surface);
-      box-shadow: 0 16px 36px rgba(80, 38, 157, 0.14);
-      padding: 12px;
-      transform: scaleX(0.82);
-      transform-origin: right center;
-      opacity: 0;
-      pointer-events: none;
-      transition: transform 0.22s ease, opacity 0.22s ease;
-      z-index: 30;
-    }
-
-    .user-filter-panel.active {
-      transform: scaleX(1);
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .user-filter-title {
-      font-size: 0.78rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-      margin-bottom: 10px;
-    }
-
-    .user-filter-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+    .quick-filter-row {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
       gap: 10px;
     }
 
-    .user-filter-field {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      min-width: 0;
-    }
-
-    .user-filter-field label {
-      font-size: 0.76rem;
-      color: var(--text-muted);
-      font-weight: 600;
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
-    }
-
-    .user-filter-select {
-      width: 100%;
+    .quick-filter-pill {
+      padding: 8px 14px;
+      background: transparent;
       border: 1px solid #e5e7eb;
-      border-radius: 10px;
+      border-radius: 999px;
       background: #ffffff;
-      color: #374151;
+      color: #6b7280;
       font-size: 0.82rem;
       font-weight: 500;
-      padding: 7px 10px;
-      outline: none;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      cursor: pointer;
+      transition: all 0.2s ease;
     }
 
-    .user-filter-select:focus {
+    .quick-filter-pill:hover {
+      background: #f9fafb;
+      border-color: #d1d5db;
+      box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
+    }
+
+    .quick-filter-pill.active {
+      background: var(--primary);
+      color: #ffffff;
       border-color: var(--primary);
-      box-shadow: 0 0 0 3px var(--ring);
+    }
+
+    .bank-filter-wrap {
+      position: relative;
+    }
+
+    .bank-filter-menu {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 8px);
+      min-width: 156px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #ffffff;
+      box-shadow: 0 14px 30px rgba(80, 38, 157, 0.16);
+      padding: 6px;
+      display: none;
+      z-index: 60;
+    }
+
+    .bank-filter-menu.active {
+      display: block;
+    }
+
+    .bank-filter-option {
+      width: 100%;
+      border: none;
+      background: transparent;
+      text-align: left;
+      color: #4b5563;
+      font-size: 0.8rem;
+      font-weight: 500;
+      border-radius: 8px;
+      padding: 7px 9px;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .bank-filter-option:hover {
+      background: #f5f3ff;
+      color: #5b21b6;
+    }
+
+    .bank-filter-option.active {
+      background: #ede9fe;
+      color: #4c1d95;
+      font-weight: 600;
     }
 
     .user-count-dot {
@@ -364,13 +373,15 @@
       border-color: #d1d5db;
     }
 
-    .ellipsis-btn span {
-      width: 4px;
-      height: 4px;
-      border-radius: 50%;
-      background: #6b7280;
-      box-shadow: -8px 0 0 #6b7280, 8px 0 0 #6b7280;
-      display: block;
+    .ellipsis-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: #6b7280;
+      transition: transform 0.2s ease, fill 0.2s ease, opacity 0.2s ease;
+    }
+
+    .ellipsis-btn.is-open svg {
+      transform: rotate(180deg);
     }
 
     .ellipsis-btn.is-loading {
@@ -378,13 +389,12 @@
       cursor: progress;
     }
 
-    .ellipsis-btn.is-loading span {
-      background: var(--primary);
-      box-shadow: -8px 0 0 var(--primary), 8px 0 0 var(--primary);
-      animation: ellipsisPulse 1s ease-in-out infinite;
+    .ellipsis-btn.is-loading svg {
+      fill: var(--primary);
+      animation: chevronPulse 1s ease-in-out infinite;
     }
 
-    @keyframes ellipsisPulse {
+    @keyframes chevronPulse {
       0%,
       100% {
         opacity: 0.5;
@@ -1209,7 +1219,7 @@
       width: 40px;
       height: 40px;
       border-radius: 50%;
-      background: #f3f4f6;
+      background: var(--primary-soft);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1220,7 +1230,7 @@
     .timeline-icon svg {
       width: 20px;
       height: 20px;
-      fill: #6b7280;
+      fill: var(--primary);
     }
 
     .timeline-icon.blue {
@@ -1748,8 +1758,12 @@
         align-items: flex-start;
       }
 
-      .user-filter-grid {
-        grid-template-columns: 1fr;
+      .user-count-wrap {
+        width: 100%;
+      }
+
+      .quick-filter-row {
+        width: 100%;
       }
 
       .top-nav {
@@ -1817,30 +1831,22 @@
       <div class="simple-view-header">
         <h2 class="simple-view-title">Profiles</h2>
         <div class="user-count-wrap">
-          <button class="user-count-badge" id="userCountBadge" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="userFilterPanel" aria-live="polite" aria-atomic="true">
+          <button class="user-count-badge" id="userCountBadge" type="button" aria-live="polite" aria-atomic="true">
             <span class="user-count-dot" aria-hidden="true"></span>
             <span class="user-count-number" id="userCount">0</span>
             <span id="userCountLabel">users</span>
           </button>
-          <div class="user-filter-panel" id="userFilterPanel" role="dialog" aria-label="User filters">
-            <div class="user-filter-title">Filter by</div>
-            <div class="user-filter-grid">
-              <div class="user-filter-field">
-                <label for="kycFilterSelect">KYC</label>
-                <select id="kycFilterSelect" class="user-filter-select">
-                  <option value="all">All</option>
-                  <option value="completed">Completed</option>
-                  <option value="pending">Pending</option>
-                  <option value="not-completed">Not completed (all)</option>
-                </select>
-              </div>
-              <div class="user-filter-field">
-                <label for="bankFilterSelect">Bank</label>
-                <select id="bankFilterSelect" class="user-filter-select">
-                  <option value="all">All</option>
-                  <option value="initiated">Initiated</option>
-                  <option value="not-initiated">Not initiated</option>
-                </select>
+          <div class="quick-filter-row" aria-label="User filters">
+            <button class="quick-filter-pill active" type="button" data-kyc-pill="all">All</button>
+            <button class="quick-filter-pill" type="button" data-kyc-pill="completed">Completed</button>
+            <button class="quick-filter-pill" type="button" data-kyc-pill="pending">Pending</button>
+            <button class="quick-filter-pill" type="button" data-kyc-pill="not-completed">Not completed</button>
+            <div class="bank-filter-wrap">
+              <button class="quick-filter-pill" id="bankFilterBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="bankFilterMenu">Bank ▾</button>
+              <div class="bank-filter-menu" id="bankFilterMenu" role="menu" aria-label="Bank filter">
+                <button class="bank-filter-option active" type="button" data-bank-filter="all" role="menuitem">All banks</button>
+                <button class="bank-filter-option" type="button" data-bank-filter="linked" role="menuitem">Linked bank</button>
+                <button class="bank-filter-option" type="button" data-bank-filter="unlinked" role="menuitem">Unlinked bank</button>
               </div>
             </div>
           </div>
@@ -1859,7 +1865,9 @@
               </div>
             </div>
             <button class="ellipsis-btn show-details-btn" aria-label="Show profile details">
-              <span></span>
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"/>
+              </svg>
             </button>
           </div>
 
@@ -2265,9 +2273,10 @@
     const userCount = document.getElementById('userCount');
     const userCountLabel = document.getElementById('userCountLabel');
     const userCountBadge = document.getElementById('userCountBadge');
-    const userFilterPanel = document.getElementById('userFilterPanel');
-    const kycFilterSelect = document.getElementById('kycFilterSelect');
-    const bankFilterSelect = document.getElementById('bankFilterSelect');
+    const kycFilterPills = Array.from(document.querySelectorAll('[data-kyc-pill]'));
+    const bankFilterBtn = document.getElementById('bankFilterBtn');
+    const bankFilterMenu = document.getElementById('bankFilterMenu');
+    const bankFilterOptions = Array.from(document.querySelectorAll('[data-bank-filter]'));
     const searchInput = document.querySelector('.top-search input');
     const activeProfileFilters = {
       kyc: 'all',
@@ -2557,13 +2566,14 @@
         });
       }
 
-      if (kycEntry?.status) {
+      const effectiveKyc = getEffectiveKycState(profile?.id, kycEntry?.status || 'Not initiated');
+      if (kycEntry?.status || effectiveKyc.completed || effectiveKyc.pending) {
         events.push({
           at: onboardingRow?.updated_at || onboardingRow?.created_at || profile?.created_at,
-          title: `KYC status updated to ${kycEntry.status}`,
+          title: effectiveKyc.completed ? 'KYC status now completed' : `KYC status updated to ${effectiveKyc.label}`,
           meta: onboardingRow?.sumsub_external_user_id ? 'Sumsub sync' : 'KYC workflow',
           details: onboardingRow?.sumsub_external_user_id ? `External user id: ${onboardingRow.sumsub_external_user_id}` : '',
-          blue: /approved|completed|verified/i.test(kycEntry.status)
+          blue: effectiveKyc.completed
         });
       }
 
@@ -3252,8 +3262,8 @@
 
         const bankInitiated = getBankInitiatedForProfile(profile);
         const matchesBank = activeProfileFilters.bank === 'all'
-          || (activeProfileFilters.bank === 'initiated' && bankInitiated)
-          || (activeProfileFilters.bank === 'not-initiated' && !bankInitiated);
+          || (activeProfileFilters.bank === 'linked' && bankInitiated)
+          || (activeProfileFilters.bank === 'unlinked' && !bankInitiated);
 
         return matchesQuery && matchesKyc && matchesBank;
       });
@@ -3758,9 +3768,9 @@
         if (!item) return;
         const details = item.querySelector('.detailed-view');
         if (!details) return;
-        const isOpening = !details.classList.contains('active');
-        details.classList.toggle('active');
-        if (!isOpening) return;
+        const isNowOpen = details.classList.toggle('active');
+        button.classList.toggle('is-open', isNowOpen);
+        if (!isNowOpen) return;
 
         button.classList.add('is-loading');
         button.title = 'Refreshing profile...';
@@ -3846,36 +3856,46 @@
       searchInput.addEventListener('input', applySearchFilter);
     }
 
-    if (userCountBadge && userFilterPanel) {
-      userCountBadge.addEventListener('click', () => {
-        const willOpen = !userFilterPanel.classList.contains('active');
-        userFilterPanel.classList.toggle('active', willOpen);
-        userCountBadge.setAttribute('aria-expanded', String(willOpen));
+    if (kycFilterPills.length) {
+      kycFilterPills.forEach((pill) => {
+        pill.addEventListener('click', () => {
+          const value = pill.dataset.kycPill || 'all';
+          activeProfileFilters.kyc = value;
+          kycFilterPills.forEach((item) => item.classList.toggle('active', item === pill));
+          applySearchFilter();
+        });
       });
     }
 
-    if (kycFilterSelect) {
-      kycFilterSelect.addEventListener('change', () => {
-        activeProfileFilters.kyc = kycFilterSelect.value || 'all';
-        applySearchFilter();
+    if (bankFilterBtn && bankFilterMenu) {
+      bankFilterBtn.addEventListener('click', () => {
+        const willOpen = !bankFilterMenu.classList.contains('active');
+        bankFilterMenu.classList.toggle('active', willOpen);
+        bankFilterBtn.setAttribute('aria-expanded', String(willOpen));
       });
     }
 
-    if (bankFilterSelect) {
-      bankFilterSelect.addEventListener('change', () => {
-        activeProfileFilters.bank = bankFilterSelect.value || 'all';
-        applySearchFilter();
+    if (bankFilterOptions.length) {
+      bankFilterOptions.forEach((option) => {
+        option.addEventListener('click', () => {
+          const value = option.dataset.bankFilter || 'all';
+          activeProfileFilters.bank = value;
+          bankFilterOptions.forEach((item) => item.classList.toggle('active', item === option));
+          if (bankFilterMenu) bankFilterMenu.classList.remove('active');
+          if (bankFilterBtn) bankFilterBtn.setAttribute('aria-expanded', 'false');
+          applySearchFilter();
+        });
       });
     }
 
     document.addEventListener('click', (event) => {
-      if (!userFilterPanel || !userCountBadge) return;
-      const withinPanel = userFilterPanel.contains(event.target);
-      const withinBadge = userCountBadge.contains(event.target);
-      if (withinPanel || withinBadge) return;
-      if (!userFilterPanel.classList.contains('active')) return;
-      userFilterPanel.classList.remove('active');
-      userCountBadge.setAttribute('aria-expanded', 'false');
+      if (!bankFilterMenu || !bankFilterBtn) return;
+      const withinMenu = bankFilterMenu.contains(event.target);
+      const withinBtn = bankFilterBtn.contains(event.target);
+      if (withinMenu || withinBtn) return;
+      if (!bankFilterMenu.classList.contains('active')) return;
+      bankFilterMenu.classList.remove('active');
+      bankFilterBtn.setAttribute('aria-expanded', 'false');
     });
 
     requireSession().then((ok) => {
