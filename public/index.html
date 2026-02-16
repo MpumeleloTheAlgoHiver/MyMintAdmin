@@ -2660,6 +2660,63 @@
       return null;
     };
 
+    const normalizeKycStatusText = (value) => String(value || '').trim().toLowerCase();
+
+    const isKycCompletedValue = (status) => {
+      const normalized = normalizeKycStatusText(status);
+      if (!normalized) return false;
+      return normalized.includes('completed')
+        || normalized.includes('complete')
+        || normalized.includes('approved')
+        || normalized.includes('verified')
+        || normalized.includes('done');
+    };
+
+    const isKycPendingValue = (status) => {
+      const normalized = normalizeKycStatusText(status);
+      if (!normalized) return false;
+      return normalized.includes('pending')
+        || normalized.includes('in progress')
+        || normalized.includes('in_progress')
+        || normalized.includes('review')
+        || normalized.includes('processing')
+        || normalized.includes('queued');
+    };
+
+    const getClientDetailsKycSignal = (profileId) => {
+      const packData = packJsonMap[profileId] || packDetailsRowMap[profileId]?.pack_details || null;
+      if (!packData) {
+        return {
+          hasClientDetails: false,
+          completed: false,
+          pending: false
+        };
+      }
+
+      return {
+        hasClientDetails: true,
+        completed: true,
+        pending: false
+      };
+    };
+
+    const getEffectiveKycState = (profileId, rawKycStatus) => {
+      const normalizedKycStatus = normalizeKycStatusText(rawKycStatus);
+      const clientDetailsKyc = getClientDetailsKycSignal(profileId);
+      const pendingLooksStale = normalizedKycStatus.includes('pending')
+        && clientDetailsKyc.hasClientDetails
+        && clientDetailsKyc.completed;
+      const completed = isKycCompletedValue(rawKycStatus)
+        || clientDetailsKyc.completed
+        || pendingLooksStale;
+      const pending = (isKycPendingValue(rawKycStatus) || clientDetailsKyc.pending) && !completed;
+      return {
+        completed,
+        pending,
+        label: completed ? 'Completed' : (pending ? 'Pending' : (rawKycStatus || 'Not initiated'))
+      };
+    };
+
     const toPrettyLabel = (key = '') => String(key)
       .replace(/_/g, ' ')
       .replace(/([a-z])([A-Z])/g, '$1 $2')
@@ -3078,7 +3135,8 @@
         setText(clone, '[data-website]', profile.email);
         setText(clone, '[data-phone]', profile.phone_number);
         const kycEntry = kycMap[profile.id] || {};
-        setText(clone, '[data-kyc-status]', kycEntry.status || 'Not initiated');
+        const effectiveKycState = getEffectiveKycState(profile.id, kycEntry.status || 'Not initiated');
+        setText(clone, '[data-kyc-status]', effectiveKycState.label);
 
         const initialsEl = clone.querySelector('[data-initials]');
         if (initialsEl) {
@@ -3118,34 +3176,12 @@
 
     const applySearchFilter = () => {
       const query = searchInput?.value?.trim().toLowerCase() || '';
-      const normalizeStatusText = (value) => String(value || '').trim().toLowerCase();
-
-      const isKycCompletedStatus = (status) => {
-        const normalized = normalizeStatusText(status);
-        if (!normalized) return false;
-        return normalized.includes('completed')
-          || normalized.includes('complete')
-          || normalized.includes('approved')
-          || normalized.includes('verified')
-          || normalized.includes('done');
-      };
-
-      const isKycPendingStatus = (status) => {
-        const normalized = normalizeStatusText(status);
-        if (!normalized) return false;
-        return normalized.includes('pending')
-          || normalized.includes('in progress')
-          || normalized.includes('in_progress')
-          || normalized.includes('review')
-          || normalized.includes('processing')
-          || normalized.includes('queued');
-      };
 
       const isTruthyBankValue = (value) => {
         if (value === true) return true;
         if (typeof value === 'number') return value > 0;
         if (typeof value !== 'string') return false;
-        const normalized = normalizeStatusText(value);
+        const normalized = normalizeKycStatusText(value);
         if (!normalized) return false;
         if (['true', 'yes', '1', 'linked', 'connected', 'initiated', 'completed', 'active', 'verified', 'success'].includes(normalized)) {
           return true;
@@ -3200,26 +3236,6 @@
         return false;
       };
 
-      const getClientDetailsKycSignal = (profileId) => {
-        const packData = packJsonMap[profileId] || packDetailsRowMap[profileId]?.pack_details || null;
-        if (!packData) {
-          return {
-            hasClientDetails: false,
-            completed: false,
-            pending: false
-          };
-        }
-
-        const reviewStatus = pickPackValue(packData, ['review.status', 'review.reviewStatus', 'reviewStatus', 'status']);
-        const reviewAnswer = pickPackValue(packData, ['review.result.reviewAnswer', 'review.reviewAnswer', 'reviewAnswer']);
-
-        return {
-          hasClientDetails: true,
-          completed: isKycCompletedStatus(reviewStatus) || isKycCompletedStatus(reviewAnswer),
-          pending: isKycPendingStatus(reviewStatus) || isKycPendingStatus(reviewAnswer)
-        };
-      };
-
       const filtered = allProfiles.filter(profile => {
         const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
         const uid = profile.id || '';
@@ -3228,19 +3244,11 @@
           || String(uid).toLowerCase().includes(query);
 
         const kycStatus = allKycMap[profile.id]?.status || 'Not initiated';
-        const normalizedKycStatus = normalizeStatusText(kycStatus);
-        const clientDetailsKyc = getClientDetailsKycSignal(profile.id);
-        const pendingLooksStale = normalizedKycStatus.includes('pending')
-          && clientDetailsKyc.hasClientDetails
-          && clientDetailsKyc.completed;
-        const kycCompleted = isKycCompletedStatus(kycStatus)
-          || clientDetailsKyc.completed
-          || pendingLooksStale;
-        const kycPending = (isKycPendingStatus(kycStatus) || clientDetailsKyc.pending) && !kycCompleted;
+        const effectiveKycState = getEffectiveKycState(profile.id, kycStatus);
         const matchesKyc = activeProfileFilters.kyc === 'all'
-          || (activeProfileFilters.kyc === 'completed' && kycCompleted)
-          || (activeProfileFilters.kyc === 'pending' && kycPending)
-          || (activeProfileFilters.kyc === 'not-completed' && !kycCompleted);
+          || (activeProfileFilters.kyc === 'completed' && effectiveKycState.completed)
+          || (activeProfileFilters.kyc === 'pending' && effectiveKycState.pending)
+          || (activeProfileFilters.kyc === 'not-completed' && !effectiveKycState.completed);
 
         const bankInitiated = getBankInitiatedForProfile(profile);
         const matchesBank = activeProfileFilters.bank === 'all'
@@ -3421,6 +3429,11 @@
       };
 
       setPackDetailsEnabled(item, true);
+      const kycStatusEl = item.querySelector('[data-kyc-status]');
+      if (kycStatusEl) {
+        const effectiveKyc = getEffectiveKycState(profileId, allKycMap[profileId]?.status || 'Not initiated');
+        kycStatusEl.textContent = effectiveKyc.label;
+      }
 
       const currentProfile = allProfiles.find(profile => String(profile.id) === String(profileId));
       if (currentProfile) {
