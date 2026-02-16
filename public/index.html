@@ -3333,12 +3333,8 @@
       renderProfiles(filtered, allKycMap);
     };
 
-    const renderHoldingAllocationCard = (row, { isStock = false } = {}) => {
-      const security = securitiesByIdMap[row.security_id] || {};
-      const securityLabel = security.name || security.symbol || row.security_id || 'Stock allocation';
-      const title = isStock
-        ? securityLabel
-        : (row.asset_class || 'Strategy allocation');
+    const renderHoldingAllocationCard = (row) => {
+      const title = row.asset_class || 'Strategy allocation';
       const asOf = row.as_of_date || '-';
       const weight = Number.isFinite(Number(row.weight)) ? `${formatNumber(row.weight, 2)}%` : '-';
       const value = row.value === null || row.value === undefined ? 'R -' : `R ${formatNumber(row.value, 2)}`;
@@ -3359,9 +3355,41 @@
           </div>
           <div class="holding-desc">Weight ${escapeHtml(weight)} • As of ${escapeHtml(asOf)}</div>
           <div class="holding-footer">
-            <div class="holding-tag">${escapeHtml(row.asset_class || (isStock ? 'Stock' : 'Strategy'))}</div>
+            <div class="holding-tag">${escapeHtml(row.asset_class || 'Strategy')}</div>
             <div class="holdings-container">
               <span class="holding-label">Allocation</span>
+            </div>
+          </div>
+        </div>
+      `;
+    };
+
+    const renderStockHoldingCard = (row) => {
+      const security = securitiesByIdMap[row.security_id] || {};
+      const title = security.name || security.symbol || row.security_id || 'Stock holding';
+      const asOf = row.as_of_date || '-';
+      const quantity = row.quantity === null || row.quantity === undefined ? '-' : formatNumber(row.quantity, 2);
+      const marketValue = row.market_value === null || row.market_value === undefined ? 'R -' : `R ${formatNumber(row.market_value, 2)}`;
+      const pnl = row.unrealized_pnl === null || row.unrealized_pnl === undefined
+        ? '-'
+        : `${Number(row.unrealized_pnl) >= 0 ? '+' : ''}R ${formatNumber(row.unrealized_pnl, 2)}`;
+
+      return `
+        <div class="holding-card">
+          <div class="holding-header">
+            <div>
+              <div class="holding-title">${escapeHtml(title)}</div>
+            </div>
+            <div>
+              <div class="holding-price">${escapeHtml(marketValue)}</div>
+              <div class="holding-change">${escapeHtml(pnl)}</div>
+            </div>
+          </div>
+          <div class="holding-desc">Quantity ${escapeHtml(quantity)} • As of ${escapeHtml(asOf)}</div>
+          <div class="holding-footer">
+            <div class="holding-tag">${escapeHtml(row.Status || 'Stock')}</div>
+            <div class="holdings-container">
+              <span class="holding-label">Holding</span>
             </div>
           </div>
         </div>
@@ -3380,13 +3408,14 @@
       const sections = Array.from(holdingsView.querySelectorAll('.holdings-section'));
       if (!summaryEl || !emptyStateEl || !strategyContainer || !stocksContainer) return;
 
-      const rows = (allocationsByUserMap[profileId] || []).slice();
-      rows.sort((a, b) => new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime());
-      const strategyRows = rows.filter(row => !row.security_id);
-      const stockRows = rows.filter(row => Boolean(row.security_id));
+      const strategyRows = (allocationsByUserMap[profileId] || []).slice();
+      strategyRows.sort((a, b) => new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime());
 
-      const total = rows.length;
-      summaryEl.textContent = total ? `Showing ${total} allocation${total === 1 ? '' : 's'}` : 'Showing 0 allocations';
+      const stockRows = (holdingsByUserMap[profileId] || []).slice();
+      stockRows.sort((a, b) => new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime());
+
+      const total = strategyRows.length + stockRows.length;
+      summaryEl.textContent = total ? `Showing ${total} holding${total === 1 ? '' : 's'}` : 'Showing 0 holdings';
 
       if (!total) {
         emptyStateEl.classList.add('active');
@@ -3404,12 +3433,12 @@
       });
 
       strategyContainer.innerHTML = strategyRows.length
-        ? strategyRows.map(row => renderHoldingAllocationCard(row, { isStock: false })).join('')
+        ? strategyRows.map(row => renderHoldingAllocationCard(row)).join('')
         : '<div class="holding-card holding-card-muted"><div class="holding-desc">No strategy allocations.</div></div>';
 
       stocksContainer.innerHTML = stockRows.length
-        ? stockRows.map(row => renderHoldingAllocationCard(row, { isStock: true })).join('')
-        : '<div class="holding-card holding-card-muted"><div class="holding-desc">No stock allocations.</div></div>';
+        ? stockRows.map(row => renderStockHoldingCard(row)).join('')
+        : '<div class="holding-card holding-card-muted"><div class="holding-desc">No stock holdings.</div></div>';
     };
 
     const loadProfiles = async () => {
