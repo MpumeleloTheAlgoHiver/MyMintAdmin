@@ -1445,6 +1445,13 @@
       box-shadow: 0 6px 16px rgba(17, 24, 39, 0.08);
     }
 
+    .holding-card-muted {
+      border-style: dashed;
+      border-color: #d1d5db;
+      background: #f9fafb;
+      box-shadow: none;
+    }
+
     .holding-header {
       display: flex;
       justify-content: space-between;
@@ -1540,6 +1547,46 @@
       color: #9ca3af;
       font-weight: 600;
       margin-left: 4px;
+    }
+
+    .holdings-empty-state {
+      border: 1px dashed #c4b5fd;
+      border-radius: 16px;
+      background: linear-gradient(180deg, #faf5ff 0%, #f9fafb 100%);
+      min-height: 190px;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #6b7280;
+      gap: 8px;
+      margin-bottom: 14px;
+      padding: 18px;
+    }
+
+    .holdings-empty-state.active {
+      display: flex;
+    }
+
+    .holdings-empty-state svg {
+      width: 34px;
+      height: 34px;
+      fill: #7c3aed;
+    }
+
+    .holdings-empty-state strong {
+      font-size: 0.96rem;
+      color: #4b5563;
+      font-weight: 600;
+    }
+
+    .holdings-empty-state p {
+      margin: 0;
+      font-size: 0.84rem;
+      color: #9ca3af;
+      max-width: 320px;
+      line-height: 1.45;
     }
 
     /* Phone modal */
@@ -2065,7 +2112,15 @@
                 <div class="holdings-view">
                   <div class="holdings-header">
                     <h2>Current holdings</h2>
-                    <span>Showing 5 of 5</span>
+                    <span data-holdings-summary>Showing 5 of 5</span>
+                  </div>
+
+                  <div class="holdings-empty-state" data-holdings-empty>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M10 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V9l-6-6h-5zm0 2h4.17L19 9.83V19H5V5h5zm2 3a4 4 0 100 8 4 4 0 000-8zm0 2.2A1.8 1.8 0 1110.2 12 1.8 1.8 0 0112 10.2z"/>
+                    </svg>
+                    <strong>No holdings allocated</strong>
+                    <p>This user has no current allocations yet. Holdings will appear here once allocation data is available.</p>
                   </div>
 
                   <div class="holdings-section">
@@ -2074,7 +2129,7 @@
                       <span class="holdings-section-chevron">▾</span>
                     </button>
 
-                    <div class="holdings-section-content">
+                    <div class="holdings-section-content" data-holdings-strategy>
                       <div class="holding-card">
                         <div class="holding-header">
                           <div>
@@ -2158,7 +2213,7 @@
                       <span class="holdings-section-chevron">▾</span>
                     </button>
 
-                    <div class="holdings-section-content">
+                    <div class="holdings-section-content" data-holdings-stocks>
                       <div class="holding-card">
                         <div class="holding-header">
                           <div>
@@ -3180,6 +3235,7 @@
         }
 
         renderHistoryForItem(clone, profile, kycEntry, onboardingMap[profile.id], packDetailsRowMap[profile.id]);
+        renderHoldingsForItem(clone, profile.id);
 
         if (packJsonMap[profile.id]) {
           const packBtn = clone.querySelector('[data-pack-details]');
@@ -3277,6 +3333,85 @@
       renderProfiles(filtered, allKycMap);
     };
 
+    const renderHoldingAllocationCard = (row, { isStock = false } = {}) => {
+      const security = securitiesByIdMap[row.security_id] || {};
+      const securityLabel = security.name || security.symbol || row.security_id || 'Stock allocation';
+      const title = isStock
+        ? securityLabel
+        : (row.asset_class || 'Strategy allocation');
+      const asOf = row.as_of_date || '-';
+      const weight = Number.isFinite(Number(row.weight)) ? `${formatNumber(row.weight, 2)}%` : '-';
+      const value = row.value === null || row.value === undefined ? 'R -' : `R ${formatNumber(row.value, 2)}`;
+      const return1d = row.return_1d === null || row.return_1d === undefined
+        ? '-'
+        : `${Number(row.return_1d) >= 0 ? '+' : ''}${formatNumber(row.return_1d, 3)}%`;
+
+      return `
+        <div class="holding-card">
+          <div class="holding-header">
+            <div>
+              <div class="holding-title">${escapeHtml(title)}</div>
+            </div>
+            <div>
+              <div class="holding-price">${escapeHtml(value)}</div>
+              <div class="holding-change">${escapeHtml(return1d)}</div>
+            </div>
+          </div>
+          <div class="holding-desc">Weight ${escapeHtml(weight)} • As of ${escapeHtml(asOf)}</div>
+          <div class="holding-footer">
+            <div class="holding-tag">${escapeHtml(row.asset_class || (isStock ? 'Stock' : 'Strategy'))}</div>
+            <div class="holdings-container">
+              <span class="holding-label">Allocation</span>
+            </div>
+          </div>
+        </div>
+      `;
+    };
+
+    const renderHoldingsForItem = (item, profileId) => {
+      if (!item || !profileId) return;
+      const holdingsView = item.querySelector('.holdings-view');
+      if (!holdingsView) return;
+
+      const summaryEl = holdingsView.querySelector('[data-holdings-summary]');
+      const emptyStateEl = holdingsView.querySelector('[data-holdings-empty]');
+      const strategyContainer = holdingsView.querySelector('[data-holdings-strategy]');
+      const stocksContainer = holdingsView.querySelector('[data-holdings-stocks]');
+      const sections = Array.from(holdingsView.querySelectorAll('.holdings-section'));
+      if (!summaryEl || !emptyStateEl || !strategyContainer || !stocksContainer) return;
+
+      const rows = (allocationsByUserMap[profileId] || []).slice();
+      rows.sort((a, b) => new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime());
+      const strategyRows = rows.filter(row => !row.security_id);
+      const stockRows = rows.filter(row => Boolean(row.security_id));
+
+      const total = rows.length;
+      summaryEl.textContent = total ? `Showing ${total} allocation${total === 1 ? '' : 's'}` : 'Showing 0 allocations';
+
+      if (!total) {
+        emptyStateEl.classList.add('active');
+        sections.forEach(section => {
+          section.style.display = 'none';
+        });
+        strategyContainer.innerHTML = '';
+        stocksContainer.innerHTML = '';
+        return;
+      }
+
+      emptyStateEl.classList.remove('active');
+      sections.forEach(section => {
+        section.style.display = '';
+      });
+
+      strategyContainer.innerHTML = strategyRows.length
+        ? strategyRows.map(row => renderHoldingAllocationCard(row, { isStock: false })).join('')
+        : '<div class="holding-card holding-card-muted"><div class="holding-desc">No strategy allocations.</div></div>';
+
+      stocksContainer.innerHTML = stockRows.length
+        ? stockRows.map(row => renderHoldingAllocationCard(row, { isStock: true })).join('')
+        : '<div class="holding-card holding-card-muted"><div class="holding-desc">No stock allocations.</div></div>';
+    };
+
     const loadProfiles = async () => {
       Object.keys(onboardingMap).forEach(key => delete onboardingMap[key]);
       Object.keys(packDetailsRowMap).forEach(key => delete packDetailsRowMap[key]);
@@ -3331,7 +3466,7 @@
 
         const { data: allocationsRows, error: allocationsError } = await supabaseClient
           .from('allocations')
-          .select('user_id, asset_class, weight, value, as_of_date, created_at, updated_at')
+          .select('user_id, asset_class, weight, value, return_1d, return_1w, return_1m, return_ytd, return_1y, as_of_date, security_id, created_at, updated_at')
           .in('user_id', userIds)
           .order('updated_at', { ascending: false });
 
@@ -3354,7 +3489,10 @@
             holdingsByUserMap[row.user_id].push(row);
           });
 
-          const securityIds = [...new Set(holdingsRows.map(row => row.security_id).filter(Boolean))];
+          const securityIds = [...new Set([
+            ...holdingsRows.map(row => row.security_id),
+            ...(allocationsRows || []).map(row => row.security_id)
+          ].filter(Boolean))];
           if (securityIds.length) {
             const { data: securityRows, error: securitiesError } = await supabaseClient
               .from('securities')
