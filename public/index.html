@@ -1625,6 +1625,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 8px;
+      min-width: 0;
       border: 1px solid #e5e7eb;
       border-radius: 10px;
       padding: 10px 12px;
@@ -1643,17 +1644,32 @@
       flex-direction: column;
       gap: 4px;
       text-align: left;
+      flex: 1;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .image-meta strong {
+      display: block;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .image-meta small {
       color: #6b7280;
       font-size: 0.75rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .image-actions {
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      flex-shrink: 0;
     }
 
     .image-actions button {
@@ -1957,7 +1973,7 @@
                     Current holdings
                   </button>
                   <button class="pack-details-btn" type="button" data-pack-details data-view="pack-details">
-                    Pack details
+                    Client details
                   </button>
                 </div>
 
@@ -2187,7 +2203,7 @@
 
                 <div class="pack-details-view" data-pack-details-view>
                   <div class="pack-details-card">
-                    <div class="pack-details-title">Pack details</div>
+                    <div class="pack-details-title">Client details</div>
                     <div class="pack-details-grid" id="packDetailsGrid"></div>
                   </div>
                   <div class="pack-details-card" id="packDetailsDocs"></div>
@@ -2322,7 +2338,7 @@
         button.dataset.imageId = imageId;
         button.innerHTML = `
           <span class="image-meta">
-            <strong>${fileName}</strong>
+            <strong title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</strong>
             <small>${fileType}${addedDate ? ` • ${addedDate}` : ''}</small>
           </span>
           <span class="image-actions">
@@ -2554,7 +2570,7 @@
       if (packRow?.pack_details || packJsonMap[profile?.id]) {
         events.push({
           at: packRow?.updated_at || packRow?.created_at || new Date().toISOString(),
-          title: 'Pack details available',
+          title: 'Client details available',
           meta: 'Saved to user_onboarding_pack_details',
           details: 'Pack JSON has been fetched and stored for this user.',
           blue: true
@@ -2797,9 +2813,9 @@
       nextBtn.disabled = safePage >= totalPages - 1;
     };
 
-    const downloadPackPdf = (pack, sections = []) => {
+    const buildPackPdfReport = (pack, sections = []) => {
       const JsPdf = window.jspdf?.jsPDF;
-      if (!JsPdf || !pack) return;
+      if (!JsPdf || !pack) return null;
 
       const doc = new JsPdf({ unit: 'pt', format: 'a4' });
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -2834,7 +2850,7 @@
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(11);
         doc.setTextColor(107, 114, 128);
-        doc.text('Pack details', margin + 14, y + 58);
+        doc.text('Client details', margin + 14, y + 58);
 
         doc.setFontSize(9);
         doc.setTextColor(124, 58, 237);
@@ -2934,7 +2950,16 @@
       const filenameBase = formatPackPrimitive(pickPackValue(pack, ['externalUserId', 'id', 'applicantId', 'fullName']))
         .toString()
         .replace(/[^a-zA-Z0-9_-]/g, '_') || 'user';
-      doc.save(`pack-report-${filenameBase}.pdf`);
+      return {
+        doc,
+        filename: `pack-report-${filenameBase}.pdf`
+      };
+    };
+
+    const downloadPackPdf = (pack, sections = []) => {
+      const report = buildPackPdfReport(pack, sections);
+      if (!report) return;
+      report.doc.save(report.filename);
     };
 
     const renderPackDetails = (container, packJson) => {
@@ -2957,7 +2982,7 @@
         container.__activePackDetails = null;
         container.__packSections = [];
         container.__packSectionsPage = 0;
-        packDetailsGrid.innerHTML = '<div class="pack-details-field">No pack details available for this user.</div>';
+        packDetailsGrid.innerHTML = '<div class="pack-details-field">No client details available for this user.</div>';
         packDetailsDocs.innerHTML = '';
         packDetailsReview.innerHTML = '';
         return;
@@ -3412,6 +3437,11 @@
       const safeBase = sanitizeFilename(externalUserId || profileId || applicantId || 'pack') || 'pack';
       const zip = new JsZip();
       zip.file(`sumsub-${safeBase}.json`, JSON.stringify(applicant, null, 2));
+      const pdfSections = buildCompletePackSections(applicant);
+      const pdfReport = buildPackPdfReport(applicant, pdfSections);
+      if (pdfReport) {
+        zip.file(pdfReport.filename, pdfReport.doc.output('blob'));
+      }
 
       if (inspectionId && items.length) {
         const docsFolder = zip.folder('documents');
