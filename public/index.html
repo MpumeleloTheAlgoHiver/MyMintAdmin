@@ -4,9 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CRM - Company Profile</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -29,7 +26,7 @@
     }
 
     body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       background: #f5f6fa;
       min-height: 100vh;
       overflow-x: hidden;
@@ -151,11 +148,17 @@
     }
 
     .simple-view-title {
-      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       font-size: 1.4rem;
       font-weight: 600;
       color: var(--text);
       letter-spacing: 0;
+    }
+
+    .user-count-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
     }
 
     .user-count-badge {
@@ -170,6 +173,87 @@
       font-size: 0.86rem;
       font-weight: 600;
       box-shadow: 0 6px 14px rgba(80, 38, 157, 0.08);
+      cursor: pointer;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+    }
+
+    .user-count-badge:hover,
+    .user-count-badge[aria-expanded="true"] {
+      border-color: var(--primary);
+      box-shadow: 0 8px 18px rgba(80, 38, 157, 0.16);
+      color: var(--text);
+    }
+
+    .user-filter-panel {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 10px);
+      width: min(360px, 72vw);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+      box-shadow: 0 16px 36px rgba(80, 38, 157, 0.14);
+      padding: 12px;
+      transform: scaleX(0.82);
+      transform-origin: right center;
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.22s ease, opacity 0.22s ease;
+      z-index: 30;
+    }
+
+    .user-filter-panel.active {
+      transform: scaleX(1);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .user-filter-title {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .user-filter-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .user-filter-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .user-filter-field label {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .user-filter-select {
+      width: 100%;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #ffffff;
+      color: #374151;
+      font-size: 0.82rem;
+      font-weight: 500;
+      padding: 7px 10px;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .user-filter-select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--ring);
     }
 
     .user-count-dot {
@@ -482,15 +566,14 @@
     }
 
     .company-title h1 {
-      font-family: 'Cormorant Garamond', serif;
       font-size: 2rem;
-      font-weight: 700;
+      font-weight: 600;
       color: var(--text);
       margin-bottom: 5px;
       display: flex;
       align-items: center;
       gap: 10px;
-      letter-spacing: 0.02em;
+      letter-spacing: 0;
     }
 
     .info-icon {
@@ -1649,6 +1732,10 @@
         align-items: flex-start;
       }
 
+      .user-filter-grid {
+        grid-template-columns: 1fr;
+      }
+
       .top-nav {
         padding: 15px 20px;
       }
@@ -1713,10 +1800,33 @@
     <section class="simple-view" id="simpleView">
       <div class="simple-view-header">
         <h2 class="simple-view-title">Profiles</h2>
-        <div class="user-count-badge" aria-live="polite" aria-atomic="true">
-          <span class="user-count-dot" aria-hidden="true"></span>
-          <span class="user-count-number" id="userCount">0</span>
-          <span id="userCountLabel">users</span>
+        <div class="user-count-wrap">
+          <button class="user-count-badge" id="userCountBadge" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="userFilterPanel" aria-live="polite" aria-atomic="true">
+            <span class="user-count-dot" aria-hidden="true"></span>
+            <span class="user-count-number" id="userCount">0</span>
+            <span id="userCountLabel">users</span>
+          </button>
+          <div class="user-filter-panel" id="userFilterPanel" role="dialog" aria-label="User filters">
+            <div class="user-filter-title">Filter by</div>
+            <div class="user-filter-grid">
+              <div class="user-filter-field">
+                <label for="kycFilterSelect">KYC</label>
+                <select id="kycFilterSelect" class="user-filter-select">
+                  <option value="all">All</option>
+                  <option value="completed">Completed</option>
+                  <option value="pending">Pending / not completed</option>
+                </select>
+              </div>
+              <div class="user-filter-field">
+                <label for="bankFilterSelect">Bank</label>
+                <select id="bankFilterSelect" class="user-filter-select">
+                  <option value="all">All</option>
+                  <option value="initiated">Initiated</option>
+                  <option value="not-initiated">Not initiated</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="simple-list" id="profilesList"></div>
@@ -2137,7 +2247,15 @@
     const profileTemplate = document.getElementById('profileItemTemplate');
     const userCount = document.getElementById('userCount');
     const userCountLabel = document.getElementById('userCountLabel');
+    const userCountBadge = document.getElementById('userCountBadge');
+    const userFilterPanel = document.getElementById('userFilterPanel');
+    const kycFilterSelect = document.getElementById('kycFilterSelect');
+    const bankFilterSelect = document.getElementById('bankFilterSelect');
     const searchInput = document.querySelector('.top-search input');
+    const activeProfileFilters = {
+      kyc: 'all',
+      bank: 'all'
+    };
     let allProfiles = [];
     let allKycMap = {};
     const onboardingMap = {};
@@ -2876,15 +2994,96 @@
 
     const applySearchFilter = () => {
       const query = searchInput?.value?.trim().toLowerCase() || '';
-      if (!query) {
-        renderProfiles(allProfiles, allKycMap);
-        return;
-      }
+      const normalizeStatusText = (value) => String(value || '').trim().toLowerCase();
+
+      const isKycCompletedStatus = (status) => {
+        const normalized = normalizeStatusText(status);
+        if (!normalized) return false;
+        return normalized.includes('completed')
+          || normalized.includes('complete')
+          || normalized.includes('approved')
+          || normalized.includes('verified')
+          || normalized.includes('done');
+      };
+
+      const isTruthyBankValue = (value) => {
+        if (value === true) return true;
+        if (typeof value === 'number') return value > 0;
+        if (typeof value !== 'string') return false;
+        const normalized = normalizeStatusText(value);
+        if (!normalized) return false;
+        if (['true', 'yes', '1', 'linked', 'connected', 'initiated', 'completed', 'active', 'verified', 'success'].includes(normalized)) {
+          return true;
+        }
+        if (normalized.includes('not') || normalized.includes('pending') || normalized.includes('failed') || normalized.includes('none')) {
+          return false;
+        }
+        return normalized.includes('linked') || normalized.includes('connected') || normalized.includes('initiated') || normalized.includes('complete');
+      };
+
+      const getBankInitiatedForProfile = (profile) => {
+        const profileId = profile?.id;
+        const onboardingRow = onboardingMap[profileId] || {};
+        const candidateKeys = [
+          'bank_initiated',
+          'bankInitiated',
+          'is_bank_initiated',
+          'bank_linked',
+          'bankLinked',
+          'is_bank_linked',
+          'bank_connected',
+          'bankConnected',
+          'bank_status',
+          'bankStatus',
+          'banking_status',
+          'bank_account_status',
+          'bank_account_linked',
+          'bank_started'
+        ];
+
+        for (const key of candidateKeys) {
+          if (onboardingRow[key] !== undefined) {
+            return isTruthyBankValue(onboardingRow[key]);
+          }
+          if (profile?.[key] !== undefined) {
+            return isTruthyBankValue(profile[key]);
+          }
+        }
+
+        for (const [key, value] of Object.entries(onboardingRow)) {
+          if (String(key).toLowerCase().includes('bank') && isTruthyBankValue(value)) {
+            return true;
+          }
+        }
+
+        for (const [key, value] of Object.entries(profile || {})) {
+          if (String(key).toLowerCase().includes('bank') && isTruthyBankValue(value)) {
+            return true;
+          }
+        }
+
+        return false;
+      };
 
       const filtered = allProfiles.filter(profile => {
         const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
         const uid = profile.id || '';
-        return fullName.toLowerCase().includes(query) || String(uid).toLowerCase().includes(query);
+        const matchesQuery = !query
+          || fullName.toLowerCase().includes(query)
+          || String(uid).toLowerCase().includes(query);
+
+        const kycStatus = allKycMap[profile.id]?.status || 'Not initiated';
+        const kycCompleted = isKycCompletedStatus(kycStatus);
+        const matchesKyc = activeProfileFilters.kyc === 'all'
+          || (activeProfileFilters.kyc === 'completed' && kycCompleted)
+          || (activeProfileFilters.kyc === 'pending' && !kycCompleted);
+
+        const bankInitiated = getBankInitiatedForProfile(profile);
+        const matchesBank = activeProfileFilters.bank === 'all'
+          || (activeProfileFilters.bank === 'initiated' && bankInitiated)
+          || (activeProfileFilters.bank === 'not-initiated' && !bankInitiated);
+
+        return matchesQuery && matchesKyc && matchesBank;
       });
 
       renderProfiles(filtered, allKycMap);
@@ -3464,6 +3663,38 @@
     if (searchInput) {
       searchInput.addEventListener('input', applySearchFilter);
     }
+
+    if (userCountBadge && userFilterPanel) {
+      userCountBadge.addEventListener('click', () => {
+        const willOpen = !userFilterPanel.classList.contains('active');
+        userFilterPanel.classList.toggle('active', willOpen);
+        userCountBadge.setAttribute('aria-expanded', String(willOpen));
+      });
+    }
+
+    if (kycFilterSelect) {
+      kycFilterSelect.addEventListener('change', () => {
+        activeProfileFilters.kyc = kycFilterSelect.value || 'all';
+        applySearchFilter();
+      });
+    }
+
+    if (bankFilterSelect) {
+      bankFilterSelect.addEventListener('change', () => {
+        activeProfileFilters.bank = bankFilterSelect.value || 'all';
+        applySearchFilter();
+      });
+    }
+
+    document.addEventListener('click', (event) => {
+      if (!userFilterPanel || !userCountBadge) return;
+      const withinPanel = userFilterPanel.contains(event.target);
+      const withinBadge = userCountBadge.contains(event.target);
+      if (withinPanel || withinBadge) return;
+      if (!userFilterPanel.classList.contains('active')) return;
+      userFilterPanel.classList.remove('active');
+      userCountBadge.setAttribute('aria-expanded', 'false');
+    });
 
     requireSession().then((ok) => {
       if (ok) {
