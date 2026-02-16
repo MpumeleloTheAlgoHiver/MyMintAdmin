@@ -2802,38 +2802,136 @@
       if (!JsPdf || !pack) return;
 
       const doc = new JsPdf({ unit: 'pt', format: 'a4' });
-      const left = 48;
-      const maxWidth = 500;
-      const bottom = 790;
-      let y = 50;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 40;
+      const contentWidth = pageWidth - (margin * 2);
+      const footerGap = 36;
+      let y = margin;
 
-      const addBlock = (text, size = 10, gap = 14) => {
-        doc.setFontSize(size);
-        const lines = doc.splitTextToSize(String(text), maxWidth);
-        if (y + (lines.length * gap) > bottom) {
-          doc.addPage();
-          y = 50;
-        }
-        doc.text(lines, left, y);
-        y += (lines.length * gap) + 4;
+      const firstName = pickPackValue(pack, ['info.firstName', 'fixedInfo.firstName', 'firstName']);
+      const lastName = pickPackValue(pack, ['info.lastName', 'fixedInfo.lastName', 'lastName']);
+      const nameFromPack = pickPackValue(pack, ['fullName', 'info.fullName', 'fixedInfo.fullName', 'applicant.fullName']);
+      const displayName = String(nameFromPack || [firstName, lastName].filter(Boolean).join(' ') || 'User').trim();
+
+      const ensureSpace = (neededHeight = 20) => {
+        if (y + neededHeight <= pageHeight - footerGap) return;
+        doc.addPage();
+        y = margin;
       };
 
-      addBlock('MyMint Admin — Verification Pack Report', 14, 16);
-      addBlock(`Generated: ${new Date().toLocaleString()}`, 9, 12);
-      addBlock(`Applicant ID: ${formatPackPrimitive(pickPackValue(pack, ['id', 'applicantId']))}`, 10, 14);
-      addBlock(`External user ID: ${formatPackPrimitive(pickPackValue(pack, ['externalUserId']))}`, 10, 14);
-      addBlock(`Review status: ${formatPackPrimitive(pickPackValue(pack, ['review.reviewStatus', 'reviewStatus', 'status']))}`, 10, 14);
-      y += 8;
+      const drawHeader = () => {
+        const headerHeight = 90;
+        doc.setFillColor(245, 240, 255);
+        doc.roundedRect(margin, y, contentWidth, headerHeight, 12, 12, 'F');
+
+        doc.setTextColor(55, 65, 81);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(24);
+        const headerName = doc.splitTextToSize(displayName, contentWidth - 28);
+        doc.text(headerName, margin + 14, y + 34);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(11);
+        doc.setTextColor(107, 114, 128);
+        doc.text('Pack details', margin + 14, y + 58);
+
+        doc.setFontSize(9);
+        doc.setTextColor(124, 58, 237);
+        doc.text(`Generated ${new Date().toLocaleString()}`, margin + 14, y + 76);
+
+        y += headerHeight + 16;
+      };
+
+      const drawSummaryCard = () => {
+        const summaryRows = [
+          ['Applicant ID', formatPackPrimitive(pickPackValue(pack, ['id', 'applicantId']))],
+          ['External user ID', formatPackPrimitive(pickPackValue(pack, ['externalUserId', 'external_user_id']))],
+          ['Review status', formatPackPrimitive(pickPackValue(pack, ['review.reviewStatus', 'reviewStatus', 'status']))],
+          ['Decision', formatPackPrimitive(pickPackValue(pack, ['review.result.reviewAnswer', 'review.reviewAnswer', 'reviewAnswer']))],
+          ['Country', formatPackPrimitive(pickPackValue(pack, ['country', 'info.country', 'fixedInfo.country']))],
+          ['Contact', formatPackPrimitive(pickPackValue(pack, ['email', 'info.email', 'fixedInfo.email']))]
+        ];
+
+        const rowHeight = 22;
+        const cardHeight = 42 + (summaryRows.length * rowHeight);
+        ensureSpace(cardHeight + 10);
+
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(229, 231, 235);
+        doc.roundedRect(margin, y, contentWidth, cardHeight, 10, 10, 'FD');
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(31, 41, 55);
+        doc.text('Summary', margin + 14, y + 22);
+
+        let rowY = y + 36;
+        summaryRows.forEach(([label, value]) => {
+          doc.setDrawColor(243, 244, 246);
+          doc.line(margin + 12, rowY, margin + contentWidth - 12, rowY);
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.setTextColor(75, 85, 99);
+          doc.text(String(label), margin + 14, rowY + 15);
+
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(31, 41, 55);
+          const valueLines = doc.splitTextToSize(String(value), contentWidth - 190);
+          doc.text(valueLines, margin + 180, rowY + 15);
+          rowY += rowHeight;
+        });
+
+        y += cardHeight + 14;
+      };
+
+      const drawSectionTitle = (title) => {
+        ensureSpace(30);
+        doc.setFillColor(237, 233, 254);
+        doc.roundedRect(margin, y, contentWidth, 24, 8, 8, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(91, 33, 182);
+        doc.text(String(title), margin + 12, y + 16);
+        y += 30;
+      };
+
+      const drawSectionRow = (label, value) => {
+        const labelX = margin + 12;
+        const valueX = margin + 190;
+        const valueMaxWidth = contentWidth - 206;
+        const valueLines = doc.splitTextToSize(String(value), valueMaxWidth);
+        const rowHeight = Math.max(20, (valueLines.length * 12) + 8);
+        ensureSpace(rowHeight + 2);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(75, 85, 99);
+        doc.text(String(label), labelX, y + 12);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(17, 24, 39);
+        doc.text(valueLines, valueX, y + 12);
+
+        doc.setDrawColor(243, 244, 246);
+        doc.line(margin + 10, y + rowHeight, margin + contentWidth - 10, y + rowHeight);
+        y += rowHeight + 2;
+      };
+
+      drawHeader();
+      drawSummaryCard();
 
       sections.forEach((section) => {
-        addBlock(section.title, 12, 15);
+        if (!section?.rows?.length) return;
+        drawSectionTitle(section.title || 'Section');
         section.rows.forEach((row) => {
-          addBlock(`${row.label}: ${row.value}`, 9, 12);
+          drawSectionRow(row.label || 'Field', formatFieldValue(row.value));
         });
         y += 6;
       });
 
-      const filenameBase = formatPackPrimitive(pickPackValue(pack, ['externalUserId', 'id', 'applicantId']))
+      const filenameBase = formatPackPrimitive(pickPackValue(pack, ['externalUserId', 'id', 'applicantId', 'fullName']))
         .toString()
         .replace(/[^a-zA-Z0-9_-]/g, '_') || 'user';
       doc.save(`pack-report-${filenameBase}.pdf`);
