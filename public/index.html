@@ -289,6 +289,11 @@
       display: block;
     }
 
+    .ellipsis-btn.is-loading {
+      opacity: 0.65;
+      cursor: progress;
+    }
+
     .detailed-view {
       max-height: 0;
       opacity: 0;
@@ -668,6 +673,20 @@
 
     .tab.active svg {
       fill: #9ca3af;
+    }
+
+    .tab.is-loading {
+      opacity: 0.75;
+      cursor: progress;
+      pointer-events: none;
+    }
+
+    .tab.is-loading::after {
+      content: 'Downloading...';
+      font-size: 0.72rem;
+      color: #6b7280;
+      margin-left: 6px;
+      font-weight: 600;
     }
 
     /* Filter Tabs */
@@ -1802,7 +1821,7 @@
                   <button class="filter-tab" data-view="holdings">
                     Current holdings
                   </button>
-                  <button class="pack-details-btn" type="button" data-pack-details data-view="pack-details" disabled>
+                  <button class="pack-details-btn" type="button" data-pack-details data-view="pack-details">
                     Pack details
                   </button>
                 </div>
@@ -2082,6 +2101,7 @@
 
 
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
@@ -2966,6 +2986,138 @@
       URL.revokeObjectURL(url);
     };
 
+    const downloadBlobFile = (blob, filename) => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    };
+
+    const sanitizeFilename = (value = '') => String(value || '')
+      .trim()
+      .replace(/[\\/:*?"<>|]+/g, '_')
+      .replace(/\s+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '');
+
+    const resolveMetadataItems = (metadata) => {
+      const items = Array.isArray(metadata)
+        ? metadata
+        : (metadata?.resources || metadata?.items || metadata?.images || metadata?.data?.resources || [metadata]);
+      return Array.isArray(items) ? items.filter(Boolean) : [];
+    };
+
+    const resolveImageId = (item) => item?.id || item?.previewId || item?.imageId || item?.resourceId;
+
+    const resolveDocumentFileName = (item, index) => {
+      const metadataName = item?.fileMetadata?.fileName;
+      const fallbackName = item?.label || item?.name || `document-${index + 1}`;
+      const rawName = metadataName || fallbackName;
+      const safeName = sanitizeFilename(rawName) || `document-${index + 1}`;
+      return safeName.includes('.') ? safeName : `${safeName}.bin`;
+    };
+
+    const persistPackForProfile = (item, applicantJson) => {
+      const profileId = item?.dataset?.profileId;
+      if (!profileId || !applicantJson) return;
+
+      packJsonMap[profileId] = applicantJson;
+      packDetailsRowMap[profileId] = {
+        ...(packDetailsRowMap[profileId] || {}),
+        user_id: profileId,
+        pack_details: applicantJson,
+        updated_at: new Date().toISOString()
+      };
+
+      setPackDetailsEnabled(item, true);
+
+      const currentProfile = allProfiles.find(profile => String(profile.id) === String(profileId));
+      if (currentProfile) {
+        renderHistoryForItem(item, currentProfile, allKycMap[profileId] || {}, onboardingMap[profileId], packDetailsRowMap[profileId]);
+      }
+
+      supabaseClient
+        .from('user_onboarding_pack_details')
+        .upsert({ user_id: profileId, pack_details: applicantJson }, { onConflict: 'user_id' })
+        .then(({ error }) => {
+          if (error) console.error('Pack details save error:', error);
+        });
+    };
+
+    const refreshAndDownloadPackZip = async (item) => {
+      const externalUserId = item?.dataset?.externalUserId;
+      const profileId = item?.dataset?.profileId;
+      if (!externalUserId) {
+        console.warn('No Sumsub external user id found for this profile.');
+        return;
+      }
+
+      const JsZip = window.JSZip;
+      if (!JsZip) {
+        console.error('JSZip is not available.');
+        return;
+      }
+
+      const applicant = await fetchApplicantByExternalId(externalUserId);
+      persistPackForProfile(item, applicant);
+
+      const applicantId = applicant?.id || applicant?.applicantId || applicant?.applicant_id;
+      if (!applicantId) {
+        throw new Error('No applicantId found in Sumsub response.');
+      }
+
+      const metadata = await fetchApplicantMetadata(applicantId);
+      const inspectionId = applicant?.inspectionId || applicant?.review?.inspectionId || findFirstValueByKeys(applicant, ['inspectionId']);
+      const items = resolveMetadataItems(metadata);
+
+      const safeBase = sanitizeFilename(externalUserId || profileId || applicantId || 'pack') || 'pack';
+      const zip = new JsZip();
+      zip.file(`sumsub-${safeBase}.json`, JSON.stringify(applicant, null, 2));
+
+      if (inspectionId && items.length) {
+        const docsFolder = zip.folder('documents');
+        const usedNames = new Map();
+
+        const fetchPromises = items.map(async (docItem, index) => {
+          const imageId = resolveImageId(docItem);
+          if (!imageId) return;
+
+          try {
+            const blob = await fetchApplicantImage(inspectionId, imageId);
+            const baseName = resolveDocumentFileName(docItem, index);
+            const duplicateCount = usedNames.get(baseName) || 0;
+            usedNames.set(baseName, duplicateCount + 1);
+            const finalName = duplicateCount === 0
+              ? baseName
+              : `${baseName.replace(/(\.[^.]*)?$/, '')}-${duplicateCount + 1}${baseName.match(/(\.[^.]*)$/)?.[1] || ''}`;
+            docsFolder.file(finalName, blob);
+          } catch (error) {
+            console.error('Document download failed:', error);
+          }
+        });
+
+        await Promise.all(fetchPromises);
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      downloadBlobFile(zipBlob, `pack-bundle-${safeBase}.zip`);
+    };
+
+    const refreshPackDataOnly = async (item) => {
+      const externalUserId = item?.dataset?.externalUserId;
+      if (!externalUserId) {
+        console.warn('No Sumsub external user id found for this profile.');
+        return null;
+      }
+      const applicant = await fetchApplicantByExternalId(externalUserId);
+      persistPackForProfile(item, applicant);
+      return applicant;
+    };
+
     const fetchApplicantByExternalId = async (externalUserId) => {
       const res = await fetch(`/api/sumsub/applicant?externalUserId=${encodeURIComponent(externalUserId)}`);
       if (!res.ok) {
@@ -3060,35 +3212,13 @@
             console.warn('No Sumsub external user id found for this profile.');
             return;
           }
-          fetch(`/api/sumsub/applicant?externalUserId=${encodeURIComponent(externalUserId)}`)
-            .then(res => res.json())
-            .then(json => {
-              console.log('Sumsub applicant:', json);
-              downloadJson(json, `sumsub-${externalUserId}.json`);
-              if (item?.dataset?.profileId) {
-                packJsonMap[item.dataset.profileId] = json;
-                packDetailsRowMap[item.dataset.profileId] = {
-                  ...(packDetailsRowMap[item.dataset.profileId] || {}),
-                  user_id: item.dataset.profileId,
-                  pack_details: json,
-                  updated_at: new Date().toISOString()
-                };
-              }
-              setPackDetailsEnabled(item, true);
-              const currentProfile = allProfiles.find(profile => String(profile.id) === String(item?.dataset?.profileId));
-              if (currentProfile) {
-                renderHistoryForItem(item, currentProfile, allKycMap[item.dataset.profileId] || {}, onboardingMap[item.dataset.profileId], packDetailsRowMap[item.dataset.profileId]);
-              }
-              if (item?.dataset?.profileId) {
-                supabaseClient
-                  .from('user_onboarding_pack_details')
-                  .upsert({ user_id: item.dataset.profileId, pack_details: json }, { onConflict: 'user_id' })
-                  .then(({ error }) => {
-                    if (error) console.error('Pack details save error:', error);
-                  });
-              }
-            })
-            .catch(err => console.error('Sumsub error:', err));
+          if (tab.classList.contains('is-loading')) return;
+          tab.classList.add('is-loading');
+          refreshAndDownloadPackZip(item)
+            .catch(err => console.error('Sumsub error:', err))
+            .finally(() => {
+              tab.classList.remove('is-loading');
+            });
         }
 
         if (tab.dataset.images === 'true') {
@@ -3153,6 +3283,7 @@
         if (view === 'pack-details') {
           const item = filterTab.closest('.simple-item');
           const profileId = item?.dataset?.profileId;
+          const externalUserId = item?.dataset?.externalUserId;
           const packJson = profileId ? packJsonMap[profileId] : null;
           if (packJson) {
             renderPackDetails(container, packJson);
@@ -3162,16 +3293,25 @@
               .select('pack_details')
               .eq('user_id', profileId)
               .single()
-              .then(({ data, error }) => {
-                if (error) {
-                  console.error('Pack details load error:', error);
+              .then(async ({ data, error }) => {
+                if (!error && data?.pack_details) {
+                  packJsonMap[profileId] = data.pack_details;
+                  renderPackDetails(container, data.pack_details);
+                  return;
+                }
+
+                if (!externalUserId) {
+                  if (error) console.error('Pack details load error:', error);
                   renderPackDetails(container, null);
                   return;
                 }
-                if (data?.pack_details) {
-                  packJsonMap[profileId] = data.pack_details;
-                  renderPackDetails(container, data.pack_details);
-                } else {
+
+                try {
+                  const applicantJson = await fetchApplicantByExternalId(externalUserId);
+                  persistPackForProfile(item, applicantJson);
+                  renderPackDetails(container, applicantJson);
+                } catch (fetchError) {
+                  console.error('Pack details fetch error:', fetchError);
                   renderPackDetails(container, null);
                 }
               });
@@ -3213,7 +3353,24 @@
         if (!item) return;
         const details = item.querySelector('.detailed-view');
         if (!details) return;
+        const isOpening = !details.classList.contains('active');
         details.classList.toggle('active');
+        if (!isOpening) return;
+
+        button.classList.add('is-loading');
+        button.title = 'Refreshing profile...';
+        button.setAttribute('aria-busy', 'true');
+        button.disabled = true;
+        refreshPackDataOnly(item)
+          .catch((error) => {
+            console.error('Pack refresh error:', error);
+          })
+          .finally(() => {
+            button.classList.remove('is-loading');
+            button.title = '';
+            button.setAttribute('aria-busy', 'false');
+            button.disabled = false;
+          });
       }
 
       const phoneAdd = event.target.closest('.phone-add-btn');
