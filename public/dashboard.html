@@ -293,7 +293,7 @@
               <p class="text-xl font-semibold text-slate-800" id="totalUsersValue">0</p>
             </div>
             <div class="border border-slate-200 rounded-2xl p-3 bg-white">
-              <p class="text-xs text-slate-500">Users KYC</p>
+              <p class="text-xs text-slate-500">Users KYC (Completed)</p>
               <p class="text-xl font-semibold text-slate-800" id="usersKycValue">0</p>
             </div>
             <div class="border border-slate-200 rounded-2xl p-3 bg-white">
@@ -787,18 +787,47 @@
     };
 
     const loadUserStats = async () => {
-      const [profilesRes, onboardingRes] = await Promise.all([
+      const [profilesRes, onboardingRes, packDetailsRes] = await Promise.all([
         supabaseClient.from('profiles').select('*'),
-        supabaseClient.from('user_onboarding').select('*')
+        supabaseClient.from('user_onboarding').select('user_id, kyc_status'),
+        supabaseClient.from('user_onboarding_pack_details').select('user_id')
       ]);
 
       const profiles = profilesRes.data || [];
       const onboardings = onboardingRes.data || [];
+      const packDetailsRows = packDetailsRes.data || [];
+
+      const normalizeStatus = (value) => String(value || '').trim().toLowerCase();
+      const isKycCompleted = (status) => {
+        const normalized = normalizeStatus(status);
+        if (!normalized) return false;
+        return normalized.includes('completed')
+          || normalized.includes('complete')
+          || normalized.includes('approved')
+          || normalized.includes('verified')
+          || normalized.includes('done');
+      };
+
+      const onboardingByUser = new Map();
+      onboardings.forEach((row) => {
+        if (row?.user_id) onboardingByUser.set(String(row.user_id), row);
+      });
+
+      const clientDetailsUsers = new Set(
+        packDetailsRows
+          .map((row) => row?.user_id)
+          .filter(Boolean)
+          .map((id) => String(id))
+      );
 
       const totalUsers = profiles.length;
-      const usersKyc = onboardings.filter(row => {
-        const status = String(row.kyc_status || '').toLowerCase();
-        return status && status !== 'not initiated';
+      const usersKyc = profiles.filter((profile) => {
+        const userId = String(profile?.id || '');
+        if (!userId) return false;
+        const onboarding = onboardingByUser.get(userId);
+        const statusCompleted = isKycCompleted(onboarding?.kyc_status);
+        const hasClientDetails = clientDetailsUsers.has(userId);
+        return statusCompleted || hasClientDetails;
       }).length;
 
       const usersLinkedBank = profiles.filter(row => {
