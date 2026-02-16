@@ -3200,6 +3200,26 @@
         return false;
       };
 
+      const getClientDetailsKycSignal = (profileId) => {
+        const packData = packJsonMap[profileId] || packDetailsRowMap[profileId]?.pack_details || null;
+        if (!packData) {
+          return {
+            hasClientDetails: false,
+            completed: false,
+            pending: false
+          };
+        }
+
+        const reviewStatus = pickPackValue(packData, ['review.status', 'review.reviewStatus', 'reviewStatus', 'status']);
+        const reviewAnswer = pickPackValue(packData, ['review.result.reviewAnswer', 'review.reviewAnswer', 'reviewAnswer']);
+
+        return {
+          hasClientDetails: true,
+          completed: isKycCompletedStatus(reviewStatus) || isKycCompletedStatus(reviewAnswer),
+          pending: isKycPendingStatus(reviewStatus) || isKycPendingStatus(reviewAnswer)
+        };
+      };
+
       const filtered = allProfiles.filter(profile => {
         const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
         const uid = profile.id || '';
@@ -3208,8 +3228,15 @@
           || String(uid).toLowerCase().includes(query);
 
         const kycStatus = allKycMap[profile.id]?.status || 'Not initiated';
-        const kycCompleted = isKycCompletedStatus(kycStatus);
-        const kycPending = isKycPendingStatus(kycStatus);
+        const normalizedKycStatus = normalizeStatusText(kycStatus);
+        const clientDetailsKyc = getClientDetailsKycSignal(profile.id);
+        const pendingLooksStale = normalizedKycStatus.includes('pending')
+          && clientDetailsKyc.hasClientDetails
+          && clientDetailsKyc.completed;
+        const kycCompleted = isKycCompletedStatus(kycStatus)
+          || clientDetailsKyc.completed
+          || pendingLooksStale;
+        const kycPending = (isKycPendingStatus(kycStatus) || clientDetailsKyc.pending) && !kycCompleted;
         const matchesKyc = activeProfileFilters.kyc === 'all'
           || (activeProfileFilters.kyc === 'completed' && kycCompleted)
           || (activeProfileFilters.kyc === 'pending' && kycPending)
