@@ -1814,7 +1814,8 @@
                 <select id="kycFilterSelect" class="user-filter-select">
                   <option value="all">All</option>
                   <option value="completed">Completed</option>
-                  <option value="pending">Pending / not completed</option>
+                  <option value="pending">Pending</option>
+                  <option value="not-completed">Not completed (all)</option>
                 </select>
               </div>
               <div class="user-filter-field">
@@ -3006,6 +3007,17 @@
           || normalized.includes('done');
       };
 
+      const isKycPendingStatus = (status) => {
+        const normalized = normalizeStatusText(status);
+        if (!normalized) return false;
+        return normalized.includes('pending')
+          || normalized.includes('in progress')
+          || normalized.includes('in_progress')
+          || normalized.includes('review')
+          || normalized.includes('processing')
+          || normalized.includes('queued');
+      };
+
       const isTruthyBankValue = (value) => {
         if (value === true) return true;
         if (typeof value === 'number') return value > 0;
@@ -3074,9 +3086,11 @@
 
         const kycStatus = allKycMap[profile.id]?.status || 'Not initiated';
         const kycCompleted = isKycCompletedStatus(kycStatus);
+        const kycPending = isKycPendingStatus(kycStatus);
         const matchesKyc = activeProfileFilters.kyc === 'all'
           || (activeProfileFilters.kyc === 'completed' && kycCompleted)
-          || (activeProfileFilters.kyc === 'pending' && !kycCompleted);
+          || (activeProfileFilters.kyc === 'pending' && kycPending)
+          || (activeProfileFilters.kyc === 'not-completed' && !kycCompleted);
 
         const bankInitiated = getBankInitiatedForProfile(profile);
         const matchesBank = activeProfileFilters.bank === 'all'
