@@ -294,6 +294,22 @@
       cursor: progress;
     }
 
+    .ellipsis-btn.is-loading span {
+      background: var(--primary);
+      box-shadow: -8px 0 0 var(--primary), 8px 0 0 var(--primary);
+      animation: ellipsisPulse 1s ease-in-out infinite;
+    }
+
+    @keyframes ellipsisPulse {
+      0%,
+      100% {
+        opacity: 0.5;
+      }
+      50% {
+        opacity: 1;
+      }
+    }
+
     .detailed-view {
       max-height: 0;
       opacity: 0;
@@ -663,9 +679,13 @@
     }
 
     .tab:hover {
-      color: #374151;
-      box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15), 0 6px 14px rgba(124, 58, 237, 0.12);
-      border-radius: 10px;
+      color: var(--primary);
+      text-shadow: 0 0 10px rgba(124, 58, 237, 0.28);
+    }
+
+    .tab:hover svg {
+      fill: var(--primary);
+      filter: drop-shadow(0 0 6px rgba(124, 58, 237, 0.3));
     }
 
     .tab.active {
