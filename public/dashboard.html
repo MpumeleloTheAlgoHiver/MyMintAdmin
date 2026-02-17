@@ -852,20 +852,57 @@
     };
 
     const loadTopHoldings = async () => {
-      const { data, error } = await supabaseClient
-        .from('securities')
-        .select('id, name, symbol, logo_url, description, market_cap, website, created_at, is_active')
-        .eq('is_active', true)
-        .order('created_at', { ascending: true })
-        .limit(3);
+      const { data: holdingsRows, error: holdingsError } = await supabaseClient
+        .from('stock_holdings')
+        .select('security_id, quantity');
 
-      if (error) {
-        console.error('Holdings load error:', error);
+      if (holdingsError) {
+        console.error('Holdings load error:', holdingsError);
         renderHoldings([]);
         return;
       }
 
-      renderHoldings(data || []);
+      const quantityBySecurityId = {};
+      (holdingsRows || []).forEach((row) => {
+        const securityId = row?.security_id;
+        if (!securityId) return;
+        const quantity = Number(row?.quantity);
+        if (!Number.isFinite(quantity)) return;
+        quantityBySecurityId[securityId] = (quantityBySecurityId[securityId] || 0) + quantity;
+      });
+
+      const rankedSecurityIds = Object.entries(quantityBySecurityId)
+        .sort(([, quantityA], [, quantityB]) => quantityB - quantityA)
+        .map(([securityId]) => securityId)
+        .slice(0, 3);
+
+      if (!rankedSecurityIds.length) {
+        renderHoldings([]);
+        return;
+      }
+
+      const { data: securitiesRows, error: securitiesError } = await supabaseClient
+        .from('securities')
+        .select('id, name, symbol, logo_url, description, market_cap, website, created_at, is_active')
+        .in('id', rankedSecurityIds)
+        .eq('is_active', true);
+
+      if (securitiesError) {
+        console.error('Securities load error:', securitiesError);
+        renderHoldings([]);
+        return;
+      }
+
+      const securityById = (securitiesRows || []).reduce((acc, security) => {
+        acc[security.id] = security;
+        return acc;
+      }, {});
+
+      const orderedSecurities = rankedSecurityIds
+        .map((securityId) => securityById[securityId])
+        .filter(Boolean);
+
+      renderHoldings(orderedSecurities);
     };
 
     const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
