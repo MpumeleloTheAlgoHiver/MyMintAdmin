@@ -2627,8 +2627,8 @@
         events.push({
           at: onboardingRow?.updated_at || onboardingRow?.created_at || profile?.created_at,
           title: effectiveKyc.completed ? 'KYC status now completed' : `KYC status updated to ${effectiveKyc.label}`,
-          meta: onboardingRow?.sumsub_external_user_id ? 'Sumsub sync' : 'KYC workflow',
-          details: onboardingRow?.sumsub_external_user_id ? `External user id: ${onboardingRow.sumsub_external_user_id}` : '',
+          meta: onboardingRow?.user_id ? 'Sumsub sync' : 'KYC workflow',
+          details: onboardingRow?.user_id ? `External user id: ${onboardingRow.user_id}` : '',
           blue: effectiveKyc.completed
         });
       }
@@ -3472,7 +3472,7 @@
           kycMap = onboarding.reduce((acc, row) => {
             acc[row.user_id] = {
               status: row.kyc_status || 'Not initiated',
-              externalUserId: row.sumsub_external_user_id || ''
+              externalUserId: row.user_id || ''
             };
             onboardingMap[row.user_id] = row;
             return acc;
