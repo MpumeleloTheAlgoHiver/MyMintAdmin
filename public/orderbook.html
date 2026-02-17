@@ -164,6 +164,35 @@
       margin-bottom: 8px;
     }
 
+    .orderbook-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .orderbook-timer {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #6b7280;
+      border: 1px solid #e5e7eb;
+      border-radius: 999px;
+      padding: 5px 10px;
+      background: #ffffff;
+      min-width: 92px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      transition: all 0.2s ease;
+    }
+
+    .orderbook-timer.is-hit {
+      color: #7c3aed;
+      border-color: #c4b5fd;
+      background: #f5f3ff;
+      box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
+    }
+
     .orderbook-subtitle {
       font-size: 0.92rem;
       color: var(--text-muted);
@@ -355,7 +384,10 @@
 
     <section class="orderbook-wrap">
       <div class="orderbook-card">
-        <h1 class="orderbook-title">Orderbook</h1>
+        <div class="orderbook-title-row">
+          <h1 class="orderbook-title">Orderbook</h1>
+          <div class="orderbook-timer" id="orderbookTimer" aria-live="polite">00:00:00</div>
+        </div>
         <p class="orderbook-subtitle">Holdings ledger with export support.</p>
         <div class="orderbook-toolbar">
           <div class="orderbook-count" id="orderbookCount">0 records</div>
@@ -396,7 +428,9 @@
     const orderbookCount = document.getElementById('orderbookCount');
     const exportOrderbookBtn = document.getElementById('exportOrderbookBtn');
     const orderbookSearch = document.getElementById('orderbookSearch');
+    const orderbookTimer = document.getElementById('orderbookTimer');
     let allOrderbookRows = [];
+    let timerHighlightUntil = 0;
 
     const requireSession = async () => {
       const { data } = await supabaseClient.auth.getSession();
@@ -461,6 +495,28 @@
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
+    };
+
+    const pad2 = (value) => String(value).padStart(2, '0');
+
+    const renderOrderbookTimer = () => {
+      if (!orderbookTimer) return;
+      const now = new Date();
+      const hours = pad2(now.getHours());
+      const minutes = pad2(now.getMinutes());
+      const seconds = pad2(now.getSeconds());
+      orderbookTimer.textContent = `${hours}:${minutes}:${seconds}`;
+
+      const isPurpleMoment = minutes === '00' && seconds === '00';
+      if (isPurpleMoment) {
+        timerHighlightUntil = Date.now() + 5000;
+      }
+      orderbookTimer.classList.toggle('is-hit', Date.now() <= timerHighlightUntil);
+    };
+
+    const startOrderbookTimer = () => {
+      renderOrderbookTimer();
+      setInterval(renderOrderbookTimer, 1000);
     };
 
     const renderOrderbookRows = (rows) => {
@@ -678,6 +734,8 @@
     requireSession().then((ok) => {
       if (ok) loadOrderbook();
     });
+
+    startOrderbookTimer();
   </script>
 </body>
 </html>

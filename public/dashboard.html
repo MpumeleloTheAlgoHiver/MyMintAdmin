@@ -669,16 +669,58 @@
       const marketCap = formatCompactCurrency(security.market_cap);
       const logoUrl = security.logo_url || '';
       const totalQuantity = Number(security.total_quantity || 0);
-      const acquiredByUsers = Array.isArray(security.acquired_by_users) ? security.acquired_by_users : [];
+      const acquiredByUsers = Array.isArray(security.acquired_by_users_details) ? security.acquired_by_users_details : [];
       const visibleAcquiredUsers = acquiredByUsers.slice(0, 3);
-      const remainingAcquiredUsers = Math.max(0, acquiredByUsers.length - visibleAcquiredUsers.length);
+      const hiddenAcquiredUsers = acquiredByUsers.slice(3);
       const quantityLabel = Number.isFinite(totalQuantity)
         ? `+${totalQuantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}`
         : '+0';
       const websiteLink = normalizeWebsite(website);
-      const acquiredUsersLabel = acquiredByUsers.length
-        ? `${visibleAcquiredUsers.join(', ')}${remainingAcquiredUsers ? ` and ${remainingAcquiredUsers} more` : ''}`
-        : 'No user acquisitions found';
+
+      const renderUserMiniCard = (user, hidden = false) => {
+        const userName = user?.name || user?.uid || 'Unknown user';
+        const userUid = user?.uid || '-';
+        const userAvatarUrl = user?.avatar_url || '';
+        const userQuantity = Number(user?.quantity || 0);
+        const userQuantityLabel = Number.isFinite(userQuantity)
+          ? `+${userQuantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}`
+          : '+0';
+        const profileLink = user?.profile_link || '/index.html';
+
+        return `
+          <div class="rounded-xl border border-slate-200 bg-slate-50 px-2 py-2 ${hidden ? 'hidden' : ''}" data-acquired-user-card="${hidden ? 'extra' : 'visible'}">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <div class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center text-[10px] text-slate-700 font-semibold">
+                  ${userAvatarUrl
+                    ? `<img src="${userAvatarUrl}" alt="${userName} avatar" class="w-full h-full object-cover" />`
+                    : userName.slice(0, 2).toUpperCase()}
+                </div>
+                <div class="min-w-0">
+                  <p class="text-xs font-semibold text-slate-700 truncate">${userName}</p>
+                  <p class="text-[10px] text-slate-500 truncate">UID: ${userUid}</p>
+                </div>
+              </div>
+              <span class="text-[10px] font-semibold text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded-full">${userQuantityLabel}</span>
+            </div>
+            <div class="mt-1.5 text-right">
+              <a class="text-[10px] font-medium text-indigo-600 hover:text-indigo-700" href="${profileLink}" target="_blank" rel="noopener">Open in Profiles</a>
+            </div>
+          </div>
+        `;
+      };
+
+      const acquiredUsersHtml = acquiredByUsers.length
+        ? `
+          <div class="space-y-2 mt-1" data-acquired-users-list>
+            ${visibleAcquiredUsers.map((user) => renderUserMiniCard(user)).join('')}
+            ${hiddenAcquiredUsers.map((user) => renderUserMiniCard(user, true)).join('')}
+          </div>
+          ${hiddenAcquiredUsers.length
+            ? `<div class="mt-2"><button type="button" class="text-xs font-medium text-indigo-600 hover:text-indigo-700" data-acquired-more>More (${hiddenAcquiredUsers.length})</button></div>`
+            : ''}
+        `
+        : '<p class="text-xs text-slate-500 mt-1">No user acquisitions found.</p>';
 
       wrapper.innerHTML = `
         <div class="flex items-start justify-between gap-3">
@@ -705,7 +747,10 @@
           <p class="text-xs text-slate-500"><span class="font-semibold text-slate-700">Owned quantity:</span> <span class="text-violet-700 font-semibold">${quantityLabel}</span></p>
           <p class="text-xs text-slate-500"><span class="font-semibold text-slate-700">Market cap:</span> ${marketCap}</p>
           <p class="text-xs text-slate-500"><span class="font-semibold text-slate-700">Website:</span> ${websiteLink ? `<a class=\"text-indigo-600 hover:text-indigo-700\" href=\"${websiteLink}\" target=\"_blank\" rel=\"noopener\">${website}</a>` : 'Not available'}</p>
-          <p class="text-xs text-slate-500"><span class="font-semibold text-slate-700">Acquired by:</span> ${acquiredUsersLabel}</p>
+          <div class="mt-2">
+            <p class="text-xs text-slate-500"><span class="font-semibold text-slate-700">Acquired by:</span></p>
+            ${acquiredUsersHtml}
+          </div>
         </div>
       `;
 
@@ -726,6 +771,16 @@
       if (logoImage && logoContainer) {
         logoImage.addEventListener('error', () => {
           logoContainer.innerHTML = symbol.slice(0, 2).toUpperCase();
+        });
+      }
+
+      const moreButton = wrapper.querySelector('[data-acquired-more]');
+      if (moreButton) {
+        moreButton.addEventListener('click', () => {
+          const extraCards = wrapper.querySelectorAll('[data-acquired-user-card="extra"]');
+          const shouldShow = Array.from(extraCards).some((card) => card.classList.contains('hidden'));
+          extraCards.forEach((card) => card.classList.toggle('hidden', !shouldShow));
+          moreButton.textContent = shouldShow ? 'Show less' : `More (${extraCards.length})`;
         });
       }
 
@@ -879,6 +934,7 @@
 
       const quantityBySecurityId = {};
       const userIdsBySecurityId = {};
+      const quantityBySecurityAndUser = {};
       (holdingsRows || []).forEach((row) => {
         const securityId = row?.security_id;
         if (!securityId) return;
@@ -888,6 +944,9 @@
         if (quantity > 0 && row?.user_id) {
           if (!userIdsBySecurityId[securityId]) userIdsBySecurityId[securityId] = new Set();
           userIdsBySecurityId[securityId].add(String(row.user_id));
+          if (!quantityBySecurityAndUser[securityId]) quantityBySecurityAndUser[securityId] = {};
+          const keyUserId = String(row.user_id);
+          quantityBySecurityAndUser[securityId][keyUserId] = (quantityBySecurityAndUser[securityId][keyUserId] || 0) + quantity;
         }
       });
 
@@ -906,10 +965,11 @@
       )];
 
       let profileNameById = {};
+      let profileAvatarById = {};
       if (allAcquirerUserIds.length) {
         const { data: profileRows, error: profilesError } = await supabaseClient
           .from('profiles')
-          .select('id, first_name, last_name, email')
+          .select('id, first_name, last_name, email, avatar_url')
           .in('id', allAcquirerUserIds);
 
         if (profilesError) {
@@ -918,6 +978,11 @@
           profileNameById = (profileRows || []).reduce((acc, profile) => {
             const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
             acc[String(profile.id)] = fullName || profile.email || String(profile.id);
+            return acc;
+          }, {});
+
+          profileAvatarById = (profileRows || []).reduce((acc, profile) => {
+            acc[String(profile.id)] = profile.avatar_url || '';
             return acc;
           }, {});
         }
@@ -945,13 +1010,20 @@
           const base = securityById[securityId];
           if (!base) return null;
 
-          const acquiredByUsers = Array.from(userIdsBySecurityId[securityId] || [])
-            .map((userId) => profileNameById[userId] || userId);
+          const acquiredByUsersDetails = Array.from(userIdsBySecurityId[securityId] || [])
+            .map((userId) => ({
+              uid: userId,
+              name: profileNameById[userId] || userId,
+              avatar_url: profileAvatarById[userId] || '',
+              quantity: quantityBySecurityAndUser[securityId]?.[userId] || 0,
+              profile_link: `/index.html?profileId=${encodeURIComponent(userId)}`
+            }))
+            .sort((a, b) => Number(b.quantity || 0) - Number(a.quantity || 0));
 
           return {
             ...base,
             total_quantity: quantityBySecurityId[securityId] || 0,
-            acquired_by_users: acquiredByUsers
+            acquired_by_users_details: acquiredByUsersDetails
           };
         })
         .filter(Boolean);
