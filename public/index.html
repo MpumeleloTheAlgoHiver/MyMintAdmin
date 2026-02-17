@@ -1426,6 +1426,8 @@
 
     .timeline-table-wrap {
       overflow-x: auto;
+      overflow-y: auto;
+      max-height: 230px;
       border: 1px solid #e5e7eb;
       border-radius: 10px;
       background: #fff;
@@ -1452,6 +1454,42 @@
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.04em;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .timeline-security-cell {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .timeline-security-logo {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 1px solid #e5e7eb;
+      object-fit: cover;
+      background: #ffffff;
+      flex-shrink: 0;
+    }
+
+    .timeline-security-fallback {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 1px solid #e5e7eb;
+      background: #f3f4f6;
+      color: #4b5563;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.62rem;
+      font-weight: 700;
+      line-height: 1;
+      text-transform: uppercase;
+      flex-shrink: 0;
     }
 
     /* Holdings Cards */
@@ -1568,6 +1606,38 @@
       font-size: 1rem;
       font-weight: 600;
       color: #111827;
+    }
+
+    .holding-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .holding-logo {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: 1px solid #e5e7eb;
+      object-fit: cover;
+      background: #ffffff;
+      flex-shrink: 0;
+    }
+
+    .holding-logo-fallback {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: 1px solid #e5e7eb;
+      background: #f3f4f6;
+      color: #4b5563;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      text-transform: uppercase;
     }
 
     .holding-price {
@@ -2600,6 +2670,12 @@
       return date.toLocaleString();
     };
 
+    const toTimestamp = (value) => {
+      if (!value) return 0;
+      const parsed = new Date(value).getTime();
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
     const escapeHtml = (value) => String(value ?? '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -2743,7 +2819,7 @@
     const buildBoughtHistoryTableHtml = (rows = []) => {
       const buyRows = rows
         .filter((row) => Number(row.quantity) > 0)
-        .sort((a, b) => new Date(b.Fill_date || b.fill_date || b.updated_at || b.created_at || 0).getTime() - new Date(a.Fill_date || a.fill_date || a.updated_at || a.created_at || 0).getTime());
+        .sort((a, b) => toTimestamp(b.Fill_date || b.fill_date || b.updated_at || b.created_at) - toTimestamp(a.Fill_date || a.fill_date || a.updated_at || a.created_at));
 
       if (!buyRows.length) {
         return '<div class="timeline-table-wrap"><div class="holding-card holding-card-muted"><div class="holding-desc">No buy records found.</div></div></div>';
@@ -2752,12 +2828,21 @@
       const body = buyRows.map((row) => {
         const security = securitiesByIdMap[row.security_id] || {};
         const label = security.name || security.symbol || row.security_id || '-';
+        const logoUrl = security.logo_url || '';
+        const titleInitial = String(label || 'S').trim().charAt(0) || 'S';
         const status = row.status || row.Status || '-';
         const fillDate = row.Fill_date || row.fill_date || row.as_of_date || '-';
 
         return `
           <tr>
-            <td>${escapeHtml(label)}</td>
+            <td>
+              <span class="timeline-security-cell">
+                ${logoUrl
+                  ? `<img class="timeline-security-logo" src="${escapeHtml(logoUrl)}" alt="${escapeHtml(label)} logo" loading="lazy">`
+                  : `<span class="timeline-security-fallback" aria-label="${escapeHtml(label)} logo fallback">${escapeHtml(titleInitial)}</span>`}
+                <span>${escapeHtml(label)}</span>
+              </span>
+            </td>
             <td>${formatNumber(row.quantity, 2)}</td>
             <td>R ${formatNumber(row.avg_fill, 2)}</td>
             <td>${escapeHtml(fillDate)}</td>
@@ -2788,7 +2873,7 @@
     const buildCurrentHoldingsByShareTableHtml = (rows = []) => {
       const aggregated = aggregateCurrentStockRows(rows)
         .filter((row) => Number(row.quantity) > 0)
-        .sort((a, b) => new Date(b.updated_at || b.as_of_date || 0).getTime() - new Date(a.updated_at || a.as_of_date || 0).getTime());
+        .sort((a, b) => toTimestamp(b.updated_at || b.as_of_date) - toTimestamp(a.updated_at || a.as_of_date));
 
       if (!aggregated.length) {
         return '<div class="timeline-table-wrap"><div class="holding-card holding-card-muted"><div class="holding-desc">No current share holdings.</div></div></div>';
@@ -2948,7 +3033,7 @@
 
       const sorted = events
         .filter(event => event.at)
-        .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+        .sort((a, b) => toTimestamp(b.at) - toTimestamp(a.at));
 
       if (!sorted.length) {
         historyView.innerHTML = `
@@ -3756,6 +3841,8 @@
     const renderStockHoldingCard = (row) => {
       const security = securitiesByIdMap[row.security_id] || {};
       const title = security.name || security.symbol || row.security_id || 'Stock holding';
+      const logoUrl = security.logo_url || '';
+      const titleInitial = String(title || 'S').trim().charAt(0) || 'S';
       const asOf = row.as_of_date || '-';
       const quantity = row.quantity === null || row.quantity === undefined ? '-' : formatNumber(row.quantity, 2);
       const marketValue = row.market_value === null || row.market_value === undefined ? 'R -' : `R ${formatNumber(row.market_value, 2)}`;
@@ -3767,7 +3854,10 @@
       return `
         <div class="holding-card">
           <div class="holding-header">
-            <div>
+            <div class="holding-title-wrap">
+              ${logoUrl
+                ? `<img class="holding-logo" src="${escapeHtml(logoUrl)}" alt="${escapeHtml(title)} logo" loading="lazy">`
+                : `<span class="holding-logo-fallback" aria-label="${escapeHtml(title)} logo fallback">${escapeHtml(titleInitial)}</span>`}
               <div class="holding-title">${escapeHtml(title)}</div>
             </div>
             <div>
@@ -3916,7 +4006,7 @@
           if (securityIds.length) {
             const { data: securityRows, error: securitiesError } = await supabaseClient
               .from('securities')
-              .select('id, symbol, name')
+              .select('id, symbol, name, logo_url')
               .in('id', securityIds);
 
             if (!securitiesError && securityRows) {
