@@ -318,6 +318,58 @@
       gap: 16px;
     }
 
+    .simple-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-left: auto;
+    }
+
+    .sumsub-review-pulse {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: #d1d5db;
+      box-shadow: 0 0 0 0 rgba(209, 213, 219, 0.7);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .sumsub-review-pulse.active {
+      opacity: 1;
+      animation: sumsubPulse 1.6s ease-out infinite;
+    }
+
+    .sumsub-review-pulse.green {
+      background: #16a34a;
+      box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.52);
+    }
+
+    .sumsub-review-pulse.yellow {
+      background: #f59e0b;
+      box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.52);
+    }
+
+    .sumsub-review-pulse.red {
+      background: #dc2626;
+      box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.52);
+    }
+
+    @keyframes sumsubPulse {
+      0% {
+        transform: scale(0.96);
+        opacity: 0.85;
+      }
+      50% {
+        transform: scale(1);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(0.96);
+        opacity: 0.85;
+      }
+    }
+
     .simple-avatar {
       width: 40px;
       height: 40px;
@@ -1913,11 +1965,14 @@
                 <div class="simple-uid" data-uid>UID: AA-0000-XX</div>
               </div>
             </div>
-            <button class="ellipsis-btn show-details-btn" aria-label="Show profile details">
-              <svg viewBox="0 0 20 20" aria-hidden="true">
-                <path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"/>
-              </svg>
-            </button>
+            <div class="simple-right">
+              <span class="sumsub-review-pulse" data-review-pulse aria-hidden="true"></span>
+              <button class="ellipsis-btn show-details-btn" aria-label="Show profile details">
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"/>
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div class="detailed-view">
@@ -2810,32 +2865,83 @@
         return {
           hasClientDetails: false,
           completed: false,
-          pending: false
+          pending: false,
+          rejected: false,
+          pulse: null,
+          reviewAnswer: ''
         };
       }
 
+      const reviewAnswerRaw = pickPackValue(packData, [
+        'review.result.reviewAnswer',
+        'review.reviewAnswer',
+        'reviewAnswer'
+      ]);
+      const reviewStatusRaw = pickPackValue(packData, [
+        'review.reviewStatus',
+        'reviewStatus',
+        'status'
+      ]);
+      const reviewAnswer = String(reviewAnswerRaw || '').trim().toUpperCase();
+      const reviewStatus = String(reviewStatusRaw || '').trim().toLowerCase();
+
+      const isGreen = reviewAnswer === 'GREEN';
+      const isYellow = reviewAnswer === 'YELLOW' || reviewAnswer === 'ORANGE';
+      const isRed = reviewAnswer === 'RED';
+      const completedFromStatus = reviewStatus.includes('completed') || reviewStatus.includes('approved');
+      const pendingFromStatus = reviewStatus.includes('pending') || reviewStatus.includes('init') || reviewStatus.includes('review') || reviewStatus.includes('process');
+
+      const pulse = isGreen ? 'green' : (isYellow ? 'yellow' : (isRed ? 'red' : null));
+
       return {
         hasClientDetails: true,
-        completed: true,
-        pending: false
+        completed: isGreen || (!isYellow && !isRed && completedFromStatus),
+        pending: isYellow || (!isRed && !isGreen && pendingFromStatus),
+        rejected: isRed,
+        pulse,
+        reviewAnswer
       };
     };
 
     const getEffectiveKycState = (profileId, rawKycStatus) => {
       const normalizedKycStatus = normalizeKycStatusText(rawKycStatus);
       const clientDetailsKyc = getClientDetailsKycSignal(profileId);
+      const rejected = clientDetailsKyc.rejected || normalizedKycStatus.includes('reject');
+      const explicitPendingFromReview = !rejected && clientDetailsKyc.pending;
+      const explicitCompletedFromReview = !rejected && !explicitPendingFromReview && clientDetailsKyc.completed;
       const pendingLooksStale = normalizedKycStatus.includes('pending')
         && clientDetailsKyc.hasClientDetails
         && clientDetailsKyc.completed;
-      const completed = isKycCompletedValue(rawKycStatus)
+      const completed = explicitCompletedFromReview || (!rejected && !explicitPendingFromReview && (isKycCompletedValue(rawKycStatus)
         || clientDetailsKyc.completed
-        || pendingLooksStale;
-      const pending = (isKycPendingValue(rawKycStatus) || clientDetailsKyc.pending) && !completed;
+        || pendingLooksStale));
+      const pending = explicitPendingFromReview || (!rejected && !completed && isKycPendingValue(rawKycStatus));
       return {
+        rejected,
         completed,
         pending,
-        label: completed ? 'Completed' : (pending ? 'Pending' : (rawKycStatus || 'Not initiated'))
+        label: rejected ? 'Rejected' : (completed ? 'Completed' : (pending ? 'Pending' : (rawKycStatus || 'Not initiated')))
       };
+    };
+
+    const updateReviewPulseForItem = (item, profileId) => {
+      if (!item || !profileId) return;
+      const pulseEl = item.querySelector('[data-review-pulse]');
+      if (!pulseEl) return;
+
+      const signal = getClientDetailsKycSignal(profileId);
+      pulseEl.classList.remove('active', 'green', 'yellow', 'red');
+      pulseEl.removeAttribute('title');
+
+      if (!signal?.pulse) return;
+
+      pulseEl.classList.add('active', signal.pulse);
+      const title = signal.pulse === 'green'
+        ? 'KYC review answer: GREEN'
+        : signal.pulse === 'yellow'
+          ? 'KYC review answer: YELLOW'
+          : 'KYC review answer: RED';
+      pulseEl.setAttribute('title', title);
     };
 
     const toPrettyLabel = (key = '') => String(key)
@@ -3269,6 +3375,7 @@
         const kycEntry = kycMap[profile.id] || {};
         const effectiveKycState = getEffectiveKycState(profile.id, kycEntry.status || 'Not initiated');
         setText(clone, '[data-kyc-status]', effectiveKycState.label);
+        updateReviewPulseForItem(clone, profile.id);
 
         const initialsEl = clone.querySelector('[data-initials]');
         if (initialsEl) {
@@ -3685,6 +3792,13 @@
       }
 
       await syncPhoneFromPack(item, applicantJson, { persistToDb: true });
+      updateReviewPulseForItem(item, profileId);
+
+      const kycStatusEl = item.querySelector('[data-kyc-status]');
+      if (kycStatusEl) {
+        const effectiveKyc = getEffectiveKycState(profileId, allKycMap[profileId]?.status || 'Not initiated');
+        kycStatusEl.textContent = effectiveKyc.label;
+      }
 
       supabaseClient
         .from('user_onboarding_pack_details')
