@@ -531,7 +531,7 @@
 
       const { data: holdingsRows, error: holdingsError } = await supabaseClient
         .from('stock_holdings')
-        .select('user_id, security_id, quantity, as_of_date, created_at, updated_at')
+        .select('id, user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, as_of_date, created_at, updated_at, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", avg_exit')
         .order('updated_at', { ascending: false });
 
       if (holdingsError) {
@@ -588,21 +588,32 @@
           `${clientName} Main`,
           `${clientName} Trading`
         ].filter(Boolean))];
-        const brokerRef = row.security_id ? `BR-${row.security_id}` : `BR-${index + 1}`;
+        const brokerRef = row.id ? `SH-${String(row.id).slice(0, 8)}` : (row.security_id ? `BR-${row.security_id}` : `BR-${index + 1}`);
         const brokerRefOptions = [...new Set([
           brokerRef,
           `${brokerRef}-A`,
           `${brokerRef}-B`
         ].filter(Boolean))];
+        const quantityValue = Number(row.quantity);
+        const isQuantityNumeric = Number.isFinite(quantityValue);
+        const side = isQuantityNumeric
+          ? (quantityValue < 0 ? 'SELL' : 'BUY')
+          : '-';
+        const statusText = String(row.status || '').trim();
+        const orderType = statusText
+          || (row.exit_date ? 'CLOSED' : (row.fill_date ? 'FILLED' : 'OPEN'));
+        const totalQuantity = isQuantityNumeric
+          ? quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 })
+          : (row.quantity ?? '-');
 
         return {
           line: index + 1,
           instrumentName,
           ticker,
           isin,
-          side: row.quantity < 0 ? 'SELL' : 'BUY',
-          totalQuantity: row.quantity ?? '-',
-          orderType: 'Market',
+          side,
+          totalQuantity,
+          orderType,
           settlementAccount,
           settlementAccountOptions,
           brokerRef,
