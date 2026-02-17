@@ -538,7 +538,6 @@
 
       const holdings = holdingsRows || [];
       const securityIds = [...new Set(holdings.map((row) => row.security_id).filter(Boolean))];
-      const userIds = [...new Set(holdings.map((row) => row.user_id).filter(Boolean))];
 
       const securitiesMap = {};
       if (securityIds.length) {
@@ -577,42 +576,16 @@
         }
       }
 
-      const profilesMap = {};
-      if (userIds.length) {
-        const { data: profileRows, error: profileError } = await supabaseClient
-          .from('profiles')
-          .select('id, first_name, last_name, email, phone_number')
-          .in('id', userIds);
-
-        if (profileError) {
-          console.error('Profiles load error:', profileError);
-        } else {
-          (profileRows || []).forEach((profile) => {
-            profilesMap[profile.id] = profile;
-          });
-        }
-      }
-
       return holdings.map((row, index) => {
         const security = securitiesMap[row.security_id] || {};
-        const profile = profilesMap[row.user_id] || {};
         const instrumentName = security.name || '-';
         const ticker = security.symbol ?? '-';
         const isin = security.isin || security.ISIN || security.isin_code || security.isincode || '-';
         const timestamp = row.updated_at || row.created_at || row.as_of_date || null;
-        const clientName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || String(row.user_id || 'Unknown client');
-        const settlementAccount = profile.email || `${clientName} Main`;
-        const settlementAccountOptions = [...new Set([
-          settlementAccount,
-          `${clientName} Main`,
-          `${clientName} Trading`
-        ].filter(Boolean))];
-        const brokerRef = row.id ? `SH-${String(row.id).slice(0, 8)}` : (row.security_id ? `BR-${row.security_id}` : `BR-${index + 1}`);
-        const brokerRefOptions = [...new Set([
-          brokerRef,
-          `${brokerRef}-A`,
-          `${brokerRef}-B`
-        ].filter(Boolean))];
+        const settlementAccount = '';
+        const settlementAccountOptions = [''];
+        const brokerRef = '';
+        const brokerRefOptions = [''];
         const quantityValue = Number(row.quantity);
         const isQuantityNumeric = Number.isFinite(quantityValue);
         const side = isQuantityNumeric
