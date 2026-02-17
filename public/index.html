@@ -2026,7 +2026,6 @@
               </div>
             </div>
             <div class="simple-right">
-              <span class="sumsub-review-pulse" data-review-pulse aria-hidden="true"></span>
               <button class="ellipsis-btn show-details-btn" aria-label="Show profile details">
                 <svg viewBox="0 0 20 20" aria-hidden="true">
                   <path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"/>
@@ -2136,7 +2135,7 @@
                     Documents
                   </button>
                   <div class="tabs-header-status">
-                    <span class="sumsub-review-pulse" data-review-pulse aria-hidden="true"></span>
+                    <span class="sumsub-review-pulse" data-review-pulse-dropdown aria-hidden="true"></span>
                   </div>
                 </div>
 
@@ -2989,26 +2988,24 @@
 
     const updateReviewPulseForItem = (item, profileId) => {
       if (!item || !profileId) return;
-      const pulseEls = Array.from(item.querySelectorAll('[data-review-pulse]'));
-      if (!pulseEls.length) return;
+      const pulseEl = item.querySelector('[data-review-pulse-dropdown]');
+      if (!pulseEl) return;
 
-      const signal = getClientDetailsKycSignal(profileId);
-      pulseEls.forEach((pulseEl) => {
-        pulseEl.classList.remove('active', 'green', 'yellow', 'red');
-        pulseEl.removeAttribute('title');
-      });
+      pulseEl.classList.remove('active', 'green', 'yellow', 'red');
+      pulseEl.removeAttribute('title');
 
-      if (!signal?.pulse) return;
+      const effectiveKycState = getEffectiveKycState(profileId, allKycMap[profileId]?.status || 'Not initiated');
+      const pulseColor = effectiveKycState.rejected
+        ? 'red'
+        : (effectiveKycState.completed ? 'green' : (effectiveKycState.pending ? 'yellow' : ''));
 
-      const title = signal.pulse === 'green'
-        ? 'KYC review answer: GREEN'
-        : signal.pulse === 'yellow'
-          ? 'KYC review answer: YELLOW'
-          : 'KYC review answer: RED';
-      pulseEls.forEach((pulseEl) => {
-        pulseEl.classList.add('active', signal.pulse);
-        pulseEl.setAttribute('title', title);
-      });
+      if (!pulseColor) {
+        pulseEl.setAttribute('title', `KYC status: ${effectiveKycState.label}`);
+        return;
+      }
+
+      pulseEl.classList.add('active', pulseColor);
+      pulseEl.setAttribute('title', `KYC status: ${effectiveKycState.label}`);
     };
 
     const toPrettyLabel = (key = '') => String(key)

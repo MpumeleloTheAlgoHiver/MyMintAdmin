@@ -170,6 +170,105 @@
       margin-bottom: 18px;
     }
 
+    .orderbook-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .orderbook-count {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .orderbook-export-btn {
+      height: 38px;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
+      color: #374151;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 0 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .orderbook-export-btn:hover {
+      background: #f9fafb;
+      border-color: #d1d5db;
+    }
+
+    .orderbook-export-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .orderbook-table-wrap {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    .orderbook-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 860px;
+    }
+
+    .orderbook-table thead th {
+      background: #f9fafb;
+      color: #4b5563;
+      text-align: left;
+      font-size: 0.78rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      font-weight: 700;
+      padding: 12px 14px;
+      border-bottom: 1px solid #e5e7eb;
+      white-space: nowrap;
+    }
+
+    .orderbook-table tbody td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #f3f4f6;
+      color: #1f2937;
+      font-size: 0.86rem;
+      vertical-align: top;
+    }
+
+    .orderbook-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .orderbook-cell-muted {
+      color: #6b7280;
+      font-size: 0.82rem;
+    }
+
+    .orderbook-client {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .orderbook-client strong {
+      font-size: 0.85rem;
+      color: #111827;
+    }
+
+    .orderbook-empty-row {
+      text-align: center;
+      color: #6b7280;
+      font-style: italic;
+      background: #fafafa;
+    }
+
     .orderbook-empty {
       border: 1px dashed #d1d5db;
       border-radius: 14px;
@@ -231,7 +330,7 @@
   <main class="main-content">
     <div class="top-nav">
       <div class="top-search">
-        <input type="search" placeholder="Search orderbook..." aria-label="Search orderbook">
+        <input id="orderbookSearch" type="search" placeholder="Search holdings, ISIN, or client..." aria-label="Search orderbook">
       </div>
       <button class="signout-btn" id="signOutBtn">Sign out</button>
     </div>
@@ -239,8 +338,29 @@
     <section class="orderbook-wrap">
       <div class="orderbook-card">
         <h1 class="orderbook-title">Orderbook</h1>
-        <p class="orderbook-subtitle">Track, inspect, and manage user orders from one place.</p>
-        <div class="orderbook-empty">Orderbook page is ready. You can now plug in your order data and table/cards here.</div>
+        <p class="orderbook-subtitle">Holdings ledger with export support.</p>
+        <div class="orderbook-toolbar">
+          <div class="orderbook-count" id="orderbookCount">0 records</div>
+          <button class="orderbook-export-btn" id="exportOrderbookBtn" type="button" disabled>Export CSV</button>
+        </div>
+        <div class="orderbook-table-wrap">
+          <table class="orderbook-table">
+            <thead>
+              <tr>
+                <th>Holdings Name</th>
+                <th>ISIN</th>
+                <th>Quantity</th>
+                <th>Time Stamp</th>
+                <th>Client Details</th>
+              </tr>
+            </thead>
+            <tbody id="orderbookTableBody">
+              <tr>
+                <td class="orderbook-empty-row" colspan="5">Loading orderbook...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   </main>
@@ -250,6 +370,11 @@
     const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const orderbookTableBody = document.getElementById('orderbookTableBody');
+    const orderbookCount = document.getElementById('orderbookCount');
+    const exportOrderbookBtn = document.getElementById('exportOrderbookBtn');
+    const orderbookSearch = document.getElementById('orderbookSearch');
+    let allOrderbookRows = [];
 
     const requireSession = async () => {
       const { data } = await supabaseClient.auth.getSession();
@@ -268,7 +393,191 @@
       });
     }
 
-    requireSession();
+    const escapeHtml = (value) => String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    const asDateTime = (value) => {
+      if (!value) return '-';
+      const dt = new Date(value);
+      if (Number.isNaN(dt.getTime())) return String(value);
+      return dt.toLocaleString();
+    };
+
+    const normalizeCsv = (value) => {
+      const base = String(value ?? '');
+      return `"${base.replace(/"/g, '""')}"`;
+    };
+
+    const downloadCsv = (rows) => {
+      const header = ['Holdings Name', 'ISIN', 'Quantity', 'Time Stamp', 'Client Details'];
+      const csvLines = [header.map(normalizeCsv).join(',')];
+
+      rows.forEach((row) => {
+        const clientDetails = [row.clientName, row.clientEmail, row.clientPhone].filter(Boolean).join(' | ');
+        csvLines.push([
+          row.holdingName,
+          row.isin,
+          row.quantity,
+          row.timestamp,
+          clientDetails
+        ].map(normalizeCsv).join(','));
+      });
+
+      const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `orderbook-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    };
+
+    const renderOrderbookRows = (rows) => {
+      if (!orderbookTableBody || !orderbookCount || !exportOrderbookBtn) return;
+      orderbookCount.textContent = `${rows.length} record${rows.length === 1 ? '' : 's'}`;
+      exportOrderbookBtn.disabled = rows.length === 0;
+
+      if (!rows.length) {
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="5">No orderbook records found.</td></tr>';
+        return;
+      }
+
+      orderbookTableBody.innerHTML = rows.map((row) => {
+        const clientName = row.clientName || 'Unknown client';
+        const clientEmail = row.clientEmail || 'No email';
+        const clientPhone = row.clientPhone || 'No phone';
+        return `
+          <tr>
+            <td>${escapeHtml(row.holdingName || '-')}</td>
+            <td class="orderbook-cell-muted">${escapeHtml(row.isin || '-')}</td>
+            <td>${escapeHtml(String(row.quantity ?? '-'))}</td>
+            <td class="orderbook-cell-muted">${escapeHtml(asDateTime(row.timestamp))}</td>
+            <td>
+              <div class="orderbook-client">
+                <strong>${escapeHtml(clientName)}</strong>
+                <span class="orderbook-cell-muted">${escapeHtml(clientEmail)}</span>
+                <span class="orderbook-cell-muted">${escapeHtml(clientPhone)}</span>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    };
+
+    const applySearchFilter = () => {
+      const query = orderbookSearch?.value?.trim().toLowerCase() || '';
+      if (!query) {
+        renderOrderbookRows(allOrderbookRows);
+        return;
+      }
+
+      const filtered = allOrderbookRows.filter((row) => {
+        const clientText = [row.clientName, row.clientEmail, row.clientPhone].filter(Boolean).join(' ').toLowerCase();
+        return String(row.holdingName || '').toLowerCase().includes(query)
+          || String(row.isin || '').toLowerCase().includes(query)
+          || clientText.includes(query);
+      });
+      renderOrderbookRows(filtered);
+    };
+
+    const loadOrderbook = async () => {
+      if (!orderbookTableBody) return;
+
+      const { data: holdingsRows, error: holdingsError } = await supabaseClient
+        .from('stock_holdings')
+        .select('user_id, security_id, quantity, as_of_date, created_at, updated_at')
+        .order('updated_at', { ascending: false });
+
+      if (holdingsError) {
+        console.error('Orderbook load error:', holdingsError);
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="5">Could not load orderbook data.</td></tr>';
+        return;
+      }
+
+      const holdings = holdingsRows || [];
+      const securityIds = [...new Set(holdings.map(row => row.security_id).filter(Boolean))];
+      const userIds = [...new Set(holdings.map(row => row.user_id).filter(Boolean))];
+
+      const securitiesMap = {};
+      if (securityIds.length) {
+        const { data: securityRows, error: securityError } = await supabaseClient
+          .from('securities')
+          .select('id, name, symbol, isin, ISIN, isin_code, isincode')
+          .in('id', securityIds);
+        if (securityError) {
+          console.error('Securities load error:', securityError);
+        } else {
+          (securityRows || []).forEach((security) => {
+            securitiesMap[security.id] = security;
+          });
+        }
+      }
+
+      const profilesMap = {};
+      if (userIds.length) {
+        const { data: profileRows, error: profileError } = await supabaseClient
+          .from('profiles')
+          .select('id, first_name, last_name, email, phone_number')
+          .in('id', userIds);
+        if (profileError) {
+          console.error('Profiles load error:', profileError);
+        } else {
+          (profileRows || []).forEach((profile) => {
+            profilesMap[profile.id] = profile;
+          });
+        }
+      }
+
+      allOrderbookRows = holdings.map((row) => {
+        const security = securitiesMap[row.security_id] || {};
+        const profile = profilesMap[row.user_id] || {};
+        const holdingName = security.name || security.symbol || row.security_id || 'Unknown holding';
+        const isin = security.isin || security.ISIN || security.isin_code || security.isincode || '-';
+        const timestamp = row.updated_at || row.created_at || row.as_of_date || null;
+        const clientName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || String(row.user_id || 'Unknown client');
+
+        return {
+          holdingName,
+          isin,
+          quantity: row.quantity ?? '-',
+          timestamp,
+          clientName,
+          clientEmail: profile.email || '',
+          clientPhone: profile.phone_number || ''
+        };
+      });
+
+      applySearchFilter();
+    };
+
+    if (orderbookSearch) {
+      orderbookSearch.addEventListener('input', applySearchFilter);
+    }
+
+    if (exportOrderbookBtn) {
+      exportOrderbookBtn.addEventListener('click', () => {
+        const query = orderbookSearch?.value?.trim().toLowerCase() || '';
+        const rows = query
+          ? allOrderbookRows.filter((row) => {
+            const clientText = [row.clientName, row.clientEmail, row.clientPhone].filter(Boolean).join(' ').toLowerCase();
+            return String(row.holdingName || '').toLowerCase().includes(query)
+              || String(row.isin || '').toLowerCase().includes(query)
+              || clientText.includes(query);
+          })
+          : allOrderbookRows;
+        downloadCsv(rows);
+      });
+    }
+
+    requireSession().then((ok) => {
+      if (ok) loadOrderbook();
+    });
   </script>
 </body>
 </html>
