@@ -3794,12 +3794,6 @@
       await syncPhoneFromPack(item, applicantJson, { persistToDb: true });
       updateReviewPulseForItem(item, profileId);
 
-      const kycStatusEl = item.querySelector('[data-kyc-status]');
-      if (kycStatusEl) {
-        const effectiveKyc = getEffectiveKycState(profileId, allKycMap[profileId]?.status || 'Not initiated');
-        kycStatusEl.textContent = effectiveKyc.label;
-      }
-
       supabaseClient
         .from('user_onboarding_pack_details')
         .upsert({ user_id: profileId, pack_details: applicantJson }, { onConflict: 'user_id' })
