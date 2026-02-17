@@ -21,6 +21,142 @@ const mimeTypes = {
   '.ico': 'image/x-icon'
 };
 
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const sendJson = (res, statusCode, body) => {
+  res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify(body));
+};
+
+const parseBearerToken = (authorizationHeader) => {
+  if (!authorizationHeader || typeof authorizationHeader !== 'string') return null;
+  if (!authorizationHeader.startsWith('Bearer ')) return null;
+  return authorizationHeader.slice('Bearer '.length).trim() || null;
+};
+
+const fetchSupabaseJson = async (path, token, useServiceRoleAuth = true) => {
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    throw new Error('Supabase server credentials are not configured');
+  }
+
+  const url = `${supabaseUrl}${path}`;
+  const authToken = useServiceRoleAuth ? supabaseServiceRoleKey : token;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'apikey': supabaseServiceRoleKey,
+      'Authorization': `Bearer ${authToken}`,
+      'Accept': 'application/json'
+    }
+  });
+
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const message = payload?.message || payload?.error || `Supabase request failed with status ${response.status}`;
+    throw new Error(message);
+  }
+
+  return payload;
+};
+
+const buildInFilter = (values) => values
+  .map((value) => encodeURIComponent(String(value)))
+  .join(',');
+
+const loadSecuritiesByIds = async (securityIds, token) => {
+  const variants = [
+    'id,name,symbol,isin',
+    'id,name,symbol,%22ISIN%22',
+    'id,name,symbol,isin_code',
+    'id,name,symbol,isincode',
+    'id,name,symbol'
+  ];
+
+  let lastError = null;
+  for (const selectClause of variants) {
+    try {
+      const rows = await fetchSupabaseJson(
+        `/rest/v1/securities?select=${selectClause}&id=in.(${buildInFilter(securityIds)})`,
+        token
+      );
+      return rows || [];
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastError) throw lastError;
+  return [];
+};
+
+const buildOrderbookRows = (holdings, securitiesRows, profileRows) => {
+  const securitiesMap = {};
+  const profilesMap = {};
+
+  securitiesRows.forEach((security) => {
+    securitiesMap[security.id] = security;
+  });
+
+  profileRows.forEach((profile) => {
+    profilesMap[profile.id] = profile;
+  });
+
+  return holdings.map((row, index) => {
+    const security = securitiesMap[row.security_id] || {};
+    const profile = profilesMap[row.user_id] || {};
+    const instrumentName = security.name || '-';
+    const ticker = security.symbol ?? '-';
+    const isin = security.isin || security.ISIN || security.isin_code || security.isincode || '-';
+    const timestamp = row.updated_at || row.created_at || row.as_of_date || null;
+    const clientName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || String(row.user_id || 'Unknown client');
+    const settlementAccount = profile.email || `${clientName} Main`;
+    const settlementAccountOptions = [...new Set([
+      settlementAccount,
+      `${clientName} Main`,
+      `${clientName} Trading`
+    ].filter(Boolean))];
+    const brokerRef = row.id ? `SH-${String(row.id).slice(0, 8)}` : (row.security_id ? `BR-${row.security_id}` : `BR-${index + 1}`);
+    const brokerRefOptions = [...new Set([
+      brokerRef,
+      `${brokerRef}-A`,
+      `${brokerRef}-B`
+    ].filter(Boolean))];
+    const quantityValue = Number(row.quantity);
+    const isQuantityNumeric = Number.isFinite(quantityValue);
+    const side = isQuantityNumeric
+      ? (quantityValue < 0 ? 'SELL' : 'BUY')
+      : '-';
+    const statusText = String(row.Status || '').trim();
+    const orderType = statusText
+      || (row.Exit_date ? 'CLOSED' : (row.Fill_date ? 'FILLED' : 'OPEN'));
+    const totalQuantity = isQuantityNumeric
+      ? quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 })
+      : (row.quantity ?? '-');
+
+    return {
+      line: index + 1,
+      instrumentName,
+      ticker,
+      isin,
+      side,
+      totalQuantity,
+      orderType,
+      settlementAccount,
+      settlementAccountOptions,
+      brokerRef,
+      brokerRefOptions,
+      timestamp
+    };
+  });
+};
+
 const getSumsubAuthHeaders = (method, pathWithQuery) => {
   const appToken = process.env.SUMSUB_APP_TOKEN;
   const appSecret = process.env.SUMSUB_APP_SECRET;
@@ -43,6 +179,46 @@ const getSumsubAuthHeaders = (method, pathWithQuery) => {
 };
 
 const server = http.createServer((req, res) => {
+  if (req.url.startsWith('/api/orderbook')) {
+    const token = parseBearerToken(req.headers.authorization);
+    if (!token) {
+      sendJson(res, 401, { error: 'Missing Authorization bearer token' });
+      return;
+    }
+
+    (async () => {
+      try {
+        await fetchSupabaseJson('/auth/v1/user', token, false);
+
+        const holdings = await fetchSupabaseJson(
+          '/rest/v1/stock_holdings?select=id,user_id,security_id,quantity,avg_fill,market_value,unrealized_pnl,as_of_date,created_at,updated_at,%22Status%22,%22Fill_date%22,%22Exit_date%22,avg_exit&order=updated_at.desc',
+          token
+        );
+
+        const securityIds = [...new Set((holdings || []).map((row) => row.security_id).filter(Boolean))];
+        const userIds = [...new Set((holdings || []).map((row) => row.user_id).filter(Boolean))];
+
+        const securitiesRows = securityIds.length ? await loadSecuritiesByIds(securityIds, token) : [];
+        const profileRows = userIds.length
+          ? await fetchSupabaseJson(
+            `/rest/v1/profiles?select=id,first_name,last_name,email,phone_number&id=in.(${buildInFilter(userIds)})`,
+            token
+          )
+          : [];
+
+        const rows = buildOrderbookRows(holdings || [], securitiesRows || [], profileRows || []);
+        sendJson(res, 200, { rows });
+      } catch (error) {
+        sendJson(res, 500, {
+          error: 'Could not load orderbook data',
+          details: error?.message || 'Unknown error'
+        });
+      }
+    })();
+
+    return;
+  }
+
   if (req.url.startsWith('/api/sumsub/applicant')) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const externalUserId = url.searchParams.get('externalUserId');
