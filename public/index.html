@@ -2726,6 +2726,61 @@
       return null;
     };
 
+    const extractPhoneFromPack = (pack = {}) => {
+      const raw = pickPackValue(pack, [
+        'phone',
+        'phoneNumber',
+        'phone_number',
+        'mobile',
+        'mobilePhone',
+        'info.phone',
+        'info.phoneNumber',
+        'info.mobile',
+        'fixedInfo.phone',
+        'fixedInfo.phoneNumber',
+        'fixedInfo.mobile',
+        'contacts.phone',
+        'contact.phone'
+      ]);
+
+      if (raw === null || raw === undefined) return '';
+      return String(raw).trim();
+    };
+
+    const syncPhoneFromPack = async (item, packJson, options = {}) => {
+      const persistToDb = options.persistToDb !== false;
+      const profileId = item?.dataset?.profileId;
+      if (!item || !profileId || !packJson) return;
+
+      const phoneFromPack = extractPhoneFromPack(packJson);
+      if (!phoneFromPack) return;
+
+      const phoneEl = item.querySelector('[data-phone]');
+      if (phoneEl) phoneEl.textContent = phoneFromPack;
+
+      const currentProfile = allProfiles.find(profile => String(profile.id) === String(profileId));
+      const existingPhone = String(currentProfile?.phone_number || '').trim();
+      if (currentProfile) {
+        currentProfile.phone_number = phoneFromPack;
+      }
+
+      if (!persistToDb || existingPhone === phoneFromPack) return;
+
+      const { error } = await supabaseClient
+        .from('profiles')
+        .update({ phone_number: phoneFromPack })
+        .eq('id', profileId);
+
+      if (error) {
+        console.error('Phone sync from pack failed:', error);
+        return;
+      }
+
+      if (currentProfile) {
+        renderHistoryForItem(item, currentProfile, allKycMap[profileId] || {}, onboardingMap[profileId], packDetailsRowMap[profileId]);
+      }
+    };
+
     const normalizeKycStatusText = (value) => String(value || '').trim().toLowerCase();
 
     const isKycCompletedValue = (status) => {
@@ -3120,6 +3175,7 @@
       const email = pickPackValue(resolvedPack, ['email', 'info.email', 'fixedInfo.email']);
       const fullName = pickPackValue(resolvedPack, ['fullName', 'info.fullName', 'fixedInfo.fullName', 'info.firstName']);
       const profileId = container.closest('.simple-item')?.dataset?.profileId;
+      const profileItem = container.closest('.simple-item');
       const effectiveKyc = profileId
         ? getEffectiveKycState(profileId, allKycMap[profileId]?.status || 'Not initiated')
         : null;
@@ -3178,6 +3234,11 @@
       packDetailsReview.style.display = 'none';
       packDetailsDocs.innerHTML = '';
       packDetailsReview.innerHTML = '';
+
+      if (profileItem) {
+        syncPhoneFromPack(profileItem, resolvedPack, { persistToDb: true })
+          .catch((error) => console.error('Phone sync from rendered pack failed:', error));
+      }
     };
 
     const renderProfiles = (profiles = [], kycMap = {}) => {
@@ -3599,7 +3660,7 @@
       return safeName.includes('.') ? safeName : `${safeName}.bin`;
     };
 
-    const persistPackForProfile = (item, applicantJson) => {
+    const persistPackForProfile = async (item, applicantJson) => {
       const profileId = item?.dataset?.profileId;
       if (!profileId || !applicantJson) return;
 
@@ -3622,6 +3683,8 @@
       if (currentProfile) {
         renderHistoryForItem(item, currentProfile, allKycMap[profileId] || {}, onboardingMap[profileId], packDetailsRowMap[profileId]);
       }
+
+      await syncPhoneFromPack(item, applicantJson, { persistToDb: true });
 
       supabaseClient
         .from('user_onboarding_pack_details')
@@ -3646,7 +3709,7 @@
       }
 
       const applicant = await fetchApplicantByExternalId(externalUserId);
-      persistPackForProfile(item, applicant);
+      await persistPackForProfile(item, applicant);
 
       const applicantId = applicant?.id || applicant?.applicantId || applicant?.applicant_id;
       if (!applicantId) {
@@ -3702,7 +3765,7 @@
         return null;
       }
       const applicant = await fetchApplicantByExternalId(externalUserId);
-      persistPackForProfile(item, applicant);
+      await persistPackForProfile(item, applicant);
       return applicant;
     };
 
@@ -3896,7 +3959,7 @@
 
                 try {
                   const applicantJson = await fetchApplicantByExternalId(externalUserId);
-                  persistPackForProfile(item, applicantJson);
+                  await persistPackForProfile(item, applicantJson);
                   renderPackDetails(container, applicantJson);
                 } catch (fetchError) {
                   console.error('Pack details fetch error:', fetchError);
