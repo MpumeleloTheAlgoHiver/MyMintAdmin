@@ -846,6 +846,14 @@
       gap: 5px;
     }
 
+    .tabs-header-status {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding-left: 10px;
+    }
+
     .tab {
       padding: 18px 20px;
       color: #6b7280;
@@ -1950,6 +1958,12 @@
         </svg>
       </a>
 
+      <a class="nav-icon" href="/orderbook.html" aria-label="Orderbook">
+        <svg viewBox="0 0 24 24">
+          <path d="M4 5h16v2H4V5zm0 6h16v2H4v-2zm0 6h10v2H4v-2z"/>
+        </svg>
+      </a>
+
       <a class="nav-icon" href="#" aria-label="Settings">
         <svg viewBox="0 0 24 24">
           <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.11-.2-.36-.28-.58-.2l-2.39.96c-.5-.38-1.05-.7-1.66-.94l-.36-2.54A.488.488 0 0 0 14.9 2h-3.8c-.24 0-.44.17-.48.4l-.36 2.54c-.61.24-1.16.56-1.66.94l-2.39-.96a.5.5 0 0 0-.58.2L3.7 8.44c-.11.21-.06.48.12.62l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.62l1.92 3.32c.11.2.36.28.58.2l2.39-.96c.5.38 1.05.7 1.66.94l.36 2.54c.04.23.24.4.48.4h3.8c.24 0 .44-.17.48-.4l.36-2.54c.61-.24 1.16-.56 1.66-.94l2.39.96c.22.08.47 0 .58-.2l1.92-3.32a.5.5 0 0 0-.12-.62l-2.03-1.58zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5S10.07 8.5 12 8.5s3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/>
@@ -2119,6 +2133,9 @@
                     </svg>
                     Documents
                   </button>
+                  <div class="tabs-header-status">
+                    <span class="sumsub-review-pulse" data-review-pulse aria-hidden="true"></span>
+                  </div>
                 </div>
 
                 <div class="filter-tabs">
@@ -2970,22 +2987,26 @@
 
     const updateReviewPulseForItem = (item, profileId) => {
       if (!item || !profileId) return;
-      const pulseEl = item.querySelector('[data-review-pulse]');
-      if (!pulseEl) return;
+      const pulseEls = Array.from(item.querySelectorAll('[data-review-pulse]'));
+      if (!pulseEls.length) return;
 
       const signal = getClientDetailsKycSignal(profileId);
-      pulseEl.classList.remove('active', 'green', 'yellow', 'red');
-      pulseEl.removeAttribute('title');
+      pulseEls.forEach((pulseEl) => {
+        pulseEl.classList.remove('active', 'green', 'yellow', 'red');
+        pulseEl.removeAttribute('title');
+      });
 
       if (!signal?.pulse) return;
 
-      pulseEl.classList.add('active', signal.pulse);
       const title = signal.pulse === 'green'
         ? 'KYC review answer: GREEN'
         : signal.pulse === 'yellow'
           ? 'KYC review answer: YELLOW'
           : 'KYC review answer: RED';
-      pulseEl.setAttribute('title', title);
+      pulseEls.forEach((pulseEl) => {
+        pulseEl.classList.add('active', signal.pulse);
+        pulseEl.setAttribute('title', title);
+      });
     };
 
     const toPrettyLabel = (key = '') => String(key)
