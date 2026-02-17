@@ -326,13 +326,13 @@
     }
 
     .sumsub-review-pulse {
-      width: 12px;
-      height: 12px;
+      width: 14px;
+      height: 14px;
       border-radius: 50%;
       background: #d1d5db;
       box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.06);
-      opacity: 0;
-      transition: opacity 0.2s ease;
+      opacity: 0.45;
+      transition: all 0.3s ease;
       position: relative;
       flex: 0 0 auto;
     }
@@ -345,6 +345,7 @@
       border: 2px solid rgba(209, 213, 219, 0.45);
       transform: scale(0.75);
       opacity: 0;
+      transition: all 0.3s ease;
     }
 
     .sumsub-review-pulse.active {
@@ -353,34 +354,35 @@
     }
 
     .sumsub-review-pulse.active::after {
+      opacity: 1;
       animation: sumsubPulseRing 1.4s ease-out infinite;
     }
 
     .sumsub-review-pulse.green {
       background: #16a34a;
-      box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+      box-shadow: 0 0 8px 2px rgba(22, 163, 74, 0.4), 0 0 0 2px rgba(22, 163, 74, 0.3);
     }
 
     .sumsub-review-pulse.green::after {
-      border-color: rgba(22, 163, 74, 0.48);
+      border-color: rgba(22, 163, 74, 0.6);
     }
 
     .sumsub-review-pulse.yellow {
       background: #f59e0b;
-      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.24);
+      box-shadow: 0 0 8px 2px rgba(245, 158, 11, 0.45), 0 0 0 2px rgba(245, 158, 11, 0.35);
     }
 
     .sumsub-review-pulse.yellow::after {
-      border-color: rgba(245, 158, 11, 0.5);
+      border-color: rgba(245, 158, 11, 0.6);
     }
 
     .sumsub-review-pulse.red {
       background: #dc2626;
-      box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.24);
+      box-shadow: 0 0 8px 2px rgba(220, 38, 38, 0.45), 0 0 0 2px rgba(220, 38, 38, 0.35);
     }
 
     .sumsub-review-pulse.red::after {
-      border-color: rgba(220, 38, 38, 0.5);
+      border-color: rgba(220, 38, 38, 0.6);
     }
 
     @keyframes sumsubPulse {
