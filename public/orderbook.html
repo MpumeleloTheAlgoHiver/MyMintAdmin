@@ -526,6 +526,122 @@
       renderOrderbookRows(filtered);
     };
 
+    const loadOrderbookClientSideFallback = async () => {
+      const { data: holdingsRows, error: holdingsError } = await supabaseClient
+        .from('stock_holdings')
+        .select('id, user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, as_of_date, created_at, updated_at, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", avg_exit')
+        .order('updated_at', { ascending: false });
+
+      if (holdingsError) {
+        throw new Error(holdingsError.message || 'Could not load stock_holdings');
+      }
+
+      const holdings = holdingsRows || [];
+      const securityIds = [...new Set(holdings.map((row) => row.security_id).filter(Boolean))];
+      const userIds = [...new Set(holdings.map((row) => row.user_id).filter(Boolean))];
+
+      const securitiesMap = {};
+      if (securityIds.length) {
+        const securitySelectVariants = [
+          'id, name, symbol, isin',
+          'id, name, symbol, "ISIN"',
+          'id, name, symbol, isin_code',
+          'id, name, symbol, isincode',
+          'id, name, symbol'
+        ];
+
+        let securityRows = [];
+        let securityError = null;
+
+        for (const selectClause of securitySelectVariants) {
+          const { data, error } = await supabaseClient
+            .from('securities')
+            .select(selectClause)
+            .in('id', securityIds);
+
+          if (!error) {
+            securityRows = data || [];
+            securityError = null;
+            break;
+          }
+
+          securityError = error;
+        }
+
+        if (securityError) {
+          console.error('Securities load error:', securityError);
+        } else {
+          securityRows.forEach((security) => {
+            securitiesMap[security.id] = security;
+          });
+        }
+      }
+
+      const profilesMap = {};
+      if (userIds.length) {
+        const { data: profileRows, error: profileError } = await supabaseClient
+          .from('profiles')
+          .select('id, first_name, last_name, email, phone_number')
+          .in('id', userIds);
+
+        if (profileError) {
+          console.error('Profiles load error:', profileError);
+        } else {
+          (profileRows || []).forEach((profile) => {
+            profilesMap[profile.id] = profile;
+          });
+        }
+      }
+
+      return holdings.map((row, index) => {
+        const security = securitiesMap[row.security_id] || {};
+        const profile = profilesMap[row.user_id] || {};
+        const instrumentName = security.name || '-';
+        const ticker = security.symbol ?? '-';
+        const isin = security.isin || security.ISIN || security.isin_code || security.isincode || '-';
+        const timestamp = row.updated_at || row.created_at || row.as_of_date || null;
+        const clientName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || String(row.user_id || 'Unknown client');
+        const settlementAccount = profile.email || `${clientName} Main`;
+        const settlementAccountOptions = [...new Set([
+          settlementAccount,
+          `${clientName} Main`,
+          `${clientName} Trading`
+        ].filter(Boolean))];
+        const brokerRef = row.id ? `SH-${String(row.id).slice(0, 8)}` : (row.security_id ? `BR-${row.security_id}` : `BR-${index + 1}`);
+        const brokerRefOptions = [...new Set([
+          brokerRef,
+          `${brokerRef}-A`,
+          `${brokerRef}-B`
+        ].filter(Boolean))];
+        const quantityValue = Number(row.quantity);
+        const isQuantityNumeric = Number.isFinite(quantityValue);
+        const side = isQuantityNumeric
+          ? (quantityValue < 0 ? 'SELL' : 'BUY')
+          : '-';
+        const statusText = String(row.status || '').trim();
+        const orderType = statusText
+          || (row.exit_date ? 'CLOSED' : (row.fill_date ? 'FILLED' : 'OPEN'));
+        const totalQuantity = isQuantityNumeric
+          ? quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 })
+          : (row.quantity ?? '-');
+
+        return {
+          line: index + 1,
+          instrumentName,
+          ticker,
+          isin,
+          side,
+          totalQuantity,
+          orderType,
+          settlementAccount,
+          settlementAccountOptions,
+          brokerRef,
+          brokerRefOptions,
+          timestamp
+        };
+      });
+    };
+
     const loadOrderbook = async () => {
       if (!orderbookTableBody) return;
 
@@ -545,6 +661,12 @@
         });
 
         const payload = await response.json().catch(() => ({}));
+        if (response.status === 404) {
+          allOrderbookRows = await loadOrderbookClientSideFallback();
+          applySearchFilter();
+          return;
+        }
+
         if (!response.ok) {
           throw new Error(payload?.details || payload?.error || 'Could not load orderbook data');
         }
@@ -553,7 +675,13 @@
         applySearchFilter();
       } catch (error) {
         console.error('Orderbook load error:', error);
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="9">Could not load orderbook data.</td></tr>';
+        try {
+          allOrderbookRows = await loadOrderbookClientSideFallback();
+          applySearchFilter();
+        } catch (fallbackError) {
+          console.error('Orderbook fallback load error:', fallbackError);
+          orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="9">Could not load orderbook data.</td></tr>';
+        }
       }
     };
 

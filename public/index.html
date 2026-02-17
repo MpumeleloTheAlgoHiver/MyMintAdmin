@@ -2661,6 +2661,7 @@
       const body = rows.map(row => {
         const security = securitiesByIdMap[row.security_id] || {};
         const label = security.symbol || security.name || row.security_id || '-';
+        const status = row.status || row.Status || '-';
         return `
           <tr>
             <td>${escapeHtml(label)}</td>
@@ -2668,7 +2669,7 @@
             <td>R ${formatNumber(row.avg_fill, 2)}</td>
             <td>R ${formatNumber(row.market_value, 2)}</td>
             <td>R ${formatNumber(row.unrealized_pnl, 2)}</td>
-            <td>${escapeHtml(row.Status || '-')}</td>
+            <td>${escapeHtml(status)}</td>
             <td>${escapeHtml(row.as_of_date || '-')}</td>
           </tr>
         `;
@@ -2687,6 +2688,138 @@
                 <th>Unrealized PnL</th>
                 <th>Status</th>
                 <th>As of</th>
+              </tr>
+            </thead>
+            <tbody>${body}</tbody>
+          </table>
+        </div>
+      `;
+    };
+
+    const aggregateCurrentStockRows = (rows = []) => {
+      const grouped = {};
+
+      rows.forEach((row) => {
+        const key = row.security_id || row.id || 'unknown-security';
+        if (!grouped[key]) {
+          grouped[key] = {
+            security_id: row.security_id || null,
+            quantity: 0,
+            market_value: 0,
+            unrealized_pnl: 0,
+            status: row.status || row.Status || null,
+            avg_fill: row.avg_fill,
+            as_of_date: row.as_of_date || row.Fill_date || row.fill_date || null,
+            updated_at: row.updated_at || row.created_at || row.as_of_date || null
+          };
+        }
+
+        const quantity = Number(row.quantity);
+        const marketValue = Number(row.market_value);
+        const unrealizedPnl = Number(row.unrealized_pnl);
+
+        if (Number.isFinite(quantity)) grouped[key].quantity += quantity;
+        if (Number.isFinite(marketValue)) grouped[key].market_value += marketValue;
+        if (Number.isFinite(unrealizedPnl)) grouped[key].unrealized_pnl += unrealizedPnl;
+
+        if (!grouped[key].status && (row.status || row.Status)) {
+          grouped[key].status = row.status || row.Status;
+        }
+
+        const candidateAsOf = row.as_of_date || row.Fill_date || row.fill_date;
+        if (candidateAsOf && (!grouped[key].as_of_date || new Date(candidateAsOf).getTime() > new Date(grouped[key].as_of_date).getTime())) {
+          grouped[key].as_of_date = candidateAsOf;
+        }
+
+        const candidateUpdated = row.updated_at || row.created_at || row.as_of_date;
+        if (candidateUpdated && (!grouped[key].updated_at || new Date(candidateUpdated).getTime() > new Date(grouped[key].updated_at).getTime())) {
+          grouped[key].updated_at = candidateUpdated;
+        }
+      });
+
+      return Object.values(grouped);
+    };
+
+    const buildBoughtHistoryTableHtml = (rows = []) => {
+      const buyRows = rows
+        .filter((row) => Number(row.quantity) > 0)
+        .sort((a, b) => new Date(b.Fill_date || b.fill_date || b.updated_at || b.created_at || 0).getTime() - new Date(a.Fill_date || a.fill_date || a.updated_at || a.created_at || 0).getTime());
+
+      if (!buyRows.length) {
+        return '<div class="timeline-table-wrap"><div class="holding-card holding-card-muted"><div class="holding-desc">No buy records found.</div></div></div>';
+      }
+
+      const body = buyRows.map((row) => {
+        const security = securitiesByIdMap[row.security_id] || {};
+        const label = security.name || security.symbol || row.security_id || '-';
+        const status = row.status || row.Status || '-';
+        const fillDate = row.Fill_date || row.fill_date || row.as_of_date || '-';
+
+        return `
+          <tr>
+            <td>${escapeHtml(label)}</td>
+            <td>${formatNumber(row.quantity, 2)}</td>
+            <td>R ${formatNumber(row.avg_fill, 2)}</td>
+            <td>${escapeHtml(fillDate)}</td>
+            <td>${escapeHtml(status)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      return `
+        <div class="timeline-table-title">Bought Shares</div>
+        <div class="timeline-table-wrap">
+          <table class="timeline-table">
+            <thead>
+              <tr>
+                <th>Security</th>
+                <th>Bought qty</th>
+                <th>Avg fill</th>
+                <th>Fill date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>${body}</tbody>
+          </table>
+        </div>
+      `;
+    };
+
+    const buildCurrentHoldingsByShareTableHtml = (rows = []) => {
+      const aggregated = aggregateCurrentStockRows(rows)
+        .filter((row) => Number(row.quantity) > 0)
+        .sort((a, b) => new Date(b.updated_at || b.as_of_date || 0).getTime() - new Date(a.updated_at || a.as_of_date || 0).getTime());
+
+      if (!aggregated.length) {
+        return '<div class="timeline-table-wrap"><div class="holding-card holding-card-muted"><div class="holding-desc">No current share holdings.</div></div></div>';
+      }
+
+      const body = aggregated.map((row) => {
+        const security = securitiesByIdMap[row.security_id] || {};
+        const label = security.name || security.symbol || row.security_id || '-';
+        const status = row.status || row.Status || '-';
+        return `
+          <tr>
+            <td>${escapeHtml(label)}</td>
+            <td>${formatNumber(row.quantity, 2)}</td>
+            <td>R ${formatNumber(row.market_value, 2)}</td>
+            <td>R ${formatNumber(row.unrealized_pnl, 2)}</td>
+            <td>${escapeHtml(status)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      return `
+        <div class="timeline-table-title">Current Holdings by Share</div>
+        <div class="timeline-table-wrap">
+          <table class="timeline-table">
+            <thead>
+              <tr>
+                <th>Security</th>
+                <th>Current qty</th>
+                <th>Market value</th>
+                <th>Unrealized PnL</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>${body}</tbody>
@@ -2781,6 +2914,29 @@
       }
 
       if (userHoldings.length) {
+        const boughtRows = userHoldings.filter((row) => Number(row.quantity) > 0);
+        const currentByShareRows = aggregateCurrentStockRows(userHoldings).filter((row) => Number(row.quantity) !== 0);
+
+        if (boughtRows.length) {
+          events.push({
+            at: getLatestTimestamp(boughtRows) || profile?.updated_at || profile?.created_at,
+            title: `Bought shares (${boughtRows.length})`,
+            meta: 'stock_holdings table',
+            details: buildBoughtHistoryTableHtml(userHoldings),
+            blue: true
+          });
+        }
+
+        if (currentByShareRows.length) {
+          events.push({
+            at: getLatestTimestamp(currentByShareRows) || profile?.updated_at || profile?.created_at,
+            title: `Current share holdings (${currentByShareRows.length})`,
+            meta: 'stock_holdings table',
+            details: buildCurrentHoldingsByShareTableHtml(userHoldings),
+            blue: true
+          });
+        }
+
         events.push({
           at: getLatestTimestamp(userHoldings) || profile?.updated_at || profile?.created_at,
           title: `Holdings snapshot (${userHoldings.length})`,
@@ -3606,6 +3762,7 @@
       const pnl = row.unrealized_pnl === null || row.unrealized_pnl === undefined
         ? '-'
         : `${Number(row.unrealized_pnl) >= 0 ? '+' : ''}R ${formatNumber(row.unrealized_pnl, 2)}`;
+      const status = row.status || row.Status || 'Stock';
 
       return `
         <div class="holding-card">
@@ -3620,7 +3777,7 @@
           </div>
           <div class="holding-desc">Quantity ${escapeHtml(quantity)} • As of ${escapeHtml(asOf)}</div>
           <div class="holding-footer">
-            <div class="holding-tag">${escapeHtml(row.Status || 'Stock')}</div>
+            <div class="holding-tag">${escapeHtml(status)}</div>
             <div class="holdings-container">
               <span class="holding-label">Holding</span>
             </div>
@@ -3644,7 +3801,8 @@
       const strategyRows = (allocationsByUserMap[profileId] || []).slice();
       strategyRows.sort((a, b) => new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime());
 
-      const stockRows = (holdingsByUserMap[profileId] || []).slice();
+      const stockRows = aggregateCurrentStockRows((holdingsByUserMap[profileId] || []).slice())
+        .filter((row) => Number(row.quantity) > 0);
       stockRows.sort((a, b) => new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime());
 
       const total = strategyRows.length + stockRows.length;
@@ -3741,7 +3899,7 @@
 
         const { data: holdingsRows, error: holdingsError } = await supabaseClient
           .from('stock_holdings')
-          .select('user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, Status, as_of_date, created_at, updated_at')
+          .select('user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", as_of_date, created_at, updated_at')
           .in('user_id', userIds)
           .order('updated_at', { ascending: false });
 
