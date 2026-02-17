@@ -251,6 +251,24 @@
       font-size: 0.82rem;
     }
 
+    .orderbook-select {
+      width: 100%;
+      min-width: 130px;
+      height: 32px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 0 8px;
+      background: #ffffff;
+      color: #374151;
+      font-size: 0.8rem;
+      outline: none;
+    }
+
+    .orderbook-select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.14);
+    }
+
     .orderbook-client {
       display: flex;
       flex-direction: column;
@@ -353,7 +371,6 @@
                 <th>ISIN</th>
                 <th>Side</th>
                 <th>Total Quantity</th>
-                <th>WVAP Limit</th>
                 <th>Order Type</th>
                 <th>Settlement Account</th>
                 <th>Broker Ref</th>
@@ -361,7 +378,7 @@
             </thead>
             <tbody id="orderbookTableBody">
               <tr>
-                <td class="orderbook-empty-row" colspan="10">Loading orderbook...</td>
+                <td class="orderbook-empty-row" colspan="9">Loading orderbook...</td>
               </tr>
             </tbody>
           </table>
@@ -418,7 +435,7 @@
     };
 
     const downloadCsv = (rows) => {
-      const header = ['Line', 'Instrument Name', 'Ticker', 'ISIN', 'Side', 'Total Quantity', 'WVAP Limit', 'Order Type', 'Settlement Account', 'Broker Ref'];
+      const header = ['Line', 'Instrument Name', 'Ticker', 'ISIN', 'Side', 'Total Quantity', 'Order Type', 'Settlement Account', 'Broker Ref'];
       const csvLines = [header.map(normalizeCsv).join(',')];
 
       rows.forEach((row) => {
@@ -429,7 +446,6 @@
           row.isin,
           row.side,
           row.totalQuantity,
-          row.wvapLimit,
           row.orderType,
           row.settlementAccount,
           row.brokerRef
@@ -453,11 +469,20 @@
       exportOrderbookBtn.disabled = rows.length === 0;
 
       if (!rows.length) {
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">No orderbook records found.</td></tr>';
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="9">No orderbook records found.</td></tr>';
         return;
       }
 
       orderbookTableBody.innerHTML = rows.map((row) => {
+        const settlementOptions = (row.settlementAccountOptions || []).map((option) => {
+          const isSelected = option === row.settlementAccount ? ' selected' : '';
+          return `<option value="${escapeHtml(option)}"${isSelected}>${escapeHtml(option)}</option>`;
+        }).join('');
+        const brokerRefOptions = (row.brokerRefOptions || []).map((option) => {
+          const isSelected = option === row.brokerRef ? ' selected' : '';
+          return `<option value="${escapeHtml(option)}"${isSelected}>${escapeHtml(option)}</option>`;
+        }).join('');
+
         return `
           <tr>
             <td>${escapeHtml(String(row.line ?? '-'))}</td>
@@ -466,10 +491,17 @@
             <td class="orderbook-cell-muted">${escapeHtml(row.isin || '-')}</td>
             <td>${escapeHtml(row.side || '-')}</td>
             <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
-            <td>${escapeHtml(String(row.wvapLimit ?? '-'))}</td>
             <td>${escapeHtml(row.orderType || '-')}</td>
-            <td class="orderbook-cell-muted">${escapeHtml(row.settlementAccount || '-')}</td>
-            <td class="orderbook-cell-muted">${escapeHtml(row.brokerRef || '-')}</td>
+            <td>
+              <select class="orderbook-select" data-settlement-select data-line="${escapeHtml(String(row.line))}">
+                ${settlementOptions}
+              </select>
+            </td>
+            <td>
+              <select class="orderbook-select" data-broker-select data-line="${escapeHtml(String(row.line))}">
+                ${brokerRefOptions}
+              </select>
+            </td>
           </tr>
         `;
       }).join('');
@@ -504,7 +536,7 @@
 
       if (holdingsError) {
         console.error('Orderbook load error:', holdingsError);
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">Could not load orderbook data.</td></tr>';
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="9">Could not load orderbook data.</td></tr>';
         return;
       }
 
@@ -550,8 +582,18 @@
         const isin = security.isin || security.ISIN || security.isin_code || security.isincode || '-';
         const timestamp = row.updated_at || row.created_at || row.as_of_date || null;
         const clientName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || String(row.user_id || 'Unknown client');
-        const settlementAccount = profile.email || clientName;
-        const brokerRef = row.security_id || '-';
+        const settlementAccount = profile.email || `${clientName} Main`;
+        const settlementAccountOptions = [...new Set([
+          settlementAccount,
+          `${clientName} Main`,
+          `${clientName} Trading`
+        ].filter(Boolean))];
+        const brokerRef = row.security_id ? `BR-${row.security_id}` : `BR-${index + 1}`;
+        const brokerRefOptions = [...new Set([
+          brokerRef,
+          `${brokerRef}-A`,
+          `${brokerRef}-B`
+        ].filter(Boolean))];
 
         return {
           line: index + 1,
@@ -560,10 +602,11 @@
           isin,
           side: row.quantity < 0 ? 'SELL' : 'BUY',
           totalQuantity: row.quantity ?? '-',
-          wvapLimit: '-',
           orderType: 'Market',
           settlementAccount,
+          settlementAccountOptions,
           brokerRef,
+          brokerRefOptions,
           timestamp
         };
       });
@@ -573,6 +616,25 @@
 
     if (orderbookSearch) {
       orderbookSearch.addEventListener('input', applySearchFilter);
+    }
+
+    if (orderbookTableBody) {
+      orderbookTableBody.addEventListener('change', (event) => {
+        const settlementSelect = event.target.closest('[data-settlement-select]');
+        const brokerSelect = event.target.closest('[data-broker-select]');
+        const lineKey = settlementSelect?.dataset?.line || brokerSelect?.dataset?.line;
+        if (!lineKey) return;
+
+        const targetRow = allOrderbookRows.find(row => String(row.line) === String(lineKey));
+        if (!targetRow) return;
+
+        if (settlementSelect) {
+          targetRow.settlementAccount = settlementSelect.value;
+        }
+        if (brokerSelect) {
+          targetRow.brokerRef = brokerSelect.value;
+        }
+      });
     }
 
     if (exportOrderbookBtn) {
