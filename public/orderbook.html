@@ -653,35 +653,11 @@
       }
 
       try {
-        const response = await fetch('/api/orderbook', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`
-          }
-        });
-
-        const payload = await response.json().catch(() => ({}));
-        if (response.status === 404) {
-          allOrderbookRows = await loadOrderbookClientSideFallback();
-          applySearchFilter();
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error(payload?.details || payload?.error || 'Could not load orderbook data');
-        }
-
-        allOrderbookRows = Array.isArray(payload?.rows) ? payload.rows : [];
+        allOrderbookRows = await loadOrderbookClientSideFallback();
         applySearchFilter();
       } catch (error) {
         console.error('Orderbook load error:', error);
-        try {
-          allOrderbookRows = await loadOrderbookClientSideFallback();
-          applySearchFilter();
-        } catch (fallbackError) {
-          console.error('Orderbook fallback load error:', fallbackError);
-          orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="9">Could not load orderbook data.</td></tr>';
-        }
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="9">Could not load orderbook data.</td></tr>';
       }
     };
 
