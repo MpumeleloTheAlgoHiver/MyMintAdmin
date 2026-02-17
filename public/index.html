@@ -326,47 +326,90 @@
     }
 
     .sumsub-review-pulse {
-      width: 11px;
-      height: 11px;
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
       background: #d1d5db;
-      box-shadow: 0 0 0 0 rgba(209, 213, 219, 0.7);
+      box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.06);
       opacity: 0;
       transition: opacity 0.2s ease;
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    .sumsub-review-pulse::after {
+      content: '';
+      position: absolute;
+      inset: -6px;
+      border-radius: 999px;
+      border: 2px solid rgba(209, 213, 219, 0.45);
+      transform: scale(0.75);
+      opacity: 0;
     }
 
     .sumsub-review-pulse.active {
       opacity: 1;
-      animation: sumsubPulse 1.6s ease-out infinite;
+      animation: sumsubPulse 1.4s ease-in-out infinite;
+    }
+
+    .sumsub-review-pulse.active::after {
+      animation: sumsubPulseRing 1.4s ease-out infinite;
     }
 
     .sumsub-review-pulse.green {
       background: #16a34a;
-      box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.52);
+      box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+    }
+
+    .sumsub-review-pulse.green::after {
+      border-color: rgba(22, 163, 74, 0.48);
     }
 
     .sumsub-review-pulse.yellow {
       background: #f59e0b;
-      box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.52);
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.24);
+    }
+
+    .sumsub-review-pulse.yellow::after {
+      border-color: rgba(245, 158, 11, 0.5);
     }
 
     .sumsub-review-pulse.red {
       background: #dc2626;
-      box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.52);
+      box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.24);
+    }
+
+    .sumsub-review-pulse.red::after {
+      border-color: rgba(220, 38, 38, 0.5);
     }
 
     @keyframes sumsubPulse {
       0% {
-        transform: scale(0.96);
-        opacity: 0.85;
+        transform: scale(0.92);
+        opacity: 0.9;
       }
       50% {
-        transform: scale(1);
+        transform: scale(1.08);
         opacity: 1;
       }
       100% {
-        transform: scale(0.96);
-        opacity: 0.85;
+        transform: scale(0.92);
+        opacity: 0.9;
+      }
+    }
+
+    @keyframes sumsubPulseRing {
+      0% {
+        transform: scale(0.75);
+        opacity: 0.7;
+      }
+      70% {
+        transform: scale(1.2);
+        opacity: 0;
+      }
+      100% {
+        transform: scale(1.2);
+        opacity: 0;
       }
     }
 
@@ -1936,6 +1979,7 @@
             <button class="quick-filter-pill active" type="button" data-kyc-pill="all">All</button>
             <button class="quick-filter-pill" type="button" data-kyc-pill="completed">Completed</button>
             <button class="quick-filter-pill" type="button" data-kyc-pill="pending">Pending</button>
+            <button class="quick-filter-pill" type="button" data-kyc-pill="rejected">Rejected</button>
             <button class="quick-filter-pill" type="button" data-kyc-pill="not-completed">Not completed</button>
             <div class="bank-filter-wrap">
               <button class="quick-filter-pill" id="bankFilterBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="bankFilterMenu">Bank ▾</button>
@@ -3488,6 +3532,7 @@
         const matchesKyc = activeProfileFilters.kyc === 'all'
           || (activeProfileFilters.kyc === 'completed' && effectiveKycState.completed)
           || (activeProfileFilters.kyc === 'pending' && effectiveKycState.pending)
+          || (activeProfileFilters.kyc === 'rejected' && effectiveKycState.rejected)
           || (activeProfileFilters.kyc === 'not-completed' && !effectiveKycState.completed);
 
         const bankInitiated = getBankInitiatedForProfile(profile);
