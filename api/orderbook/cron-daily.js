@@ -58,17 +58,6 @@ module.exports = async (req, res) => {
     const now = new Date();
     const localNow = getNowInTimezoneParts(now, timeZone);
     const dateKey = `${String(localNow.year).padStart(4, '0')}-${String(localNow.month).padStart(2, '0')}-${String(localNow.day).padStart(2, '0')}`;
-    const isPastCutoff = localNow.hour > targetHour || (localNow.hour === targetHour && localNow.minute >= targetMinute);
-
-    if (!isPastCutoff) {
-      return sendJson(res, 200, {
-        ok: true,
-        skipped: true,
-        reason: 'Before cutoff time',
-        now: localNow,
-        target: { hour: targetHour, minute: targetMinute, timeZone }
-      });
-    }
 
     const existingRuns = await requestSupabaseJson(
       `/rest/v1/orderbook_email_runs?select=id,run_date,status,sent_at&run_date=eq.${dateKey}&limit=1`,
@@ -153,6 +142,7 @@ module.exports = async (req, res) => {
       rowCount: rows.length,
       at: dateLabel,
       runDate: dateKey,
+      target: { hour: targetHour, minute: targetMinute, timeZone },
       timeZone
     });
   } catch (error) {
