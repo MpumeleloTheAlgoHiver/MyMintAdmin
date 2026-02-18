@@ -959,10 +959,10 @@
         const ticker = security.symbol ?? '-';
         const isin = '000';
         const timestamp = row.updated_at || row.created_at || row.as_of_date || null;
-        const settlementAccount = '';
-        const settlementAccountOptions = [''];
-        const brokerRef = '';
-        const brokerRefOptions = [''];
+        const settlementAccount = 'mint nominies';
+        const settlementAccountOptions = ['mint nominies'];
+        const brokerRef = 'Longmark';
+        const brokerRefOptions = ['Longmark'];
         const quantityValue = Number(row.quantity);
         const isQuantityNumeric = Number.isFinite(quantityValue);
         const side = isQuantityNumeric
