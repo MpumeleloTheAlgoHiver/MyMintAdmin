@@ -938,7 +938,7 @@
       if (securityIds.length) {
         const { data: securityRows, error: securityError } = await supabaseClient
           .from('securities')
-          .select('id, name, symbol')
+          .select('id, name, symbol, isin')
           .in('id', securityIds);
 
         if (securityError) {
@@ -957,7 +957,7 @@
         const security = securitiesMap[row.security_id] || {};
         const instrumentName = security.name || '-';
         const ticker = security.symbol ?? '-';
-        const isin = '000';
+        const isin = security.isin ?? '-';
         const timestamp = row.updated_at || row.created_at || row.as_of_date || null;
         const settlementAccount = 'mint nominies';
         const settlementAccountOptions = ['mint nominies'];
