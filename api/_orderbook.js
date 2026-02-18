@@ -46,28 +46,10 @@ const buildInFilter = (values) => values
   .join(',');
 
 const loadSecuritiesByIds = async (securityIds) => {
-  const variants = [
-    'id,name,symbol,isin',
-    'id,name,symbol,%22ISIN%22',
-    'id,name,symbol,isin_code',
-    'id,name,symbol,isincode',
-    'id,name,symbol'
-  ];
-
-  let lastError = null;
-  for (const selectClause of variants) {
-    try {
-      const rows = await fetchSupabaseJson(
-        `/rest/v1/securities?select=${selectClause}&id=in.(${buildInFilter(securityIds)})`
-      );
-      return rows || [];
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  if (lastError) throw lastError;
-  return [];
+  const rows = await fetchSupabaseJson(
+    `/rest/v1/securities?select=id,name,symbol&id=in.(${buildInFilter(securityIds)})`
+  );
+  return rows || [];
 };
 
 const buildOrderbookRows = (holdings, securitiesRows) => {
@@ -85,7 +67,7 @@ const buildOrderbookRows = (holdings, securitiesRows) => {
       line: index + 1,
       instrumentName: security.name || '-',
       ticker: security.symbol ?? '-',
-      isin: security.isin || security.ISIN || security.isin_code || security.isincode || '-',
+      isin: '-',
       side: isQuantityNumeric ? (quantityValue < 0 ? 'SELL' : 'BUY') : '-',
       totalQuantity: isQuantityNumeric
         ? quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 })

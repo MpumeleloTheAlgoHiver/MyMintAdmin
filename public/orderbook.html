@@ -517,7 +517,7 @@
 
       <div class="filled-orderbooks-card">
         <h2 class="filled-orderbooks-title">Filled Order Books</h2>
-        <p class="filled-orderbooks-subtitle">Snapshots captured when the timer hits 11:40 AM.</p>
+        <p class="filled-orderbooks-subtitle">Snapshots captured when the timer hits 11:59 AM.</p>
         <div class="filled-orderbooks-list" id="filledOrderbooksList">
           <div class="filled-orderbook-empty">No filled order books yet.</div>
         </div>
@@ -772,11 +772,11 @@
       const seconds = pad2(now.getSeconds());
       orderbookTimer.textContent = `${hours}:${minutes}:${seconds}`;
 
-      const isPurpleMoment = hours === '11' && minutes === '40' && seconds === '00';
+      const isPurpleMoment = hours === '11' && minutes === '59';
       if (isPurpleMoment) {
         timerHighlightUntil = Date.now() + 5000;
 
-        const triggerKey = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}-${hours}-${minutes}-${seconds}`;
+        const triggerKey = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}-${hours}-${minutes}`;
         if (lastFilledTriggerKey !== triggerKey) {
           lastFilledTriggerKey = triggerKey;
           captureFilledOrderbook();
@@ -868,36 +868,15 @@
 
       const securitiesMap = {};
       if (securityIds.length) {
-        const securitySelectVariants = [
-          'id, name, symbol, isin',
-          'id, name, symbol, "ISIN"',
-          'id, name, symbol, isin_code',
-          'id, name, symbol, isincode',
-          'id, name, symbol'
-        ];
-
-        let securityRows = [];
-        let securityError = null;
-
-        for (const selectClause of securitySelectVariants) {
-          const { data, error } = await supabaseClient
-            .from('securities')
-            .select(selectClause)
-            .in('id', securityIds);
-
-          if (!error) {
-            securityRows = data || [];
-            securityError = null;
-            break;
-          }
-
-          securityError = error;
-        }
+        const { data: securityRows, error: securityError } = await supabaseClient
+          .from('securities')
+          .select('id, name, symbol')
+          .in('id', securityIds);
 
         if (securityError) {
           console.error('Securities load error:', securityError);
         } else {
-          securityRows.forEach((security) => {
+          (securityRows || []).forEach((security) => {
             securitiesMap[security.id] = security;
           });
         }
@@ -907,7 +886,7 @@
         const security = securitiesMap[row.security_id] || {};
         const instrumentName = security.name || '-';
         const ticker = security.symbol ?? '-';
-        const isin = security.isin || security.ISIN || security.isin_code || security.isincode || '-';
+        const isin = '-';
         const timestamp = row.updated_at || row.created_at || row.as_of_date || null;
         const settlementAccount = '';
         const settlementAccountOptions = [''];
