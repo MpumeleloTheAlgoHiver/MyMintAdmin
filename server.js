@@ -23,6 +23,13 @@ const mimeTypes = {
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const resendApiKey = process.env.RESEND_API_KEY;
+const orderbookEmailFrom = process.env.ORDERBOOK_EMAIL_FROM;
+const orderbookEmailTo = process.env.ORDERBOOK_EMAIL_TO;
+const orderbookDailyAmHour = Number(process.env.ORDERBOOK_DAILY_AM_HOUR || 11);
+const orderbookDailyAmMinute = Number(process.env.ORDERBOOK_DAILY_AM_MINUTE || 40);
+const orderbookEnableIntervalScheduler = String(process.env.ORDERBOOK_ENABLE_INTERVAL_SCHEDULER || '').toLowerCase() === 'true';
+let lastDailyOrderbookEmailDateKey = '';
 
 const sendJson = (res, statusCode, body) => {
   res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -33,6 +40,175 @@ const parseBearerToken = (authorizationHeader) => {
   if (!authorizationHeader || typeof authorizationHeader !== 'string') return null;
   if (!authorizationHeader.startsWith('Bearer ')) return null;
   return authorizationHeader.slice('Bearer '.length).trim() || null;
+};
+
+const readJsonBody = (req) => new Promise((resolve, reject) => {
+  let body = '';
+  req.on('data', (chunk) => {
+    body += chunk;
+    if (body.length > 1024 * 1024) {
+      reject(new Error('Payload too large'));
+      req.destroy();
+    }
+  });
+
+  req.on('end', () => {
+    try {
+      const parsed = body ? JSON.parse(body) : {};
+      resolve(parsed);
+    } catch (error) {
+      reject(new Error('Invalid JSON body'));
+    }
+  });
+
+  req.on('error', (error) => {
+    reject(error);
+  });
+});
+
+const sendOrderbookCsvEmail = async ({ subject, csvContent, fileName }) => {
+  if (!resendApiKey || !orderbookEmailFrom || !orderbookEmailTo) {
+    throw new Error('Email service not configured. Set RESEND_API_KEY, ORDERBOOK_EMAIL_FROM, ORDERBOOK_EMAIL_TO');
+  }
+
+  const safeFileName = String(fileName || 'filled-order-book.csv');
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${resendApiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: orderbookEmailFrom,
+      to: [orderbookEmailTo],
+      subject: subject || 'Filled Order Book CSV',
+      text: 'Attached is the latest filled order book CSV.',
+      attachments: [
+        {
+          filename: safeFileName,
+          content: Buffer.from(String(csvContent || ''), 'utf8').toString('base64')
+        }
+      ]
+    })
+  });
+
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const message = payload?.message || payload?.error || `Resend request failed with ${response.status}`;
+    throw new Error(message);
+  }
+
+  return payload;
+};
+
+const toOrderbookCsvContent = (rows) => {
+  const normalizeCsv = (value) => {
+    const base = String(value ?? '');
+    return `"${base.replace(/"/g, '""')}"`;
+  };
+
+  const header = ['Line', 'Instrument Name', 'Ticker', 'ISIN', 'Side', 'Total Quantity', 'Order Type', 'Settlement Account', 'Broker Ref'];
+  const csvLines = [header.map(normalizeCsv).join(',')];
+
+  rows.forEach((row) => {
+    csvLines.push([
+      row.line,
+      row.instrumentName,
+      row.ticker,
+      row.isin,
+      row.side,
+      row.totalQuantity,
+      row.orderType,
+      row.settlementAccount,
+      row.brokerRef
+    ].map(normalizeCsv).join(','));
+  });
+
+  return csvLines.join('\n');
+};
+
+const buildDailySnapshotRows = (holdings, securitiesRows) => {
+  const securitiesMap = {};
+  securitiesRows.forEach((security) => {
+    securitiesMap[security.id] = security;
+  });
+
+  return (holdings || []).map((row, index) => {
+    const security = securitiesMap[row.security_id] || {};
+    const quantityValue = Number(row.quantity);
+    const isQuantityNumeric = Number.isFinite(quantityValue);
+
+    return {
+      line: index + 1,
+      instrumentName: security.name || '-',
+      ticker: security.symbol ?? '-',
+      isin: security.isin || security.ISIN || security.isin_code || security.isincode || '-',
+      side: isQuantityNumeric ? (quantityValue < 0 ? 'SELL' : 'BUY') : '-',
+      totalQuantity: isQuantityNumeric
+        ? quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 })
+        : (row.quantity ?? '-'),
+      orderType: 'Market',
+      settlementAccount: '',
+      brokerRef: ''
+    };
+  });
+};
+
+const sendDailyOrderbookSnapshotEmail = async () => {
+  const holdings = await fetchSupabaseJson(
+    '/rest/v1/stock_holdings?select=id,user_id,security_id,quantity,avg_fill,market_value,unrealized_pnl,as_of_date,created_at,updated_at,%22Status%22,%22Fill_date%22,%22Exit_date%22,avg_exit&order=updated_at.desc',
+    null
+  );
+
+  const securityIds = [...new Set((holdings || []).map((row) => row.security_id).filter(Boolean))];
+  const securitiesRows = securityIds.length ? await loadSecuritiesByIds(securityIds, null) : [];
+  const rows = buildDailySnapshotRows(holdings || [], securitiesRows || []);
+  const now = new Date();
+  const dateLabel = now.toLocaleString();
+
+  await sendOrderbookCsvEmail({
+    subject: `Daily Filled Order Book - ${dateLabel}`,
+    csvContent: toOrderbookCsvContent(rows),
+    fileName: `daily-filled-orderbook-${now.toISOString().slice(0, 10)}.csv`
+  });
+};
+
+const maybeRunDailyOrderbookScheduler = async () => {
+  const now = new Date();
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  if (hours !== orderbookDailyAmHour || minutes !== orderbookDailyAmMinute) {
+    return;
+  }
+
+  if (lastDailyOrderbookEmailDateKey === dateKey) {
+    return;
+  }
+
+  lastDailyOrderbookEmailDateKey = dateKey;
+
+  try {
+    await sendDailyOrderbookSnapshotEmail();
+    console.log(`[OrderbookScheduler] Daily CSV sent for ${dateKey} at ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`);
+  } catch (error) {
+    console.error('[OrderbookScheduler] Daily CSV send failed:', error?.message || error);
+  }
+};
+
+const startDailyOrderbookScheduler = () => {
+  setInterval(() => {
+    maybeRunDailyOrderbookScheduler();
+  }, 30000);
+
+  maybeRunDailyOrderbookScheduler();
 };
 
 const fetchSupabaseJson = async (path, token, useServiceRoleAuth = true) => {
@@ -179,6 +355,34 @@ const getSumsubAuthHeaders = (method, pathWithQuery) => {
 };
 
 const server = http.createServer((req, res) => {
+  if (req.url.startsWith('/api/orderbook/send-csv') && req.method === 'POST') {
+    const token = parseBearerToken(req.headers.authorization);
+    if (!token) {
+      sendJson(res, 401, { error: 'Missing Authorization bearer token' });
+      return;
+    }
+
+    (async () => {
+      try {
+        await fetchSupabaseJson('/auth/v1/user', token, false);
+        const body = await readJsonBody(req);
+        await sendOrderbookCsvEmail({
+          subject: body?.subject,
+          csvContent: body?.csvContent,
+          fileName: body?.fileName
+        });
+        sendJson(res, 200, { ok: true });
+      } catch (error) {
+        sendJson(res, 500, {
+          error: 'Could not send orderbook CSV email',
+          details: error?.message || 'Unknown error'
+        });
+      }
+    })();
+
+    return;
+  }
+
   if (req.url.startsWith('/api/orderbook')) {
     const token = parseBearerToken(req.headers.authorization);
     if (!token) {
@@ -384,4 +588,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
+  if (orderbookEnableIntervalScheduler) {
+    startDailyOrderbookScheduler();
+  }
 });

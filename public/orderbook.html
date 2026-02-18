@@ -325,6 +325,104 @@
       font-size: 0.92rem;
     }
 
+    .filled-orderbooks-card {
+      margin-top: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .filled-orderbooks-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 6px;
+    }
+
+    .filled-orderbooks-subtitle {
+      font-size: 0.84rem;
+      color: #6b7280;
+      margin-bottom: 12px;
+    }
+
+    .filled-orderbooks-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .filled-orderbook-item {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #ffffff;
+      overflow: hidden;
+    }
+
+    .filled-orderbook-summary {
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .filled-orderbook-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .filled-orderbook-meta {
+      color: #6b7280;
+      font-size: 0.78rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .filled-orderbook-email-status {
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .filled-orderbook-email-status.sent {
+      background: #ecfdf3;
+      color: #166534;
+      border: 1px solid #86efac;
+    }
+
+    .filled-orderbook-email-status.failed {
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fca5a5;
+    }
+
+    .filled-orderbook-details {
+      padding: 0 12px 12px;
+    }
+
+    .filled-orderbook-empty {
+      border: 1px dashed #d1d5db;
+      border-radius: 12px;
+      background: #fafafa;
+      color: #6b7280;
+      font-size: 0.85rem;
+      padding: 16px;
+      text-align: center;
+    }
+
     @media screen and (max-width: 768px) {
       .sidebar {
         display: none;
@@ -416,6 +514,14 @@
           </table>
         </div>
       </div>
+
+      <div class="filled-orderbooks-card">
+        <h2 class="filled-orderbooks-title">Filled Order Books</h2>
+        <p class="filled-orderbooks-subtitle">Snapshots captured when the timer hits 11:40 AM.</p>
+        <div class="filled-orderbooks-list" id="filledOrderbooksList">
+          <div class="filled-orderbook-empty">No filled order books yet.</div>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -429,8 +535,12 @@
     const exportOrderbookBtn = document.getElementById('exportOrderbookBtn');
     const orderbookSearch = document.getElementById('orderbookSearch');
     const orderbookTimer = document.getElementById('orderbookTimer');
+    const filledOrderbooksList = document.getElementById('filledOrderbooksList');
     let allOrderbookRows = [];
     let timerHighlightUntil = 0;
+    let lastFilledTriggerKey = '';
+    const FILLED_ARCHIVE_KEY = 'filled-orderbooks-archive-v1';
+    let filledOrderbooksArchive = [];
 
     const requireSession = async () => {
       const { data } = await supabaseClient.auth.getSession();
@@ -468,7 +578,7 @@
       return `"${base.replace(/"/g, '""')}"`;
     };
 
-    const downloadCsv = (rows) => {
+    const toCsvContent = (rows) => {
       const header = ['Line', 'Instrument Name', 'Ticker', 'ISIN', 'Side', 'Total Quantity', 'Order Type', 'Settlement Account', 'Broker Ref'];
       const csvLines = [header.map(normalizeCsv).join(',')];
 
@@ -486,7 +596,11 @@
         ].map(normalizeCsv).join(','));
       });
 
-      const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      return csvLines.join('\n');
+    };
+
+    const downloadCsv = (rows) => {
+      const blob = new Blob([toCsvContent(rows)], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -495,6 +609,157 @@
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
+    };
+
+    const getArchiveDateKey = (dateObj) => `${dateObj.getFullYear()}-${pad2(dateObj.getMonth() + 1)}-${pad2(dateObj.getDate())}`;
+
+    const readFilledArchive = () => {
+      try {
+        const raw = localStorage.getItem(FILLED_ARCHIVE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const persistFilledArchive = () => {
+      try {
+        localStorage.setItem(FILLED_ARCHIVE_KEY, JSON.stringify(filledOrderbooksArchive));
+      } catch {
+      }
+    };
+
+    const emailStatusChip = (status) => {
+      if (status === 'sent') {
+        return '<span class="filled-orderbook-email-status sent">Email Sent</span>';
+      }
+      if (status === 'failed') {
+        return '<span class="filled-orderbook-email-status failed">Email Failed</span>';
+      }
+      return '';
+    };
+
+    const renderFilledOrderbooks = () => {
+      if (!filledOrderbooksList) return;
+
+      if (!filledOrderbooksArchive.length) {
+        filledOrderbooksList.innerHTML = '<div class="filled-orderbook-empty">No filled order books yet.</div>';
+        return;
+      }
+
+      const sorted = filledOrderbooksArchive.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      filledOrderbooksList.innerHTML = sorted.map((book) => {
+        const rows = Array.isArray(book.rows) ? book.rows : [];
+        const body = rows.length
+          ? rows.map((row) => `
+            <tr>
+              <td>${escapeHtml(String(row.line ?? '-'))}</td>
+              <td>${escapeHtml(row.instrumentName || '-')}</td>
+              <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
+              <td class="orderbook-cell-muted">${escapeHtml(row.isin || '-')}</td>
+              <td>${escapeHtml(row.side || '-')}</td>
+              <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
+              <td>${escapeHtml(row.orderType || '-')}</td>
+              <td>${escapeHtml(row.settlementAccount || '')}</td>
+              <td>${escapeHtml(row.brokerRef || '')}</td>
+            </tr>
+          `).join('')
+          : '<tr><td class="orderbook-empty-row" colspan="9">No rows captured.</td></tr>';
+
+        return `
+          <details class="filled-orderbook-item">
+            <summary class="filled-orderbook-summary">
+              <span>${escapeHtml(book.title || 'Filled Order Book')}</span>
+              <span class="filled-orderbook-meta">
+                <span>${escapeHtml(book.dateLabel || '-')}</span>
+                ${emailStatusChip(book.emailStatus)}
+              </span>
+            </summary>
+            <div class="filled-orderbook-details">
+              <div class="orderbook-table-wrap">
+                <table class="orderbook-table">
+                  <thead>
+                    <tr>
+                      <th>Line</th>
+                      <th>Instrument Name</th>
+                      <th>Ticker</th>
+                      <th>ISIN</th>
+                      <th>Side</th>
+                      <th>Total Quantity</th>
+                      <th>Order Type</th>
+                      <th>Settlement Account</th>
+                      <th>Broker Ref</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${body}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </details>
+        `;
+      }).join('');
+    };
+
+    const sendFilledOrderbookEmail = async (snapshot) => {
+      try {
+        const { data } = await supabaseClient.auth.getSession();
+        const token = data?.session?.access_token;
+        if (!token) {
+          return { status: 'failed' };
+        }
+
+        const response = await fetch('/api/orderbook/send-csv', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            subject: `${snapshot.title} - ${snapshot.dateLabel}`,
+            csvContent: toCsvContent(snapshot.rows || []),
+            fileName: `${(snapshot.title || 'filled-order-book').replace(/\s+/g, '-').toLowerCase()}.csv`
+          })
+        });
+
+        return response.ok ? { status: 'sent' } : { status: 'failed' };
+      } catch {
+        return { status: 'failed' };
+      }
+    };
+
+    const captureFilledOrderbook = async () => {
+      if (!allOrderbookRows.length) return;
+
+      const now = new Date();
+      const dateKey = getArchiveDateKey(now);
+      const todaysCount = filledOrderbooksArchive.filter((item) => item.dateKey === dateKey).length;
+      const sequence = todaysCount + 1;
+      const snapshot = {
+        id: `${dateKey}-${sequence}`,
+        dateKey,
+        sequence,
+        title: `Filled Order Book ${sequence}`,
+        dateLabel: now.toLocaleString(),
+        createdAt: now.toISOString(),
+        rows: allOrderbookRows.map((row, index) => ({
+          ...row,
+          line: index + 1
+        })),
+        emailStatus: ''
+      };
+
+      const emailResult = await sendFilledOrderbookEmail(snapshot);
+      snapshot.emailStatus = emailResult.status;
+
+      filledOrderbooksArchive.push(snapshot);
+      persistFilledArchive();
+      renderFilledOrderbooks();
+      allOrderbookRows = [];
+      applySearchFilter();
     };
 
     const pad2 = (value) => String(value).padStart(2, '0');
@@ -507,9 +772,15 @@
       const seconds = pad2(now.getSeconds());
       orderbookTimer.textContent = `${hours}:${minutes}:${seconds}`;
 
-      const isPurpleMoment = minutes === '00' && seconds === '00';
+      const isPurpleMoment = hours === '11' && minutes === '40' && seconds === '00';
       if (isPurpleMoment) {
         timerHighlightUntil = Date.now() + 5000;
+
+        const triggerKey = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}-${hours}-${minutes}-${seconds}`;
+        if (lastFilledTriggerKey !== triggerKey) {
+          lastFilledTriggerKey = triggerKey;
+          captureFilledOrderbook();
+        }
       }
       orderbookTimer.classList.toggle('is-hit', Date.now() <= timerHighlightUntil);
     };
@@ -732,6 +1003,9 @@
     requireSession().then((ok) => {
       if (ok) loadOrderbook();
     });
+
+    filledOrderbooksArchive = readFilledArchive();
+    renderFilledOrderbooks();
 
     startOrderbookTimer();
   </script>
