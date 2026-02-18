@@ -730,7 +730,7 @@
         const { data } = await supabaseClient.auth.getSession();
         const token = data?.session?.access_token;
         if (!token) {
-          return { status: 'failed' };
+          return { status: 'failed', details: 'No active session token found.' };
         }
 
         const response = await fetch('/api/orderbook/send-csv', {
@@ -746,9 +746,18 @@
           })
         });
 
-        return response.ok ? { status: 'sent' } : { status: 'failed' };
-      } catch {
-        return { status: 'failed' };
+        if (response.ok) {
+          return { status: 'sent', details: '' };
+        }
+
+        const payload = await response.json().catch(() => ({}));
+        const details = payload?.details || payload?.error || `HTTP ${response.status}`;
+        console.error('Orderbook email send failed:', details, payload);
+        return { status: 'failed', details };
+      } catch (error) {
+        const details = error?.message || 'Network or unknown error';
+        console.error('Orderbook email send failed:', details, error);
+        return { status: 'failed', details };
       }
     };
 
@@ -775,6 +784,7 @@
 
       const emailResult = await sendFilledOrderbookEmail(snapshot);
       snapshot.emailStatus = emailResult.status;
+      snapshot.emailError = emailResult.details || '';
 
       filledOrderbooksArchive.push(snapshot);
       persistFilledArchive();
@@ -994,6 +1004,7 @@
 
         const emailResult = await sendFilledOrderbookEmail(targetBook);
         targetBook.emailStatus = emailResult.status;
+        targetBook.emailError = emailResult.details || '';
         persistFilledArchive();
         renderFilledOrderbooks();
       });
