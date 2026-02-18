@@ -51,8 +51,8 @@ module.exports = async (req, res) => {
   }
 
   const timeZone = process.env.ORDERBOOK_TIMEZONE || 'Africa/Johannesburg';
-  const targetHour = Number(process.env.ORDERBOOK_DAILY_AM_HOUR || 11);
-  const targetMinute = Number(process.env.ORDERBOOK_DAILY_AM_MINUTE || 59);
+  const targetHour = Number(process.env.ORDERBOOK_DAILY_AM_HOUR || 15);
+  const targetMinute = Number(process.env.ORDERBOOK_DAILY_AM_MINUTE || 30);
 
   try {
     const now = new Date();

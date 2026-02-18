@@ -26,8 +26,8 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const resendApiKey = process.env.RESEND_API_KEY;
 const orderbookEmailFrom = process.env.ORDERBOOK_EMAIL_FROM;
 const orderbookEmailTo = process.env.ORDERBOOK_EMAIL_TO;
-const orderbookDailyAmHour = Number(process.env.ORDERBOOK_DAILY_AM_HOUR || 11);
-const orderbookDailyAmMinute = Number(process.env.ORDERBOOK_DAILY_AM_MINUTE || 40);
+const orderbookDailyAmHour = Number(process.env.ORDERBOOK_DAILY_AM_HOUR || 15);
+const orderbookDailyAmMinute = Number(process.env.ORDERBOOK_DAILY_AM_MINUTE || 30);
 const orderbookEnableIntervalScheduler = String(process.env.ORDERBOOK_ENABLE_INTERVAL_SCHEDULER || '').toLowerCase() === 'true';
 let lastDailyOrderbookEmailDateKey = '';
 
