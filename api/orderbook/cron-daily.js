@@ -62,7 +62,7 @@ module.exports = async (req, res) => {
     const targetMinuteOfDay = (targetHour * 60) + targetMinute;
 
     const existingRuns = await requestSupabaseJson(
-      `/rest/v1/orderbook_email_runs?select=id,run_date,status,sent_at&run_date=eq.${dateKey}&limit=1`,
+      `/rest/v1/orderbook_email_runs?select=id,run_date,status,sent_at,sequence_number,title,date_label&run_date=eq.${dateKey}&limit=1`,
       { method: 'GET' }
     );
     const existingRun = Array.isArray(existingRuns) && existingRuns.length ? existingRuns[0] : null;
@@ -122,6 +122,20 @@ module.exports = async (req, res) => {
     const rows = await loadLiveOrderbookRows(previousSentAt);
     const dateLabel = `${String(localNow.year).padStart(4, '0')}-${String(localNow.month).padStart(2, '0')}-${String(localNow.day).padStart(2, '0')} ${String(localNow.hour).padStart(2, '0')}:${String(localNow.minute).padStart(2, '0')}`;
 
+    let sequenceNumber = Number(existingRun?.sequence_number || 0);
+    if (!Number.isFinite(sequenceNumber) || sequenceNumber <= 0) {
+      const latestSequenceRows = await requestSupabaseJson(
+        '/rest/v1/orderbook_email_runs?select=sequence_number&sequence_number=not.is.null&order=sequence_number.desc&limit=1',
+        { method: 'GET' }
+      );
+      const latestSequence = Array.isArray(latestSequenceRows) && latestSequenceRows.length
+        ? Number(latestSequenceRows[0]?.sequence_number || 0)
+        : 0;
+      sequenceNumber = latestSequence + 1;
+    }
+    const snapshotTitle = existingRun?.title || `Filled Order Book ${sequenceNumber}`;
+    const snapshotDateLabel = existingRun?.date_label || dateLabel;
+
     if (!rows.length) {
       await requestSupabaseJson(
         `/rest/v1/orderbook_email_runs?run_date=eq.${dateKey}`,
@@ -130,6 +144,7 @@ module.exports = async (req, res) => {
           body: {
             status: 'no_data',
             row_count: 0,
+            snapshot_rows: [],
             sent_at: null,
             error_message: null,
             last_attempt_at: new Date().toISOString()
@@ -162,6 +177,10 @@ module.exports = async (req, res) => {
             status: 'sent',
             sent_at: new Date().toISOString(),
             row_count: rows.length,
+            sequence_number: sequenceNumber,
+            title: snapshotTitle,
+            date_label: snapshotDateLabel,
+            snapshot_rows: rows,
             error_message: null
           }
         }
@@ -173,6 +192,11 @@ module.exports = async (req, res) => {
           method: 'PATCH',
           body: {
             status: 'failed',
+            sequence_number: sequenceNumber,
+            title: snapshotTitle,
+            date_label: snapshotDateLabel,
+            snapshot_rows: rows,
+            row_count: rows.length,
             error_message: sendError?.message || 'Unknown send error',
             last_attempt_at: new Date().toISOString()
           }
@@ -185,6 +209,8 @@ module.exports = async (req, res) => {
     return sendJson(res, 200, {
       ok: true,
       sent: true,
+      sequence: sequenceNumber,
+      title: snapshotTitle,
       rowCount: rows.length,
       at: dateLabel,
       runDate: dateKey,

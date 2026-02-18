@@ -15,6 +15,14 @@ create table if not exists public.orderbook_email_runs (
 
 create index if not exists idx_orderbook_email_runs_run_date on public.orderbook_email_runs (run_date);
 
+alter table public.orderbook_email_runs
+  add column if not exists sequence_number bigint null,
+  add column if not exists title text null,
+  add column if not exists date_label text null,
+  add column if not exists snapshot_rows jsonb null;
+
+create index if not exists idx_orderbook_email_runs_sequence_number on public.orderbook_email_runs (sequence_number);
+
 create or replace function public.set_orderbook_email_runs_updated_at()
 returns trigger
 language plpgsql

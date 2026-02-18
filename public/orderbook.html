@@ -696,6 +696,45 @@
       }
     };
 
+    const loadFilledArchiveFromDb = async () => {
+      const { data } = await supabaseClient.auth.getSession();
+      const token = data?.session?.access_token;
+      if (!token) return null;
+
+      const response = await fetch('/api/orderbook/archive', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.details || payload?.error || `Archive HTTP ${response.status}`);
+      }
+
+      const payload = await response.json().catch(() => ({}));
+      const items = Array.isArray(payload?.items) ? payload.items : [];
+      return items;
+    };
+
+    const upsertFilledArchiveToDb = async (snapshot) => {
+      const { data } = await supabaseClient.auth.getSession();
+      const token = data?.session?.access_token;
+      if (!token || !snapshot) return false;
+
+      const response = await fetch('/api/orderbook/archive-upsert', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ snapshot })
+      });
+
+      return response.ok;
+    };
+
     const emailStatusChip = (status) => {
       if (status === 'sent') {
         return '<span class="filled-orderbook-email-status sent">Email Sent</span>';
@@ -830,6 +869,12 @@
       snapshot.emailStatus = emailResult.status;
       snapshot.emailError = emailResult.details || '';
 
+      try {
+        await upsertFilledArchiveToDb(snapshot);
+      } catch (error) {
+        console.error('Archive DB upsert failed:', error?.message || error);
+      }
+
       filledOrderbooksArchive.push(snapshot);
       persistFilledArchive();
       renderFilledOrderbooks();
@@ -864,7 +909,7 @@
       const seconds = pad2(now.getSeconds());
       orderbookTimer.textContent = `${hours}:${minutes}:${seconds}`;
 
-      const isPurpleMoment = hours === '11' && minutes === '59';
+      const isPurpleMoment = hours === '15' && minutes === '30';
       if (isPurpleMoment) {
         timerHighlightUntil = Date.now() + 5000;
       }
@@ -1066,6 +1111,11 @@
         const emailResult = await sendFilledOrderbookEmail(targetBook);
         targetBook.emailStatus = emailResult.status;
         targetBook.emailError = emailResult.details || '';
+        try {
+          await upsertFilledArchiveToDb(targetBook);
+        } catch (error) {
+          console.error('Archive DB upsert failed:', error?.message || error);
+        }
         persistFilledArchive();
         renderFilledOrderbooks();
       });
@@ -1108,12 +1158,25 @@
       });
     }
 
-    requireSession().then((ok) => {
-      if (ok) loadOrderbook();
-    });
-
     filledOrderbooksArchive = readFilledArchive();
     renderFilledOrderbooks();
+
+    requireSession().then(async (ok) => {
+      if (!ok) return;
+
+      try {
+        const dbArchive = await loadFilledArchiveFromDb();
+        if (Array.isArray(dbArchive)) {
+          filledOrderbooksArchive = dbArchive;
+          persistFilledArchive();
+          renderFilledOrderbooks();
+        }
+      } catch (error) {
+        console.error('Could not load DB archive:', error?.message || error);
+      }
+
+      loadOrderbook();
+    });
 
     startOrderbookTimer();
   </script>
