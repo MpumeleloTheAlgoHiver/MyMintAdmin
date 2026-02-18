@@ -148,7 +148,7 @@ const buildDailySnapshotRows = (holdings, securitiesRows) => {
       line: index + 1,
       instrumentName: security.name || '-',
       ticker: security.symbol ?? '-',
-      isin: security.isin || security.ISIN || security.isin_code || security.isincode || '-',
+      isin: '000',
       side: isQuantityNumeric ? (quantityValue < 0 ? 'SELL' : 'BUY') : '-',
       totalQuantity: isQuantityNumeric
         ? quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 })
@@ -289,7 +289,7 @@ const buildOrderbookRows = (holdings, securitiesRows, profileRows) => {
     const profile = profilesMap[row.user_id] || {};
     const instrumentName = security.name || '-';
     const ticker = security.symbol ?? '-';
-    const isin = security.isin || security.ISIN || security.isin_code || security.isincode || '-';
+    const isin = '000';
     const timestamp = row.updated_at || row.created_at || row.as_of_date || null;
     const clientName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || String(row.user_id || 'Unknown client');
     const settlementAccount = profile.email || `${clientName} Main`;

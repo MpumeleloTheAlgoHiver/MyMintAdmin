@@ -67,7 +67,7 @@ const buildOrderbookRows = (holdings, securitiesRows) => {
       line: index + 1,
       instrumentName: security.name || '-',
       ticker: security.symbol ?? '-',
-      isin: '-',
+      isin: '000',
       side: isQuantityNumeric ? (quantityValue < 0 ? 'SELL' : 'BUY') : '-',
       totalQuantity: isQuantityNumeric
         ? quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 })

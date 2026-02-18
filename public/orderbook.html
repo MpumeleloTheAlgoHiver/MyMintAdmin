@@ -538,7 +538,7 @@
     const filledOrderbooksList = document.getElementById('filledOrderbooksList');
     let allOrderbookRows = [];
     let timerHighlightUntil = 0;
-    let lastFilledTriggerKey = '';
+    let isCapturingFilledOrderbook = false;
     const FILLED_ARCHIVE_KEY = 'filled-orderbooks-archive-v1';
     let filledOrderbooksArchive = [];
 
@@ -612,6 +612,16 @@
     };
 
     const getArchiveDateKey = (dateObj) => `${dateObj.getFullYear()}-${pad2(dateObj.getMonth() + 1)}-${pad2(dateObj.getDate())}`;
+
+    const hasFilledOrderbookForDate = (dateKey) => {
+      return filledOrderbooksArchive.some((item) => item.dateKey === dateKey);
+    };
+
+    const isPastFilledCutoff = (dateObj) => {
+      const hour = dateObj.getHours();
+      const minute = dateObj.getMinutes();
+      return hour > 11 || (hour === 11 && minute >= 59);
+    };
 
     const readFilledArchive = () => {
       try {
@@ -762,6 +772,23 @@
       applySearchFilter();
     };
 
+    const maybeCaptureFilledOrderbook = async () => {
+      const now = new Date();
+      const dateKey = getArchiveDateKey(now);
+
+      if (!isPastFilledCutoff(now)) return;
+      if (hasFilledOrderbookForDate(dateKey)) return;
+      if (!allOrderbookRows.length) return;
+      if (isCapturingFilledOrderbook) return;
+
+      isCapturingFilledOrderbook = true;
+      try {
+        await captureFilledOrderbook();
+      } finally {
+        isCapturingFilledOrderbook = false;
+      }
+    };
+
     const pad2 = (value) => String(value).padStart(2, '0');
 
     const renderOrderbookTimer = () => {
@@ -775,14 +802,10 @@
       const isPurpleMoment = hours === '11' && minutes === '59';
       if (isPurpleMoment) {
         timerHighlightUntil = Date.now() + 5000;
-
-        const triggerKey = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}-${hours}-${minutes}`;
-        if (lastFilledTriggerKey !== triggerKey) {
-          lastFilledTriggerKey = triggerKey;
-          captureFilledOrderbook();
-        }
       }
       orderbookTimer.classList.toggle('is-hit', Date.now() <= timerHighlightUntil);
+
+      maybeCaptureFilledOrderbook();
     };
 
     const startOrderbookTimer = () => {
@@ -886,7 +909,7 @@
         const security = securitiesMap[row.security_id] || {};
         const instrumentName = security.name || '-';
         const ticker = security.symbol ?? '-';
-        const isin = '-';
+        const isin = '000';
         const timestamp = row.updated_at || row.created_at || row.as_of_date || null;
         const settlementAccount = '';
         const settlementAccountOptions = [''];
@@ -932,6 +955,7 @@
       try {
         allOrderbookRows = await loadOrderbookClientSideFallback();
         applySearchFilter();
+        maybeCaptureFilledOrderbook();
       } catch (error) {
         console.error('Orderbook load error:', error);
         orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="9">Could not load orderbook data.</td></tr>';
