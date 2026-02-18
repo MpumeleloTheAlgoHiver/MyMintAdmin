@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/orderbook/cron-daily",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 16 * * *"
     }
   ]
 }
