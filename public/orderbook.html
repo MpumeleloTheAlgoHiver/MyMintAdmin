@@ -528,7 +528,7 @@
 
       <div class="filled-orderbooks-card">
         <h2 class="filled-orderbooks-title">Filled Order Books</h2>
-        <p class="filled-orderbooks-subtitle">Snapshots captured when the timer hits 11:59 AM.</p>
+        <p class="filled-orderbooks-subtitle">Snapshots captured when the timer hits 15:30.</p>
         <div class="filled-orderbooks-list" id="filledOrderbooksList">
           <div class="filled-orderbook-empty">No filled order books yet.</div>
         </div>
@@ -652,10 +652,31 @@
       return filledOrderbooksArchive.some((item) => item.dateKey === dateKey);
     };
 
+    const getNextFilledOrderbookSequence = () => {
+      const maxExisting = filledOrderbooksArchive.reduce((maxValue, item) => {
+        const directSequence = Number(item?.sequence);
+        if (Number.isFinite(directSequence) && directSequence > maxValue) {
+          return directSequence;
+        }
+
+        const titleMatch = String(item?.title || '').match(/(\d+)$/);
+        if (titleMatch) {
+          const parsed = Number(titleMatch[1]);
+          if (Number.isFinite(parsed) && parsed > maxValue) {
+            return parsed;
+          }
+        }
+
+        return maxValue;
+      }, 0);
+
+      return maxExisting + 1;
+    };
+
     const isPastFilledCutoff = (dateObj) => {
       const hour = dateObj.getHours();
       const minute = dateObj.getMinutes();
-      return hour > 11 || (hour === 11 && minute >= 59);
+      return hour > 15 || (hour === 15 && minute >= 30);
     };
 
     const readFilledArchive = () => {
@@ -790,8 +811,7 @@
 
       const now = new Date();
       const dateKey = getArchiveDateKey(now);
-      const todaysCount = filledOrderbooksArchive.filter((item) => item.dateKey === dateKey).length;
-      const sequence = todaysCount + 1;
+      const sequence = getNextFilledOrderbookSequence();
       const snapshot = {
         id: `${dateKey}-${sequence}`,
         dateKey,
