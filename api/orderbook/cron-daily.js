@@ -98,8 +98,41 @@ module.exports = async (req, res) => {
       }
     );
 
-    const rows = await loadLiveOrderbookRows();
+    const previousSentRuns = await requestSupabaseJson(
+      `/rest/v1/orderbook_email_runs?select=sent_at,run_date,status&status=eq.sent&run_date=lt.${dateKey}&order=run_date.desc&limit=1`,
+      { method: 'GET' }
+    );
+    const previousSentAt = Array.isArray(previousSentRuns) && previousSentRuns.length
+      ? previousSentRuns[0]?.sent_at || null
+      : null;
+
+    const rows = await loadLiveOrderbookRows(previousSentAt);
     const dateLabel = `${String(localNow.year).padStart(4, '0')}-${String(localNow.month).padStart(2, '0')}-${String(localNow.day).padStart(2, '0')} ${String(localNow.hour).padStart(2, '0')}:${String(localNow.minute).padStart(2, '0')}`;
+
+    if (!rows.length) {
+      await requestSupabaseJson(
+        `/rest/v1/orderbook_email_runs?run_date=eq.${dateKey}`,
+        {
+          method: 'PATCH',
+          body: {
+            status: 'no_data',
+            row_count: 0,
+            sent_at: null,
+            error_message: null,
+            last_attempt_at: new Date().toISOString()
+          }
+        }
+      );
+
+      return sendJson(res, 200, {
+        ok: true,
+        skipped: true,
+        reason: 'No new entries since last filled order book',
+        runDate: dateKey,
+        timeZone,
+        target: { hour: targetHour, minute: targetMinute, timeZone }
+      });
+    }
 
     try {
       await sendOrderbookCsvEmail({

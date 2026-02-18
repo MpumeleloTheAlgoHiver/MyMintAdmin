@@ -624,6 +624,30 @@
 
     const getArchiveDateKey = (dateObj) => `${dateObj.getFullYear()}-${pad2(dateObj.getMonth() + 1)}-${pad2(dateObj.getDate())}`;
 
+    const getArchivedSourceIds = () => {
+      const sourceIds = new Set();
+      filledOrderbooksArchive.forEach((book) => {
+        (book?.rows || []).forEach((row) => {
+          if (row?.sourceId) {
+            sourceIds.add(String(row.sourceId));
+          }
+        });
+      });
+      return sourceIds;
+    };
+
+    const getLatestArchiveCreatedAt = () => {
+      let latest = null;
+      filledOrderbooksArchive.forEach((book) => {
+        const createdAt = book?.createdAt;
+        if (!createdAt) return;
+        if (!latest || new Date(createdAt).getTime() > new Date(latest).getTime()) {
+          latest = createdAt;
+        }
+      });
+      return latest;
+    };
+
     const hasFilledOrderbookForDate = (dateKey) => {
       return filledOrderbooksArchive.some((item) => item.dateKey === dateKey);
     };
@@ -926,6 +950,9 @@
         }
       }
 
+      const archivedSourceIds = getArchivedSourceIds();
+      const latestArchiveCreatedAt = getLatestArchiveCreatedAt();
+
       return holdings.map((row, index) => {
         const security = securitiesMap[row.security_id] || {};
         const instrumentName = security.name || '-';
@@ -947,6 +974,7 @@
           : (row.quantity ?? '-');
 
         return {
+          sourceId: row.id || '',
           line: index + 1,
           instrumentName,
           ticker,
@@ -960,7 +988,20 @@
           brokerRefOptions,
           timestamp
         };
-      });
+      }).filter((row) => {
+        if (row.sourceId && archivedSourceIds.has(String(row.sourceId))) {
+          return false;
+        }
+
+        if (!latestArchiveCreatedAt || !row.timestamp) {
+          return true;
+        }
+
+        return new Date(row.timestamp).getTime() > new Date(latestArchiveCreatedAt).getTime();
+      }).map((row, index) => ({
+        ...row,
+        line: index + 1
+      }));
     };
 
     const loadOrderbook = async () => {
