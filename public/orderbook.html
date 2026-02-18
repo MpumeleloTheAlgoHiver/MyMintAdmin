@@ -647,9 +647,7 @@
         const side = isQuantityNumeric
           ? (quantityValue < 0 ? 'SELL' : 'BUY')
           : '-';
-        const statusText = String(row.status || '').trim();
-        const orderType = statusText
-          || (row.exit_date ? 'CLOSED' : (row.fill_date ? 'FILLED' : 'OPEN'));
+        const orderType = 'Market';
         const totalQuantity = isQuantityNumeric
           ? quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 })
           : (row.quantity ?? '-');
