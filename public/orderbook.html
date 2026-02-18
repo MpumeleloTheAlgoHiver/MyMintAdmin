@@ -409,6 +409,17 @@
       border: 1px solid #fca5a5;
     }
 
+    .filled-orderbook-email-status.retry {
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    .filled-orderbook-email-status.retry:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(153, 27, 27, 0.16);
+    }
+
     .filled-orderbook-details {
       padding: 0 12px 12px;
     }
@@ -645,7 +656,7 @@
         return '<span class="filled-orderbook-email-status sent">Email Sent</span>';
       }
       if (status === 'failed') {
-        return '<span class="filled-orderbook-email-status failed">Email Failed</span>';
+        return '<button type="button" class="filled-orderbook-email-status failed retry" data-email-retry-btn aria-label="Retry email">Email Failed</button>';
       }
       return '';
     };
@@ -684,7 +695,7 @@
               <span>${escapeHtml(book.title || 'Filled Order Book')}</span>
               <span class="filled-orderbook-meta">
                 <span>${escapeHtml(book.dateLabel || '-')}</span>
-                ${emailStatusChip(book.emailStatus)}
+                <span data-book-id="${escapeHtml(String(book.id || ''))}">${emailStatusChip(book.emailStatus)}</span>
               </span>
             </summary>
             <div class="filled-orderbook-details">
@@ -964,6 +975,28 @@
 
     if (orderbookSearch) {
       orderbookSearch.addEventListener('input', applySearchFilter);
+    }
+
+    if (filledOrderbooksList) {
+      filledOrderbooksList.addEventListener('click', async (event) => {
+        const retryBtn = event.target.closest('[data-email-retry-btn]');
+        if (!retryBtn) return;
+
+        const idContainer = retryBtn.closest('[data-book-id]');
+        const targetBookId = idContainer?.dataset?.bookId;
+        if (!targetBookId) return;
+
+        const targetBook = filledOrderbooksArchive.find((book) => String(book.id) === String(targetBookId));
+        if (!targetBook) return;
+
+        retryBtn.disabled = true;
+        retryBtn.textContent = 'Sending...';
+
+        const emailResult = await sendFilledOrderbookEmail(targetBook);
+        targetBook.emailStatus = emailResult.status;
+        persistFilledArchive();
+        renderFilledOrderbooks();
+      });
     }
 
     if (orderbookTableBody) {
