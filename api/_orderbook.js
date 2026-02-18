@@ -4,7 +4,15 @@ const sendJson = (res, statusCode, body) => {
   res.end(JSON.stringify(body));
 };
 
-const fetchSupabaseJson = async (path, token = null, useServiceRoleAuth = true) => {
+const requestSupabaseJson = async (path, options = {}) => {
+  const {
+    method = 'GET',
+    token = null,
+    useServiceRoleAuth = true,
+    body = null,
+    extraHeaders = {}
+  } = options;
+
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -18,12 +26,15 @@ const fetchSupabaseJson = async (path, token = null, useServiceRoleAuth = true) 
   }
 
   const response = await fetch(`${supabaseUrl}${path}`, {
-    method: 'GET',
+    method,
     headers: {
       'apikey': supabaseServiceRoleKey,
       'Authorization': `Bearer ${authToken}`,
-      'Accept': 'application/json'
-    }
+      'Accept': 'application/json',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      ...extraHeaders
+    },
+    ...(body ? { body: JSON.stringify(body) } : {})
   });
 
   let payload = null;
@@ -39,6 +50,14 @@ const fetchSupabaseJson = async (path, token = null, useServiceRoleAuth = true) 
   }
 
   return payload;
+};
+
+const fetchSupabaseJson = async (path, token = null, useServiceRoleAuth = true) => {
+  return requestSupabaseJson(path, {
+    method: 'GET',
+    token,
+    useServiceRoleAuth
+  });
 };
 
 const buildInFilter = (values) => values
@@ -166,6 +185,7 @@ const loadLiveOrderbookRows = async () => {
 
 module.exports = {
   sendJson,
+  requestSupabaseJson,
   fetchSupabaseJson,
   buildInFilter,
   toOrderbookCsvContent,
