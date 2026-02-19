@@ -1065,6 +1065,7 @@
             <tr>
               <td>${escapeHtml(String(row.line ?? '-'))}</td>
               <td>${escapeHtml(row.instrumentName || '-')}</td>
+              <td>${escapeHtml(row.clientAccountId || '-')}</td>
               <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
               <td class="orderbook-cell-muted">${escapeHtml(row.isin || '-')}</td>
               <td>${escapeHtml(row.side || '-')}</td>
@@ -1094,6 +1095,7 @@
                     <tr>
                       <th>Line</th>
                       <th>Instrument Name</th>
+                      <th>Client Account ID</th>
                       <th>Ticker</th>
                       <th>ISIN</th>
                       <th>Side</th>
@@ -1340,7 +1342,7 @@
       if (userIds.length) {
         const { data: profileRows, error: profileError } = await supabaseClient
           .from('profiles')
-          .select('id, first_name, last_name')
+          .select('id, first_name, last_name, mint_number')
           .in('id', userIds);
 
         if (profileError) {
@@ -1364,7 +1366,8 @@
         const timestamp = row.updated_at || row.created_at || row.as_of_date || null;
         const clientName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() || 'Unknown Client';
         const accountSeed = deterministicNumberFromText(row.user_id || row.id || `${index + 1}`);
-        const clientAccountId = `MINT-${String(accountSeed % 1000000).padStart(6, '0')}`;
+        const profileMintNumber = String(profile.mint_number || '').trim();
+        const clientAccountId = profileMintNumber || `MINT-${String(accountSeed % 1000000).padStart(6, '0')}`;
         const bndReference = `BND-${formatDateCompact(timestamp)}-${String(accountSeed % 1000).padStart(3, '0')}`;
         const settlementAccount = 'mint nominies';
         const settlementAccountOptions = ['mint nominies'];
