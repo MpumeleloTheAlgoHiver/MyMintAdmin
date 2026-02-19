@@ -1036,8 +1036,6 @@
       const targetSecurityId = String(targetRow?.securityId || '').trim();
       const targetInstrument = String(targetRow?.instrumentName || '').trim().toLowerCase();
       const targetTicker = String(targetRow?.ticker || '').trim().toLowerCase();
-      const targetIsin = String(targetRow?.isin || '').trim().toLowerCase();
-
       const related = rows
         .filter((row) => {
           if (String(row?.side || '').toUpperCase() !== 'BUY') return false;
@@ -1049,10 +1047,8 @@
 
           const rowInstrument = String(row?.instrumentName || '').trim().toLowerCase();
           const rowTicker = String(row?.ticker || '').trim().toLowerCase();
-          const rowIsin = String(row?.isin || '').trim().toLowerCase();
           return rowInstrument === targetInstrument
-            && rowTicker === targetTicker
-            && rowIsin === targetIsin;
+            && rowTicker === targetTicker;
         })
         .sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
 
@@ -1400,8 +1396,6 @@
         const rowSide = String(row?.side || '').trim().toUpperCase() || 'BUY';
         const rowInstrument = normalizeMatchText(row?.instrumentName);
         const rowTicker = normalizeMatchText(row?.ticker);
-        const rowIsin = normalizeMatchText(row?.isin);
-
         const relatedRawRows = (allOrderbookRawRows || [])
           .filter((rawRow) => {
             if (String(rawRow?.side || '').trim().toUpperCase() !== rowSide) return false;
@@ -1412,8 +1406,7 @@
             }
 
             return normalizeMatchText(rawRow?.instrumentName) === rowInstrument
-              && normalizeMatchText(rawRow?.ticker) === rowTicker
-              && normalizeMatchText(rawRow?.isin) === rowIsin;
+              && normalizeMatchText(rawRow?.ticker) === rowTicker;
           })
           .sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
 
@@ -1847,7 +1840,7 @@
       if (securityIds.length) {
         const { data: securityRows, error: securityError } = await supabaseClient
           .from('securities')
-          .select('id, name, symbol, isin, last_price')
+          .select('id, name, symbol, last_price')
           .in('id', securityIds);
 
         if (securityError) {
@@ -1899,7 +1892,6 @@
         const packDetails = onboardingPackDetailsMap[row.user_id] || null;
         const instrumentName = security.name || '-';
         const ticker = security.symbol ?? '-';
-        const isin = security.isin ?? '-';
         const timestamp = row.updated_at || row.created_at || row.as_of_date || null;
         const clientName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() || 'Unknown Client';
         const accountSeed = deterministicNumberFromText(row.user_id || row.id || `${index + 1}`);
@@ -1945,7 +1937,6 @@
           line: index + 1,
           instrumentName,
           ticker,
-          isin,
           clientName,
           clientAccountId,
           orderbookSequence: activeOrderbookSequence,
