@@ -582,6 +582,7 @@
                   <th>ISIN</th>
                   <th>Side</th>
                   <th>Total Quantity</th>
+                  <th>Market Value</th>
                   <th>Order Type</th>
                   <th>Settlement Account</th>
                   <th>Broker Ref</th>
@@ -589,7 +590,7 @@
               </thead>
               <tbody id="orderbookTableBody">
                 <tr>
-                  <td class="orderbook-empty-row" colspan="9">Loading orderbook...</td>
+                  <td class="orderbook-empty-row" colspan="10">Loading orderbook...</td>
                 </tr>
               </tbody>
             </table>
@@ -598,7 +599,7 @@
 
         <div class="filled-orderbooks-card">
           <h2 class="filled-orderbooks-title">Active Order Books</h2>
-          <p class="filled-orderbooks-subtitle">Snapshots captured when the timer hits 15:30 (automatic email send stays enabled).</p>
+          <p class="filled-orderbooks-subtitle">Snapshots captured when the timer hits 15:30.</p>
           <div class="filled-orderbooks-list" id="filledOrderbooksList">
             <div class="filled-orderbook-empty">No active order books yet.</div>
           </div>
@@ -672,8 +673,15 @@
       return `"${base.replace(/"/g, '""')}"`;
     };
 
+    const asRandValue = (value) => {
+      const text = String(value ?? '').trim();
+      if (!text || text === '-') return '-';
+      if (/^R\s*/i.test(text)) return text;
+      return `R ${text}`;
+    };
+
     const toCsvContent = (rows) => {
-      const header = ['Line', 'Instrument Name', 'Ticker', 'ISIN', 'Side', 'Total Quantity', 'Order Type', 'Settlement Account', 'Broker Ref'];
+      const header = ['Line', 'Instrument Name', 'Ticker', 'ISIN', 'Side', 'Total Quantity', 'Market Value', 'Order Type', 'Settlement Account', 'Broker Ref'];
       const csvLines = [header.map(normalizeCsv).join(',')];
 
       rows.forEach((row) => {
@@ -684,6 +692,7 @@
           row.isin,
           row.side,
           row.totalQuantity,
+          asRandValue(row.marketValue),
           row.orderType,
           row.settlementAccount,
           row.brokerRef
@@ -828,6 +837,14 @@
       return '';
     };
 
+    const formatBookTitle = (book) => {
+      const rawTitle = String(book?.title || '').trim();
+      if (rawTitle) {
+        return rawTitle.replace(/^filled\s+order\s+book\s*/i, 'Order Book ');
+      }
+      return `Order Book ${book?.sequence || '-'}: ${book?.dateLabel || '-'}`;
+    };
+
     const setActiveTab = (tabName) => {
       const isActiveBooks = tabName === 'active';
       if (activeBooksTab) {
@@ -867,17 +884,18 @@
               <td class="orderbook-cell-muted">${escapeHtml(row.isin || '-')}</td>
               <td>${escapeHtml(row.side || '-')}</td>
               <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
+              <td>${escapeHtml(asRandValue(row.marketValue))}</td>
               <td>${escapeHtml(row.orderType || '-')}</td>
               <td>${escapeHtml(row.settlementAccount || '')}</td>
               <td>${escapeHtml(row.brokerRef || '')}</td>
             </tr>
           `).join('')
-          : '<tr><td class="orderbook-empty-row" colspan="9">No rows captured.</td></tr>';
+          : '<tr><td class="orderbook-empty-row" colspan="10">No rows captured.</td></tr>';
 
         return `
           <details class="filled-orderbook-item">
             <summary class="filled-orderbook-summary">
-              <span>${escapeHtml(book.title || `Order Book ${book.sequence || '-'}: ${book.dateLabel || '-'}`)}</span>
+              <span>${escapeHtml(formatBookTitle(book))}</span>
               <span class="filled-orderbook-meta">
                 <span>${escapeHtml(book.dateLabel || '-')}</span>
                 <span data-book-id="${escapeHtml(String(book.id || ''))}">${emailStatusChip(book.emailStatus)}</span>
@@ -894,6 +912,7 @@
                       <th>ISIN</th>
                       <th>Side</th>
                       <th>Total Quantity</th>
+                      <th>Market Value</th>
                       <th>Order Type</th>
                       <th>Settlement Account</th>
                       <th>Broker Ref</th>
@@ -1030,7 +1049,7 @@
       exportOrderbookBtn.disabled = rows.length === 0;
 
       if (!rows.length) {
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="9">No orderbook records found.</td></tr>';
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">No orderbook records found.</td></tr>';
         return;
       }
 
@@ -1052,6 +1071,7 @@
             <td class="orderbook-cell-muted">${escapeHtml(row.isin || '-')}</td>
             <td>${escapeHtml(row.side || '-')}</td>
             <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
+            <td>${escapeHtml(asRandValue(row.marketValue))}</td>
             <td>${escapeHtml(row.orderType || '-')}</td>
             <td>
               <select class="orderbook-select" data-settlement-select data-line="${escapeHtml(String(row.line))}">
@@ -1080,6 +1100,7 @@
           || String(row.ticker || '').toLowerCase().includes(query)
           || String(row.isin || '').toLowerCase().includes(query)
           || String(row.side || '').toLowerCase().includes(query)
+          || String(row.marketValue || '').toLowerCase().includes(query)
           || String(row.orderType || '').toLowerCase().includes(query)
           || String(row.settlementAccount || '').toLowerCase().includes(query)
           || String(row.brokerRef || '').toLowerCase().includes(query);
@@ -1104,7 +1125,7 @@
       if (securityIds.length) {
         const { data: securityRows, error: securityError } = await supabaseClient
           .from('securities')
-          .select('id, name, symbol, isin')
+          .select('id, name, symbol, isin, last_price')
           .in('id', securityIds);
 
         if (securityError) {
@@ -1131,6 +1152,8 @@
         const brokerRefOptions = ['Longmark'];
         const quantityValue = Number(row.quantity);
         const isQuantityNumeric = Number.isFinite(quantityValue);
+        const lastPrice = Number(security.last_price);
+        const hasLastPrice = Number.isFinite(lastPrice);
         const side = isQuantityNumeric
           ? (quantityValue < 0 ? 'SELL' : 'BUY')
           : '-';
@@ -1138,6 +1161,9 @@
         const totalQuantity = isQuantityNumeric
           ? quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 })
           : (row.quantity ?? '-');
+        const marketValue = (isQuantityNumeric && hasLastPrice)
+          ? `R ${((quantityValue / 100) * lastPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          : '-';
 
         return {
           sourceId: row.id || '',
@@ -1147,6 +1173,7 @@
           isin,
           side,
           totalQuantity,
+          marketValue,
           orderType,
           settlementAccount,
           settlementAccountOptions,
@@ -1176,7 +1203,7 @@
       const { data } = await supabaseClient.auth.getSession();
       const accessToken = data?.session?.access_token;
       if (!accessToken) {
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="9">No active session found.</td></tr>';
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">No active session found.</td></tr>';
         return;
       }
 
@@ -1186,7 +1213,7 @@
         maybeCaptureFilledOrderbook();
       } catch (error) {
         console.error('Orderbook load error:', error);
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="9">Could not load orderbook data.</td></tr>';
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">Could not load orderbook data.</td></tr>';
       }
     };
 
@@ -1258,6 +1285,7 @@
               || String(row.ticker || '').toLowerCase().includes(query)
               || String(row.isin || '').toLowerCase().includes(query)
               || String(row.side || '').toLowerCase().includes(query)
+              || String(row.marketValue || '').toLowerCase().includes(query)
               || String(row.orderType || '').toLowerCase().includes(query)
               || String(row.settlementAccount || '').toLowerCase().includes(query)
               || String(row.brokerRef || '').toLowerCase().includes(query);
