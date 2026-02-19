@@ -283,14 +283,15 @@
     .orderbook-table-wrap {
       border: 1px solid #e5e7eb;
       border-radius: 12px;
-      overflow: hidden;
+      overflow-x: auto;
+      overflow-y: hidden;
       background: #ffffff;
     }
 
     .orderbook-table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 860px;
+      min-width: 1020px;
     }
 
     .orderbook-table thead th {
@@ -586,11 +587,12 @@
                   <th>Order Type</th>
                   <th>Settlement Account</th>
                   <th>Broker Ref</th>
+                  <th>Unrealized PnL</th>
                 </tr>
               </thead>
               <tbody id="orderbookTableBody">
                 <tr>
-                  <td class="orderbook-empty-row" colspan="10">Loading orderbook...</td>
+                  <td class="orderbook-empty-row" colspan="11">Loading orderbook...</td>
                 </tr>
               </tbody>
             </table>
@@ -681,7 +683,7 @@
     };
 
     const toCsvContent = (rows) => {
-      const header = ['Line', 'Instrument Name', 'Ticker', 'ISIN', 'Side', 'Total Quantity', 'Market Value', 'Order Type', 'Settlement Account', 'Broker Ref'];
+      const header = ['Line', 'Instrument Name', 'Ticker', 'ISIN', 'Side', 'Total Quantity', 'Market Value', 'Order Type', 'Settlement Account', 'Broker Ref', 'Unrealized PnL'];
       const csvLines = [header.map(normalizeCsv).join(',')];
 
       rows.forEach((row) => {
@@ -695,7 +697,8 @@
           asRandValue(row.marketValue),
           row.orderType,
           row.settlementAccount,
-          row.brokerRef
+          row.brokerRef,
+          row.unrealizedPnl
         ].map(normalizeCsv).join(','));
       });
 
@@ -888,9 +891,10 @@
               <td>${escapeHtml(row.orderType || '-')}</td>
               <td>${escapeHtml(row.settlementAccount || '')}</td>
               <td>${escapeHtml(row.brokerRef || '')}</td>
+              <td>${escapeHtml(String(row.unrealizedPnl ?? '-'))}</td>
             </tr>
           `).join('')
-          : '<tr><td class="orderbook-empty-row" colspan="10">No rows captured.</td></tr>';
+          : '<tr><td class="orderbook-empty-row" colspan="11">No rows captured.</td></tr>';
 
         return `
           <details class="filled-orderbook-item">
@@ -916,6 +920,7 @@
                       <th>Order Type</th>
                       <th>Settlement Account</th>
                       <th>Broker Ref</th>
+                      <th>Unrealized PnL</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1049,7 +1054,7 @@
       exportOrderbookBtn.disabled = rows.length === 0;
 
       if (!rows.length) {
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">No orderbook records found.</td></tr>';
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="11">No orderbook records found.</td></tr>';
         return;
       }
 
@@ -1083,6 +1088,7 @@
                 ${brokerRefOptions}
               </select>
             </td>
+            <td>${escapeHtml(String(row.unrealizedPnl ?? '-'))}</td>
           </tr>
         `;
       }).join('');
@@ -1103,7 +1109,8 @@
           || String(row.marketValue || '').toLowerCase().includes(query)
           || String(row.orderType || '').toLowerCase().includes(query)
           || String(row.settlementAccount || '').toLowerCase().includes(query)
-          || String(row.brokerRef || '').toLowerCase().includes(query);
+          || String(row.brokerRef || '').toLowerCase().includes(query)
+          || String(row.unrealizedPnl || '').toLowerCase().includes(query);
       });
       renderOrderbookRows(filtered);
     };
@@ -1164,6 +1171,10 @@
         const marketValue = (isQuantityNumeric && hasLastPrice)
           ? `R ${((quantityValue / 100) * lastPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : '-';
+        const unrealizedPnlValue = Number(row.unrealized_pnl);
+        const unrealizedPnl = Number.isFinite(unrealizedPnlValue)
+          ? unrealizedPnlValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : (row.unrealized_pnl ?? '-');
 
         return {
           sourceId: row.id || '',
@@ -1174,6 +1185,7 @@
           side,
           totalQuantity,
           marketValue,
+          unrealizedPnl,
           orderType,
           settlementAccount,
           settlementAccountOptions,
@@ -1203,7 +1215,7 @@
       const { data } = await supabaseClient.auth.getSession();
       const accessToken = data?.session?.access_token;
       if (!accessToken) {
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">No active session found.</td></tr>';
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="11">No active session found.</td></tr>';
         return;
       }
 
@@ -1213,7 +1225,7 @@
         maybeCaptureFilledOrderbook();
       } catch (error) {
         console.error('Orderbook load error:', error);
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">Could not load orderbook data.</td></tr>';
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="11">Could not load orderbook data.</td></tr>';
       }
     };
 
@@ -1288,7 +1300,8 @@
               || String(row.marketValue || '').toLowerCase().includes(query)
               || String(row.orderType || '').toLowerCase().includes(query)
               || String(row.settlementAccount || '').toLowerCase().includes(query)
-              || String(row.brokerRef || '').toLowerCase().includes(query);
+                || String(row.brokerRef || '').toLowerCase().includes(query)
+                || String(row.unrealizedPnl || '').toLowerCase().includes(query);
           })
           : allOrderbookRows;
         downloadCsv(rows);
