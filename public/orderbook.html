@@ -653,7 +653,7 @@
                   <th>Ticker</th>
                   <th>ISIN</th>
                   <th>Side</th>
-                  <th>Total Quantity</th>
+                  <th>Total QYT</th>
                   <th>Market Value</th>
                   <th>Order Type</th>
                   <th>Settlement Account</th>
@@ -815,6 +815,37 @@
       const pack = normalizePackDetailsObject(packDetails);
       if (!pack) return '';
 
+      const deepFindByKeyPattern = (source, keyPattern) => {
+        const candidates = [];
+
+        const walk = (node) => {
+          if (node === null || node === undefined) return;
+          if (Array.isArray(node)) {
+            node.forEach(walk);
+            return;
+          }
+          if (typeof node !== 'object') return;
+
+          Object.entries(node).forEach(([key, value]) => {
+            if (value === null || value === undefined) return;
+
+            if (keyPattern.test(String(key)) && (typeof value === 'string' || typeof value === 'number')) {
+              const normalized = String(value).trim();
+              if (normalized) {
+                candidates.push(normalized);
+              }
+            }
+
+            if (typeof value === 'object') {
+              walk(value);
+            }
+          });
+        };
+
+        walk(source);
+        return candidates;
+      };
+
       const raw = pickNestedValue(pack, [
         'info.idNumber',
         'info.id_number',
@@ -836,7 +867,19 @@
         'registrationNumber'
       ]);
 
-      return String(raw || '').trim();
+      if (raw) {
+        return String(raw).trim();
+      }
+
+      const deepCandidates = deepFindByKeyPattern(pack, /(id.?number|identity.?number|national.?id|passport|reg(istration)?\s*number|document\s*number)/i)
+        .filter((value) => /[0-9]/.test(value));
+
+      if (deepCandidates.length) {
+        deepCandidates.sort((a, b) => b.length - a.length);
+        return String(deepCandidates[0]).trim();
+      }
+
+      return '';
     };
 
     const getBndSuffix = (orderbookSequence, lineNumber) => {
@@ -891,8 +934,9 @@
           clientAccountId: accountId,
           bndReference,
           clientName: shortClientName(row.clientName),
-          idRegNoFull: String(row.clientIdRegNo || row.userId || '-'),
+          idRegNoFull: String(row.clientIdRegNo || '-'),
           quantity: row.totalQuantity || '-',
+          marketValue: asRandValue(row.marketValue || '-'),
           orderTimestamp: formatTimeOnly(row.timestamp),
           instructionType: row.orderType || 'Market',
           settlementRef: row.settlementRef || ''
@@ -914,6 +958,7 @@
           <td>${escapeHtml(detailRow.clientName)}</td>
           <td>${escapeHtml(maskIdentifier(detailRow.idRegNoFull || detailRow.idRegNo || '-'))}</td>
           <td>${escapeHtml(String(detailRow.quantity))}</td>
+          <td>${escapeHtml(asRandValue(detailRow.marketValue || '-'))}</td>
           <td>${escapeHtml(detailRow.orderTimestamp)}</td>
           <td>${escapeHtml(detailRow.instructionType)}</td>
           <td>${escapeHtml(detailRow.settlementRef || '')}</td>
@@ -931,6 +976,7 @@
                 <th>Client Name</th>
                 <th>ID / Reg No</th>
                 <th>Quantity</th>
+                <th>Market Value</th>
                 <th>Order Timestamp</th>
                 <th>Instruction Type</th>
                 <th>Settlement Ref</th>
@@ -954,6 +1000,7 @@
             <td>${escapeHtml(row.clientName || '-')}</td>
             <td>${escapeHtml(maskIdentifier(row.idRegNoFull || row.idRegNo || '-'))}</td>
             <td>${escapeHtml(String(row.quantity ?? '-'))}</td>
+            <td>${escapeHtml(asRandValue(row.marketValue || '-'))}</td>
             <td>${escapeHtml(row.orderTimestamp || '-')}</td>
             <td>${escapeHtml(row.instructionType || 'Market')}</td>
             <td>${escapeHtml(row.settlementRef || '')}</td>
@@ -971,6 +1018,7 @@
                   <th>Client Name</th>
                   <th>ID / Reg No</th>
                   <th>Quantity</th>
+                  <th>Market Value</th>
                   <th>Order Timestamp</th>
                   <th>Instruction Type</th>
                   <th>Settlement Ref</th>
@@ -1027,8 +1075,9 @@
             <td>${escapeHtml(accountId)}</td>
             <td>${escapeHtml(bndReference)}</td>
             <td>${escapeHtml(shortClientName(row.clientName))}</td>
-            <td>${escapeHtml(maskIdentifier(row.clientIdRegNo || row.userId || '-'))}</td>
+            <td>${escapeHtml(maskIdentifier(row.clientIdRegNo || '-'))}</td>
             <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
+            <td>${escapeHtml(asRandValue(row.marketValue || '-'))}</td>
             <td>${escapeHtml(formatTimeOnly(row.timestamp))}</td>
             <td>${escapeHtml(row.orderType || 'Market')}</td>
             <td>${escapeHtml(row.settlementRef || '')}</td>
@@ -1047,6 +1096,7 @@
                 <th>Client Name</th>
                 <th>ID / Reg No</th>
                 <th>Quantity</th>
+                <th>Market Value</th>
                 <th>Order Timestamp</th>
                 <th>Instruction Type</th>
                 <th>Settlement Ref</th>
@@ -1118,8 +1168,9 @@
               lineNumber: index + 1
             }),
             clientName: shortClientName(item.clientName),
-            idRegNoFull: String(item.clientIdRegNo || item.userId || '-'),
+            idRegNoFull: String(item.clientIdRegNo || '-'),
             quantity: item.totalQuantity || '-',
+            marketValue: asRandValue(item.marketValue || '-'),
             orderTimestamp: formatTimeOnly(item.timestamp),
             instructionType: item.orderType || 'Market',
             settlementRef: item.settlementRef || ''
@@ -1146,7 +1197,7 @@
     };
 
     const toCsvContent = (rows) => {
-      const header = ['Line', 'Instrument Name', 'Ticker', 'ISIN', 'Side', 'Total Quantity', 'Market Value', 'Order Type', 'Settlement Account', 'Broker Ref', 'Unrealized PnL'];
+      const header = ['Line', 'Instrument Name', 'Ticker', 'ISIN', 'Side', 'Total QYT', 'Market Value', 'Order Type', 'Settlement Account', 'Broker Ref', 'Unrealized PnL'];
       const csvLines = [header.map(normalizeCsv).join(',')];
 
       rows.forEach((row) => {
@@ -1431,7 +1482,7 @@
                       <th>Ticker</th>
                       <th>ISIN</th>
                       <th>Side</th>
-                      <th>Total Quantity</th>
+                      <th>Total QYT</th>
                       <th>Market Value</th>
                       <th>Order Type</th>
                       <th>Settlement Account</th>
@@ -1766,7 +1817,7 @@
           clientAccountId,
           orderbookSequence: activeOrderbookSequence,
           bndReference,
-          clientIdRegNo: clientIdFromPack || row.user_id || '-',
+          clientIdRegNo: clientIdFromPack || '-',
           side,
           quantityValue: isQuantityNumeric ? quantityValue : 0,
           totalQuantity,
