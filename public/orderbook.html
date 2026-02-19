@@ -705,6 +705,7 @@
     const activeBooksPanel = document.getElementById('activeBooksPanel');
     const closedBooksPanel = document.getElementById('closedBooksPanel');
     let allOrderbookRows = [];
+    let allOrderbookRawRows = [];
     let timerHighlightUntil = 0;
     let isCapturingFilledOrderbook = false;
     const FILLED_ARCHIVE_KEY = 'filled-orderbooks-archive-v1';
@@ -792,7 +793,11 @@
     };
 
     const buildBndRowsForOrder = (targetRow) => {
-      const related = allOrderbookRows
+      if (Array.isArray(targetRow?.bndRows) && targetRow.bndRows.length) {
+        return targetRow.bndRows;
+      }
+
+      const related = allOrderbookRawRows
         .filter((row) => String(row.securityId || '') === String(targetRow.securityId || '') && String(row.side || '').toUpperCase() === 'BUY')
         .sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
 
@@ -865,6 +870,45 @@
     };
 
     const renderSnapshotBndDetailsTable = (snapshotRows, targetRow) => {
+      if (Array.isArray(targetRow?.bndRows) && targetRow.bndRows.length) {
+        const body = targetRow.bndRows.map((row) => `
+          <tr>
+            <td>${escapeHtml(String(row.line ?? '-'))}</td>
+            <td>${escapeHtml(row.clientAccountId || '-')}</td>
+            <td>${escapeHtml(row.bndReference || '-')}</td>
+            <td>${escapeHtml(row.clientName || '-')}</td>
+            <td>${escapeHtml(row.idRegNo || '-')}</td>
+            <td>${escapeHtml(String(row.quantity ?? '-'))}</td>
+            <td>${escapeHtml(row.orderTimestamp || '-')}</td>
+            <td>${escapeHtml(row.instructionType || 'Market')}</td>
+            <td>${escapeHtml(row.settlementRef || '')}</td>
+          </tr>
+        `).join('');
+
+        return `
+          <div class="orderbook-detail-table-wrap">
+            <table class="orderbook-detail-table">
+              <thead>
+                <tr>
+                  <th>Line</th>
+                  <th>Client Account ID</th>
+                  <th>BND Reference</th>
+                  <th>Client Name</th>
+                  <th>ID / Reg No</th>
+                  <th>Quantity</th>
+                  <th>Order Timestamp</th>
+                  <th>Instruction Type</th>
+                  <th>Settlement Ref</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${body}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
       const rows = Array.isArray(snapshotRows) ? snapshotRows : [];
       const targetSecurityId = String(targetRow?.securityId || '').trim();
       const targetInstrument = String(targetRow?.instrumentName || '').trim().toLowerCase();
@@ -938,6 +982,88 @@
       `;
     };
 
+    const aggregateOrderbookRows = (rows) => {
+      const groups = new Map();
+
+      (rows || []).forEach((row) => {
+        const key = [
+          String(row.securityId || row.instrumentName || ''),
+          String(row.side || '').toUpperCase(),
+          String(row.orderType || '').toUpperCase()
+        ].join('|');
+
+        if (!groups.has(key)) {
+          groups.set(key, {
+            ...row,
+            quantityValue: Number(row.quantityValue || 0),
+            marketValueNumber: Number(row.marketValueNumber || 0),
+            unrealizedPnlNumber: Number(row.unrealizedPnlNumber || 0),
+            sourceIds: row.sourceId ? [String(row.sourceId)] : [],
+            bndRows: []
+          });
+          return;
+        }
+
+        const group = groups.get(key);
+        group.quantityValue += Number(row.quantityValue || 0);
+        group.marketValueNumber += Number(row.marketValueNumber || 0);
+        group.unrealizedPnlNumber += Number(row.unrealizedPnlNumber || 0);
+        if (row.sourceId) {
+          group.sourceIds.push(String(row.sourceId));
+        }
+
+        const groupTs = new Date(group.timestamp || 0).getTime();
+        const rowTs = new Date(row.timestamp || 0).getTime();
+        if (rowTs > groupTs) {
+          group.timestamp = row.timestamp;
+        }
+      });
+
+      const aggregated = Array.from(groups.values()).map((group) => {
+        const normalizedSourceIds = [...new Set(group.sourceIds || [])];
+        const relatedRawRows = (rows || [])
+          .filter((rawRow) => {
+            return String(rawRow.securityId || '') === String(group.securityId || '')
+              && String(rawRow.side || '').toUpperCase() === String(group.side || '').toUpperCase()
+              && String(rawRow.orderType || '').toUpperCase() === String(group.orderType || '').toUpperCase();
+          })
+          .sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
+
+        const bndRows = relatedRawRows.map((item, index) => {
+          const seed = deterministicNumberFromText(item.userId || item.sourceId || item.clientName || `${index + 1}`);
+          const suffix = String(seed % 1000).padStart(3, '0');
+          return {
+            line: index + 1,
+            clientAccountId: item.clientAccountId || `MINT-${String(seed % 1000000).padStart(6, '0')}`,
+            bndReference: item.bndReference || `BND-${formatDateCompact(item.timestamp)}-${suffix}`,
+            clientName: shortClientName(item.clientName),
+            idRegNo: maskIdentifier(item.clientIdRegNo || item.userId || '-'),
+            quantity: item.totalQuantity || '-',
+            orderTimestamp: formatTimeOnly(item.timestamp),
+            instructionType: item.orderType || 'Market',
+            settlementRef: item.settlementRef || ''
+          };
+        });
+
+        return {
+          ...group,
+          sourceId: normalizedSourceIds[0] || '',
+          sourceIds: normalizedSourceIds,
+          totalQuantity: group.quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 }),
+          marketValue: `R ${group.marketValueNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          unrealizedPnl: group.unrealizedPnlNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          bndRows
+        };
+      });
+
+      return aggregated
+        .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
+        .map((row, index) => ({
+          ...row,
+          line: index + 1
+        }));
+    };
+
     const toCsvContent = (rows) => {
       const header = ['Line', 'Instrument Name', 'Ticker', 'ISIN', 'Side', 'Total Quantity', 'Market Value', 'Order Type', 'Settlement Account', 'Broker Ref', 'Unrealized PnL'];
       const csvLines = [header.map(normalizeCsv).join(',')];
@@ -981,6 +1107,11 @@
         (book?.rows || []).forEach((row) => {
           if (row?.sourceId) {
             sourceIds.add(String(row.sourceId));
+          }
+          if (Array.isArray(row?.sourceIds)) {
+            row.sourceIds.forEach((sourceId) => {
+              if (sourceId) sourceIds.add(String(sourceId));
+            });
           }
         });
       });
@@ -1442,7 +1573,7 @@
       const archivedSourceIds = getArchivedSourceIds();
       const latestArchiveCreatedAt = getLatestArchiveCreatedAt();
 
-      return holdings.map((row, index) => {
+      const rawRows = holdings.map((row, index) => {
         const security = securitiesMap[row.security_id] || {};
         const profile = profilesMap[row.user_id] || {};
         const instrumentName = security.name || '-';
@@ -1462,6 +1593,11 @@
         const isQuantityNumeric = Number.isFinite(quantityValue);
         const lastPrice = Number(security.last_price);
         const hasLastPrice = Number.isFinite(lastPrice);
+        const computedMarketValueNumber = (isQuantityNumeric && hasLastPrice)
+          ? ((quantityValue / 100) * lastPrice)
+          : 0;
+        const unrealizedPnlValue = Number(row.unrealized_pnl);
+        const normalizedUnrealizedPnlNumber = Number.isFinite(unrealizedPnlValue) ? unrealizedPnlValue : 0;
         const side = isQuantityNumeric
           ? (quantityValue < 0 ? 'SELL' : 'BUY')
           : '-';
@@ -1470,11 +1606,10 @@
           ? quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 })
           : (row.quantity ?? '-');
         const marketValue = (isQuantityNumeric && hasLastPrice)
-          ? `R ${((quantityValue / 100) * lastPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          ? `R ${computedMarketValueNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : '-';
-        const unrealizedPnlValue = Number(row.unrealized_pnl);
         const unrealizedPnl = Number.isFinite(unrealizedPnlValue)
-          ? unrealizedPnlValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          ? normalizedUnrealizedPnlNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
           : (row.unrealized_pnl ?? '-');
 
         return {
@@ -1490,8 +1625,11 @@
           bndReference,
           clientIdRegNo: row.user_id || '-',
           side,
+          quantityValue: isQuantityNumeric ? quantityValue : 0,
           totalQuantity,
+          marketValueNumber: computedMarketValueNumber,
           marketValue,
+          unrealizedPnlNumber: normalizedUnrealizedPnlNumber,
           unrealizedPnl,
           orderType,
           settlementAccount,
@@ -1510,10 +1648,10 @@
         }
 
         return new Date(row.timestamp).getTime() > new Date(latestArchiveCreatedAt).getTime();
-      }).map((row, index) => ({
-        ...row,
-        line: index + 1
-      }));
+      });
+
+      allOrderbookRawRows = rawRows;
+      return aggregateOrderbookRows(rawRows);
     };
 
     const loadOrderbook = async () => {
