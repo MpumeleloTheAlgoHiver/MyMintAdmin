@@ -636,7 +636,7 @@
       <div class="orderbook-tab-panel active" id="activeBooksPanel" role="tabpanel" aria-labelledby="activeBooksTab">
         <div class="orderbook-card">
           <div class="orderbook-title-row">
-            <h1 class="orderbook-title">Orderbook</h1>
+            <h1 class="orderbook-title" id="orderbookTitle">Orderbook :01</h1>
             <div class="orderbook-timer" id="orderbookTimer" aria-live="polite">00:00:00</div>
           </div>
           <p class="orderbook-subtitle">Holdings ledger with export support.</p>
@@ -700,12 +700,14 @@
     const orderbookSearch = document.getElementById('orderbookSearch');
     const orderbookTimer = document.getElementById('orderbookTimer');
     const filledOrderbooksList = document.getElementById('filledOrderbooksList');
+    const orderbookTitle = document.getElementById('orderbookTitle');
     const activeBooksTab = document.getElementById('activeBooksTab');
     const closedBooksTab = document.getElementById('closedBooksTab');
     const activeBooksPanel = document.getElementById('activeBooksPanel');
     const closedBooksPanel = document.getElementById('closedBooksPanel');
     let allOrderbookRows = [];
     let allOrderbookRawRows = [];
+    let activeOrderbookSequence = 1;
     let timerHighlightUntil = 0;
     let isCapturingFilledOrderbook = false;
     const FILLED_ARCHIVE_KEY = 'filled-orderbooks-archive-v1';
@@ -778,6 +780,76 @@
       return Math.abs(hash);
     };
 
+    const pickNestedValue = (source, paths = []) => {
+      for (const path of paths) {
+        const parts = String(path || '').split('.').filter(Boolean);
+        let current = source;
+        for (const part of parts) {
+          if (current === null || current === undefined) {
+            current = undefined;
+            break;
+          }
+          current = current[part];
+        }
+        if (current !== undefined && current !== null && String(current).trim() !== '') {
+          return current;
+        }
+      }
+      return null;
+    };
+
+    const normalizePackDetailsObject = (value) => {
+      if (!value) return null;
+      if (typeof value === 'object') return value;
+      if (typeof value === 'string') {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    };
+
+    const extractIdFromPackDetails = (packDetails) => {
+      const pack = normalizePackDetailsObject(packDetails);
+      if (!pack) return '';
+
+      const raw = pickNestedValue(pack, [
+        'info.idNumber',
+        'info.id_number',
+        'fixedInfo.idNumber',
+        'fixedInfo.id_number',
+        'idNumber',
+        'id_number',
+        'idDoc.number',
+        'idDoc.idNumber',
+        'document.number',
+        'document.idNumber',
+        'documents.0.number',
+        'documents.0.idNumber',
+        'personalDetails.idNumber',
+        'personal_details.id_number',
+        'nationalId',
+        'national_id',
+        'regNumber',
+        'registrationNumber'
+      ]);
+
+      return String(raw || '').trim();
+    };
+
+    const getBndSuffix = (orderbookSequence, lineNumber) => {
+      const seq = Number(orderbookSequence || 0);
+      const line = Number(lineNumber || 0);
+      const combined = (Math.max(seq, 0) * 100) + Math.max(line, 0);
+      return String(combined).padStart(3, '0');
+    };
+
+    const buildBndReference = ({ timestamp, orderbookSequence, lineNumber }) => {
+      return `BND-${formatDateCompact(timestamp)}-${getBndSuffix(orderbookSequence, lineNumber)}`;
+    };
+
     const formatTimeOnly = (value) => {
       if (!value) return '-';
       const date = new Date(value);
@@ -807,16 +879,19 @@
 
       return related.map((row, index) => {
         const clientSeed = deterministicNumberFromText(row.userId || row.sourceId || row.clientName || `${index + 1}`);
-        const suffix = String(clientSeed % 1000).padStart(3, '0');
         const accountId = row.clientAccountId || `MINT-${String(clientSeed % 1000000).padStart(6, '0')}`;
-        const bndReference = row.bndReference || `BND-${formatDateCompact(row.timestamp)}-${suffix}`;
+        const bndReference = row.bndReference || buildBndReference({
+          timestamp: row.timestamp,
+          orderbookSequence: row.orderbookSequence || targetRow.orderbookSequence || activeOrderbookSequence,
+          lineNumber: index + 1
+        });
 
         return {
           line: index + 1,
           clientAccountId: accountId,
           bndReference,
           clientName: shortClientName(row.clientName),
-          idRegNo: maskIdentifier(row.clientIdRegNo || row.userId || '-'),
+          idRegNoFull: String(row.clientIdRegNo || row.userId || '-'),
           quantity: row.totalQuantity || '-',
           orderTimestamp: formatTimeOnly(row.timestamp),
           instructionType: row.orderType || 'Market',
@@ -837,7 +912,7 @@
           <td>${escapeHtml(detailRow.clientAccountId)}</td>
           <td>${escapeHtml(detailRow.bndReference)}</td>
           <td>${escapeHtml(detailRow.clientName)}</td>
-          <td>${escapeHtml(detailRow.idRegNo)}</td>
+          <td>${escapeHtml(maskIdentifier(detailRow.idRegNoFull || detailRow.idRegNo || '-'))}</td>
           <td>${escapeHtml(String(detailRow.quantity))}</td>
           <td>${escapeHtml(detailRow.orderTimestamp)}</td>
           <td>${escapeHtml(detailRow.instructionType)}</td>
@@ -869,7 +944,7 @@
       `;
     };
 
-    const renderSnapshotBndDetailsTable = (snapshotRows, targetRow) => {
+    const renderSnapshotBndDetailsTable = (snapshotRows, targetRow, parentSequence = null) => {
       if (Array.isArray(targetRow?.bndRows) && targetRow.bndRows.length) {
         const body = targetRow.bndRows.map((row) => `
           <tr>
@@ -877,7 +952,7 @@
             <td>${escapeHtml(row.clientAccountId || '-')}</td>
             <td>${escapeHtml(row.bndReference || '-')}</td>
             <td>${escapeHtml(row.clientName || '-')}</td>
-            <td>${escapeHtml(row.idRegNo || '-')}</td>
+            <td>${escapeHtml(maskIdentifier(row.idRegNoFull || row.idRegNo || '-'))}</td>
             <td>${escapeHtml(String(row.quantity ?? '-'))}</td>
             <td>${escapeHtml(row.orderTimestamp || '-')}</td>
             <td>${escapeHtml(row.instructionType || 'Market')}</td>
@@ -939,9 +1014,12 @@
 
       const body = related.map((row, index) => {
         const seed = deterministicNumberFromText(row.userId || row.sourceId || row.clientName || `${index + 1}`);
-        const suffix = String(seed % 1000).padStart(3, '0');
         const accountId = row.clientAccountId || `MINT-${String(seed % 1000000).padStart(6, '0')}`;
-        const bndReference = row.bndReference || `BND-${formatDateCompact(row.timestamp)}-${suffix}`;
+        const bndReference = row.bndReference || buildBndReference({
+          timestamp: row.timestamp,
+          orderbookSequence: row.orderbookSequence || targetRow.orderbookSequence || parentSequence || activeOrderbookSequence,
+          lineNumber: index + 1
+        });
 
         return `
           <tr>
@@ -1031,13 +1109,16 @@
 
         const bndRows = relatedRawRows.map((item, index) => {
           const seed = deterministicNumberFromText(item.userId || item.sourceId || item.clientName || `${index + 1}`);
-          const suffix = String(seed % 1000).padStart(3, '0');
           return {
             line: index + 1,
             clientAccountId: item.clientAccountId || `MINT-${String(seed % 1000000).padStart(6, '0')}`,
-            bndReference: item.bndReference || `BND-${formatDateCompact(item.timestamp)}-${suffix}`,
+            bndReference: item.bndReference || buildBndReference({
+              timestamp: item.timestamp,
+              orderbookSequence: item.orderbookSequence || group.orderbookSequence || activeOrderbookSequence,
+              lineNumber: index + 1
+            }),
             clientName: shortClientName(item.clientName),
-            idRegNo: maskIdentifier(item.clientIdRegNo || item.userId || '-'),
+            idRegNoFull: String(item.clientIdRegNo || item.userId || '-'),
             quantity: item.totalQuantity || '-',
             orderTimestamp: formatTimeOnly(item.timestamp),
             instructionType: item.orderType || 'Market',
@@ -1141,7 +1222,7 @@
           return directSequence;
         }
 
-        const titleMatch = String(item?.title || '').match(/(\d+)$/);
+        const titleMatch = String(item?.title || '').match(/order\s*book\s*(\d+)/i);
         if (titleMatch) {
           const parsed = Number(titleMatch[1]);
           if (Number.isFinite(parsed) && parsed > maxValue) {
@@ -1153,6 +1234,41 @@
       }, 0);
 
       return maxExisting + 1;
+    };
+
+    const getTodayOrderbookSequence = () => {
+      const now = new Date();
+      const dateKey = getArchiveDateKey(now);
+      const todayItems = filledOrderbooksArchive.filter((item) => String(item?.dateKey || '') === dateKey);
+
+      if (!todayItems.length) {
+        return getNextFilledOrderbookSequence();
+      }
+
+      const maxToday = todayItems.reduce((maxValue, item) => {
+        const directSequence = Number(item?.sequence);
+        if (Number.isFinite(directSequence) && directSequence > maxValue) {
+          return directSequence;
+        }
+
+        const titleMatch = String(item?.title || '').match(/order\s*book\s*(\d+)/i);
+        if (titleMatch) {
+          const parsed = Number(titleMatch[1]);
+          if (Number.isFinite(parsed) && parsed > maxValue) {
+            return parsed;
+          }
+        }
+
+        return maxValue;
+      }, 0);
+
+      return maxToday > 0 ? maxToday : getNextFilledOrderbookSequence();
+    };
+
+    const updateOrderbookHeaderSequence = () => {
+      activeOrderbookSequence = getTodayOrderbookSequence();
+      if (!orderbookTitle) return;
+      orderbookTitle.textContent = `Orderbook :${String(activeOrderbookSequence).padStart(2, '0')}`;
     };
 
     const isPastFilledCutoff = (dateObj) => {
@@ -1287,7 +1403,7 @@
               <td colspan="12">
                 <div class="orderbook-detail-wrap">
                   <div class="orderbook-detail-title">BND Allocation Details</div>
-                  ${renderSnapshotBndDetailsTable(rows, row)}
+                  ${renderSnapshotBndDetailsTable(rows, row, book.sequence)}
                 </div>
               </td>
             </tr>
@@ -1376,6 +1492,7 @@
       const now = new Date();
       const dateKey = getArchiveDateKey(now);
       const sequence = getNextFilledOrderbookSequence();
+      activeOrderbookSequence = sequence;
       const snapshot = {
         id: `${dateKey}-${sequence}`,
         dateKey,
@@ -1385,6 +1502,7 @@
         createdAt: now.toISOString(),
         rows: allOrderbookRows.map((row, index) => ({
           ...row,
+          orderbookSequence: sequence,
           line: index + 1
         })),
         emailStatus: ''
@@ -1403,6 +1521,7 @@
       filledOrderbooksArchive.push(snapshot);
       persistFilledArchive();
       renderFilledOrderbooks();
+      updateOrderbookHeaderSequence();
       allOrderbookRows = [];
       applySearchFilter();
     };
@@ -1540,6 +1659,7 @@
 
       const securitiesMap = {};
       const profilesMap = {};
+      const onboardingPackDetailsMap = {};
       if (securityIds.length) {
         const { data: securityRows, error: securityError } = await supabaseClient
           .from('securities')
@@ -1568,14 +1688,31 @@
             profilesMap[profile.id] = profile;
           });
         }
+
+        const { data: packRows, error: packError } = await supabaseClient
+          .from('user_onboarding_pack_details')
+          .select('user_id, pack_details')
+          .in('user_id', userIds);
+
+        if (packError) {
+          console.error('Pack details load error:', packError);
+        } else {
+          (packRows || []).forEach((row) => {
+            if (row?.user_id) {
+              onboardingPackDetailsMap[row.user_id] = row.pack_details;
+            }
+          });
+        }
       }
 
       const archivedSourceIds = getArchivedSourceIds();
       const latestArchiveCreatedAt = getLatestArchiveCreatedAt();
+      updateOrderbookHeaderSequence();
 
       const rawRows = holdings.map((row, index) => {
         const security = securitiesMap[row.security_id] || {};
         const profile = profilesMap[row.user_id] || {};
+        const packDetails = onboardingPackDetailsMap[row.user_id] || null;
         const instrumentName = security.name || '-';
         const ticker = security.symbol ?? '-';
         const isin = security.isin ?? '-';
@@ -1584,7 +1721,12 @@
         const accountSeed = deterministicNumberFromText(row.user_id || row.id || `${index + 1}`);
         const profileMintNumber = String(profile.mint_number || '').trim();
         const clientAccountId = profileMintNumber || `MINT-${String(accountSeed % 1000000).padStart(6, '0')}`;
-        const bndReference = `BND-${formatDateCompact(timestamp)}-${String(accountSeed % 1000).padStart(3, '0')}`;
+        const bndReference = buildBndReference({
+          timestamp,
+          orderbookSequence: activeOrderbookSequence,
+          lineNumber: index + 1
+        });
+        const clientIdFromPack = extractIdFromPackDetails(packDetails);
         const settlementAccount = 'mint nominies';
         const settlementAccountOptions = ['mint nominies'];
         const brokerRef = 'Longmark';
@@ -1622,8 +1764,9 @@
           isin,
           clientName,
           clientAccountId,
+          orderbookSequence: activeOrderbookSequence,
           bndReference,
-          clientIdRegNo: row.user_id || '-',
+          clientIdRegNo: clientIdFromPack || row.user_id || '-',
           side,
           quantityValue: isQuantityNumeric ? quantityValue : 0,
           totalQuantity,
@@ -1808,6 +1951,7 @@
 
     filledOrderbooksArchive = readFilledArchive();
     setActiveTab('active');
+    updateOrderbookHeaderSequence();
     renderFilledOrderbooks();
 
     requireSession().then(async (ok) => {
@@ -1818,6 +1962,7 @@
         if (Array.isArray(dbArchive)) {
           filledOrderbooksArchive = dbArchive;
           persistFilledArchive();
+          updateOrderbookHeaderSequence();
           renderFilledOrderbooks();
         }
       } catch (error) {
