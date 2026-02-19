@@ -864,6 +864,80 @@
       `;
     };
 
+    const renderSnapshotBndDetailsTable = (snapshotRows, targetRow) => {
+      const rows = Array.isArray(snapshotRows) ? snapshotRows : [];
+      const targetSecurityId = String(targetRow?.securityId || '').trim();
+      const targetInstrument = String(targetRow?.instrumentName || '').trim().toLowerCase();
+      const targetTicker = String(targetRow?.ticker || '').trim().toLowerCase();
+      const targetIsin = String(targetRow?.isin || '').trim().toLowerCase();
+
+      const related = rows
+        .filter((row) => {
+          if (String(row?.side || '').toUpperCase() !== 'BUY') return false;
+
+          const rowSecurityId = String(row?.securityId || '').trim();
+          if (targetSecurityId && rowSecurityId) {
+            return rowSecurityId === targetSecurityId;
+          }
+
+          const rowInstrument = String(row?.instrumentName || '').trim().toLowerCase();
+          const rowTicker = String(row?.ticker || '').trim().toLowerCase();
+          const rowIsin = String(row?.isin || '').trim().toLowerCase();
+          return rowInstrument === targetInstrument
+            && rowTicker === targetTicker
+            && rowIsin === targetIsin;
+        })
+        .sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
+
+      if (!related.length) {
+        return '<div class="filled-orderbook-empty">No BND buyer rows for this entry.</div>';
+      }
+
+      const body = related.map((row, index) => {
+        const seed = deterministicNumberFromText(row.userId || row.sourceId || row.clientName || `${index + 1}`);
+        const suffix = String(seed % 1000).padStart(3, '0');
+        const accountId = row.clientAccountId || `MINT-${String(seed % 1000000).padStart(6, '0')}`;
+        const bndReference = row.bndReference || `BND-${formatDateCompact(row.timestamp)}-${suffix}`;
+
+        return `
+          <tr>
+            <td>${escapeHtml(String(index + 1))}</td>
+            <td>${escapeHtml(accountId)}</td>
+            <td>${escapeHtml(bndReference)}</td>
+            <td>${escapeHtml(shortClientName(row.clientName))}</td>
+            <td>${escapeHtml(maskIdentifier(row.clientIdRegNo || row.userId || '-'))}</td>
+            <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
+            <td>${escapeHtml(formatTimeOnly(row.timestamp))}</td>
+            <td>${escapeHtml(row.orderType || 'Market')}</td>
+            <td>${escapeHtml(row.settlementRef || '')}</td>
+          </tr>
+        `;
+      }).join('');
+
+      return `
+        <div class="orderbook-detail-table-wrap">
+          <table class="orderbook-detail-table">
+            <thead>
+              <tr>
+                <th>Line</th>
+                <th>Client Account ID</th>
+                <th>BND Reference</th>
+                <th>Client Name</th>
+                <th>ID / Reg No</th>
+                <th>Quantity</th>
+                <th>Order Timestamp</th>
+                <th>Instruction Type</th>
+                <th>Settlement Ref</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${body}
+            </tbody>
+          </table>
+        </div>
+      `;
+    };
+
     const toCsvContent = (rows) => {
       const header = ['Line', 'Instrument Name', 'Ticker', 'ISIN', 'Side', 'Total Quantity', 'Market Value', 'Order Type', 'Settlement Account', 'Broker Ref', 'Unrealized PnL'];
       const csvLines = [header.map(normalizeCsv).join(',')];
@@ -1061,8 +1135,10 @@
       filledOrderbooksList.innerHTML = sorted.map((book) => {
         const rows = Array.isArray(book.rows) ? book.rows : [];
         const body = rows.length
-          ? rows.map((row) => `
-            <tr>
+          ? rows.map((row, rowIndex) => {
+            const rowKey = `${String(book.id || 'book')}-${rowIndex}`;
+            return `
+            <tr class="orderbook-main-row" data-archive-main-row data-archive-line-key="${escapeHtml(rowKey)}">
               <td>${escapeHtml(String(row.line ?? '-'))}</td>
               <td>${escapeHtml(row.instrumentName || '-')}</td>
               <td>${escapeHtml(row.clientAccountId || '-')}</td>
@@ -1076,8 +1152,17 @@
               <td>${escapeHtml(row.brokerRef || '')}</td>
               <td>${escapeHtml(String(row.unrealizedPnl ?? '-'))}</td>
             </tr>
-          `).join('')
-          : '<tr><td class="orderbook-empty-row" colspan="11">No rows captured.</td></tr>';
+            <tr class="orderbook-detail-row is-hidden" data-archive-detail-row data-archive-line-key="${escapeHtml(rowKey)}">
+              <td colspan="12">
+                <div class="orderbook-detail-wrap">
+                  <div class="orderbook-detail-title">BND Allocation Details</div>
+                  ${renderSnapshotBndDetailsTable(rows, row)}
+                </div>
+              </td>
+            </tr>
+          `;
+          }).join('')
+          : '<tr><td class="orderbook-empty-row" colspan="12">No rows captured.</td></tr>';
 
         return `
           <details class="filled-orderbook-item">
@@ -1488,6 +1573,34 @@
         }
         persistFilledArchive();
         renderFilledOrderbooks();
+      });
+
+      filledOrderbooksList.addEventListener('click', (event) => {
+        if (event.target.closest('button, a, input, select, summary')) {
+          return;
+        }
+
+        const mainRow = event.target.closest('[data-archive-main-row]');
+        if (!mainRow) return;
+
+        const rowKey = mainRow.dataset.archiveLineKey;
+        if (!rowKey) return;
+
+        const tableBody = mainRow.closest('tbody');
+        if (!tableBody) return;
+
+        const detailRows = Array.from(tableBody.querySelectorAll('[data-archive-detail-row]'));
+        const detailRow = detailRows.find((row) => row.dataset.archiveLineKey === rowKey);
+        if (!detailRow) return;
+
+        const willOpen = detailRow.classList.contains('is-hidden');
+        detailRows.forEach((row) => {
+          row.classList.add('is-hidden');
+        });
+
+        if (willOpen) {
+          detailRow.classList.remove('is-hidden');
+        }
       });
     }
 
