@@ -71,7 +71,7 @@ const sendOrderbookCsvEmail = async ({ subject, csvContent, fileName }) => {
     throw new Error('Email service not configured. Set RESEND_API_KEY, ORDERBOOK_EMAIL_FROM, ORDERBOOK_EMAIL_TO');
   }
 
-  const safeFileName = String(fileName || 'filled-order-book.csv');
+  const safeFileName = String(fileName || 'order-book.csv');
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -81,8 +81,8 @@ const sendOrderbookCsvEmail = async ({ subject, csvContent, fileName }) => {
     body: JSON.stringify({
       from: orderbookEmailFrom,
       to: [orderbookEmailTo],
-      subject: subject || 'Filled Order Book CSV',
-      text: 'Attached is the latest filled order book CSV.',
+      subject: subject || 'Order Book CSV',
+      text: 'Attached is the latest order book CSV.',
       attachments: [
         {
           filename: safeFileName,
@@ -173,9 +173,9 @@ const sendDailyOrderbookSnapshotEmail = async () => {
   const dateLabel = now.toLocaleString();
 
   await sendOrderbookCsvEmail({
-    subject: `Daily Filled Order Book - ${dateLabel}`,
+    subject: `Daily Order Book - ${dateLabel}`,
     csvContent: toOrderbookCsvContent(rows),
-    fileName: `daily-filled-orderbook-${now.toISOString().slice(0, 10)}.csv`
+    fileName: `daily-orderbook-${now.toISOString().slice(0, 10)}.csv`
   });
 };
 

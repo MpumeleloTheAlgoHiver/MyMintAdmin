@@ -133,7 +133,7 @@ module.exports = async (req, res) => {
         : 0;
       sequenceNumber = latestSequence + 1;
     }
-    const snapshotTitle = existingRun?.title || `Filled Order Book ${sequenceNumber}`;
+    const snapshotTitle = existingRun?.title || `Order Book ${sequenceNumber}`;
     const snapshotDateLabel = existingRun?.date_label || dateLabel;
 
     if (!rows.length) {
@@ -155,7 +155,7 @@ module.exports = async (req, res) => {
       return sendJson(res, 200, {
         ok: true,
         skipped: true,
-        reason: 'No new entries since last filled order book',
+        reason: 'No new entries since last order book',
         runDate: dateKey,
         timeZone,
         target: { hour: targetHour, minute: targetMinute, timeZone }
@@ -164,9 +164,9 @@ module.exports = async (req, res) => {
 
     try {
       await sendOrderbookCsvEmail({
-        subject: `Daily Filled Order Book - ${dateLabel} (${timeZone})`,
+        subject: `Daily Order Book - ${dateLabel} (${timeZone})`,
         csvContent: toOrderbookCsvContent(rows),
-        fileName: `daily-filled-orderbook-${String(localNow.year).padStart(4, '0')}-${String(localNow.month).padStart(2, '0')}-${String(localNow.day).padStart(2, '0')}.csv`
+        fileName: `daily-orderbook-${String(localNow.year).padStart(4, '0')}-${String(localNow.month).padStart(2, '0')}-${String(localNow.day).padStart(2, '0')}.csv`
       });
 
       await requestSupabaseJson(

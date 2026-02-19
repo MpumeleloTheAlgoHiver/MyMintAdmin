@@ -149,6 +149,49 @@
       padding: 24px 32px;
     }
 
+    .orderbook-tabs {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
+      box-shadow: var(--shadow);
+    }
+
+    .orderbook-tab-btn {
+      border: 1px solid transparent;
+      background: transparent;
+      color: #4b5563;
+      font-size: 0.84rem;
+      font-weight: 700;
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .orderbook-tab-btn:hover {
+      background: #f9fafb;
+      color: #1f2937;
+    }
+
+    .orderbook-tab-btn.active {
+      background: #f5f3ff;
+      color: #6d28d9;
+      border-color: #ddd6fe;
+    }
+
+    .orderbook-tab-panel {
+      display: none;
+    }
+
+    .orderbook-tab-panel.active {
+      display: block;
+    }
+
     .orderbook-card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -434,6 +477,27 @@
       text-align: center;
     }
 
+    .closed-books-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .closed-books-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 6px;
+    }
+
+    .closed-books-subtitle {
+      font-size: 0.84rem;
+      color: #6b7280;
+      margin-bottom: 12px;
+    }
+
     @media screen and (max-width: 768px) {
       .sidebar {
         display: none;
@@ -492,45 +556,60 @@
     </div>
 
     <section class="orderbook-wrap">
-      <div class="orderbook-card">
-        <div class="orderbook-title-row">
-          <h1 class="orderbook-title">Orderbook</h1>
-          <div class="orderbook-timer" id="orderbookTimer" aria-live="polite">00:00:00</div>
+      <div class="orderbook-tabs" role="tablist" aria-label="Orderbook tabs">
+        <button class="orderbook-tab-btn active" id="activeBooksTab" type="button" role="tab" aria-selected="true" aria-controls="activeBooksPanel">Active Books</button>
+        <button class="orderbook-tab-btn" id="closedBooksTab" type="button" role="tab" aria-selected="false" aria-controls="closedBooksPanel">Closed Books</button>
+      </div>
+
+      <div class="orderbook-tab-panel active" id="activeBooksPanel" role="tabpanel" aria-labelledby="activeBooksTab">
+        <div class="orderbook-card">
+          <div class="orderbook-title-row">
+            <h1 class="orderbook-title">Orderbook</h1>
+            <div class="orderbook-timer" id="orderbookTimer" aria-live="polite">00:00:00</div>
+          </div>
+          <p class="orderbook-subtitle">Holdings ledger with export support.</p>
+          <div class="orderbook-toolbar">
+            <div class="orderbook-count" id="orderbookCount">0 records</div>
+            <button class="orderbook-export-btn" id="exportOrderbookBtn" type="button" disabled>Export CSV</button>
+          </div>
+          <div class="orderbook-table-wrap">
+            <table class="orderbook-table">
+              <thead>
+                <tr>
+                  <th>Line</th>
+                  <th>Instrument Name</th>
+                  <th>Ticker</th>
+                  <th>ISIN</th>
+                  <th>Side</th>
+                  <th>Total Quantity</th>
+                  <th>Order Type</th>
+                  <th>Settlement Account</th>
+                  <th>Broker Ref</th>
+                </tr>
+              </thead>
+              <tbody id="orderbookTableBody">
+                <tr>
+                  <td class="orderbook-empty-row" colspan="9">Loading orderbook...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-        <p class="orderbook-subtitle">Holdings ledger with export support.</p>
-        <div class="orderbook-toolbar">
-          <div class="orderbook-count" id="orderbookCount">0 records</div>
-          <button class="orderbook-export-btn" id="exportOrderbookBtn" type="button" disabled>Export CSV</button>
-        </div>
-        <div class="orderbook-table-wrap">
-          <table class="orderbook-table">
-            <thead>
-              <tr>
-                <th>Line</th>
-                <th>Instrument Name</th>
-                <th>Ticker</th>
-                <th>ISIN</th>
-                <th>Side</th>
-                <th>Total Quantity</th>
-                <th>Order Type</th>
-                <th>Settlement Account</th>
-                <th>Broker Ref</th>
-              </tr>
-            </thead>
-            <tbody id="orderbookTableBody">
-              <tr>
-                <td class="orderbook-empty-row" colspan="9">Loading orderbook...</td>
-              </tr>
-            </tbody>
-          </table>
+
+        <div class="filled-orderbooks-card">
+          <h2 class="filled-orderbooks-title">Active Order Books</h2>
+          <p class="filled-orderbooks-subtitle">Snapshots captured when the timer hits 15:30 (automatic email send stays enabled).</p>
+          <div class="filled-orderbooks-list" id="filledOrderbooksList">
+            <div class="filled-orderbook-empty">No active order books yet.</div>
+          </div>
         </div>
       </div>
 
-      <div class="filled-orderbooks-card">
-        <h2 class="filled-orderbooks-title">Filled Order Books</h2>
-        <p class="filled-orderbooks-subtitle">Snapshots captured when the timer hits 15:30.</p>
-        <div class="filled-orderbooks-list" id="filledOrderbooksList">
-          <div class="filled-orderbook-empty">No filled order books yet.</div>
+      <div class="orderbook-tab-panel" id="closedBooksPanel" role="tabpanel" aria-labelledby="closedBooksTab">
+        <div class="closed-books-card">
+          <h2 class="closed-books-title">Closed Books</h2>
+          <p class="closed-books-subtitle">Closed-book logic is not enabled yet.</p>
+          <div class="filled-orderbook-empty">No closed books yet.</div>
         </div>
       </div>
     </section>
@@ -547,6 +626,10 @@
     const orderbookSearch = document.getElementById('orderbookSearch');
     const orderbookTimer = document.getElementById('orderbookTimer');
     const filledOrderbooksList = document.getElementById('filledOrderbooksList');
+    const activeBooksTab = document.getElementById('activeBooksTab');
+    const closedBooksTab = document.getElementById('closedBooksTab');
+    const activeBooksPanel = document.getElementById('activeBooksPanel');
+    const closedBooksPanel = document.getElementById('closedBooksPanel');
     let allOrderbookRows = [];
     let timerHighlightUntil = 0;
     let isCapturingFilledOrderbook = false;
@@ -745,11 +828,29 @@
       return '';
     };
 
+    const setActiveTab = (tabName) => {
+      const isActiveBooks = tabName === 'active';
+      if (activeBooksTab) {
+        activeBooksTab.classList.toggle('active', isActiveBooks);
+        activeBooksTab.setAttribute('aria-selected', isActiveBooks ? 'true' : 'false');
+      }
+      if (closedBooksTab) {
+        closedBooksTab.classList.toggle('active', !isActiveBooks);
+        closedBooksTab.setAttribute('aria-selected', isActiveBooks ? 'false' : 'true');
+      }
+      if (activeBooksPanel) {
+        activeBooksPanel.classList.toggle('active', isActiveBooks);
+      }
+      if (closedBooksPanel) {
+        closedBooksPanel.classList.toggle('active', !isActiveBooks);
+      }
+    };
+
     const renderFilledOrderbooks = () => {
       if (!filledOrderbooksList) return;
 
       if (!filledOrderbooksArchive.length) {
-        filledOrderbooksList.innerHTML = '<div class="filled-orderbook-empty">No filled order books yet.</div>';
+        filledOrderbooksList.innerHTML = '<div class="filled-orderbook-empty">No active order books yet.</div>';
         return;
       }
 
@@ -776,7 +877,7 @@
         return `
           <details class="filled-orderbook-item">
             <summary class="filled-orderbook-summary">
-              <span>${escapeHtml(book.title || 'Filled Order Book')}</span>
+              <span>${escapeHtml(book.title || `Order Book ${book.sequence || '-'}: ${book.dateLabel || '-'}`)}</span>
               <span class="filled-orderbook-meta">
                 <span>${escapeHtml(book.dateLabel || '-')}</span>
                 <span data-book-id="${escapeHtml(String(book.id || ''))}">${emailStatusChip(book.emailStatus)}</span>
@@ -824,9 +925,9 @@
             'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
-            subject: `${snapshot.title} - ${snapshot.dateLabel}`,
+            subject: `${snapshot.title}`,
             csvContent: toCsvContent(snapshot.rows || []),
-            fileName: `${(snapshot.title || 'filled-order-book').replace(/\s+/g, '-').toLowerCase()}.csv`
+            fileName: `${(snapshot.title || 'order-book').replace(/\s+/g, '-').toLowerCase()}.csv`
           })
         });
 
@@ -855,7 +956,7 @@
         id: `${dateKey}-${sequence}`,
         dateKey,
         sequence,
-        title: `Filled Order Book ${sequence}`,
+        title: `Order Book ${sequence}: ${now.toLocaleString()}`,
         dateLabel: now.toLocaleString(),
         createdAt: now.toISOString(),
         rows: allOrderbookRows.map((row, index) => ({
@@ -1093,6 +1194,14 @@
       orderbookSearch.addEventListener('input', applySearchFilter);
     }
 
+    if (activeBooksTab) {
+      activeBooksTab.addEventListener('click', () => setActiveTab('active'));
+    }
+
+    if (closedBooksTab) {
+      closedBooksTab.addEventListener('click', () => setActiveTab('closed'));
+    }
+
     if (filledOrderbooksList) {
       filledOrderbooksList.addEventListener('click', async (event) => {
         const retryBtn = event.target.closest('[data-email-retry-btn]');
@@ -1159,6 +1268,7 @@
     }
 
     filledOrderbooksArchive = readFilledArchive();
+    setActiveTab('active');
     renderFilledOrderbooks();
 
     requireSession().then(async (ok) => {

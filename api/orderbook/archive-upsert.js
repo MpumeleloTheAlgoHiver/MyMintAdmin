@@ -45,7 +45,7 @@ module.exports = async (req, res) => {
       status,
       row_count: rows.length,
       sequence_number: sequence,
-      title: snapshot.title || (sequence ? `Filled Order Book ${sequence}` : null),
+      title: snapshot.title || (sequence ? `Order Book ${sequence}` : null),
       date_label: snapshot.dateLabel || null,
       snapshot_rows: rows,
       error_message: snapshot.emailError || null,

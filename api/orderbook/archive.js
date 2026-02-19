@@ -11,7 +11,7 @@ const normalizeArchiveRows = (rows) => {
         id: `${dateKey}-${sequence}`,
         dateKey,
         sequence,
-        title: row.title || `Filled Order Book ${sequence}`,
+        title: row.title || `Order Book ${sequence}`,
         dateLabel: row.date_label || dateKey,
         createdAt,
         rows: row.snapshot_rows || [],

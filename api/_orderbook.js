@@ -147,11 +147,11 @@ const sendOrderbookCsvEmail = async ({ subject, csvContent, fileName }) => {
     body: JSON.stringify({
       from: orderbookEmailFrom,
       to: recipients,
-      subject: subject || 'Filled Order Book CSV',
-      text: 'Attached is the latest filled order book CSV.',
+      subject: subject || 'Order Book CSV',
+      text: 'Attached is the latest order book CSV.',
       attachments: [
         {
-          filename: String(fileName || 'filled-order-book.csv'),
+          filename: String(fileName || 'order-book.csv'),
           content: Buffer.from(String(csvContent || ''), 'utf8').toString('base64')
         }
       ]
