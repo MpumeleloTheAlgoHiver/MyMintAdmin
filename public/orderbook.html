@@ -622,7 +622,7 @@
   <main class="main-content">
     <div class="top-nav">
       <div class="top-search">
-        <input id="orderbookSearch" type="search" placeholder="Search instrument, ticker, ISIN, side, account, or broker ref..." aria-label="Search orderbook">
+        <input id="orderbookSearch" type="search" placeholder="Search instrument, ticker, side, account, or broker ref..." aria-label="Search orderbook">
       </div>
       <button class="signout-btn" id="signOutBtn">Sign out</button>
     </div>
@@ -651,7 +651,6 @@
                   <th>Line</th>
                   <th>Instrument Name</th>
                   <th>Ticker</th>
-                  <th>ISIN</th>
                   <th>Side</th>
                   <th>Total QYT</th>
                   <th>Market Value</th>
@@ -663,7 +662,7 @@
               </thead>
               <tbody id="orderbookTableBody">
                 <tr>
-                  <td class="orderbook-empty-row" colspan="11">Loading orderbook...</td>
+                  <td class="orderbook-empty-row" colspan="10">Loading orderbook...</td>
                 </tr>
               </tbody>
             </table>
@@ -711,6 +710,7 @@
     let timerHighlightUntil = 0;
     let isCapturingFilledOrderbook = false;
     const FILLED_ARCHIVE_KEY = 'filled-orderbooks-archive-v1';
+    const ARCHIVE_BACKFILL_KEY = 'orderbook-archive-backfill-v1';
     let filledOrderbooksArchive = [];
 
     const requireSession = async () => {
@@ -1197,7 +1197,7 @@
     };
 
     const toCsvContent = (rows) => {
-      const header = ['Line', 'Instrument Name', 'Ticker', 'ISIN', 'Side', 'Total QYT', 'Market Value', 'Order Type', 'Settlement Account', 'Broker Ref', 'Unrealized PnL'];
+      const header = ['Line', 'Instrument Name', 'Ticker', 'Side', 'Total QYT', 'Market Value', 'Order Type', 'Settlement Account', 'Broker Ref', 'Unrealized PnL'];
       const csvLines = [header.map(normalizeCsv).join(',')];
 
       rows.forEach((row) => {
@@ -1205,7 +1205,6 @@
           row.line,
           row.instrumentName,
           row.ticker,
-          row.isin,
           row.side,
           row.totalQuantity,
           asRandValue(row.marketValue),
@@ -1345,6 +1344,146 @@
       }
     };
 
+    const hasCompletedArchiveBackfill = () => {
+      try {
+        return localStorage.getItem(ARCHIVE_BACKFILL_KEY) === 'done';
+      } catch {
+        return false;
+      }
+    };
+
+    const markArchiveBackfillCompleted = () => {
+      try {
+        localStorage.setItem(ARCHIVE_BACKFILL_KEY, 'done');
+      } catch {
+      }
+    };
+
+    const normalizeMatchText = (value) => String(value || '').trim().toLowerCase();
+
+    const buildBackfillBndRows = (relatedRawRows, fallbackSequence) => {
+      return (relatedRawRows || []).map((item, index) => {
+        const seed = deterministicNumberFromText(item.userId || item.sourceId || item.clientName || `${index + 1}`);
+        return {
+          line: index + 1,
+          clientAccountId: item.clientAccountId || `MINT-${String(seed % 1000000).padStart(6, '0')}`,
+          bndReference: item.bndReference || buildBndReference({
+            timestamp: item.timestamp,
+            orderbookSequence: item.orderbookSequence || fallbackSequence || activeOrderbookSequence,
+            lineNumber: index + 1
+          }),
+          clientName: shortClientName(item.clientName),
+          idRegNoFull: String(item.clientIdRegNo || '-'),
+          quantity: item.totalQuantity || '-',
+          marketValue: asRandValue(item.marketValue || '-'),
+          orderTimestamp: formatTimeOnly(item.timestamp),
+          instructionType: item.orderType || 'Market',
+          settlementRef: item.settlementRef || ''
+        };
+      });
+    };
+
+    const backfillSnapshotWithCurrentData = (snapshot) => {
+      const sequence = Number(snapshot?.sequence || 0) || activeOrderbookSequence;
+      const rows = Array.isArray(snapshot?.rows) ? snapshot.rows : [];
+      let changed = false;
+
+      const updatedRows = rows.map((row) => {
+        const needsBndRows = !Array.isArray(row?.bndRows) || !row.bndRows.length;
+        const needsClientAccountId = !String(row?.clientAccountId || '').trim();
+
+        if (!needsBndRows && !needsClientAccountId) {
+          return row;
+        }
+
+        const rowSecurityId = String(row?.securityId || '').trim();
+        const rowSide = String(row?.side || '').trim().toUpperCase() || 'BUY';
+        const rowInstrument = normalizeMatchText(row?.instrumentName);
+        const rowTicker = normalizeMatchText(row?.ticker);
+        const rowIsin = normalizeMatchText(row?.isin);
+
+        const relatedRawRows = (allOrderbookRawRows || [])
+          .filter((rawRow) => {
+            if (String(rawRow?.side || '').trim().toUpperCase() !== rowSide) return false;
+
+            const rawSecurityId = String(rawRow?.securityId || '').trim();
+            if (rowSecurityId && rawSecurityId) {
+              return rawSecurityId === rowSecurityId;
+            }
+
+            return normalizeMatchText(rawRow?.instrumentName) === rowInstrument
+              && normalizeMatchText(rawRow?.ticker) === rowTicker
+              && normalizeMatchText(rawRow?.isin) === rowIsin;
+          })
+          .sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
+
+        if (!relatedRawRows.length) {
+          return row;
+        }
+
+        const builtBndRows = buildBackfillBndRows(relatedRawRows, sequence);
+        const firstClientAccountId = builtBndRows[0]?.clientAccountId || '';
+        changed = true;
+
+        return {
+          ...row,
+          clientAccountId: String(row?.clientAccountId || '').trim() || firstClientAccountId,
+          sourceIds: Array.isArray(row?.sourceIds) && row.sourceIds.length
+            ? row.sourceIds
+            : relatedRawRows.map((item) => String(item?.sourceId || '')).filter(Boolean),
+          sourceId: row?.sourceId || String(relatedRawRows[0]?.sourceId || ''),
+          bndRows: builtBndRows
+        };
+      });
+
+      if (!changed) return { changed: false, snapshot };
+      return {
+        changed: true,
+        snapshot: {
+          ...snapshot,
+          rows: updatedRows
+        }
+      };
+    };
+
+    const maybeBackfillLegacyArchiveSnapshots = async () => {
+      if (hasCompletedArchiveBackfill()) return;
+      if (!Array.isArray(filledOrderbooksArchive) || !filledOrderbooksArchive.length) {
+        markArchiveBackfillCompleted();
+        return;
+      }
+      if (!Array.isArray(allOrderbookRawRows) || !allOrderbookRawRows.length) {
+        return;
+      }
+
+      const updatedSnapshots = [];
+      const changedSnapshots = [];
+
+      filledOrderbooksArchive.forEach((snapshot) => {
+        const result = backfillSnapshotWithCurrentData(snapshot);
+        updatedSnapshots.push(result.snapshot);
+        if (result.changed) {
+          changedSnapshots.push(result.snapshot);
+        }
+      });
+
+      if (changedSnapshots.length) {
+        for (const snapshot of changedSnapshots) {
+          try {
+            await upsertFilledArchiveToDb(snapshot);
+          } catch (error) {
+            console.error('Archive backfill upsert failed:', error?.message || error);
+          }
+        }
+
+        filledOrderbooksArchive = updatedSnapshots;
+        persistFilledArchive();
+        renderFilledOrderbooks();
+      }
+
+      markArchiveBackfillCompleted();
+    };
+
     const loadFilledArchiveFromDb = async () => {
       const { data } = await supabaseClient.auth.getSession();
       const token = data?.session?.access_token;
@@ -1439,9 +1578,7 @@
             <tr class="orderbook-main-row" data-archive-main-row data-archive-line-key="${escapeHtml(rowKey)}">
               <td>${escapeHtml(String(row.line ?? '-'))}</td>
               <td>${escapeHtml(row.instrumentName || '-')}</td>
-              <td>${escapeHtml(row.clientAccountId || '-')}</td>
               <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
-              <td class="orderbook-cell-muted">${escapeHtml(row.isin || '-')}</td>
               <td>${escapeHtml(row.side || '-')}</td>
               <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
               <td>${escapeHtml(asRandValue(row.marketValue))}</td>
@@ -1451,7 +1588,7 @@
               <td>${escapeHtml(String(row.unrealizedPnl ?? '-'))}</td>
             </tr>
             <tr class="orderbook-detail-row is-hidden" data-archive-detail-row data-archive-line-key="${escapeHtml(rowKey)}">
-              <td colspan="12">
+              <td colspan="10">
                 <div class="orderbook-detail-wrap">
                   <div class="orderbook-detail-title">BND Allocation Details</div>
                   ${renderSnapshotBndDetailsTable(rows, row, book.sequence)}
@@ -1460,7 +1597,7 @@
             </tr>
           `;
           }).join('')
-          : '<tr><td class="orderbook-empty-row" colspan="12">No rows captured.</td></tr>';
+          : '<tr><td class="orderbook-empty-row" colspan="10">No rows captured.</td></tr>';
 
         return `
           <details class="filled-orderbook-item">
@@ -1478,9 +1615,7 @@
                     <tr>
                       <th>Line</th>
                       <th>Instrument Name</th>
-                      <th>Client Account ID</th>
                       <th>Ticker</th>
-                      <th>ISIN</th>
                       <th>Side</th>
                       <th>Total QYT</th>
                       <th>Market Value</th>
@@ -1624,7 +1759,7 @@
       exportOrderbookBtn.disabled = rows.length === 0;
 
       if (!rows.length) {
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="11">No orderbook records found.</td></tr>';
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">No orderbook records found.</td></tr>';
         return;
       }
 
@@ -1644,7 +1779,6 @@
             <td>${escapeHtml(String(row.line ?? '-'))}</td>
             <td>${escapeHtml(row.instrumentName || '-')}</td>
             <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
-            <td class="orderbook-cell-muted">${escapeHtml(row.isin || '-')}</td>
             <td>${escapeHtml(row.side || '-')}</td>
             <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
             <td>${escapeHtml(asRandValue(row.marketValue))}</td>
@@ -1662,7 +1796,7 @@
             <td>${escapeHtml(String(row.unrealizedPnl ?? '-'))}</td>
           </tr>
           <tr class="orderbook-detail-row is-hidden" data-orderbook-detail-row data-line-key="${lineKey}">
-            <td colspan="11">
+            <td colspan="10">
               <div class="orderbook-detail-wrap">
                 <div class="orderbook-detail-title">BND Allocation Details</div>
                 ${renderBndDetailsTable(row)}
@@ -1683,7 +1817,6 @@
       const filtered = allOrderbookRows.filter((row) => {
         return String(row.instrumentName || '').toLowerCase().includes(query)
           || String(row.ticker || '').toLowerCase().includes(query)
-          || String(row.isin || '').toLowerCase().includes(query)
           || String(row.side || '').toLowerCase().includes(query)
           || String(row.marketValue || '').toLowerCase().includes(query)
           || String(row.orderType || '').toLowerCase().includes(query)
@@ -1854,17 +1987,18 @@
       const { data } = await supabaseClient.auth.getSession();
       const accessToken = data?.session?.access_token;
       if (!accessToken) {
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="11">No active session found.</td></tr>';
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">No active session found.</td></tr>';
         return;
       }
 
       try {
         allOrderbookRows = await loadOrderbookClientSideFallback();
+        await maybeBackfillLegacyArchiveSnapshots();
         applySearchFilter();
         maybeCaptureFilledOrderbook();
       } catch (error) {
         console.error('Orderbook load error:', error);
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="11">Could not load orderbook data.</td></tr>';
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">Could not load orderbook data.</td></tr>';
       }
     };
 
@@ -1987,7 +2121,6 @@
           ? allOrderbookRows.filter((row) => {
             return String(row.instrumentName || '').toLowerCase().includes(query)
               || String(row.ticker || '').toLowerCase().includes(query)
-              || String(row.isin || '').toLowerCase().includes(query)
               || String(row.side || '').toLowerCase().includes(query)
               || String(row.marketValue || '').toLowerCase().includes(query)
               || String(row.orderType || '').toLowerCase().includes(query)
