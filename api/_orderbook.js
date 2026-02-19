@@ -81,6 +81,8 @@ const buildOrderbookRows = (holdings, securitiesRows) => {
     const security = securitiesMap[row.security_id] || {};
     const quantityValue = Number(row.quantity);
     const isQuantityNumeric = Number.isFinite(quantityValue);
+    const marketValueNumber = Number(row.market_value);
+    const hasMarketValue = Number.isFinite(marketValueNumber);
 
     return {
       line: index + 1,
@@ -91,6 +93,10 @@ const buildOrderbookRows = (holdings, securitiesRows) => {
       totalQuantity: isQuantityNumeric
         ? quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 })
         : (row.quantity ?? '-'),
+      marketValueNumber: hasMarketValue ? marketValueNumber : 0,
+      marketValue: hasMarketValue
+        ? `R ${marketValueNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        : '-',
       orderType: 'Market',
       settlementAccount: '',
       brokerRef: ''
@@ -124,7 +130,7 @@ const toOrderbookCsvContent = (rows) => {
   return csvLines.join('\n');
 };
 
-const sendOrderbookCsvEmail = async ({ subject, csvContent, fileName }) => {
+const sendOrderbookCsvEmail = async ({ subject, csvContent, fileName, idempotencyKey }) => {
   const resendApiKey = process.env.RESEND_API_KEY;
   const orderbookEmailFrom = process.env.ORDERBOOK_EMAIL_FROM;
   const orderbookEmailTo = process.env.ORDERBOOK_EMAIL_TO;
@@ -142,7 +148,8 @@ const sendOrderbookCsvEmail = async ({ subject, csvContent, fileName }) => {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${resendApiKey}`,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      ...(idempotencyKey ? { 'Idempotency-Key': String(idempotencyKey) } : {})
     },
     body: JSON.stringify({
       from: orderbookEmailFrom,

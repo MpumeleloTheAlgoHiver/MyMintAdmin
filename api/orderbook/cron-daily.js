@@ -56,13 +56,14 @@ module.exports = async (req, res) => {
 
   try {
     const now = new Date();
+    const nowIso = now.toISOString();
     const localNow = getNowInTimezoneParts(now, timeZone);
     const dateKey = `${String(localNow.year).padStart(4, '0')}-${String(localNow.month).padStart(2, '0')}-${String(localNow.day).padStart(2, '0')}`;
     const currentMinuteOfDay = (localNow.hour * 60) + localNow.minute;
     const targetMinuteOfDay = (targetHour * 60) + targetMinute;
 
     const existingRuns = await requestSupabaseJson(
-      `/rest/v1/orderbook_email_runs?select=id,run_date,status,sent_at,sequence_number,title,date_label&run_date=eq.${dateKey}&limit=1`,
+      `/rest/v1/orderbook_email_runs?select=id,run_date,status,sent_at,last_attempt_at,sequence_number,title,date_label&run_date=eq.${dateKey}&limit=1`,
       { method: 'GET' }
     );
     const existingRun = Array.isArray(existingRuns) && existingRuns.length ? existingRuns[0] : null;
@@ -77,6 +78,22 @@ module.exports = async (req, res) => {
         now: localNow,
         target: { hour: targetHour, minute: targetMinute, timeZone }
       });
+    }
+
+    if (existingRun?.status === 'sending') {
+      const lastAttemptMs = existingRun?.last_attempt_at ? new Date(existingRun.last_attempt_at).getTime() : 0;
+      const sendingCooldownMs = 60 * 60 * 1000;
+      if (lastAttemptMs && (Date.now() - lastAttemptMs) < sendingCooldownMs) {
+        return sendJson(res, 200, {
+          ok: true,
+          skipped: true,
+          reason: 'Run is already in progress',
+          runDate: dateKey,
+          sentAt: existingRun.sent_at || null,
+          now: localNow,
+          target: { hour: targetHour, minute: targetMinute, timeZone }
+        });
+      }
     }
 
     if (currentMinuteOfDay < targetMinuteOfDay) {
@@ -96,7 +113,7 @@ module.exports = async (req, res) => {
       timezone: timeZone,
       target_hour: targetHour,
       target_minute: targetMinute,
-      last_attempt_at: new Date().toISOString(),
+      last_attempt_at: nowIso,
       error_message: null
     };
 
@@ -111,6 +128,40 @@ module.exports = async (req, res) => {
       }
     );
 
+    const claimRows = await requestSupabaseJson(
+      `/rest/v1/orderbook_email_runs?run_date=eq.${dateKey}&status=in.(pending,failed,no_data)`,
+      {
+        method: 'PATCH',
+        body: {
+          status: 'sending',
+          last_attempt_at: nowIso,
+          error_message: null
+        },
+        extraHeaders: {
+          'Prefer': 'return=representation'
+        }
+      }
+    );
+    const claimedRun = Array.isArray(claimRows) && claimRows.length ? claimRows[0] : null;
+
+    if (!claimedRun) {
+      const latestRuns = await requestSupabaseJson(
+        `/rest/v1/orderbook_email_runs?select=status,sent_at,last_attempt_at&run_date=eq.${dateKey}&limit=1`,
+        { method: 'GET' }
+      );
+      const latestRun = Array.isArray(latestRuns) && latestRuns.length ? latestRuns[0] : null;
+      return sendJson(res, 200, {
+        ok: true,
+        skipped: true,
+        reason: latestRun?.status === 'sent' ? 'Already sent for date' : 'Run is already in progress',
+        runDate: dateKey,
+        status: latestRun?.status || null,
+        sentAt: latestRun?.sent_at || null,
+        now: localNow,
+        target: { hour: targetHour, minute: targetMinute, timeZone }
+      });
+    }
+
     const previousSentRuns = await requestSupabaseJson(
       `/rest/v1/orderbook_email_runs?select=sent_at,run_date,status&status=eq.sent&run_date=lt.${dateKey}&order=run_date.desc&limit=1`,
       { method: 'GET' }
@@ -122,7 +173,7 @@ module.exports = async (req, res) => {
     const rows = await loadLiveOrderbookRows(previousSentAt);
     const dateLabel = `${String(localNow.year).padStart(4, '0')}-${String(localNow.month).padStart(2, '0')}-${String(localNow.day).padStart(2, '0')} ${String(localNow.hour).padStart(2, '0')}:${String(localNow.minute).padStart(2, '0')}`;
 
-    let sequenceNumber = Number(existingRun?.sequence_number || 0);
+    let sequenceNumber = Number(claimedRun?.sequence_number || existingRun?.sequence_number || 0);
     if (!Number.isFinite(sequenceNumber) || sequenceNumber <= 0) {
       const latestSequenceRows = await requestSupabaseJson(
         '/rest/v1/orderbook_email_runs?select=sequence_number&sequence_number=not.is.null&order=sequence_number.desc&limit=1',
@@ -133,8 +184,8 @@ module.exports = async (req, res) => {
         : 0;
       sequenceNumber = latestSequence + 1;
     }
-    const snapshotTitle = existingRun?.title || `Order Book ${sequenceNumber}`;
-    const snapshotDateLabel = existingRun?.date_label || dateLabel;
+    const snapshotTitle = claimedRun?.title || existingRun?.title || `Order Book ${sequenceNumber}`;
+    const snapshotDateLabel = claimedRun?.date_label || existingRun?.date_label || dateLabel;
 
     if (!rows.length) {
       await requestSupabaseJson(
@@ -147,7 +198,7 @@ module.exports = async (req, res) => {
             snapshot_rows: [],
             sent_at: null,
             error_message: null,
-            last_attempt_at: new Date().toISOString()
+            last_attempt_at: nowIso
           }
         }
       );
@@ -166,7 +217,8 @@ module.exports = async (req, res) => {
       await sendOrderbookCsvEmail({
         subject: `Daily Order Book - ${dateLabel} (${timeZone})`,
         csvContent: toOrderbookCsvContent(rows),
-        fileName: `daily-orderbook-${String(localNow.year).padStart(4, '0')}-${String(localNow.month).padStart(2, '0')}-${String(localNow.day).padStart(2, '0')}.csv`
+        fileName: `daily-orderbook-${String(localNow.year).padStart(4, '0')}-${String(localNow.month).padStart(2, '0')}-${String(localNow.day).padStart(2, '0')}.csv`,
+        idempotencyKey: `orderbook-daily-${dateKey}`
       });
 
       await requestSupabaseJson(
