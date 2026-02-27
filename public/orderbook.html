@@ -1,0 +1,2153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mint Orderbook</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #f5f6fa;
+      --surface: #ffffff;
+      --border: #e8defa;
+      --text: #22163a;
+      --text-muted: #6b7280;
+      --primary: #7c3aed;
+      --shadow: 0 14px 34px rgba(80, 38, 157, 0.1);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      color: var(--text);
+    }
+
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 75px;
+      height: 100vh;
+      background: rgba(255, 255, 255, 0.86);
+      backdrop-filter: blur(8px);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 0;
+      z-index: 1000;
+    }
+
+    .sidebar-logo {
+      width: 45px;
+      height: 45px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 40px;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      width: 100%;
+      padding: 0 15px;
+    }
+
+    .nav-icon {
+      width: 45px;
+      height: 45px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.25s ease;
+    }
+
+    .nav-icon svg {
+      width: 22px;
+      height: 22px;
+      fill: #9ca3af;
+      transition: fill 0.25s ease;
+    }
+
+    .nav-icon:hover svg,
+    .nav-icon.active svg {
+      fill: #374151;
+    }
+
+    .main-content {
+      margin-left: 75px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .top-nav {
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .top-search {
+      flex: 1;
+      max-width: 520px;
+    }
+
+    .top-search input {
+      width: 100%;
+      height: 42px;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      background: #f9fafb;
+      padding: 0 14px;
+      font-size: 0.9rem;
+      color: #111827;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .top-search input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+      background: #ffffff;
+    }
+
+    .signout-btn {
+      padding: 8px 14px;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
+      color: #374151;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .signout-btn:hover {
+      background: #f9fafb;
+      border-color: #d1d5db;
+    }
+
+    .orderbook-wrap {
+      padding: 24px 32px;
+    }
+
+    .orderbook-tabs {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
+      box-shadow: var(--shadow);
+    }
+
+    .orderbook-tab-btn {
+      border: 1px solid transparent;
+      background: transparent;
+      color: #4b5563;
+      font-size: 0.84rem;
+      font-weight: 700;
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .orderbook-tab-btn:hover {
+      background: #f9fafb;
+      color: #1f2937;
+    }
+
+    .orderbook-tab-btn.active {
+      background: #f5f3ff;
+      color: #6d28d9;
+      border-color: #ddd6fe;
+    }
+
+    .orderbook-tab-panel {
+      display: none;
+    }
+
+    .orderbook-tab-panel.active {
+      display: block;
+    }
+
+    .orderbook-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 22px;
+    }
+
+    .orderbook-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 8px;
+    }
+
+    .orderbook-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .orderbook-timer {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #6b7280;
+      border: 1px solid #e5e7eb;
+      border-radius: 999px;
+      padding: 5px 10px;
+      background: #ffffff;
+      min-width: 92px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      transition: all 0.2s ease;
+    }
+
+    .orderbook-timer.is-hit {
+      color: #7c3aed;
+      border-color: #c4b5fd;
+      background: #f5f3ff;
+      box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
+    }
+
+    .orderbook-subtitle {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      margin-bottom: 18px;
+    }
+
+    .orderbook-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .orderbook-count {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .orderbook-export-btn {
+      height: 38px;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
+      color: #374151;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 0 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .orderbook-export-btn:hover {
+      background: #f9fafb;
+      border-color: #d1d5db;
+    }
+
+    .orderbook-export-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .orderbook-table-wrap {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      background: #ffffff;
+    }
+
+    .orderbook-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1020px;
+    }
+
+    .orderbook-table thead th {
+      background: #f9fafb;
+      color: #4b5563;
+      text-align: left;
+      font-size: 0.78rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      font-weight: 700;
+      padding: 12px 14px;
+      border-bottom: 1px solid #e5e7eb;
+      white-space: nowrap;
+    }
+
+    .orderbook-table tbody td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #f3f4f6;
+      color: #1f2937;
+      font-size: 0.86rem;
+      vertical-align: top;
+    }
+
+    .orderbook-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .orderbook-main-row {
+      cursor: pointer;
+    }
+
+    .orderbook-main-row:hover td {
+      background: #fafafa;
+    }
+
+    .orderbook-detail-row.is-hidden {
+      display: none;
+    }
+
+    .orderbook-detail-row td {
+      background: #fcfcff;
+      border-bottom: 1px solid #f3f4f6;
+      padding: 0;
+    }
+
+    .orderbook-detail-wrap {
+      padding: 12px;
+    }
+
+    .orderbook-detail-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+
+    .orderbook-detail-table-wrap {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      background: #ffffff;
+    }
+
+    .orderbook-detail-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1120px;
+    }
+
+    .orderbook-detail-table thead th {
+      background: #f9fafb;
+      color: #4b5563;
+      text-align: left;
+      font-size: 0.74rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      font-weight: 700;
+      padding: 10px 12px;
+      border-bottom: 1px solid #e5e7eb;
+      white-space: nowrap;
+    }
+
+    .orderbook-detail-table tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f3f4f6;
+      color: #1f2937;
+      font-size: 0.82rem;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+
+    .orderbook-detail-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .orderbook-cell-muted {
+      color: #6b7280;
+      font-size: 0.82rem;
+    }
+
+    .orderbook-select {
+      width: 100%;
+      min-width: 130px;
+      height: 32px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 0 8px;
+      background: #ffffff;
+      color: #374151;
+      font-size: 0.8rem;
+      outline: none;
+    }
+
+    .orderbook-select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.14);
+    }
+
+    .orderbook-client {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .orderbook-client strong {
+      font-size: 0.85rem;
+      color: #111827;
+    }
+
+    .orderbook-empty-row {
+      text-align: center;
+      color: #6b7280;
+      font-style: italic;
+      background: #fafafa;
+    }
+
+    .orderbook-empty {
+      border: 1px dashed #d1d5db;
+      border-radius: 14px;
+      padding: 26px;
+      background: #fafafa;
+      color: #4b5563;
+      font-size: 0.92rem;
+    }
+
+    .filled-orderbooks-card {
+      margin-top: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .filled-orderbooks-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 6px;
+    }
+
+    .filled-orderbooks-subtitle {
+      font-size: 0.84rem;
+      color: #6b7280;
+      margin-bottom: 12px;
+    }
+
+    .filled-orderbooks-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .filled-orderbook-item {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #ffffff;
+      overflow: hidden;
+    }
+
+    .filled-orderbook-summary {
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .filled-orderbook-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .filled-orderbook-meta {
+      color: #6b7280;
+      font-size: 0.78rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .filled-orderbook-email-status {
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .filled-orderbook-email-status.sent {
+      background: #ecfdf3;
+      color: #166534;
+      border: 1px solid #86efac;
+    }
+
+    .filled-orderbook-email-status.failed {
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fca5a5;
+    }
+
+    .filled-orderbook-email-status.retry {
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    .filled-orderbook-email-status.retry:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(153, 27, 27, 0.16);
+    }
+
+    .filled-orderbook-details {
+      padding: 0 12px 12px;
+    }
+
+    .filled-orderbook-empty {
+      border: 1px dashed #d1d5db;
+      border-radius: 12px;
+      background: #fafafa;
+      color: #6b7280;
+      font-size: 0.85rem;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .closed-books-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .closed-books-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 6px;
+    }
+
+    .closed-books-subtitle {
+      font-size: 0.84rem;
+      color: #6b7280;
+      margin-bottom: 12px;
+    }
+
+    @media screen and (max-width: 768px) {
+      .sidebar {
+        display: none;
+      }
+
+      .main-content {
+        margin-left: 0;
+      }
+
+      .top-nav,
+      .orderbook-wrap {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img src="/icon.png" alt="App logo" style="width: 32px; height: 32px;" />
+    </div>
+
+    <nav class="sidebar-nav">
+      <a class="nav-icon" href="/dashboard.html" aria-label="Dashboard">
+        <svg viewBox="0 0 24 24">
+          <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+        </svg>
+      </a>
+
+      <a class="nav-icon" href="/index.html" aria-label="Profiles">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 12c1.66 0 3-1.34 3-3S13.66 6 12 6 9 7.34 9 9s1.34 3 3 3zm0 2c-2.22 0-6 1.11-6 3.33V19h12v-1.67C18 15.11 14.22 14 12 14z"/>
+        </svg>
+      </a>
+
+      <a class="nav-icon active" href="/orderbook.html" aria-label="Orderbook">
+        <svg viewBox="0 0 24 24">
+          <path d="M4 5h16v2H4V5zm0 6h16v2H4v-2zm0 6h10v2H4v-2z"/>
+        </svg>
+      </a>
+
+      <a class="nav-icon" href="#" aria-label="Settings">
+        <svg viewBox="0 0 24 24">
+          <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.11-.2-.36-.28-.58-.2l-2.39.96c-.5-.38-1.05-.7-1.66-.94l-.36-2.54A.488.488 0 0 0 14.9 2h-3.8c-.24 0-.44.17-.48.4l-.36 2.54c-.61.24-1.16.56-1.66.94l-2.39-.96a.5.5 0 0 0-.58.2L3.7 8.44c-.11.21-.06.48.12.62l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.62l1.92 3.32c.11.2.36.28.58.2l2.39-.96c.5.38 1.05.7 1.66.94l.36 2.54c.04.23.24.4.48.4h3.8c.24 0 .44-.17.48-.4l.36-2.54c.61-.24 1.16-.56 1.66-.94l2.39.96c.22.08.47 0 .58-.2l1.92-3.32a.5.5 0 0 0-.12-.62l-2.03-1.58zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5S10.07 8.5 12 8.5s3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/>
+        </svg>
+      </a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <div class="top-nav">
+      <div class="top-search">
+        <input id="orderbookSearch" type="search" placeholder="Search instrument, ticker, side, account, or broker ref..." aria-label="Search orderbook">
+      </div>
+      <button class="signout-btn" id="signOutBtn">Sign out</button>
+    </div>
+
+    <section class="orderbook-wrap">
+      <div class="orderbook-tabs" role="tablist" aria-label="Orderbook tabs">
+        <button class="orderbook-tab-btn active" id="activeBooksTab" type="button" role="tab" aria-selected="true" aria-controls="activeBooksPanel">Active Books</button>
+        <button class="orderbook-tab-btn" id="closedBooksTab" type="button" role="tab" aria-selected="false" aria-controls="closedBooksPanel">Closed Books</button>
+      </div>
+
+      <div class="orderbook-tab-panel active" id="activeBooksPanel" role="tabpanel" aria-labelledby="activeBooksTab">
+        <div class="orderbook-card">
+          <div class="orderbook-title-row">
+            <h1 class="orderbook-title" id="orderbookTitle">Orderbook :01</h1>
+            <div class="orderbook-timer" id="orderbookTimer" aria-live="polite">00:00:00</div>
+          </div>
+          <p class="orderbook-subtitle">Holdings ledger with export support.</p>
+          <div class="orderbook-toolbar">
+            <div class="orderbook-count" id="orderbookCount">0 records</div>
+            <button class="orderbook-export-btn" id="exportOrderbookBtn" type="button" disabled>Export CSV</button>
+          </div>
+          <div class="orderbook-table-wrap">
+            <table class="orderbook-table">
+              <thead>
+                <tr>
+                  <th>Line</th>
+                  <th>Instrument Name</th>
+                  <th>Ticker</th>
+                  <th>Side</th>
+                  <th>Total QYT</th>
+                  <th>Market Value</th>
+                  <th>Order Type</th>
+                  <th>Settlement Account</th>
+                  <th>Broker Ref</th>
+                  <th>Unrealized PnL</th>
+                </tr>
+              </thead>
+              <tbody id="orderbookTableBody">
+                <tr>
+                  <td class="orderbook-empty-row" colspan="10">Loading orderbook...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="filled-orderbooks-card">
+          <h2 class="filled-orderbooks-title">Active Order Books</h2>
+          <p class="filled-orderbooks-subtitle">Snapshots captured when the timer hits 15:30.</p>
+          <div class="filled-orderbooks-list" id="filledOrderbooksList">
+            <div class="filled-orderbook-empty">No active order books yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="orderbook-tab-panel" id="closedBooksPanel" role="tabpanel" aria-labelledby="closedBooksTab">
+        <div class="closed-books-card">
+          <h2 class="closed-books-title">Closed Books</h2>
+          <p class="closed-books-subtitle">Closed-book logic is not enabled yet.</p>
+          <div class="filled-orderbook-empty">No closed books yet.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const orderbookTableBody = document.getElementById('orderbookTableBody');
+    const orderbookCount = document.getElementById('orderbookCount');
+    const exportOrderbookBtn = document.getElementById('exportOrderbookBtn');
+    const orderbookSearch = document.getElementById('orderbookSearch');
+    const orderbookTimer = document.getElementById('orderbookTimer');
+    const filledOrderbooksList = document.getElementById('filledOrderbooksList');
+    const orderbookTitle = document.getElementById('orderbookTitle');
+    const activeBooksTab = document.getElementById('activeBooksTab');
+    const closedBooksTab = document.getElementById('closedBooksTab');
+    const activeBooksPanel = document.getElementById('activeBooksPanel');
+    const closedBooksPanel = document.getElementById('closedBooksPanel');
+    let allOrderbookRows = [];
+    let allOrderbookRawRows = [];
+    let activeOrderbookSequence = 1;
+    let timerHighlightUntil = 0;
+    let isCapturingFilledOrderbook = false;
+    const FILLED_ARCHIVE_KEY = 'filled-orderbooks-archive-v1';
+    const ARCHIVE_BACKFILL_KEY = 'orderbook-archive-backfill-v1';
+    let filledOrderbooksArchive = [];
+
+    const requireSession = async () => {
+      const { data } = await supabaseClient.auth.getSession();
+      if (!data.session) {
+        window.location.href = '/signin.html';
+        return false;
+      }
+      return true;
+    };
+
+    const signOutBtn = document.getElementById('signOutBtn');
+    if (signOutBtn) {
+      signOutBtn.addEventListener('click', async () => {
+        await supabaseClient.auth.signOut();
+        window.location.href = '/signin.html';
+      });
+    }
+
+    const escapeHtml = (value) => String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    const asDateTime = (value) => {
+      if (!value) return '-';
+      const dt = new Date(value);
+      if (Number.isNaN(dt.getTime())) return String(value);
+      return dt.toLocaleString();
+    };
+
+    const normalizeCsv = (value) => {
+      const base = String(value ?? '');
+      return `"${base.replace(/"/g, '""')}"`;
+    };
+
+    const asRandValue = (value) => {
+      const text = String(value ?? '').trim();
+      if (!text || text === '-') return '-';
+      if (/^R\s*/i.test(text)) return text;
+      return `R ${text}`;
+    };
+
+    const maskIdentifier = (value) => {
+      const text = String(value ?? '').replace(/\s+/g, '');
+      if (!text) return '-';
+      if (text.length <= 5) return `${text}xxxxx`;
+      return `${text.slice(0, text.length - 5)}xxxxx`;
+    };
+
+    const shortClientName = (fullName) => {
+      const text = String(fullName || '').trim();
+      if (!text) return 'Unknown Client';
+      const parts = text.split(/\s+/).filter(Boolean);
+      if (parts.length === 1) return parts[0];
+      return `${parts[0][0]}. ${parts.slice(1).join(' ')}`;
+    };
+
+    const deterministicNumberFromText = (text, mod = 1000000) => {
+      let hash = 0;
+      const source = String(text || '');
+      for (let i = 0; i < source.length; i += 1) {
+        hash = ((hash * 31) + source.charCodeAt(i)) % mod;
+      }
+      return Math.abs(hash);
+    };
+
+    const pickNestedValue = (source, paths = []) => {
+      for (const path of paths) {
+        const parts = String(path || '').split('.').filter(Boolean);
+        let current = source;
+        for (const part of parts) {
+          if (current === null || current === undefined) {
+            current = undefined;
+            break;
+          }
+          current = current[part];
+        }
+        if (current !== undefined && current !== null && String(current).trim() !== '') {
+          return current;
+        }
+      }
+      return null;
+    };
+
+    const normalizePackDetailsObject = (value) => {
+      if (!value) return null;
+      if (typeof value === 'object') return value;
+      if (typeof value === 'string') {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    };
+
+    const extractIdFromPackDetails = (packDetails) => {
+      const pack = normalizePackDetailsObject(packDetails);
+      if (!pack) return '';
+
+      const deepFindByKeyPattern = (source, keyPattern) => {
+        const candidates = [];
+
+        const walk = (node) => {
+          if (node === null || node === undefined) return;
+          if (Array.isArray(node)) {
+            node.forEach(walk);
+            return;
+          }
+          if (typeof node !== 'object') return;
+
+          Object.entries(node).forEach(([key, value]) => {
+            if (value === null || value === undefined) return;
+
+            if (keyPattern.test(String(key)) && (typeof value === 'string' || typeof value === 'number')) {
+              const normalized = String(value).trim();
+              if (normalized) {
+                candidates.push(normalized);
+              }
+            }
+
+            if (typeof value === 'object') {
+              walk(value);
+            }
+          });
+        };
+
+        walk(source);
+        return candidates;
+      };
+
+      const raw = pickNestedValue(pack, [
+        'info.idNumber',
+        'info.id_number',
+        'fixedInfo.idNumber',
+        'fixedInfo.id_number',
+        'idNumber',
+        'id_number',
+        'idDoc.number',
+        'idDoc.idNumber',
+        'document.number',
+        'document.idNumber',
+        'documents.0.number',
+        'documents.0.idNumber',
+        'personalDetails.idNumber',
+        'personal_details.id_number',
+        'nationalId',
+        'national_id',
+        'regNumber',
+        'registrationNumber'
+      ]);
+
+      if (raw) {
+        return String(raw).trim();
+      }
+
+      const deepCandidates = deepFindByKeyPattern(pack, /(id.?number|identity.?number|national.?id|passport|reg(istration)?\s*number|document\s*number)/i)
+        .filter((value) => /[0-9]/.test(value));
+
+      if (deepCandidates.length) {
+        deepCandidates.sort((a, b) => b.length - a.length);
+        return String(deepCandidates[0]).trim();
+      }
+
+      return '';
+    };
+
+    const getBndSuffix = (orderbookSequence, lineNumber) => {
+      const seq = Number(orderbookSequence || 0);
+      const line = Number(lineNumber || 0);
+      const combined = (Math.max(seq, 0) * 100) + Math.max(line, 0);
+      return String(combined).padStart(3, '0');
+    };
+
+    const buildBndReference = ({ timestamp, orderbookSequence, lineNumber }) => {
+      return `BND-${formatDateCompact(timestamp)}-${getBndSuffix(orderbookSequence, lineNumber)}`;
+    };
+
+    const formatTimeOnly = (value) => {
+      if (!value) return '-';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '-';
+      return date.toLocaleTimeString([], { hour12: false });
+    };
+
+    const formatDateCompact = (value) => {
+      if (!value) return '00000000';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '00000000';
+      return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+    };
+
+    const buildBndRowsForOrder = (targetRow) => {
+      if (Array.isArray(targetRow?.bndRows) && targetRow.bndRows.length) {
+        return targetRow.bndRows;
+      }
+
+      const related = allOrderbookRawRows
+        .filter((row) => String(row.securityId || '') === String(targetRow.securityId || '') && String(row.side || '').toUpperCase() === 'BUY')
+        .sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
+
+      if (!related.length) {
+        return [];
+      }
+
+      return related.map((row, index) => {
+        const clientSeed = deterministicNumberFromText(row.userId || row.sourceId || row.clientName || `${index + 1}`);
+        const accountId = row.clientAccountId || `MINT-${String(clientSeed % 1000000).padStart(6, '0')}`;
+        const bndReference = row.bndReference || buildBndReference({
+          timestamp: row.timestamp,
+          orderbookSequence: row.orderbookSequence || targetRow.orderbookSequence || activeOrderbookSequence,
+          lineNumber: index + 1
+        });
+
+        return {
+          line: index + 1,
+          clientAccountId: accountId,
+          bndReference,
+          clientName: shortClientName(row.clientName),
+          idRegNoFull: String(row.clientIdRegNo || '-'),
+          quantity: row.totalQuantity || '-',
+          marketValue: asRandValue(row.marketValue || '-'),
+          orderTimestamp: formatTimeOnly(row.timestamp),
+          instructionType: row.orderType || 'Market',
+          settlementRef: row.settlementRef || ''
+        };
+      });
+    };
+
+    const renderBndDetailsTable = (row) => {
+      const bndRows = buildBndRowsForOrder(row);
+      if (!bndRows.length) {
+        return '<div class="filled-orderbook-empty">No BND buyer rows for this entry.</div>';
+      }
+
+      const body = bndRows.map((detailRow) => `
+        <tr>
+          <td>${escapeHtml(String(detailRow.line))}</td>
+          <td>${escapeHtml(detailRow.clientAccountId)}</td>
+          <td>${escapeHtml(detailRow.bndReference)}</td>
+          <td>${escapeHtml(detailRow.clientName)}</td>
+          <td>${escapeHtml(maskIdentifier(detailRow.idRegNoFull || detailRow.idRegNo || '-'))}</td>
+          <td>${escapeHtml(String(detailRow.quantity))}</td>
+          <td>${escapeHtml(asRandValue(detailRow.marketValue || '-'))}</td>
+          <td>${escapeHtml(detailRow.orderTimestamp)}</td>
+          <td>${escapeHtml(detailRow.instructionType)}</td>
+          <td>${escapeHtml(detailRow.settlementRef || '')}</td>
+        </tr>
+      `).join('');
+
+      return `
+        <div class="orderbook-detail-table-wrap">
+          <table class="orderbook-detail-table">
+            <thead>
+              <tr>
+                <th>Line</th>
+                <th>Client Account ID</th>
+                <th>BND Reference</th>
+                <th>Client Name</th>
+                <th>ID / Reg No</th>
+                <th>Quantity</th>
+                <th>Market Value</th>
+                <th>Order Timestamp</th>
+                <th>Instruction Type</th>
+                <th>Settlement Ref</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${body}
+            </tbody>
+          </table>
+        </div>
+      `;
+    };
+
+    const renderSnapshotBndDetailsTable = (snapshotRows, targetRow, parentSequence = null) => {
+      if (Array.isArray(targetRow?.bndRows) && targetRow.bndRows.length) {
+        const body = targetRow.bndRows.map((row) => `
+          <tr>
+            <td>${escapeHtml(String(row.line ?? '-'))}</td>
+            <td>${escapeHtml(row.clientAccountId || '-')}</td>
+            <td>${escapeHtml(row.bndReference || '-')}</td>
+            <td>${escapeHtml(row.clientName || '-')}</td>
+            <td>${escapeHtml(maskIdentifier(row.idRegNoFull || row.idRegNo || '-'))}</td>
+            <td>${escapeHtml(String(row.quantity ?? '-'))}</td>
+            <td>${escapeHtml(asRandValue(row.marketValue || '-'))}</td>
+            <td>${escapeHtml(row.orderTimestamp || '-')}</td>
+            <td>${escapeHtml(row.instructionType || 'Market')}</td>
+            <td>${escapeHtml(row.settlementRef || '')}</td>
+          </tr>
+        `).join('');
+
+        return `
+          <div class="orderbook-detail-table-wrap">
+            <table class="orderbook-detail-table">
+              <thead>
+                <tr>
+                  <th>Line</th>
+                  <th>Client Account ID</th>
+                  <th>BND Reference</th>
+                  <th>Client Name</th>
+                  <th>ID / Reg No</th>
+                  <th>Quantity</th>
+                  <th>Market Value</th>
+                  <th>Order Timestamp</th>
+                  <th>Instruction Type</th>
+                  <th>Settlement Ref</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${body}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      const rows = Array.isArray(snapshotRows) ? snapshotRows : [];
+      const targetSecurityId = String(targetRow?.securityId || '').trim();
+      const targetInstrument = String(targetRow?.instrumentName || '').trim().toLowerCase();
+      const targetTicker = String(targetRow?.ticker || '').trim().toLowerCase();
+      const related = rows
+        .filter((row) => {
+          if (String(row?.side || '').toUpperCase() !== 'BUY') return false;
+
+          const rowSecurityId = String(row?.securityId || '').trim();
+          if (targetSecurityId && rowSecurityId) {
+            return rowSecurityId === targetSecurityId;
+          }
+
+          const rowInstrument = String(row?.instrumentName || '').trim().toLowerCase();
+          const rowTicker = String(row?.ticker || '').trim().toLowerCase();
+          return rowInstrument === targetInstrument
+            && rowTicker === targetTicker;
+        })
+        .sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
+
+      if (!related.length) {
+        return '<div class="filled-orderbook-empty">No BND buyer rows for this entry.</div>';
+      }
+
+      const body = related.map((row, index) => {
+        const seed = deterministicNumberFromText(row.userId || row.sourceId || row.clientName || `${index + 1}`);
+        const accountId = row.clientAccountId || `MINT-${String(seed % 1000000).padStart(6, '0')}`;
+        const bndReference = row.bndReference || buildBndReference({
+          timestamp: row.timestamp,
+          orderbookSequence: row.orderbookSequence || targetRow.orderbookSequence || parentSequence || activeOrderbookSequence,
+          lineNumber: index + 1
+        });
+
+        return `
+          <tr>
+            <td>${escapeHtml(String(index + 1))}</td>
+            <td>${escapeHtml(accountId)}</td>
+            <td>${escapeHtml(bndReference)}</td>
+            <td>${escapeHtml(shortClientName(row.clientName))}</td>
+            <td>${escapeHtml(maskIdentifier(row.clientIdRegNo || '-'))}</td>
+            <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
+            <td>${escapeHtml(asRandValue(row.marketValue || '-'))}</td>
+            <td>${escapeHtml(formatTimeOnly(row.timestamp))}</td>
+            <td>${escapeHtml(row.orderType || 'Market')}</td>
+            <td>${escapeHtml(row.settlementRef || '')}</td>
+          </tr>
+        `;
+      }).join('');
+
+      return `
+        <div class="orderbook-detail-table-wrap">
+          <table class="orderbook-detail-table">
+            <thead>
+              <tr>
+                <th>Line</th>
+                <th>Client Account ID</th>
+                <th>BND Reference</th>
+                <th>Client Name</th>
+                <th>ID / Reg No</th>
+                <th>Quantity</th>
+                <th>Market Value</th>
+                <th>Order Timestamp</th>
+                <th>Instruction Type</th>
+                <th>Settlement Ref</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${body}
+            </tbody>
+          </table>
+        </div>
+      `;
+    };
+
+    const aggregateOrderbookRows = (rows) => {
+      const groups = new Map();
+
+      (rows || []).forEach((row) => {
+        const key = [
+          String(row.securityId || row.instrumentName || ''),
+          String(row.side || '').toUpperCase(),
+          String(row.orderType || '').toUpperCase()
+        ].join('|');
+
+        if (!groups.has(key)) {
+          groups.set(key, {
+            ...row,
+            quantityValue: Number(row.quantityValue || 0),
+            marketValueNumber: Number(row.marketValueNumber || 0),
+            unrealizedPnlNumber: Number(row.unrealizedPnlNumber || 0),
+            sourceIds: row.sourceId ? [String(row.sourceId)] : [],
+            bndRows: []
+          });
+          return;
+        }
+
+        const group = groups.get(key);
+        group.quantityValue += Number(row.quantityValue || 0);
+        group.marketValueNumber += Number(row.marketValueNumber || 0);
+        group.unrealizedPnlNumber += Number(row.unrealizedPnlNumber || 0);
+        if (row.sourceId) {
+          group.sourceIds.push(String(row.sourceId));
+        }
+
+        const groupTs = new Date(group.timestamp || 0).getTime();
+        const rowTs = new Date(row.timestamp || 0).getTime();
+        if (rowTs > groupTs) {
+          group.timestamp = row.timestamp;
+        }
+      });
+
+      const aggregated = Array.from(groups.values()).map((group) => {
+        const normalizedSourceIds = [...new Set(group.sourceIds || [])];
+        const relatedRawRows = (rows || [])
+          .filter((rawRow) => {
+            return String(rawRow.securityId || '') === String(group.securityId || '')
+              && String(rawRow.side || '').toUpperCase() === String(group.side || '').toUpperCase()
+              && String(rawRow.orderType || '').toUpperCase() === String(group.orderType || '').toUpperCase();
+          })
+          .sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
+
+        const bndRows = relatedRawRows.map((item, index) => {
+          const seed = deterministicNumberFromText(item.userId || item.sourceId || item.clientName || `${index + 1}`);
+          return {
+            line: index + 1,
+            clientAccountId: item.clientAccountId || `MINT-${String(seed % 1000000).padStart(6, '0')}`,
+            bndReference: item.bndReference || buildBndReference({
+              timestamp: item.timestamp,
+              orderbookSequence: item.orderbookSequence || group.orderbookSequence || activeOrderbookSequence,
+              lineNumber: index + 1
+            }),
+            clientName: shortClientName(item.clientName),
+            idRegNoFull: String(item.clientIdRegNo || '-'),
+            quantity: item.totalQuantity || '-',
+            marketValue: asRandValue(item.marketValue || '-'),
+            orderTimestamp: formatTimeOnly(item.timestamp),
+            instructionType: item.orderType || 'Market',
+            settlementRef: item.settlementRef || ''
+          };
+        });
+
+        return {
+          ...group,
+          sourceId: normalizedSourceIds[0] || '',
+          sourceIds: normalizedSourceIds,
+          totalQuantity: group.quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 }),
+          marketValue: `R ${group.marketValueNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          unrealizedPnl: group.unrealizedPnlNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          bndRows
+        };
+      });
+
+      return aggregated
+        .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
+        .map((row, index) => ({
+          ...row,
+          line: index + 1
+        }));
+    };
+
+    const toCsvContent = (rows) => {
+      const header = ['Line', 'Instrument Name', 'Ticker', 'Side', 'Total QYT', 'Market Value', 'Order Type', 'Settlement Account', 'Broker Ref', 'Unrealized PnL'];
+      const csvLines = [header.map(normalizeCsv).join(',')];
+
+      rows.forEach((row) => {
+        csvLines.push([
+          row.line,
+          row.instrumentName,
+          row.ticker,
+          row.side,
+          row.totalQuantity,
+          asRandValue(row.marketValue),
+          row.orderType,
+          row.settlementAccount,
+          row.brokerRef,
+          row.unrealizedPnl
+        ].map(normalizeCsv).join(','));
+      });
+
+      return csvLines.join('\n');
+    };
+
+    const downloadCsv = (rows) => {
+      const blob = new Blob([toCsvContent(rows)], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `orderbook-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    };
+
+    const getArchiveDateKey = (dateObj) => `${dateObj.getFullYear()}-${pad2(dateObj.getMonth() + 1)}-${pad2(dateObj.getDate())}`;
+
+    const getArchivedSourceIds = () => {
+      const sourceIds = new Set();
+      filledOrderbooksArchive.forEach((book) => {
+        (book?.rows || []).forEach((row) => {
+          if (row?.sourceId) {
+            sourceIds.add(String(row.sourceId));
+          }
+          if (Array.isArray(row?.sourceIds)) {
+            row.sourceIds.forEach((sourceId) => {
+              if (sourceId) sourceIds.add(String(sourceId));
+            });
+          }
+        });
+      });
+      return sourceIds;
+    };
+
+    const getLatestArchiveCreatedAt = () => {
+      let latest = null;
+      filledOrderbooksArchive.forEach((book) => {
+        const createdAt = book?.createdAt;
+        if (!createdAt) return;
+        if (!latest || new Date(createdAt).getTime() > new Date(latest).getTime()) {
+          latest = createdAt;
+        }
+      });
+      return latest;
+    };
+
+    const hasFilledOrderbookForDate = (dateKey) => {
+      return filledOrderbooksArchive.some((item) => item.dateKey === dateKey);
+    };
+
+    const getNextFilledOrderbookSequence = () => {
+      const maxExisting = filledOrderbooksArchive.reduce((maxValue, item) => {
+        const directSequence = Number(item?.sequence);
+        if (Number.isFinite(directSequence) && directSequence > maxValue) {
+          return directSequence;
+        }
+
+        const titleMatch = String(item?.title || '').match(/order\s*book\s*(\d+)/i);
+        if (titleMatch) {
+          const parsed = Number(titleMatch[1]);
+          if (Number.isFinite(parsed) && parsed > maxValue) {
+            return parsed;
+          }
+        }
+
+        return maxValue;
+      }, 0);
+
+      return maxExisting + 1;
+    };
+
+    const getTodayOrderbookSequence = () => {
+      const now = new Date();
+      const dateKey = getArchiveDateKey(now);
+      const todayItems = filledOrderbooksArchive.filter((item) => String(item?.dateKey || '') === dateKey);
+
+      if (!todayItems.length) {
+        return getNextFilledOrderbookSequence();
+      }
+
+      const maxToday = todayItems.reduce((maxValue, item) => {
+        const directSequence = Number(item?.sequence);
+        if (Number.isFinite(directSequence) && directSequence > maxValue) {
+          return directSequence;
+        }
+
+        const titleMatch = String(item?.title || '').match(/order\s*book\s*(\d+)/i);
+        if (titleMatch) {
+          const parsed = Number(titleMatch[1]);
+          if (Number.isFinite(parsed) && parsed > maxValue) {
+            return parsed;
+          }
+        }
+
+        return maxValue;
+      }, 0);
+
+      return maxToday > 0 ? maxToday : getNextFilledOrderbookSequence();
+    };
+
+    const updateOrderbookHeaderSequence = () => {
+      activeOrderbookSequence = getTodayOrderbookSequence();
+      if (!orderbookTitle) return;
+      orderbookTitle.textContent = `Orderbook :${String(activeOrderbookSequence).padStart(2, '0')}`;
+    };
+
+    const isPastFilledCutoff = (dateObj) => {
+      const hour = dateObj.getHours();
+      const minute = dateObj.getMinutes();
+      return hour > 15 || (hour === 15 && minute >= 30);
+    };
+
+    const readFilledArchive = () => {
+      try {
+        const raw = localStorage.getItem(FILLED_ARCHIVE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const persistFilledArchive = () => {
+      try {
+        localStorage.setItem(FILLED_ARCHIVE_KEY, JSON.stringify(filledOrderbooksArchive));
+      } catch {
+      }
+    };
+
+    const hasCompletedArchiveBackfill = () => {
+      try {
+        return localStorage.getItem(ARCHIVE_BACKFILL_KEY) === 'done';
+      } catch {
+        return false;
+      }
+    };
+
+    const markArchiveBackfillCompleted = () => {
+      try {
+        localStorage.setItem(ARCHIVE_BACKFILL_KEY, 'done');
+      } catch {
+      }
+    };
+
+    const normalizeMatchText = (value) => String(value || '').trim().toLowerCase();
+
+    const buildBackfillBndRows = (relatedRawRows, fallbackSequence) => {
+      return (relatedRawRows || []).map((item, index) => {
+        const seed = deterministicNumberFromText(item.userId || item.sourceId || item.clientName || `${index + 1}`);
+        return {
+          line: index + 1,
+          clientAccountId: item.clientAccountId || `MINT-${String(seed % 1000000).padStart(6, '0')}`,
+          bndReference: item.bndReference || buildBndReference({
+            timestamp: item.timestamp,
+            orderbookSequence: item.orderbookSequence || fallbackSequence || activeOrderbookSequence,
+            lineNumber: index + 1
+          }),
+          clientName: shortClientName(item.clientName),
+          idRegNoFull: String(item.clientIdRegNo || '-'),
+          quantity: item.totalQuantity || '-',
+          marketValue: asRandValue(item.marketValue || '-'),
+          orderTimestamp: formatTimeOnly(item.timestamp),
+          instructionType: item.orderType || 'Market',
+          settlementRef: item.settlementRef || ''
+        };
+      });
+    };
+
+    const backfillSnapshotWithCurrentData = (snapshot) => {
+      const sequence = Number(snapshot?.sequence || 0) || activeOrderbookSequence;
+      const rows = Array.isArray(snapshot?.rows) ? snapshot.rows : [];
+      let changed = false;
+
+      const updatedRows = rows.map((row) => {
+        const needsBndRows = !Array.isArray(row?.bndRows) || !row.bndRows.length;
+        const needsClientAccountId = !String(row?.clientAccountId || '').trim();
+
+        if (!needsBndRows && !needsClientAccountId) {
+          return row;
+        }
+
+        const rowSecurityId = String(row?.securityId || '').trim();
+        const rowSide = String(row?.side || '').trim().toUpperCase() || 'BUY';
+        const rowInstrument = normalizeMatchText(row?.instrumentName);
+        const rowTicker = normalizeMatchText(row?.ticker);
+        const relatedRawRows = (allOrderbookRawRows || [])
+          .filter((rawRow) => {
+            if (String(rawRow?.side || '').trim().toUpperCase() !== rowSide) return false;
+
+            const rawSecurityId = String(rawRow?.securityId || '').trim();
+            if (rowSecurityId && rawSecurityId) {
+              return rawSecurityId === rowSecurityId;
+            }
+
+            return normalizeMatchText(rawRow?.instrumentName) === rowInstrument
+              && normalizeMatchText(rawRow?.ticker) === rowTicker;
+          })
+          .sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
+
+        if (!relatedRawRows.length) {
+          return row;
+        }
+
+        const builtBndRows = buildBackfillBndRows(relatedRawRows, sequence);
+        const firstClientAccountId = builtBndRows[0]?.clientAccountId || '';
+        changed = true;
+
+        return {
+          ...row,
+          clientAccountId: String(row?.clientAccountId || '').trim() || firstClientAccountId,
+          sourceIds: Array.isArray(row?.sourceIds) && row.sourceIds.length
+            ? row.sourceIds
+            : relatedRawRows.map((item) => String(item?.sourceId || '')).filter(Boolean),
+          sourceId: row?.sourceId || String(relatedRawRows[0]?.sourceId || ''),
+          bndRows: builtBndRows
+        };
+      });
+
+      if (!changed) return { changed: false, snapshot };
+      return {
+        changed: true,
+        snapshot: {
+          ...snapshot,
+          rows: updatedRows
+        }
+      };
+    };
+
+    const maybeBackfillLegacyArchiveSnapshots = async () => {
+      if (hasCompletedArchiveBackfill()) return;
+      if (!Array.isArray(filledOrderbooksArchive) || !filledOrderbooksArchive.length) {
+        markArchiveBackfillCompleted();
+        return;
+      }
+      if (!Array.isArray(allOrderbookRawRows) || !allOrderbookRawRows.length) {
+        return;
+      }
+
+      const updatedSnapshots = [];
+      const changedSnapshots = [];
+
+      filledOrderbooksArchive.forEach((snapshot) => {
+        const result = backfillSnapshotWithCurrentData(snapshot);
+        updatedSnapshots.push(result.snapshot);
+        if (result.changed) {
+          changedSnapshots.push(result.snapshot);
+        }
+      });
+
+      if (changedSnapshots.length) {
+        for (const snapshot of changedSnapshots) {
+          try {
+            await upsertFilledArchiveToDb(snapshot);
+          } catch (error) {
+            console.error('Archive backfill upsert failed:', error?.message || error);
+          }
+        }
+
+        filledOrderbooksArchive = updatedSnapshots;
+        persistFilledArchive();
+        renderFilledOrderbooks();
+      }
+
+      markArchiveBackfillCompleted();
+    };
+
+    const loadFilledArchiveFromDb = async () => {
+      const { data } = await supabaseClient.auth.getSession();
+      const token = data?.session?.access_token;
+      if (!token) return null;
+
+      const response = await fetch('/api/orderbook/archive', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.details || payload?.error || `Archive HTTP ${response.status}`);
+      }
+
+      const payload = await response.json().catch(() => ({}));
+      const items = Array.isArray(payload?.items) ? payload.items : [];
+      return items;
+    };
+
+    const upsertFilledArchiveToDb = async (snapshot) => {
+      const { data } = await supabaseClient.auth.getSession();
+      const token = data?.session?.access_token;
+      if (!token || !snapshot) return false;
+
+      const response = await fetch('/api/orderbook/archive-upsert', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ snapshot })
+      });
+
+      return response.ok;
+    };
+
+    const emailStatusChip = (status) => {
+      if (status === 'sent') {
+        return '<span class="filled-orderbook-email-status sent">Email Sent</span>';
+      }
+      if (status === 'failed') {
+        return '<button type="button" class="filled-orderbook-email-status failed retry" data-email-retry-btn aria-label="Retry email">Email Failed</button>';
+      }
+      return '';
+    };
+
+    const formatBookTitle = (book) => {
+      const rawTitle = String(book?.title || '').trim();
+      if (rawTitle) {
+        return rawTitle.replace(/^filled\s+order\s+book\s*/i, 'Order Book ');
+      }
+      return `Order Book ${book?.sequence || '-'}: ${book?.dateLabel || '-'}`;
+    };
+
+    const setActiveTab = (tabName) => {
+      const isActiveBooks = tabName === 'active';
+      if (activeBooksTab) {
+        activeBooksTab.classList.toggle('active', isActiveBooks);
+        activeBooksTab.setAttribute('aria-selected', isActiveBooks ? 'true' : 'false');
+      }
+      if (closedBooksTab) {
+        closedBooksTab.classList.toggle('active', !isActiveBooks);
+        closedBooksTab.setAttribute('aria-selected', isActiveBooks ? 'false' : 'true');
+      }
+      if (activeBooksPanel) {
+        activeBooksPanel.classList.toggle('active', isActiveBooks);
+      }
+      if (closedBooksPanel) {
+        closedBooksPanel.classList.toggle('active', !isActiveBooks);
+      }
+    };
+
+    const renderFilledOrderbooks = () => {
+      if (!filledOrderbooksList) return;
+
+      if (!filledOrderbooksArchive.length) {
+        filledOrderbooksList.innerHTML = '<div class="filled-orderbook-empty">No active order books yet.</div>';
+        return;
+      }
+
+      const sorted = filledOrderbooksArchive.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      filledOrderbooksList.innerHTML = sorted.map((book) => {
+        const rows = Array.isArray(book.rows) ? book.rows : [];
+        const body = rows.length
+          ? rows.map((row, rowIndex) => {
+            const rowKey = `${String(book.id || 'book')}-${rowIndex}`;
+            return `
+            <tr class="orderbook-main-row" data-archive-main-row data-archive-line-key="${escapeHtml(rowKey)}">
+              <td>${escapeHtml(String(row.line ?? '-'))}</td>
+              <td>${escapeHtml(row.instrumentName || '-')}</td>
+              <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
+              <td>${escapeHtml(row.side || '-')}</td>
+              <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
+              <td>${escapeHtml(asRandValue(row.marketValue))}</td>
+              <td>${escapeHtml(row.orderType || '-')}</td>
+              <td>${escapeHtml(row.settlementAccount || '')}</td>
+              <td>${escapeHtml(row.brokerRef || '')}</td>
+              <td>${escapeHtml(String(row.unrealizedPnl ?? '-'))}</td>
+            </tr>
+            <tr class="orderbook-detail-row is-hidden" data-archive-detail-row data-archive-line-key="${escapeHtml(rowKey)}">
+              <td colspan="10">
+                <div class="orderbook-detail-wrap">
+                  <div class="orderbook-detail-title">BND Allocation Details</div>
+                  ${renderSnapshotBndDetailsTable(rows, row, book.sequence)}
+                </div>
+              </td>
+            </tr>
+          `;
+          }).join('')
+          : '<tr><td class="orderbook-empty-row" colspan="10">No rows captured.</td></tr>';
+
+        return `
+          <details class="filled-orderbook-item">
+            <summary class="filled-orderbook-summary">
+              <span>${escapeHtml(formatBookTitle(book))}</span>
+              <span class="filled-orderbook-meta">
+                <span>${escapeHtml(book.dateLabel || '-')}</span>
+                <span data-book-id="${escapeHtml(String(book.id || ''))}">${emailStatusChip(book.emailStatus)}</span>
+              </span>
+            </summary>
+            <div class="filled-orderbook-details">
+              <div class="orderbook-table-wrap">
+                <table class="orderbook-table">
+                  <thead>
+                    <tr>
+                      <th>Line</th>
+                      <th>Instrument Name</th>
+                      <th>Ticker</th>
+                      <th>Side</th>
+                      <th>Total QYT</th>
+                      <th>Market Value</th>
+                      <th>Order Type</th>
+                      <th>Settlement Account</th>
+                      <th>Broker Ref</th>
+                      <th>Unrealized PnL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${body}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </details>
+        `;
+      }).join('');
+    };
+
+    const sendFilledOrderbookEmail = async (snapshot) => {
+      try {
+        const { data } = await supabaseClient.auth.getSession();
+        const token = data?.session?.access_token;
+        if (!token) {
+          return { status: 'failed', details: 'No active session token found.' };
+        }
+
+        const response = await fetch('/api/orderbook/send-csv', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            subject: `${snapshot.title}`,
+            csvContent: toCsvContent(snapshot.rows || []),
+            fileName: `${(snapshot.title || 'order-book').replace(/\s+/g, '-').toLowerCase()}.csv`
+          })
+        });
+
+        if (response.ok) {
+          return { status: 'sent', details: '' };
+        }
+
+        const payload = await response.json().catch(() => ({}));
+        const details = payload?.details || payload?.error || `HTTP ${response.status}`;
+        console.error('Orderbook email send failed:', details, payload);
+        return { status: 'failed', details };
+      } catch (error) {
+        const details = error?.message || 'Network or unknown error';
+        console.error('Orderbook email send failed:', details, error);
+        return { status: 'failed', details };
+      }
+    };
+
+    const captureFilledOrderbook = async () => {
+      if (!allOrderbookRows.length) return;
+
+      const now = new Date();
+      const dateKey = getArchiveDateKey(now);
+      const sequence = getNextFilledOrderbookSequence();
+      activeOrderbookSequence = sequence;
+      const snapshot = {
+        id: `${dateKey}-${sequence}`,
+        dateKey,
+        sequence,
+        title: `Order Book ${sequence}: ${now.toLocaleString()}`,
+        dateLabel: now.toLocaleString(),
+        createdAt: now.toISOString(),
+        rows: allOrderbookRows.map((row, index) => ({
+          ...row,
+          orderbookSequence: sequence,
+          line: index + 1
+        })),
+        emailStatus: ''
+      };
+
+      const emailResult = await sendFilledOrderbookEmail(snapshot);
+      snapshot.emailStatus = emailResult.status;
+      snapshot.emailError = emailResult.details || '';
+
+      try {
+        await upsertFilledArchiveToDb(snapshot);
+      } catch (error) {
+        console.error('Archive DB upsert failed:', error?.message || error);
+      }
+
+      filledOrderbooksArchive.push(snapshot);
+      persistFilledArchive();
+      renderFilledOrderbooks();
+      updateOrderbookHeaderSequence();
+      allOrderbookRows = [];
+      applySearchFilter();
+    };
+
+    const maybeCaptureFilledOrderbook = async () => {
+      const now = new Date();
+      const dateKey = getArchiveDateKey(now);
+
+      if (!isPastFilledCutoff(now)) return;
+      if (hasFilledOrderbookForDate(dateKey)) return;
+      if (!allOrderbookRows.length) return;
+      if (isCapturingFilledOrderbook) return;
+
+      isCapturingFilledOrderbook = true;
+      try {
+        await captureFilledOrderbook();
+      } finally {
+        isCapturingFilledOrderbook = false;
+      }
+    };
+
+    const pad2 = (value) => String(value).padStart(2, '0');
+
+    const renderOrderbookTimer = () => {
+      if (!orderbookTimer) return;
+      const now = new Date();
+      const hours = pad2(now.getHours());
+      const minutes = pad2(now.getMinutes());
+      const seconds = pad2(now.getSeconds());
+      orderbookTimer.textContent = `${hours}:${minutes}:${seconds}`;
+
+      const isPurpleMoment = hours === '15' && minutes === '30';
+      if (isPurpleMoment) {
+        timerHighlightUntil = Date.now() + 5000;
+      }
+      orderbookTimer.classList.toggle('is-hit', Date.now() <= timerHighlightUntil);
+
+      maybeCaptureFilledOrderbook();
+    };
+
+    const startOrderbookTimer = () => {
+      renderOrderbookTimer();
+      setInterval(renderOrderbookTimer, 1000);
+    };
+
+    const renderOrderbookRows = (rows) => {
+      if (!orderbookTableBody || !orderbookCount || !exportOrderbookBtn) return;
+      orderbookCount.textContent = `${rows.length} record${rows.length === 1 ? '' : 's'}`;
+      exportOrderbookBtn.disabled = rows.length === 0;
+
+      if (!rows.length) {
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">No orderbook records found.</td></tr>';
+        return;
+      }
+
+      orderbookTableBody.innerHTML = rows.map((row) => {
+        const settlementOptions = (row.settlementAccountOptions || []).map((option) => {
+          const isSelected = option === row.settlementAccount ? ' selected' : '';
+          return `<option value="${escapeHtml(option)}"${isSelected}>${escapeHtml(option)}</option>`;
+        }).join('');
+        const brokerRefOptions = (row.brokerRefOptions || []).map((option) => {
+          const isSelected = option === row.brokerRef ? ' selected' : '';
+          return `<option value="${escapeHtml(option)}"${isSelected}>${escapeHtml(option)}</option>`;
+        }).join('');
+        const lineKey = escapeHtml(String(row.line));
+
+        return `
+          <tr class="orderbook-main-row" data-orderbook-main-row data-line-key="${lineKey}">
+            <td>${escapeHtml(String(row.line ?? '-'))}</td>
+            <td>${escapeHtml(row.instrumentName || '-')}</td>
+            <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
+            <td>${escapeHtml(row.side || '-')}</td>
+            <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
+            <td>${escapeHtml(asRandValue(row.marketValue))}</td>
+            <td>${escapeHtml(row.orderType || '-')}</td>
+            <td>
+              <select class="orderbook-select" data-settlement-select data-line="${escapeHtml(String(row.line))}">
+                ${settlementOptions}
+              </select>
+            </td>
+            <td>
+              <select class="orderbook-select" data-broker-select data-line="${escapeHtml(String(row.line))}">
+                ${brokerRefOptions}
+              </select>
+            </td>
+            <td>${escapeHtml(String(row.unrealizedPnl ?? '-'))}</td>
+          </tr>
+          <tr class="orderbook-detail-row is-hidden" data-orderbook-detail-row data-line-key="${lineKey}">
+            <td colspan="10">
+              <div class="orderbook-detail-wrap">
+                <div class="orderbook-detail-title">BND Allocation Details</div>
+                ${renderBndDetailsTable(row)}
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    };
+
+    const applySearchFilter = () => {
+      const query = orderbookSearch?.value?.trim().toLowerCase() || '';
+      if (!query) {
+        renderOrderbookRows(allOrderbookRows);
+        return;
+      }
+
+      const filtered = allOrderbookRows.filter((row) => {
+        return String(row.instrumentName || '').toLowerCase().includes(query)
+          || String(row.ticker || '').toLowerCase().includes(query)
+          || String(row.side || '').toLowerCase().includes(query)
+          || String(row.marketValue || '').toLowerCase().includes(query)
+          || String(row.orderType || '').toLowerCase().includes(query)
+          || String(row.settlementAccount || '').toLowerCase().includes(query)
+          || String(row.brokerRef || '').toLowerCase().includes(query)
+          || String(row.unrealizedPnl || '').toLowerCase().includes(query);
+      });
+      renderOrderbookRows(filtered);
+    };
+
+    const loadOrderbookClientSideFallback = async () => {
+      const { data: holdingsRows, error: holdingsError } = await supabaseClient
+        .from('stock_holdings')
+        .select('id, user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, as_of_date, created_at, updated_at, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", avg_exit')
+        .order('updated_at', { ascending: false });
+
+      if (holdingsError) {
+        throw new Error(holdingsError.message || 'Could not load stock_holdings');
+      }
+
+      const holdings = holdingsRows || [];
+      const securityIds = [...new Set(holdings.map((row) => row.security_id).filter(Boolean))];
+      const userIds = [...new Set(holdings.map((row) => row.user_id).filter(Boolean))];
+
+      const securitiesMap = {};
+      const profilesMap = {};
+      const onboardingPackDetailsMap = {};
+      if (securityIds.length) {
+        const { data: securityRows, error: securityError } = await supabaseClient
+          .from('securities')
+          .select('id, name, symbol, last_price')
+          .in('id', securityIds);
+
+        if (securityError) {
+          console.error('Securities load error:', securityError);
+        } else {
+          (securityRows || []).forEach((security) => {
+            securitiesMap[security.id] = security;
+          });
+        }
+      }
+
+      if (userIds.length) {
+        const { data: profileRows, error: profileError } = await supabaseClient
+          .from('profiles')
+          .select('id, first_name, last_name, mint_number')
+          .in('id', userIds);
+
+        if (profileError) {
+          console.error('Profiles load error:', profileError);
+        } else {
+          (profileRows || []).forEach((profile) => {
+            profilesMap[profile.id] = profile;
+          });
+        }
+
+        const { data: packRows, error: packError } = await supabaseClient
+          .from('user_onboarding_pack_details')
+          .select('user_id, pack_details')
+          .in('user_id', userIds);
+
+        if (packError) {
+          console.error('Pack details load error:', packError);
+        } else {
+          (packRows || []).forEach((row) => {
+            if (row?.user_id) {
+              onboardingPackDetailsMap[row.user_id] = row.pack_details;
+            }
+          });
+        }
+      }
+
+      const archivedSourceIds = getArchivedSourceIds();
+      const latestArchiveCreatedAt = getLatestArchiveCreatedAt();
+      updateOrderbookHeaderSequence();
+
+      const rawRows = holdings.map((row, index) => {
+        const security = securitiesMap[row.security_id] || {};
+        const profile = profilesMap[row.user_id] || {};
+        const packDetails = onboardingPackDetailsMap[row.user_id] || null;
+        const instrumentName = security.name || '-';
+        const ticker = security.symbol ?? '-';
+        const timestamp = row.updated_at || row.created_at || row.as_of_date || null;
+        const clientName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() || 'Unknown Client';
+        const accountSeed = deterministicNumberFromText(row.user_id || row.id || `${index + 1}`);
+        const profileMintNumber = String(profile.mint_number || '').trim();
+        const clientAccountId = profileMintNumber || `MINT-${String(accountSeed % 1000000).padStart(6, '0')}`;
+        const bndReference = buildBndReference({
+          timestamp,
+          orderbookSequence: activeOrderbookSequence,
+          lineNumber: index + 1
+        });
+        const clientIdFromPack = extractIdFromPackDetails(packDetails);
+        const settlementAccount = 'mint nominies';
+        const settlementAccountOptions = ['mint nominies'];
+        const brokerRef = 'Longmark';
+        const brokerRefOptions = ['Longmark'];
+        const quantityValue = Number(row.quantity);
+        const isQuantityNumeric = Number.isFinite(quantityValue);
+        const lastPrice = Number(security.last_price);
+        const hasLastPrice = Number.isFinite(lastPrice);
+        const computedMarketValueNumber = (isQuantityNumeric && hasLastPrice)
+          ? ((quantityValue / 100) * lastPrice)
+          : 0;
+        const unrealizedPnlValue = Number(row.unrealized_pnl);
+        const normalizedUnrealizedPnlNumber = Number.isFinite(unrealizedPnlValue) ? unrealizedPnlValue : 0;
+        const side = isQuantityNumeric
+          ? (quantityValue < 0 ? 'SELL' : 'BUY')
+          : '-';
+        const orderType = 'Market';
+        const totalQuantity = isQuantityNumeric
+          ? quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 })
+          : (row.quantity ?? '-');
+        const marketValue = (isQuantityNumeric && hasLastPrice)
+          ? `R ${computedMarketValueNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          : '-';
+        const unrealizedPnl = Number.isFinite(unrealizedPnlValue)
+          ? normalizedUnrealizedPnlNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : (row.unrealized_pnl ?? '-');
+
+        return {
+          sourceId: row.id || '',
+          userId: row.user_id || '',
+          securityId: row.security_id || '',
+          line: index + 1,
+          instrumentName,
+          ticker,
+          clientName,
+          clientAccountId,
+          orderbookSequence: activeOrderbookSequence,
+          bndReference,
+          clientIdRegNo: clientIdFromPack || '-',
+          side,
+          quantityValue: isQuantityNumeric ? quantityValue : 0,
+          totalQuantity,
+          marketValueNumber: computedMarketValueNumber,
+          marketValue,
+          unrealizedPnlNumber: normalizedUnrealizedPnlNumber,
+          unrealizedPnl,
+          orderType,
+          settlementAccount,
+          settlementAccountOptions,
+          brokerRef,
+          brokerRefOptions,
+          timestamp
+        };
+      }).filter((row) => {
+        if (row.sourceId && archivedSourceIds.has(String(row.sourceId))) {
+          return false;
+        }
+
+        if (!latestArchiveCreatedAt || !row.timestamp) {
+          return true;
+        }
+
+        return new Date(row.timestamp).getTime() > new Date(latestArchiveCreatedAt).getTime();
+      });
+
+      allOrderbookRawRows = rawRows;
+      return aggregateOrderbookRows(rawRows);
+    };
+
+    const loadOrderbook = async () => {
+      if (!orderbookTableBody) return;
+
+      const { data } = await supabaseClient.auth.getSession();
+      const accessToken = data?.session?.access_token;
+      if (!accessToken) {
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">No active session found.</td></tr>';
+        return;
+      }
+
+      try {
+        allOrderbookRows = await loadOrderbookClientSideFallback();
+        await maybeBackfillLegacyArchiveSnapshots();
+        applySearchFilter();
+        maybeCaptureFilledOrderbook();
+      } catch (error) {
+        console.error('Orderbook load error:', error);
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">Could not load orderbook data.</td></tr>';
+      }
+    };
+
+    if (orderbookSearch) {
+      orderbookSearch.addEventListener('input', applySearchFilter);
+    }
+
+    if (activeBooksTab) {
+      activeBooksTab.addEventListener('click', () => setActiveTab('active'));
+    }
+
+    if (closedBooksTab) {
+      closedBooksTab.addEventListener('click', () => setActiveTab('closed'));
+    }
+
+    if (filledOrderbooksList) {
+      filledOrderbooksList.addEventListener('click', async (event) => {
+        const retryBtn = event.target.closest('[data-email-retry-btn]');
+        if (!retryBtn) return;
+
+        const idContainer = retryBtn.closest('[data-book-id]');
+        const targetBookId = idContainer?.dataset?.bookId;
+        if (!targetBookId) return;
+
+        const targetBook = filledOrderbooksArchive.find((book) => String(book.id) === String(targetBookId));
+        if (!targetBook) return;
+
+        retryBtn.disabled = true;
+        retryBtn.textContent = 'Sending...';
+
+        const emailResult = await sendFilledOrderbookEmail(targetBook);
+        targetBook.emailStatus = emailResult.status;
+        targetBook.emailError = emailResult.details || '';
+        try {
+          await upsertFilledArchiveToDb(targetBook);
+        } catch (error) {
+          console.error('Archive DB upsert failed:', error?.message || error);
+        }
+        persistFilledArchive();
+        renderFilledOrderbooks();
+      });
+
+      filledOrderbooksList.addEventListener('click', (event) => {
+        if (event.target.closest('button, a, input, select, summary')) {
+          return;
+        }
+
+        const mainRow = event.target.closest('[data-archive-main-row]');
+        if (!mainRow) return;
+
+        const rowKey = mainRow.dataset.archiveLineKey;
+        if (!rowKey) return;
+
+        const tableBody = mainRow.closest('tbody');
+        if (!tableBody) return;
+
+        const detailRows = Array.from(tableBody.querySelectorAll('[data-archive-detail-row]'));
+        const detailRow = detailRows.find((row) => row.dataset.archiveLineKey === rowKey);
+        if (!detailRow) return;
+
+        const willOpen = detailRow.classList.contains('is-hidden');
+        detailRows.forEach((row) => {
+          row.classList.add('is-hidden');
+        });
+
+        if (willOpen) {
+          detailRow.classList.remove('is-hidden');
+        }
+      });
+    }
+
+    if (orderbookTableBody) {
+      orderbookTableBody.addEventListener('click', (event) => {
+        if (event.target.closest('select, button, input, a, option')) {
+          return;
+        }
+
+        const mainRow = event.target.closest('[data-orderbook-main-row]');
+        if (!mainRow) return;
+
+        const lineKey = mainRow.dataset.lineKey;
+        if (!lineKey) return;
+
+        const detailRow = orderbookTableBody.querySelector(`[data-orderbook-detail-row][data-line-key="${lineKey}"]`);
+        if (!detailRow) return;
+
+        const willOpen = detailRow.classList.contains('is-hidden');
+
+        orderbookTableBody.querySelectorAll('[data-orderbook-detail-row]').forEach((row) => {
+          row.classList.add('is-hidden');
+        });
+
+        if (willOpen) {
+          detailRow.classList.remove('is-hidden');
+        }
+      });
+
+      orderbookTableBody.addEventListener('change', (event) => {
+        const settlementSelect = event.target.closest('[data-settlement-select]');
+        const brokerSelect = event.target.closest('[data-broker-select]');
+        const lineKey = settlementSelect?.dataset?.line || brokerSelect?.dataset?.line;
+        if (!lineKey) return;
+
+        const targetRow = allOrderbookRows.find(row => String(row.line) === String(lineKey));
+        if (!targetRow) return;
+
+        if (settlementSelect) {
+          targetRow.settlementAccount = settlementSelect.value;
+        }
+        if (brokerSelect) {
+          targetRow.brokerRef = brokerSelect.value;
+        }
+      });
+    }
+
+    if (exportOrderbookBtn) {
+      exportOrderbookBtn.addEventListener('click', () => {
+        const query = orderbookSearch?.value?.trim().toLowerCase() || '';
+        const rows = query
+          ? allOrderbookRows.filter((row) => {
+            return String(row.instrumentName || '').toLowerCase().includes(query)
+              || String(row.ticker || '').toLowerCase().includes(query)
+              || String(row.side || '').toLowerCase().includes(query)
+              || String(row.marketValue || '').toLowerCase().includes(query)
+              || String(row.orderType || '').toLowerCase().includes(query)
+              || String(row.settlementAccount || '').toLowerCase().includes(query)
+                || String(row.brokerRef || '').toLowerCase().includes(query)
+                || String(row.unrealizedPnl || '').toLowerCase().includes(query);
+          })
+          : allOrderbookRows;
+        downloadCsv(rows);
+      });
+    }
+
+    filledOrderbooksArchive = readFilledArchive();
+    setActiveTab('active');
+    updateOrderbookHeaderSequence();
+    renderFilledOrderbooks();
+
+    requireSession().then(async (ok) => {
+      if (!ok) return;
+
+      try {
+        const dbArchive = await loadFilledArchiveFromDb();
+        if (Array.isArray(dbArchive)) {
+          filledOrderbooksArchive = dbArchive;
+          persistFilledArchive();
+          updateOrderbookHeaderSequence();
+          renderFilledOrderbooks();
+        }
+      } catch (error) {
+        console.error('Could not load DB archive:', error?.message || error);
+      }
+
+      loadOrderbook();
+    });
+
+    startOrderbookTimer();
+  </script>
+</body>
+</html>

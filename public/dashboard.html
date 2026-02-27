@@ -1,0 +1,1584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mint dashboard </title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      overflow: auto;
+    }
+        
+    .gradient-bg {
+      background: #f5f6fa;
+    }
+        
+    .backdrop-blur {
+      backdrop-filter: blur(12px);
+    }
+        
+    .chart-gradient {
+      background: linear-gradient(to bottom right, #f8fafc, rgba(219, 234, 254, 0.3), rgba(250, 232, 255, 0.2));
+    }
+        
+    .dot-pattern {
+      background-image: radial-gradient(circle at 2px 2px, rgba(148, 163, 184, 0.05) 1px, transparent 0);
+      background-size: 32px 32px;
+    }
+        
+    .premium-gradient {
+      background: linear-gradient(to bottom right, #e2e8f0, #cbd5e1);
+    }
+        
+    .bar-animation {
+      animation: barGrow 0.6s ease-out;
+    }
+        
+    @keyframes barGrow {
+      from {
+        height: 0;
+      }
+    }
+
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 75px;
+      height: 100vh;
+      background: rgba(255, 255, 255, 0.86);
+      backdrop-filter: blur(8px);
+      border-right: 1px solid #e8defa;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 0;
+      z-index: 1000;
+    }
+
+    .sidebar-logo {
+      width: 45px;
+      height: 45px;
+      background: transparent;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 40px;
+      cursor: pointer;
+    }
+
+    .sidebar-logo svg {
+      width: 24px;
+      height: 24px;
+      fill: #ffffff;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      width: 100%;
+      padding: 0 15px;
+    }
+
+    .nav-icon {
+      width: 45px;
+      height: 45px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .nav-icon svg {
+      width: 22px;
+      height: 22px;
+      fill: #9ca3af;
+      transition: fill 0.3s ease;
+    }
+
+    .nav-icon:hover svg,
+    .nav-icon.active svg {
+      fill: #374151;
+    }
+
+    .main-content {
+      margin-left: 75px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .top-nav {
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e8defa;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .top-search {
+      flex: 1;
+      max-width: 520px;
+      position: relative;
+    }
+
+    .top-search input {
+      width: 100%;
+      height: 42px;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      background: #f9fafb;
+      padding: 0 14px;
+      font-size: 0.9rem;
+      color: #111827;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .top-search input:focus {
+      border-color: #7c3aed;
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+      background: #ffffff;
+    }
+
+    .top-nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .signout-btn {
+      padding: 8px 14px;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
+      color: #374151;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .signout-btn:hover {
+      background: #f9fafb;
+      border-color: #d1d5db;
+    }
+
+    .dashboard-shell {
+      flex: 1;
+      overflow: visible;
+    }
+
+    .strategy-scroll-list {
+      max-height: 320px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .strategy-scroll-list::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .strategy-scroll-list::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 999px;
+    }
+
+    .strategy-item-copy {
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .strategy-item-desc {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .chart-scroll::-webkit-scrollbar {
+      height: 8px;
+    }
+
+    .chart-scroll::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 999px;
+    }
+
+    .chart-scroll {
+      scrollbar-color: #d1d5db transparent;
+      scrollbar-width: thin;
+    }
+  </style>
+</head>
+<body class="gradient-bg min-h-screen">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img src="/icon.png" alt="App logo" style="width: 32px; height: 32px;" />
+    </div>
+
+    <nav class="sidebar-nav">
+      <a class="nav-icon active" href="/dashboard.html" aria-label="Dashboard">
+        <svg viewBox="0 0 24 24">
+          <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+        </svg>
+      </a>
+
+      <a class="nav-icon" href="/index.html" aria-label="Profiles">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 12c1.66 0 3-1.34 3-3S13.66 6 12 6 9 7.34 9 9s1.34 3 3 3zm0 2c-2.22 0-6 1.11-6 3.33V19h12v-1.67C18 15.11 14.22 14 12 14z"/>
+        </svg>
+      </a>
+
+      <a class="nav-icon" href="/orderbook.html" aria-label="Orderbook">
+        <svg viewBox="0 0 24 24">
+          <path d="M4 5h16v2H4V5zm0 6h16v2H4v-2zm0 6h10v2H4v-2z"/>
+        </svg>
+      </a>
+
+      <a class="nav-icon" href="#" aria-label="Settings">
+        <svg viewBox="0 0 24 24">
+          <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.11-.2-.36-.28-.58-.2l-2.39.96c-.5-.38-1.05-.7-1.66-.94l-.36-2.54A.488.488 0 0 0 14.9 2h-3.8c-.24 0-.44.17-.48.4l-.36 2.54c-.61.24-1.16.56-1.66.94l-2.39-.96a.5.5 0 0 0-.58.2L3.7 8.44c-.11.21-.06.48.12.62l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.62l1.92 3.32c.11.2.36.28.58.2l2.39-.96c.5.38 1.05.7 1.66.94l.36 2.54c.04.23.24.4.48.4h3.8c.24 0 .44-.17.48-.4l.36-2.54c.61-.24 1.16-.56 1.66-.94l2.39.96c.22.08.47 0 .58-.2l1.92-3.32a.5.5 0 0 0-.12-.62l-2.03-1.58zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5S10.07 8.5 12 8.5s3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/>
+        </svg>
+      </a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <div class="top-nav">
+      <div class="top-search">
+        <input type="search" placeholder="Search dashboard..." aria-label="Search dashboard">
+      </div>
+      <div class="top-nav-actions">
+        <button class="signout-btn" id="signOutBtn">Sign out</button>
+      </div>
+    </div>
+
+    <div class="dashboard-shell">
+      <div class="max-w-7xl mx-auto px-5 py-5 space-y-4">
+        <div class="flex items-center gap-4 border-b border-slate-200 pb-2">
+          <button id="tabOverview" type="button" class="text-sm font-semibold text-slate-900 border-b-2 border-slate-900 pb-2">
+            Overview
+          </button>
+          <button id="tabStrategies" type="button" class="text-sm font-medium text-slate-500 hover:text-slate-800 pb-2">
+            Strategies
+          </button>
+        </div>
+
+        <div id="tabOverviewPanel">
+          <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+            <div class="xl:col-span-8 space-y-4">
+              <div class="bg-white rounded-3xl p-6 shadow-sm">
+                <div class="flex items-start justify-between mb-4">
+                  <div>
+                    <div class="flex items-center gap-3 mb-2">
+                      <div class="p-2 bg-slate-100 rounded-lg">
+                        <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                      </div>
+                      <h2 class="text-2xl font-semibold text-slate-800">Strategies</h2>
+                    </div>
+                    <p class="text-slate-500 text-sm">
+                      Live strategies pulled from your database.
+                    </p>
+                  </div>
+                </div>
+
+                <div id="strategyChart" class="relative h-72 rounded-3xl overflow-hidden mb-4"></div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="userStatsCards">
+                  <div class="border border-slate-200 rounded-2xl p-3 bg-white">
+                    <p class="text-xs text-slate-500">Total users</p>
+                    <p class="text-xl font-semibold text-slate-800" id="totalUsersValue">0</p>
+                  </div>
+                  <div class="border border-slate-200 rounded-2xl p-3 bg-white">
+                    <p class="text-xs text-slate-500">Users KYC (Completed)</p>
+                    <p class="text-xl font-semibold text-slate-800" id="usersKycValue">0</p>
+                  </div>
+                  <div class="border border-slate-200 rounded-2xl p-3 bg-white">
+                    <p class="text-xs text-slate-500">Users linked bank</p>
+                    <p class="text-xl font-semibold text-slate-800" id="usersBankValue">0</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-white rounded-3xl p-6 shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                  <h2 class="text-xl font-semibold text-slate-800">Featured strategies</h2>
+                  <span class="text-xs text-slate-500" id="featuredCount">0 featured</span>
+                </div>
+
+                <div class="space-y-3" id="featuredStrategies"></div>
+              </div>
+            </div>
+
+            <div class="xl:col-span-4 space-y-4">
+              <div class="bg-white rounded-3xl p-5 shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                  <h2 class="text-xl font-semibold text-slate-800">Top performing holdings</h2>
+                  <span class="text-xs text-slate-500" id="topHoldingsCount">0 holdings</span>
+                </div>
+
+                <div class="space-y-3" id="topHoldingsList"></div>
+              </div>
+
+              <div class="bg-white rounded-3xl p-5 shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                  <h2 class="text-xl font-semibold text-slate-800">All strategies</h2>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs text-slate-500" id="totalCount">0 total</span>
+                    <select id="allStrategiesFilter" class="text-xs border border-slate-300 rounded-lg px-2 py-1 bg-white text-slate-700">
+                      <option value="all">All strategies</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="space-y-3 strategy-scroll-list" id="allStrategiesList"></div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <div id="tabStrategiesPanel" class="hidden">
+          <div class="grid grid-cols-1 xl:grid-cols-12 gap-5">
+            <section class="xl:col-span-5 space-y-4">
+              <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
+                <div class="flex items-start justify-between mb-4">
+                  <div>
+                    <h2 class="text-lg font-semibold text-slate-900">Add new strategy</h2>
+                    <p class="text-xs text-slate-500 mt-1">Capture the basics for a new strategy on the platform.</p>
+                  </div>
+                </div>
+
+                <form id="strategyForm" class="space-y-3">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-xs font-medium text-slate-600 mb-1" for="strategyName">Strategy name</label>
+                      <input id="strategyName" name="name" type="text" required
+                        class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                        placeholder="Global Growth Fund" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-slate-600 mb-1" for="strategyShortName">Short name</label>
+                      <input id="strategyShortName" name="short_name" type="text"
+                        class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                        placeholder="GGF" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1" for="strategyDescription">Description / objective</label>
+                    <textarea id="strategyDescription" name="description" rows="3"
+                      class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 resize-none"
+                      placeholder="Briefly describe what this strategy aims to achieve."></textarea>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label class="block text-xs font-medium text-slate-600 mb-1" for="strategyRisk">Risk level</label>
+                      <select id="strategyRisk" name="risk_level"
+                        class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500">
+                        <option value="">Unspecified</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-slate-600 mb-1" for="strategySector">Sector</label>
+                      <input id="strategySector" name="sector" type="text"
+                        class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                        placeholder="Multi-asset, Equity, Income…" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-slate-600 mb-1" for="strategyMinInvestment">Minimum investment</label>
+                      <input id="strategyMinInvestment" name="min_investment" type="number" min="0" step="1"
+                        class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                        placeholder="e.g. 50000" />
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label class="block text-xs font-medium text-slate-600 mb-1" for="strategyCurrency">Base currency</label>
+                      <input id="strategyCurrency" name="base_currency" type="text"
+                        class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                        placeholder="ZAR" />
+                    </div>
+                    <div class="flex items-center gap-2 mt-5 sm:mt-6">
+                      <input id="strategyIsPublic" name="is_public" type="checkbox"
+                        class="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                      <label for="strategyIsPublic" class="text-xs text-slate-700">Public strategy</label>
+                    </div>
+                    <div class="flex items-center gap-2 mt-2 sm:mt-6">
+                      <input id="strategyIsFeatured" name="is_featured" type="checkbox"
+                        class="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                      <label for="strategyIsFeatured" class="text-xs text-slate-700">Featured</label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Included assets</label>
+                    <p class="text-[11px] text-slate-500 mb-2">Pick existing assets from your securities universe to include in this strategy.</p>
+                    <div class="border border-slate-200 rounded-2xl p-3 bg-slate-50 space-y-2">
+                      <div class="flex items-center gap-2">
+                        <input
+                          id="strategyAssetsSearch"
+                          type="search"
+                          placeholder="Search assets by name or symbol…"
+                          class="w-full border border-slate-300 rounded-full px-3 py-1 text-xs bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                        />
+                      </div>
+                      <div id="strategyAssetsSelected" class="flex flex-wrap gap-1 min-h-[1.5rem]">
+                        </div>
+                      <div class="max-h-40 overflow-y-auto rounded-xl bg-white border border-slate-200" id="strategyAssetsList">
+                        </div>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center justify-between pt-2">
+                    <p id="strategyFormMessage" class="text-xs text-slate-500"></p>
+                    <button type="submit"
+                      class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-semibold shadow-sm hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-1">
+                      <span>Save strategy</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </section>
+
+            <section class="xl:col-span-7 space-y-4">
+              <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                  <div>
+                    <h2 class="text-lg font-semibold text-slate-900">All strategies</h2>
+                    <p class="text-xs text-slate-500 mt-1">Use filters and sort options to quickly find a strategy.</p>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2 text-xs">
+                    <input id="strategySearch" type="search" placeholder="Search strategies…"
+                      class="border border-slate-300 rounded-full px-3 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500">
+                    <select id="filterRisk"
+                      class="border border-slate-300 rounded-full px-3 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500">
+                      <option value="">All risks</option>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                    <select id="filterVisibility"
+                      class="border border-slate-300 rounded-full px-3 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500">
+                      <option value="">All visibility</option>
+                      <option value="public">Public only</option>
+                      <option value="featured">Featured only</option>
+                    </select>
+                    <select id="sortBy"
+                      class="border border-slate-300 rounded-full px-3 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500">
+                      <option value="recent">Newest first</option>
+                      <option value="name">Name A–Z</option>
+                      <option value="min_investment_desc">Min investment high → low</option>
+                      <option value="min_investment_asc">Min investment low → high</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div id="strategiesList" class="strategy-scroll-list space-y-3 text-sm text-slate-600">
+                </div>
+              </div>
+
+              <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
+                <div class="flex items-center justify-between mb-4">
+                  <h2 class="text-lg font-semibold text-slate-900">Top 5 performing strategies</h2>
+                  <span id="top5Badge" class="text-xs text-slate-500">0 strategies</span>
+                </div>
+                <div id="topStrategiesList" class="space-y-3 text-sm text-slate-600"></div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const strategyChart = document.getElementById('strategyChart');
+    const featuredStrategies = document.getElementById('featuredStrategies');
+    const allStrategiesList = document.getElementById('allStrategiesList');
+    const allStrategiesFilter = document.getElementById('allStrategiesFilter');
+    const featuredCount = document.getElementById('featuredCount');
+    const totalCount = document.getElementById('totalCount');
+    const topHoldingsList = document.getElementById('topHoldingsList');
+    const topHoldingsCount = document.getElementById('topHoldingsCount');
+    const statTotal = document.getElementById('statTotal');
+    const statFeatured = document.getElementById('statFeatured');
+    const statPublic = document.getElementById('statPublic');
+    const statAvgMin = document.getElementById('statAvgMin');
+    const riskLow = document.getElementById('riskLow');
+    const riskMedium = document.getElementById('riskMedium');
+    const riskHigh = document.getElementById('riskHigh');
+    const riskUnknown = document.getElementById('riskUnknown');
+    const totalUsersValue = document.getElementById('totalUsersValue');
+    const usersKycValue = document.getElementById('usersKycValue');
+    const usersBankValue = document.getElementById('usersBankValue');
+    let allStrategiesData = [];
+    let allStrategiesFullData = [];
+    let allSecuritiesForStrategies = [];
+    let selectedSecurityIdsForStrategy = new Set();
+
+    const tabOverview = document.getElementById('tabOverview');
+    const tabStrategies = document.getElementById('tabStrategies');
+    const tabOverviewPanel = document.getElementById('tabOverviewPanel');
+    const tabStrategiesPanel = document.getElementById('tabStrategiesPanel');
+
+    const strategySearch = document.getElementById('strategySearch');
+    const strategyForm = document.getElementById('strategyForm');
+    const strategyFormMessage = document.getElementById('strategyFormMessage');
+    const strategiesList = document.getElementById('strategiesList');
+    const topStrategiesList = document.getElementById('topStrategiesList');
+    const top5Badge = document.getElementById('top5Badge');
+    const filterRisk = document.getElementById('filterRisk');
+    const filterVisibility = document.getElementById('filterVisibility');
+    const sortBy = document.getElementById('sortBy');
+    const strategyAssetsSearch = document.getElementById('strategyAssetsSearch');
+    const strategyAssetsSelected = document.getElementById('strategyAssetsSelected');
+    const strategyAssetsList = document.getElementById('strategyAssetsList');
+
+    const formatCurrency = (value, currency = 'ZAR') => {
+      if (value === null || value === undefined) return 'No minimum';
+      const numeric = Number(value);
+      if (Number.isNaN(numeric) || numeric === 0) return 'No minimum';
+      try {
+        return new Intl.NumberFormat('en-ZA', {
+          style: 'currency',
+          currency,
+          maximumFractionDigits: 0
+        }).format(numeric);
+      } catch (error) {
+        return `${numeric.toLocaleString()} ${currency}`;
+      }
+    };
+
+    const formatCompactCurrency = (value) => {
+      if (value === null || value === undefined) return 'Not available';
+      const numeric = Number(value);
+      if (Number.isNaN(numeric) || numeric === 0) return 'Not available';
+      try {
+        return `$${new Intl.NumberFormat('en', {
+          notation: 'compact',
+          maximumFractionDigits: 1
+        }).format(numeric)}`;
+      } catch (error) {
+        return `$${numeric.toLocaleString()}`;
+      }
+    };
+
+    const normalizeWebsite = (value) => {
+      if (!value) return '';
+      return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+    };
+
+    const getInitials = (name = '') => {
+      const parts = name.trim().split(/\s+/).filter(Boolean);
+      if (!parts.length) return 'NA';
+      if (parts.length === 1) {
+        return parts[0].slice(0, 2).toUpperCase();
+      }
+      return parts.slice(0, 2).map(part => part[0].toUpperCase()).join('');
+    };
+
+    const riskBadgeClass = (risk) => {
+      switch (risk) {
+        case 'low':
+          return 'bg-emerald-100 text-emerald-700';
+        case 'medium':
+          return 'bg-amber-100 text-amber-700';
+        case 'high':
+          return 'bg-rose-100 text-rose-700';
+        default:
+          return 'bg-slate-100 text-slate-600';
+      }
+    };
+
+    const createStrategySlug = (value) => {
+      const base = String(value || '')
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 48);
+      const fallback = base || 'strategy';
+      const unique = Date.now().toString(36).slice(-6);
+      return `${fallback}-${unique}`;
+    };
+
+    const renderStrategyItem = (strategy) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'strategy-item border border-slate-200 rounded-2xl p-3 flex items-start justify-between gap-3';
+
+      const name = strategy.short_name || strategy.name || 'Untitled strategy';
+      const description = strategy.description || strategy.objective || 'No description provided.';
+      const sector = strategy.sector ? `• ${strategy.sector}` : '';
+      const risk = (strategy.risk_level || 'unspecified').toLowerCase();
+      const minInvestment = formatCurrency(strategy.min_investment, strategy.base_currency || 'ZAR');
+
+      wrapper.innerHTML = `
+        <div class="strategy-item-copy">
+          <p class="font-medium text-slate-800">${name}</p>
+          <p class="strategy-item-desc text-xs text-slate-500 mt-1">${description}</p>
+          <p class="text-xs text-slate-400 mt-1">${strategy.base_currency || 'ZAR'} ${sector}</p>
+        </div>
+        <div class="flex flex-col items-end gap-2">
+          <span class="px-2 py-0.5 text-xs rounded-full ${riskBadgeClass(risk)}">${risk}</span>
+          <span class="text-xs text-slate-500">${minInvestment}</span>
+        </div>
+      `;
+
+      return wrapper;
+    };
+
+    const populateAllStrategiesFilter = (strategies) => {
+      if (!allStrategiesFilter) return;
+      const previous = allStrategiesFilter.value || 'all';
+      allStrategiesFilter.innerHTML = '';
+
+      const allOption = document.createElement('option');
+      allOption.value = 'all';
+      allOption.textContent = 'All strategies';
+      allStrategiesFilter.appendChild(allOption);
+
+      strategies.forEach((strategy) => {
+        const option = document.createElement('option');
+        option.value = String(strategy.id);
+        option.textContent = strategy.short_name || strategy.name || 'Untitled strategy';
+        allStrategiesFilter.appendChild(option);
+      });
+
+      allStrategiesFilter.value = Array.from(allStrategiesFilter.options).some(opt => opt.value === previous)
+        ? previous
+        : 'all';
+    };
+
+    const renderAllStrategiesByFilter = () => {
+      if (!allStrategiesList) return;
+      const selected = allStrategiesFilter ? allStrategiesFilter.value : 'all';
+      if (selected === 'all') {
+        renderList(allStrategiesList, allStrategiesData, 'No strategies available.');
+        return;
+      }
+      const match = allStrategiesData.filter(item => String(item.id) === selected);
+      renderList(allStrategiesList, match, 'No strategies available.');
+    };
+
+    const renderList = (container, items, emptyMessage) => {
+      if (!container) return;
+      container.innerHTML = '';
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-sm text-slate-500';
+        empty.textContent = emptyMessage;
+        container.appendChild(empty);
+        return;
+      }
+      items.forEach(item => container.appendChild(renderStrategyItem(item)));
+    };
+
+    const renderSelectedAssetsPills = () => {
+      if (!strategyAssetsSelected) return;
+      strategyAssetsSelected.innerHTML = '';
+      if (!selectedSecurityIdsForStrategy.size) {
+        const empty = document.createElement('span');
+        empty.className = 'text-[11px] text-slate-400';
+        empty.textContent = 'No assets selected yet.';
+        strategyAssetsSelected.appendChild(empty);
+        return;
+      }
+
+      Array.from(selectedSecurityIdsForStrategy).forEach((id) => {
+        const asset = allSecuritiesForStrategies.find((s) => String(s.id) === String(id));
+        const label = asset ? `${asset.symbol || ''} ${asset.name ? '· ' + asset.name : ''}`.trim() : id;
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.className = 'flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 text-[11px]';
+        pill.innerHTML = `<span>${label}</span><span class="text-[13px] leading-none">&times;</span>`;
+        pill.addEventListener('click', () => {
+          selectedSecurityIdsForStrategy.delete(id);
+          renderSelectedAssetsPills();
+          renderAssetsPickerList();
+        });
+        strategyAssetsSelected.appendChild(pill);
+      });
+    };
+
+    const renderAssetsPickerList = () => {
+      if (!strategyAssetsList) return;
+      strategyAssetsList.innerHTML = '';
+
+      const term = (strategyAssetsSearch?.value || '').trim().toLowerCase();
+      let items = [...allSecuritiesForStrategies];
+      if (term) {
+        items = items.filter((item) => {
+          const text = `${item.symbol || ''} ${item.name || ''}`.toLowerCase();
+          return text.includes(term);
+        });
+      }
+
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'px-3 py-2 text-[11px] text-slate-500';
+        empty.textContent = term ? 'No assets match your search.' : 'No assets available.';
+        strategyAssetsList.appendChild(empty);
+        return;
+      }
+
+      items.forEach((item) => {
+        const isSelected = selectedSecurityIdsForStrategy.has(String(item.id));
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = `w-full flex items-center justify-between px-3 py-1.5 text-[11px] border-b border-slate-100 last:border-b-0 hover:bg-slate-50 ${isSelected ? 'bg-violet-50' : ''}`;
+        row.innerHTML = `
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-100 text-[10px] text-slate-700 font-semibold">
+              ${(item.symbol || item.name || '?').slice(0, 2).toUpperCase()}
+            </span>
+            <span class="truncate">${item.name || 'Unnamed asset'}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] text-slate-400">${item.symbol || ''}</span>
+            <span class="w-4 h-4 rounded-full border ${isSelected ? 'bg-violet-600 border-violet-600' : 'border-slate-300'}"></span>
+          </div>
+        `;
+        row.addEventListener('click', () => {
+          const key = String(item.id);
+          if (selectedSecurityIdsForStrategy.has(key)) {
+            selectedSecurityIdsForStrategy.delete(key);
+          } else {
+            selectedSecurityIdsForStrategy.add(key);
+          }
+          renderSelectedAssetsPills();
+          renderAssetsPickerList();
+        });
+        strategyAssetsList.appendChild(row);
+      });
+    };
+
+    const applyStrategiesFiltersAndRender = () => {
+      if (!strategiesList) return;
+      let items = [...allStrategiesFullData];
+
+      const searchText = (strategySearch?.value || '').trim().toLowerCase();
+      if (searchText) {
+        items = items.filter((item) => {
+          const text = [
+            item.name,
+            item.short_name,
+            item.description,
+            item.objective,
+            item.sector
+          ].filter(Boolean).join(' ').toLowerCase();
+          return text.includes(searchText);
+        });
+      }
+
+      const riskValue = filterRisk?.value || '';
+      if (riskValue) {
+        items = items.filter((item) => (item.risk_level || '').toLowerCase() === riskValue);
+      }
+
+      const visValue = filterVisibility?.value || '';
+      if (visValue === 'public') {
+        items = items.filter((item) => item.is_public);
+      } else if (visValue === 'featured') {
+        items = items.filter((item) => item.is_featured);
+      }
+
+      const sortValue = sortBy?.value || 'recent';
+      if (sortValue === 'name') {
+        items.sort((a, b) => (a.short_name || a.name || '').localeCompare(b.short_name || b.name || ''));
+      } else if (sortValue === 'min_investment_desc') {
+        items.sort((a, b) => (Number(b.min_investment) || 0) - (Number(a.min_investment) || 0));
+      } else if (sortValue === 'min_investment_asc') {
+        items.sort((a, b) => (Number(a.min_investment) || 0) - (Number(b.min_investment) || 0));
+      } else {
+        items.sort((a, b) => {
+          const aCreated = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return bCreated - aCreated;
+        });
+      }
+
+      strategiesList.innerHTML = '';
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-sm text-slate-500';
+        empty.textContent = 'No strategies match your filters.';
+        strategiesList.appendChild(empty);
+        return;
+      }
+
+      items.forEach((item) => strategiesList.appendChild(renderStrategyItem(item)));
+    };
+
+    const renderTop5Strategies = () => {
+      if (!topStrategiesList) return;
+      const scored = [...allStrategiesFullData].map((item) => ({
+        item,
+        score: Number(item.min_investment) || 0
+      }));
+
+      scored.sort((a, b) => b.score - a.score);
+      const top5 = scored.slice(0, 5).map((entry) => entry.item);
+
+      topStrategiesList.innerHTML = '';
+      if (!top5.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-sm text-slate-500';
+        empty.textContent = 'No strategies available yet.';
+        topStrategiesList.appendChild(empty);
+      } else {
+        top5.forEach((strategy, index) => {
+          const row = document.createElement('div');
+          row.className = 'border border-slate-200 rounded-2xl p-3 flex items-center justify-between gap-3';
+
+          const name = strategy.short_name || strategy.name || 'Untitled strategy';
+          const currency = strategy.base_currency || 'ZAR';
+          const minInvestment = formatCurrency(strategy.min_investment, currency);
+
+          row.innerHTML = `
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-7 h-7 rounded-full bg-slate-900 text-xs text-white flex items-center justify-center font-semibold">${index + 1}</div>
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-slate-900 truncate">${name}</p>
+                <p class="text-xs text-slate-500 truncate">Min investment: ${minInvestment}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              ${strategy.is_featured ? '<span class="px-2 py-0.5 text-[10px] rounded-full bg-amber-100 text-amber-700 font-semibold">Featured</span>' : ''}
+              ${strategy.is_public ? '<span class="px-2 py-0.5 text-[10px] rounded-full bg-emerald-100 text-emerald-700 font-semibold">Public</span>' : ''}
+            </div>
+          `;
+
+          topStrategiesList.appendChild(row);
+        });
+      }
+
+      if (top5Badge) {
+        top5Badge.textContent = `${top5.length} strategies`;
+      }
+    };
+
+    const buildStrategyChart = (strategies) => {
+      if (!strategyChart) return;
+      strategyChart.innerHTML = `
+        <div class="absolute inset-0">
+          <div class="chart-gradient absolute inset-0"></div>
+          <div class="dot-pattern absolute inset-0"></div>
+        </div>
+        <div class="relative h-full px-6 pt-10 pb-6 overflow-x-auto chart-scroll" id="chart-container">
+          <div class="relative h-full min-w-full flex items-end justify-between gap-3" id="chart-content">
+            <svg class="absolute inset-0 w-full h-full" style="pointer-events: none;" id="chart-svg"></svg>
+          </div>
+        </div>
+      `;
+
+      const chartItems = (strategies || []).map((item, index) => {
+        const value = Number(item.min_investment || 0);
+        return {
+          name: item.short_name || item.name || `Strategy ${index + 1}`,
+          value: Number.isFinite(value) && value > 0 ? value : 20 + index * 10
+        };
+      });
+
+      if (!chartItems.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-sm text-slate-500 relative z-10';
+        empty.textContent = 'No strategies available.';
+        strategyChart.appendChild(empty);
+        return;
+      }
+
+      const maxValue = Math.max(...chartItems.map(item => item.value));
+      const container = document.getElementById('chart-container');
+      const content = document.getElementById('chart-content');
+      const svg = document.getElementById('chart-svg');
+      if (!container || !content || !svg) return;
+
+      const contentWidth = Math.max(container.clientWidth, chartItems.length * 70);
+      content.style.width = `${contentWidth}px`;
+
+      const percentBadge = document.createElement('div');
+      percentBadge.className = 'absolute top-4 right-4 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full';
+      percentBadge.textContent = '+12.4%';
+      content.appendChild(percentBadge);
+
+      const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+      const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+      gradient.setAttribute('id', 'lineGradient');
+      gradient.setAttribute('x1', '0%');
+      gradient.setAttribute('y1', '0%');
+      gradient.setAttribute('x2', '0%');
+      gradient.setAttribute('y2', '100%');
+
+      const stop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+      stop1.setAttribute('offset', '0%');
+      stop1.setAttribute('stop-color', 'rgb(148, 163, 184)');
+      stop1.setAttribute('stop-opacity', '0.3');
+
+      const stop2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+      stop2.setAttribute('offset', '100%');
+      stop2.setAttribute('stop-color', 'rgb(148, 163, 184)');
+      stop2.setAttribute('stop-opacity', '0.1');
+
+      gradient.appendChild(stop1);
+      gradient.appendChild(stop2);
+      defs.appendChild(gradient);
+      svg.appendChild(defs);
+
+      chartItems.forEach((item, idx) => {
+        if (idx === chartItems.length - 1) return;
+        const currentHeight = (item.value / maxValue) * 100;
+        const nextHeight = (chartItems[idx + 1].value / maxValue) * 100;
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', `${(idx / (chartItems.length - 1)) * 100}%`);
+        line.setAttribute('y1', `${100 - currentHeight - 10}%`);
+        line.setAttribute('x2', `${((idx + 1) / (chartItems.length - 1)) * 100}%`);
+        line.setAttribute('y2', `${100 - nextHeight - 10}%`);
+        line.setAttribute('stroke', 'url(#lineGradient)');
+        line.setAttribute('stroke-width', '2');
+        line.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(line);
+      });
+
+      let activeIndex = -1;
+
+      const setActive = (index) => {
+        activeIndex = index;
+        content.querySelectorAll('[data-label]').forEach((el, idx) => {
+          el.classList.toggle('hidden', idx !== activeIndex);
+        });
+        content.querySelectorAll('[data-bg]').forEach((el, idx) => {
+          el.classList.toggle('hidden', idx !== activeIndex);
+        });
+      };
+
+      chartItems.forEach((item, index) => {
+        const height = (item.value / maxValue) * 100;
+        const isHighest = item.value === maxValue;
+
+        const column = document.createElement('div');
+        column.className = 'flex-1 flex flex-col items-center gap-4 relative z-10';
+
+        const barContainer = document.createElement('div');
+        barContainer.className = 'relative w-full flex justify-center';
+        barContainer.style.height = '140px';
+
+        const barWrapper = document.createElement('div');
+        barWrapper.className = 'absolute bottom-0 flex flex-col items-center';
+
+        const label = document.createElement('div');
+        label.className = 'mb-2 bg-slate-800 text-white px-3 py-1 rounded-full text-xs font-medium shadow-lg hidden';
+        label.textContent = `${item.value.toLocaleString()}`;
+        label.dataset.label = 'true';
+        barWrapper.appendChild(label);
+
+        const lineContainer = document.createElement('div');
+        lineContainer.className = 'relative flex flex-col items-center';
+
+        const backgroundBar = document.createElement('div');
+        backgroundBar.className = 'absolute bar-animation hidden';
+        backgroundBar.style.width = '72px';
+        backgroundBar.style.height = `${height * 1.4 + 70}px`;
+        backgroundBar.style.bottom = '-70px';
+        backgroundBar.style.background = 'linear-gradient(to top, rgba(148, 163, 184, 0.2), rgba(148, 163, 184, 0))';
+        backgroundBar.style.borderRadius = '999px';
+        backgroundBar.style.zIndex = '-1';
+        backgroundBar.dataset.bg = 'true';
+        lineContainer.appendChild(backgroundBar);
+
+        const dot = document.createElement('div');
+        dot.className = `w-2.5 h-2.5 rounded-full mb-1 ${isHighest ? 'bg-slate-800' : 'bg-slate-400'}`;
+        lineContainer.appendChild(dot);
+
+        const line = document.createElement('div');
+        line.className = 'w-0.5 rounded-full transition-all bar-animation bg-slate-300';
+        const jitter = 0.85 + (index % 5) * 0.08;
+        line.style.height = `${height * 1.2 * jitter}px`;
+        lineContainer.appendChild(line);
+
+        barWrapper.appendChild(lineContainer);
+        barContainer.appendChild(barWrapper);
+        column.appendChild(barContainer);
+
+        const dayCircle = document.createElement('div');
+        dayCircle.className = `w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-semibold transition-all ${isHighest ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`;
+        dayCircle.textContent = getInitials(item.name);
+        dayCircle.addEventListener('click', () => setActive(index));
+        column.appendChild(dayCircle);
+
+        content.appendChild(column);
+      });
+
+      setActive(-1);
+    };
+
+    const renderHoldingCard = (security) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'border border-slate-200 rounded-2xl p-3';
+
+      const name = security.name || 'Unnamed holding';
+      const symbol = security.symbol || 'N/A';
+      const description = security.description || 'No description provided.';
+      const website = security.website || '';
+      const marketCap = formatCompactCurrency(security.market_cap);
+      const logoUrl = security.logo_url || '';
+      const totalQuantity = Number(security.total_quantity || 0);
+      const acquiredByUsers = Array.isArray(security.acquired_by_users_details) ? security.acquired_by_users_details : [];
+      const visibleAcquiredUsers = acquiredByUsers.slice(0, 3);
+      const hiddenAcquiredUsers = acquiredByUsers.slice(3);
+      const quantityLabel = Number.isFinite(totalQuantity)
+        ? `+${totalQuantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}`
+        : '+0';
+      const websiteLink = normalizeWebsite(website);
+
+      const renderUserMiniCard = (user, hidden = false) => {
+        const userName = user?.name || user?.uid || 'Unknown user';
+        const userUid = user?.uid || '-';
+        const userAvatarUrl = user?.avatar_url || '';
+        const userQuantity = Number(user?.quantity || 0);
+        const userQuantityLabel = Number.isFinite(userQuantity)
+          ? `+${userQuantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}`
+          : '+0';
+        const profileLink = user?.profile_link || '/index.html';
+
+        return `
+          <div class="rounded-xl border border-slate-200 bg-slate-50 px-2 py-2 ${hidden ? 'hidden' : ''}" data-acquired-user-card="${hidden ? 'extra' : 'visible'}">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <div class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center text-[10px] text-slate-700 font-semibold">
+                  ${userAvatarUrl
+                    ? `<img src="${userAvatarUrl}" alt="${userName} avatar" class="w-full h-full object-cover" />`
+                    : userName.slice(0, 2).toUpperCase()}
+                </div>
+                <div class="min-w-0">
+                  <p class="text-xs font-semibold text-slate-700 truncate">${userName}</p>
+                  <p class="text-[10px] text-slate-500 truncate">UID: ${userUid}</p>
+                </div>
+              </div>
+              <span class="text-[10px] font-semibold text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded-full">${userQuantityLabel}</span>
+            </div>
+            <div class="mt-1.5 text-right">
+              <a class="text-[10px] font-medium text-indigo-600 hover:text-indigo-700" href="${profileLink}" target="_blank" rel="noopener">Open in Profiles</a>
+            </div>
+          </div>
+        `;
+      };
+
+      const acquiredUsersHtml = acquiredByUsers.length
+        ? `
+          <div class="space-y-2 mt-1" data-acquired-users-list>
+            ${visibleAcquiredUsers.map((user) => renderUserMiniCard(user)).join('')}
+            ${hiddenAcquiredUsers.map((user) => renderUserMiniCard(user, true)).join('')}
+          </div>
+          ${hiddenAcquiredUsers.length
+            ? `<div class="mt-2"><button type="button" class="text-xs font-medium text-indigo-600 hover:text-indigo-700" data-acquired-more>More (${hiddenAcquiredUsers.length})</button></div>`
+            : ''}
+        `
+        : '<p class="text-xs text-slate-500 mt-1">No user acquisitions found.</p>';
+
+      wrapper.innerHTML = `
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden flex items-center justify-center text-slate-600 text-xs font-semibold" data-logo>
+              ${logoUrl ? `<img src="${logoUrl}" alt="${name} logo" class="w-full h-full object-contain" />` : symbol.slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <p class="font-medium text-slate-800">${name}</p>
+              <p class="text-xs text-slate-500">$${symbol}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-violet-700 bg-violet-100 px-2 py-1 rounded-full">${quantityLabel}</span>
+            <button class="text-slate-400 hover:text-slate-600 transition" type="button" aria-label="Toggle details">
+              <svg class="w-4 h-4 transition-transform" viewBox="0 0 20 20" fill="currentColor" data-chevron>
+                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="mt-3 text-sm text-slate-600 hidden" data-details>
+          <p class="mb-2">${description}</p>
+          <p class="text-xs text-slate-500"><span class="font-semibold text-slate-700">Owned quantity:</span> <span class="text-violet-700 font-semibold">${quantityLabel}</span></p>
+          <p class="text-xs text-slate-500"><span class="font-semibold text-slate-700">Market cap:</span> ${marketCap}</p>
+          <p class="text-xs text-slate-500"><span class="font-semibold text-slate-700">Website:</span> ${websiteLink ? `<a class=\"text-indigo-600 hover:text-indigo-700\" href=\"${websiteLink}\" target=\"_blank\" rel=\"noopener\">${website}</a>` : 'Not available'}</p>
+          <div class="mt-2">
+            <p class="text-xs text-slate-500"><span class="font-semibold text-slate-700">Acquired by:</span></p>
+            ${acquiredUsersHtml}
+          </div>
+        </div>
+      `;
+
+      const toggleButton = wrapper.querySelector('button');
+      const details = wrapper.querySelector('[data-details]');
+      const chevron = wrapper.querySelector('[data-chevron]');
+      if (toggleButton && details) {
+        toggleButton.addEventListener('click', () => {
+          const isHidden = details.classList.toggle('hidden');
+          if (chevron) {
+            chevron.classList.toggle('rotate-180', !isHidden);
+          }
+        });
+      }
+
+      const logoContainer = wrapper.querySelector('[data-logo]');
+      const logoImage = wrapper.querySelector('img');
+      if (logoImage && logoContainer) {
+        logoImage.addEventListener('error', () => {
+          logoContainer.innerHTML = symbol.slice(0, 2).toUpperCase();
+        });
+      }
+
+      const moreButton = wrapper.querySelector('[data-acquired-more]');
+      if (moreButton) {
+        moreButton.addEventListener('click', () => {
+          const extraCards = wrapper.querySelectorAll('[data-acquired-user-card="extra"]');
+          const shouldShow = Array.from(extraCards).some((card) => card.classList.contains('hidden'));
+          extraCards.forEach((card) => card.classList.toggle('hidden', !shouldShow));
+          moreButton.textContent = shouldShow ? 'Show less' : `More (${extraCards.length})`;
+        });
+      }
+
+      return wrapper;
+    };
+
+    const renderHoldings = (items) => {
+      if (!topHoldingsList) return;
+      topHoldingsList.innerHTML = '';
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-sm text-slate-500';
+        empty.textContent = 'No holdings available.';
+        topHoldingsList.appendChild(empty);
+      } else {
+        items.forEach(item => topHoldingsList.appendChild(renderHoldingCard(item)));
+      }
+
+      if (topHoldingsCount) {
+        topHoldingsCount.textContent = `${items.length} holdings`;
+      }
+    };
+
+    const updateStats = (strategies) => {
+      const total = strategies.length;
+      const featured = strategies.filter(item => item.is_featured).length;
+      const publicCount = strategies.filter(item => item.is_public).length;
+      const avgCurrency = strategies.find(item => item.base_currency)?.base_currency || 'ZAR';
+      const avgMin = total
+        ? strategies.reduce((sum, item) => sum + Number(item.min_investment || 0), 0) / total
+        : 0;
+
+      const riskCounts = strategies.reduce(
+        (acc, item) => {
+          const risk = (item.risk_level || 'unspecified').toLowerCase();
+          if (risk === 'low') acc.low += 1;
+          else if (risk === 'medium') acc.medium += 1;
+          else if (risk === 'high') acc.high += 1;
+          else acc.unknown += 1;
+          return acc;
+        },
+        { low: 0, medium: 0, high: 0, unknown: 0 }
+      );
+
+      if (statTotal) statTotal.textContent = total.toString();
+      if (statFeatured) statFeatured.textContent = featured.toString();
+      if (statPublic) statPublic.textContent = publicCount.toString();
+      if (statAvgMin) statAvgMin.textContent = formatCurrency(avgMin, avgCurrency);
+      if (riskLow) riskLow.textContent = riskCounts.low.toString();
+      if (riskMedium) riskMedium.textContent = riskCounts.medium.toString();
+      if (riskHigh) riskHigh.textContent = riskCounts.high.toString();
+      if (riskUnknown) riskUnknown.textContent = riskCounts.unknown.toString();
+      if (featuredCount) featuredCount.textContent = `${featured} featured`;
+      if (totalCount) totalCount.textContent = `${total} total`;
+    };
+
+    const loadStrategies = async () => {
+      const { data, error } = await supabaseClient
+        .from('strategies')
+        .select('id, slug, name, short_name, description, objective, risk_level, sector, min_investment, base_currency, is_featured, is_public, status, created_at, holdings')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Strategies load error:', error);
+        renderList(featuredStrategies, [], 'No featured strategies available.');
+        renderList(allStrategiesList, [], 'No strategies found.');
+        if (strategiesList) {
+          strategiesList.innerHTML = '<div class="text-sm text-slate-500">Could not load strategies.</div>';
+        }
+        if (topStrategiesList) {
+          topStrategiesList.innerHTML = '<div class="text-sm text-slate-500">Could not load strategies.</div>';
+        }
+        if (top5Badge) top5Badge.textContent = '0 strategies';
+        return;
+      }
+
+      const strategies = data || [];
+      const featured = strategies.filter(item => item.is_featured && item.is_public);
+
+      // The previous code was mistakenly assigning "publicOnly" data to sections labeled "All".
+      // We are now passing the complete `strategies` array to reflect all data points properly.
+      allStrategiesData = strategies;
+      allStrategiesFullData = strategies;
+
+      renderList(featuredStrategies, featured.slice(0, 3), 'No featured strategies yet.');
+      
+      populateAllStrategiesFilter(strategies);
+      renderAllStrategiesByFilter();
+      buildStrategyChart(strategies);
+      updateStats(strategies);
+      
+      applyStrategiesFiltersAndRender();
+      renderTop5Strategies();
+    };
+
+    const showFormMessage = (text, type = 'info') => {
+      if (!strategyFormMessage) return;
+      strategyFormMessage.textContent = text || '';
+      strategyFormMessage.className = 'text-xs ' + (type === 'error'
+        ? 'text-rose-600'
+        : type === 'success'
+          ? 'text-emerald-600'
+          : 'text-slate-500');
+    };
+
+    const handleStrategySubmit = async (event) => {
+      event.preventDefault();
+      if (!strategyForm) return;
+
+      const formData = new FormData(strategyForm);
+      const payload = {
+        slug: '',
+        name: (formData.get('name') || '').toString().trim() || null,
+        short_name: (formData.get('short_name') || '').toString().trim() || null,
+        description: (formData.get('description') || '').toString().trim() || null,
+        objective: (formData.get('description') || '').toString().trim() || null,
+        risk_level: (formData.get('risk_level') || '').toString().trim() || null,
+        sector: (formData.get('sector') || '').toString().trim() || null,
+        min_investment: formData.get('min_investment') ? Number(formData.get('min_investment')) : null,
+        base_currency: (formData.get('base_currency') || '').toString().trim() || 'ZAR',
+        is_public: strategyForm.querySelector('#strategyIsPublic')?.checked || false,
+        is_featured: strategyForm.querySelector('#strategyIsFeatured')?.checked || false,
+        holdings: Array.from(selectedSecurityIdsForStrategy).map((securityId) => ({ security_id: securityId }))
+      };
+
+      if (!payload.name) {
+        showFormMessage('Please provide at least a strategy name.', 'error');
+        return;
+      }
+
+      payload.slug = createStrategySlug(payload.short_name || payload.name);
+
+      showFormMessage('Saving strategy…', 'info');
+
+      const submitButton = strategyForm.querySelector('button[type="submit"]');
+      const originalText = submitButton ? submitButton.innerHTML : '';
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<span>Saving…</span>';
+      }
+
+      const { error } = await supabaseClient
+        .from('strategies')
+        .insert([payload]);
+
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.innerHTML = originalText || '<span>Save strategy</span>';
+      }
+
+      if (error) {
+        console.error('Failed to create strategy', error);
+        showFormMessage('Could not save strategy. Please try again.', 'error');
+        return;
+      }
+
+      strategyForm.reset();
+      selectedSecurityIdsForStrategy = new Set();
+      renderSelectedAssetsPills();
+      renderAssetsPickerList();
+      showFormMessage('Strategy saved successfully.', 'success');
+      await loadStrategies();
+    };
+
+    const loadUserStats = async () => {
+      const [profilesRes, onboardingRes, packDetailsRes] = await Promise.all([
+        supabaseClient.from('profiles').select('*'),
+        supabaseClient.from('user_onboarding').select('user_id, kyc_status'),
+        supabaseClient.from('user_onboarding_pack_details').select('user_id')
+      ]);
+
+      const profiles = profilesRes.data || [];
+      const onboardings = onboardingRes.data || [];
+      const packDetailsRows = packDetailsRes.data || [];
+
+      const normalizeStatus = (value) => String(value || '').trim().toLowerCase();
+      const isKycCompleted = (status) => {
+        const normalized = normalizeStatus(status);
+        if (!normalized) return false;
+        return normalized.includes('completed')
+          || normalized.includes('complete')
+          || normalized.includes('approved')
+          || normalized.includes('verified')
+          || normalized.includes('done');
+      };
+
+      const onboardingByUser = new Map();
+      onboardings.forEach((row) => {
+        if (row?.user_id) onboardingByUser.set(String(row.user_id), row);
+      });
+
+      const clientDetailsUsers = new Set(
+        packDetailsRows
+          .map((row) => row?.user_id)
+          .filter(Boolean)
+          .map((id) => String(id))
+      );
+
+      const totalUsers = profiles.length;
+      const usersKyc = profiles.filter((profile) => {
+        const userId = String(profile?.id || '');
+        if (!userId) return false;
+        const onboarding = onboardingByUser.get(userId);
+        const statusCompleted = isKycCompleted(onboarding?.kyc_status);
+        const hasClientDetails = clientDetailsUsers.has(userId);
+        return statusCompleted || hasClientDetails;
+      }).length;
+
+      const usersLinkedBank = profiles.filter(row => {
+        return Boolean(
+          row.bank_linked ||
+          row.bank_account ||
+          row.bank_account_number ||
+          row.bank_name ||
+          row.bank_id
+        );
+      }).length;
+
+      if (totalUsersValue) totalUsersValue.textContent = totalUsers.toString();
+      if (usersKycValue) usersKycValue.textContent = usersKyc.toString();
+      if (usersBankValue) usersBankValue.textContent = usersLinkedBank.toString();
+    };
+
+    const loadTopHoldings = async () => {
+      const { data: holdingsRows, error: holdingsError } = await supabaseClient
+        .from('stock_holdings')
+        .select('security_id, user_id, quantity');
+
+      if (holdingsError) {
+        console.error('Holdings load error:', holdingsError);
+        renderHoldings([]);
+        return;
+      }
+
+      const quantityBySecurityId = {};
+      const userIdsBySecurityId = {};
+      const quantityBySecurityAndUser = {};
+      (holdingsRows || []).forEach((row) => {
+        const securityId = row?.security_id;
+        if (!securityId) return;
+        const quantity = Number(row?.quantity);
+        if (!Number.isFinite(quantity)) return;
+        quantityBySecurityId[securityId] = (quantityBySecurityId[securityId] || 0) + quantity;
+        if (quantity > 0 && row?.user_id) {
+          if (!userIdsBySecurityId[securityId]) userIdsBySecurityId[securityId] = new Set();
+          userIdsBySecurityId[securityId].add(String(row.user_id));
+          if (!quantityBySecurityAndUser[securityId]) quantityBySecurityAndUser[securityId] = {};
+          const keyUserId = String(row.user_id);
+          quantityBySecurityAndUser[securityId][keyUserId] = (quantityBySecurityAndUser[securityId][keyUserId] || 0) + quantity;
+        }
+      });
+
+      const rankedSecurityIds = Object.entries(quantityBySecurityId)
+        .sort(([, quantityA], [, quantityB]) => quantityB - quantityA)
+        .map(([securityId]) => securityId)
+        .slice(0, 3);
+
+      if (!rankedSecurityIds.length) {
+        renderHoldings([]);
+        return;
+      }
+
+      const allAcquirerUserIds = [...new Set(
+        rankedSecurityIds.flatMap((securityId) => Array.from(userIdsBySecurityId[securityId] || []))
+      )];
+
+      let profileNameById = {};
+      let profileAvatarById = {};
+      if (allAcquirerUserIds.length) {
+        const { data: profileRows, error: profilesError } = await supabaseClient
+          .from('profiles')
+          .select('id, first_name, last_name, email, avatar_url')
+          .in('id', allAcquirerUserIds);
+
+        if (profilesError) {
+          console.error('Profiles load error:', profilesError);
+        } else {
+          profileNameById = (profileRows || []).reduce((acc, profile) => {
+            const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+            acc[String(profile.id)] = fullName || profile.email || String(profile.id);
+            return acc;
+          }, {});
+
+          profileAvatarById = (profileRows || []).reduce((acc, profile) => {
+            acc[String(profile.id)] = profile.avatar_url || '';
+            return acc;
+          }, {});
+        }
+      }
+
+      const { data: securitiesRows, error: securitiesError } = await supabaseClient
+        .from('securities')
+        .select('id, name, symbol, logo_url, description, market_cap, website, created_at, is_active')
+        .in('id', rankedSecurityIds)
+        .eq('is_active', true);
+
+      if (securitiesError) {
+        console.error('Securities load error:', securitiesError);
+        renderHoldings([]);
+        return;
+      }
+
+      const securityById = (securitiesRows || []).reduce((acc, security) => {
+        acc[security.id] = security;
+        return acc;
+      }, {});
+
+      const orderedSecurities = rankedSecurityIds
+        .map((securityId) => {
+          const base = securityById[securityId];
+          if (!base) return null;
+
+          const acquiredByUsersDetails = Array.from(userIdsBySecurityId[securityId] || [])
+            .map((userId) => ({
+              uid: userId,
+              name: profileNameById[userId] || userId,
+              avatar_url: profileAvatarById[userId] || '',
+              quantity: quantityBySecurityAndUser[securityId]?.[userId] || 0,
+              profile_link: `/index.html?profileId=${encodeURIComponent(userId)}`
+            }))
+            .sort((a, b) => Number(b.quantity || 0) - Number(a.quantity || 0));
+
+          return {
+            ...base,
+            total_quantity: quantityBySecurityId[securityId] || 0,
+            acquired_by_users_details: acquiredByUsersDetails
+          };
+        })
+        .filter(Boolean);
+
+      renderHoldings(orderedSecurities);
+    };
+
+    const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
+
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const requireSession = async () => {
+      const { data } = await supabaseClient.auth.getSession();
+      if (!data.session) {
+        window.location.href = '/signin.html';
+        return false;
+      }
+      return true;
+    };
+
+    const signOutBtn = document.getElementById('signOutBtn');
+    if (signOutBtn) {
+      signOutBtn.addEventListener('click', async () => {
+        await supabaseClient.auth.signOut();
+        window.location.href = '/signin.html';
+      });
+    }
+
+    if (allStrategiesFilter) {
+      allStrategiesFilter.addEventListener('change', renderAllStrategiesByFilter);
+    }
+
+    if (strategyForm) {
+      strategyForm.addEventListener('submit', handleStrategySubmit);
+    }
+
+    if (strategySearch) {
+      strategySearch.addEventListener('input', () => applyStrategiesFiltersAndRender());
+    }
+
+    [filterRisk, filterVisibility, sortBy].forEach((el) => {
+      if (el) {
+        el.addEventListener('change', () => applyStrategiesFiltersAndRender());
+      }
+    });
+
+    if (strategyAssetsSearch) {
+      strategyAssetsSearch.addEventListener('input', () => renderAssetsPickerList());
+    }
+
+    if (tabOverview && tabStrategies && tabOverviewPanel && tabStrategiesPanel) {
+      tabOverview.addEventListener('click', () => {
+        tabOverviewPanel.classList.remove('hidden');
+        tabStrategiesPanel.classList.add('hidden');
+        tabOverview.classList.add('border-b-2', 'border-slate-900', 'text-slate-900', 'font-semibold');
+        tabStrategies.classList.remove('border-b-2', 'border-slate-900', 'font-semibold');
+        tabStrategies.classList.add('text-slate-500');
+      });
+
+      tabStrategies.addEventListener('click', () => {
+        tabOverviewPanel.classList.add('hidden');
+        tabStrategiesPanel.classList.remove('hidden');
+        tabStrategies.classList.add('border-b-2', 'border-slate-900', 'text-slate-900', 'font-semibold');
+        tabOverview.classList.remove('border-b-2', 'border-slate-900', 'font-semibold');
+        tabOverview.classList.add('text-slate-500');
+      });
+    }
+
+    // Initialize everything on page load
+    window.addEventListener('DOMContentLoaded', async function() {
+      const ok = await requireSession();
+      if (!ok) return;
+
+      const { data: securitiesRows, error: securitiesError } = await supabaseClient
+        .from('securities')
+        .select('id, symbol, name')
+        .order('name', { ascending: true });
+
+      if (securitiesError) {
+        console.error('Securities load error (strategies picker):', securitiesError);
+        allSecuritiesForStrategies = [];
+      } else {
+        allSecuritiesForStrategies = securitiesRows || [];
+      }
+
+      renderSelectedAssetsPills();
+      renderAssetsPickerList();
+
+      loadStrategies();
+      loadTopHoldings();
+      loadUserStats();
+    });
+  </script>
+</body>
+</html>
