@@ -672,6 +672,29 @@
     </div>
   </main>
 
+  <!-- Password confirmation modal for destructive actions -->
+  <div id="pwConfirmModal" class="modal-backdrop hidden">
+    <div class="modal-content max-w-sm w-full p-6">
+      <div class="flex items-start gap-3 mb-4">
+        <div id="pwConfirmIcon" class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-amber-100">
+          <svg class="w-5 h-5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="min-w-0">
+          <p class="font-semibold text-slate-900" id="pwConfirmTitle">Confirm action</p>
+          <p class="text-sm text-slate-500 mt-0.5" id="pwConfirmDescription"></p>
+        </div>
+      </div>
+      <label class="block text-xs font-medium text-slate-700 mb-1">Enter your password to confirm</label>
+      <input id="pwConfirmInput" type="password" placeholder="Your password" autocomplete="current-password"
+        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 mb-1">
+      <p id="pwConfirmError" class="text-xs text-rose-600 mb-3 hidden"></p>
+      <div class="flex gap-2 mt-4">
+        <button type="button" id="pwConfirmCancel" class="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
+        <button type="button" id="pwConfirmSubmit" class="flex-1 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors bg-amber-600 hover:bg-amber-700" id="pwConfirmTitle">Confirm</button>
+      </div>
+    </div>
+  </div>
+
   <div id="strategyModal" class="modal-backdrop hidden">
     <div class="modal-content" id="strategyModalContent"></div>
   </div>
@@ -2172,23 +2195,101 @@
       });
     }
 
+    const _pwModal = document.getElementById('pwConfirmModal');
+    const _pwInput = document.getElementById('pwConfirmInput');
+    const _pwError = document.getElementById('pwConfirmError');
+    const _pwTitle = document.getElementById('pwConfirmTitle');
+    const _pwDesc = document.getElementById('pwConfirmDescription');
+    const _pwSubmit = document.getElementById('pwConfirmSubmit');
+    const _pwCancel = document.getElementById('pwConfirmCancel');
+    const _pwIcon = document.getElementById('pwConfirmIcon');
+
+    const confirmWithPassword = (title, description, { danger = false } = {}) => new Promise((resolve) => {
+      _pwTitle.textContent = title;
+      _pwDesc.textContent = description;
+      _pwInput.value = '';
+      _pwError.textContent = '';
+      _pwError.classList.add('hidden');
+      _pwSubmit.textContent = 'Confirm';
+      _pwSubmit.disabled = false;
+      if (danger) {
+        _pwSubmit.className = 'flex-1 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors bg-rose-600 hover:bg-rose-700';
+        _pwIcon.className = 'w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-rose-100';
+        _pwIcon.querySelector('svg').className = 'w-5 h-5 text-rose-600';
+      } else {
+        _pwSubmit.className = 'flex-1 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors bg-amber-600 hover:bg-amber-700';
+        _pwIcon.className = 'w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-amber-100';
+        _pwIcon.querySelector('svg').className = 'w-5 h-5 text-amber-600';
+      }
+      _pwModal.classList.remove('hidden');
+      _pwInput.focus();
+
+      const cleanup = () => {
+        _pwModal.classList.add('hidden');
+        _pwSubmit.removeEventListener('click', onSubmit);
+        _pwCancel.removeEventListener('click', onCancel);
+      };
+
+      const onCancel = () => { cleanup(); resolve(false); };
+
+      const onSubmit = async () => {
+        const password = _pwInput.value.trim();
+        if (!password) {
+          _pwError.textContent = 'Please enter your password.';
+          _pwError.classList.remove('hidden');
+          return;
+        }
+        _pwSubmit.textContent = 'Verifying…';
+        _pwSubmit.disabled = true;
+        _pwError.classList.add('hidden');
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        if (!user) { _pwError.textContent = 'Session expired. Please sign in again.'; _pwError.classList.remove('hidden'); _pwSubmit.textContent = 'Confirm'; _pwSubmit.disabled = false; return; }
+        const { error } = await supabaseClient.auth.signInWithPassword({ email: user.email, password });
+        if (error) {
+          _pwError.textContent = 'Incorrect password. Please try again.';
+          _pwError.classList.remove('hidden');
+          _pwSubmit.textContent = 'Confirm';
+          _pwSubmit.disabled = false;
+          _pwInput.value = '';
+          _pwInput.focus();
+          return;
+        }
+        cleanup();
+        resolve(true);
+      };
+
+      _pwSubmit.addEventListener('click', onSubmit);
+      _pwCancel.addEventListener('click', onCancel);
+      _pwInput.addEventListener('keydown', function onKey(e) {
+        if (e.key === 'Enter') { onSubmit(); }
+        if (e.key === 'Escape') { onCancel(); }
+        if (!_pwModal.classList.contains('hidden')) return;
+        _pwInput.removeEventListener('keydown', onKey);
+      });
+    });
+
     const archiveStrategy = async (id) => {
+      const confirmed = await confirmWithPassword(
+        'Archive strategy',
+        'This strategy will be set to archived and removed from the public listings. Enter your password to continue.'
+      );
+      if (!confirmed) return;
       const { error } = await supabaseClient.from('strategies').update({ status: 'archived', is_public: false }).eq('id', id);
       if (error) { alert('Failed to archive strategy: ' + error.message); return; }
-      allSecuritiesCache = null;
-      await applyStrategiesFiltersAndRender();
+      await loadStrategies();
     };
 
     const deleteStrategy = async (id, name) => {
-      if (!confirm(`Permanently delete "${name}"? This cannot be undone.`)) return;
+      const confirmed = await confirmWithPassword(
+        `Delete "${name}"`,
+        'This will permanently delete the strategy and cannot be undone. Enter your password to continue.',
+        { danger: true }
+      );
+      if (!confirmed) return;
       const { error } = await supabaseClient.from('strategies').delete().eq('id', id);
       if (error) { alert('Failed to delete strategy: ' + error.message); return; }
-      await applyStrategiesFiltersAndRender();
+      await loadStrategies();
     };
-
-    document.addEventListener('click', () => {
-      document.querySelectorAll('.strategy-menu-dropdown').forEach(d => d.classList.add('hidden'));
-    });
 
     const signOutBtn = document.getElementById('signOutBtn');
     if (signOutBtn) {
