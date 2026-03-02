@@ -703,7 +703,6 @@
     let allStrategiesData = [];
     let allStrategiesFullData = [];
     let formHoldings = [];
-    let searchTimeout = null;
 
     const normalizeSymbol = (symbol) => {
       if (typeof symbol !== 'string') return symbol;
@@ -1143,50 +1142,49 @@
       return matched > 0 ? Math.round(total) : null;
     };
 
-    const searchSecurities = async (query) => {
-      if (!query || query.length < 1) { securityDropdown.classList.add('hidden'); return; }
+    let allSecuritiesCache = null;
+    let securitiesLoading = false;
 
-      let data = null, error = null;
+    const loadAllSecurities = async () => {
+      if (allSecuritiesCache !== null || securitiesLoading) return;
+      securitiesLoading = true;
+      securityDropdown.innerHTML = `<div class="px-3 py-3 text-sm text-slate-400 text-center">Loading assets...</div>`;
+      securityDropdown.classList.remove('hidden');
 
-      const attempt1 = await supabaseClient
-        .from('securities')
-        .select('id, symbol, name, logo_url, last_price')
-        .or(`symbol.ilike.%${query}%,name.ilike.%${query}%`)
-        .limit(20);
-      if (!attempt1.error && attempt1.data) {
-        data = attempt1.data;
+      let data = null;
+      const r1 = await supabaseClient.from('securities').select('id, symbol, name, logo_url, last_price').order('name', { ascending: true }).limit(500);
+      if (!r1.error && r1.data) {
+        data = r1.data;
       } else {
-        const attempt2 = await supabaseClient
-          .from('securities')
-          .select('id, symbol, name')
-          .or(`symbol.ilike.%${query}%,name.ilike.%${query}%`)
-          .limit(20);
-        if (!attempt2.error && attempt2.data) {
-          data = attempt2.data;
-        } else {
-          error = attempt2.error;
-          console.error('Securities search error:', attempt1.error, attempt2.error);
-        }
+        const r2 = await supabaseClient.from('securities').select('id, symbol, name').order('name', { ascending: true }).limit(500);
+        if (!r2.error && r2.data) data = r2.data;
+        else console.error('Failed to load securities:', r1.error, r2.error);
       }
 
-      if (error || !data || data.length === 0) {
-        securityDropdown.innerHTML = `<div class="px-3 py-3 text-sm text-slate-400 text-center">${error ? 'Error loading securities' : 'No matching securities found'}</div>`;
-        securityDropdown.classList.remove('hidden');
-        return;
-      }
+      allSecuritiesCache = (data || []).map(s => ({ ...s, _sym: s.symbol || '' }));
+      securitiesLoading = false;
+      renderSecuritiesDropdown(securitySearchInput.value.trim());
+    };
 
-      const enriched = data.map(s => ({ ...s, _sym: s.symbol || '' }));
+    const renderSecuritiesDropdown = (query) => {
+      if (!allSecuritiesCache) return;
       const existingSymbols = new Set(formHoldings.map(h => h.symbol));
-      const filtered = enriched.filter(s => !existingSymbols.has(s._sym));
+      const q = query.toLowerCase();
+      const filtered = allSecuritiesCache.filter(s => {
+        if (existingSymbols.has(s._sym)) return false;
+        if (!q) return true;
+        return s._sym.toLowerCase().includes(q) || (s.name || '').toLowerCase().includes(q);
+      });
+
       if (filtered.length === 0) {
-        securityDropdown.innerHTML = `<div class="px-3 py-3 text-sm text-slate-400 text-center">All matching securities already added</div>`;
+        securityDropdown.innerHTML = `<div class="px-3 py-3 text-sm text-slate-400 text-center">${query ? 'No matching securities found' : 'All securities already added'}</div>`;
         securityDropdown.classList.remove('hidden');
         return;
       }
 
       securityDropdown.innerHTML = filtered.map(s => `
         <button type="button" data-symbol="${s._sym}" data-name="${s.name || s._sym}" data-price="${s.last_price || 0}" data-logo="${s.logo_url || ''}"
-          class="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 transition-colors first:rounded-t-xl last:rounded-b-xl">
+          class="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 transition-colors">
           <div class="w-7 h-7 rounded-lg border border-slate-200 bg-white flex items-center justify-center overflow-hidden flex-shrink-0">
             ${s.logo_url
               ? `<img src="${s.logo_url}" alt="${s._sym}" class="w-full h-full object-cover" />`
@@ -1208,7 +1206,7 @@
         btn.addEventListener('click', () => {
           addHolding({ symbol: btn.dataset.symbol, name: btn.dataset.name, last_price: Number(btn.dataset.price) || 0, logo_url: btn.dataset.logo || null, shares: 1, weight: 0 });
           securitySearchInput.value = '';
-          securityDropdown.classList.add('hidden');
+          renderSecuritiesDropdown('');
         });
       });
     };
@@ -2037,9 +2035,12 @@
     if (strategyForm) strategyForm.addEventListener('submit', handleStrategySubmit);
     if (strategySearch) strategySearch.addEventListener('input', () => applyStrategiesFiltersAndRender());
 
+    securitySearchInput.addEventListener('focus', () => {
+      loadAllSecurities();
+    });
+
     securitySearchInput.addEventListener('input', () => {
-      clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(() => searchSecurities(securitySearchInput.value.trim()), 300);
+      renderSecuritiesDropdown(securitySearchInput.value.trim());
     });
 
     document.addEventListener('click', (e) => {
