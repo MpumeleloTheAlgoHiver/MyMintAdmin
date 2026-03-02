@@ -323,6 +323,18 @@
   </style>
 </head>
 <body class="gradient-bg min-h-screen">
+
+  <!-- Global strategy context menu — appended to body so overflow on scroll containers never clips it -->
+  <div id="strategyContextMenu" class="hidden fixed z-[9999] bg-white border border-slate-200 rounded-xl shadow-lg min-w-[140px] py-1">
+    <button type="button" id="ctxArchiveBtn" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+      <svg class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>
+      Archive
+    </button>
+    <button type="button" id="ctxDeleteBtn" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 transition-colors">
+      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      Delete
+    </button>
+  </div>
   <aside class="sidebar">
     <div class="sidebar-logo">
       <img src="/icon.png" alt="App logo" style="width: 32px; height: 32px;" />
@@ -1324,6 +1336,42 @@
       });
     };
 
+    const _ctxMenu = document.getElementById('strategyContextMenu');
+    const _ctxArchiveBtn = document.getElementById('ctxArchiveBtn');
+    const _ctxDeleteBtn = document.getElementById('ctxDeleteBtn');
+    let _ctxCleanup = null;
+
+    const hideStrategyContextMenu = () => {
+      _ctxMenu.classList.add('hidden');
+      if (_ctxCleanup) { _ctxCleanup(); _ctxCleanup = null; }
+    };
+
+    const showStrategyContextMenu = (btn, strategyId, strategyName, securitiesMap) => {
+      hideStrategyContextMenu();
+      const rect = btn.getBoundingClientRect();
+      const menuW = 160;
+      let left = rect.right - menuW;
+      if (left < 8) left = 8;
+      _ctxMenu.style.top = (rect.bottom + 4) + 'px';
+      _ctxMenu.style.left = left + 'px';
+      _ctxMenu.classList.remove('hidden');
+
+      const onArchive = () => { hideStrategyContextMenu(); archiveStrategy(strategyId); };
+      const onDelete = () => { hideStrategyContextMenu(); deleteStrategy(strategyId, strategyName); };
+      _ctxArchiveBtn.addEventListener('click', onArchive);
+      _ctxDeleteBtn.addEventListener('click', onDelete);
+      _ctxCleanup = () => {
+        _ctxArchiveBtn.removeEventListener('click', onArchive);
+        _ctxDeleteBtn.removeEventListener('click', onDelete);
+      };
+    };
+
+    document.addEventListener('click', (e) => {
+      if (!_ctxMenu.classList.contains('hidden') && !_ctxMenu.contains(e.target) && !e.target.closest('.strategy-menu-btn')) {
+        hideStrategyContextMenu();
+      }
+    });
+
     const renderStrategyCard = (strategy, securitiesMap) => {
       const wrapper = document.createElement('div');
       wrapper.className = 'border border-slate-200 rounded-2xl p-4 cursor-pointer hover:border-violet-300 hover:shadow-md transition-all';
@@ -1377,21 +1425,9 @@
           <div class="flex flex-col items-end gap-1 flex-shrink-0">
             <div class="flex items-center gap-2">
               <span class="px-2 py-0.5 text-[11px] rounded-full ${riskBadgeClass(risk)}">${risk}</span>
-              <div class="relative strategy-menu-wrap">
-                <button type="button" class="strategy-menu-btn w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors" data-id="${strategy.id}" data-name="${name}">
-                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
-                </button>
-                <div class="strategy-menu-dropdown hidden absolute right-0 top-7 z-20 bg-white border border-slate-200 rounded-xl shadow-lg min-w-[140px] py-1">
-                  <button type="button" class="archive-strategy-btn w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors" data-id="${strategy.id}">
-                    <svg class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>
-                    Archive
-                  </button>
-                  <button type="button" class="delete-strategy-btn w-full flex items-center gap-2 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 transition-colors" data-id="${strategy.id}" data-name="${name}">
-                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                    Delete
-                  </button>
-                </div>
-              </div>
+              <button type="button" class="strategy-menu-btn w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors" data-id="${strategy.id}" data-name="${name}">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+              </button>
             </div>
             <span class="text-xs font-medium text-slate-700">${minInvestment ? formatCurrency(minInvestment, currency) : 'No min'}</span>
           </div>
@@ -1405,22 +1441,10 @@
         </div>` : ''}
       `;
 
-      const menuDropdown = wrapper.querySelector('.strategy-menu-dropdown');
-
       wrapper.addEventListener('click', (e) => {
         if (e.target.closest('.strategy-menu-btn')) {
-          document.querySelectorAll('.strategy-menu-dropdown').forEach(d => { if (d !== menuDropdown) d.classList.add('hidden'); });
-          if (menuDropdown) menuDropdown.classList.toggle('hidden');
-          return;
-        }
-        if (e.target.closest('.archive-strategy-btn')) {
-          if (menuDropdown) menuDropdown.classList.add('hidden');
-          archiveStrategy(strategy.id);
-          return;
-        }
-        if (e.target.closest('.delete-strategy-btn')) {
-          if (menuDropdown) menuDropdown.classList.add('hidden');
-          deleteStrategy(strategy.id, name);
+          const btn = e.target.closest('.strategy-menu-btn');
+          showStrategyContextMenu(btn, strategy.id, name, securitiesMap);
           return;
         }
         if (e.target.closest('.factsheet-link')) {
