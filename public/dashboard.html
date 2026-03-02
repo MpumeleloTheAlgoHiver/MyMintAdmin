@@ -1152,9 +1152,9 @@
       securityDropdown.innerHTML = `<div class="px-3 py-3 text-sm text-slate-400 text-center">Loading assets...</div>`;
       securityDropdown.classList.remove('hidden');
 
-      const [securitiesResult, holdingsResult] = await Promise.all([
+      const [securitiesResult, strategiesResult] = await Promise.all([
         supabaseClient.from('securities').select('id, symbol, name, logo_url, last_price').order('name', { ascending: true }).limit(500),
-        supabaseClient.from('stock_holdings').select('security_id, quantity')
+        supabaseClient.from('strategies').select('holdings, created_at').order('created_at', { ascending: false }).limit(200)
       ]);
 
       let data = null;
@@ -1166,19 +1166,31 @@
         else console.error('Failed to load securities:', securitiesResult.error, r2.error);
       }
 
-      if (!holdingsResult.error && holdingsResult.data) {
-        holdingsQuantityMap = {};
-        holdingsResult.data.forEach(row => {
-          const qty = Number(row.quantity) || 0;
-          holdingsQuantityMap[row.security_id] = (holdingsQuantityMap[row.security_id] || 0) + qty;
+      const symbolHoldingsMap = {};
+      if (!strategiesResult.error && strategiesResult.data) {
+        strategiesResult.data.forEach(strategy => {
+          const holdings = Array.isArray(strategy.holdings) ? strategy.holdings : [];
+          holdings.forEach(h => {
+            const sym = h.symbol || h.ticker || '';
+            if (!sym) return;
+            if (!symbolHoldingsMap[sym]) {
+              symbolHoldingsMap[sym] = { shares: Number(h.shares || h.quantity || 0), weight: Number(h.weight || 0) };
+            }
+          });
         });
       }
 
-      allSecuritiesCache = (data || []).map(s => ({
-        ...s,
-        _sym: s.symbol || '',
-        _totalShares: holdingsQuantityMap[s.id] || 0
-      }));
+      allSecuritiesCache = (data || []).map(s => {
+        const sym = s.symbol || '';
+        const holdingData = symbolHoldingsMap[sym] || symbolHoldingsMap[normalizeSymbol(sym)] || null;
+        return {
+          ...s,
+          _sym: sym,
+          _totalShares: holdingData ? holdingData.shares : 0,
+          _weight: holdingData ? holdingData.weight : 0,
+          _hasHoldings: !!holdingData
+        };
+      });
       securitiesLoading = false;
       renderSecuritiesDropdown(securitySearchInput.value.trim());
     };
@@ -1200,7 +1212,7 @@
       }
 
       securityDropdown.innerHTML = filtered.map(s => `
-        <button type="button" data-symbol="${s._sym}" data-name="${s.name || s._sym}" data-price="${s.last_price || 0}" data-logo="${s.logo_url || ''}" data-shares="${s._totalShares || 0}"
+        <button type="button" data-symbol="${s._sym}" data-name="${s.name || s._sym}" data-price="${s.last_price || 0}" data-logo="${s.logo_url || ''}" data-shares="${s._totalShares || 0}" data-weight="${s._weight || 0}"
           class="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 transition-colors">
           <div class="w-7 h-7 rounded-lg border border-slate-200 bg-white flex items-center justify-center overflow-hidden flex-shrink-0">
             ${s.logo_url
@@ -1214,7 +1226,7 @@
           </div>
           <div class="text-right flex-shrink-0">
             <p class="text-xs font-medium text-slate-700">${s.last_price ? 'R ' + (Number(s.last_price) / 100).toFixed(2) : 'N/A'}</p>
-            <p class="text-[10px] text-slate-400">${s._totalShares ? s._totalShares.toLocaleString() + ' shares' : 'No holdings'}</p>
+            <p class="text-[10px] ${s._hasHoldings ? 'text-violet-600' : 'text-slate-400'}">${s._hasHoldings ? s._totalShares.toLocaleString() + ' shares' : 'No data'}</p>
           </div>
         </button>
       `).join('');
@@ -1223,7 +1235,8 @@
       securityDropdown.querySelectorAll('button').forEach(btn => {
         btn.addEventListener('click', () => {
           const totalShares = Number(btn.dataset.shares) || 0;
-          addHolding({ symbol: btn.dataset.symbol, name: btn.dataset.name, last_price: Number(btn.dataset.price) || 0, logo_url: btn.dataset.logo || null, shares: totalShares, weight: 0 });
+          const storedWeight = Number(btn.dataset.weight) || 0;
+          addHolding({ symbol: btn.dataset.symbol, name: btn.dataset.name, last_price: Number(btn.dataset.price) || 0, logo_url: btn.dataset.logo || null, shares: totalShares, weight: storedWeight });
           securitySearchInput.value = '';
           renderSecuritiesDropdown('');
         });
