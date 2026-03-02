@@ -1411,6 +1411,9 @@
           openFactsheetInline(strategy.id);
           return;
         }
+        if (e.target.closest('.strategy-menu-wrap')) {
+          return;
+        }
         openStrategyModal(strategy, securitiesMap);
       });
       return wrapper;
