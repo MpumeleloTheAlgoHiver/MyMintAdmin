@@ -3207,7 +3207,6 @@
   </div>
 
 
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -3231,8 +3230,6 @@
       kyc: 'all',
       bank: 'all'
     };
-    const MANDATE_TEMPLATE_PATH = '/mandate-template.html';
-    let mandateTemplateHtmlCache = null;
     let allProfiles = [];
     let allKycMap = {};
     const onboardingMap = {};
@@ -4879,16 +4876,6 @@
       }
     };
 
-    const getMandateTemplateHtml = async () => {
-      if (mandateTemplateHtmlCache) return mandateTemplateHtmlCache;
-      const response = await fetch(MANDATE_TEMPLATE_PATH, { cache: 'no-store' });
-      if (!response.ok) {
-        throw new Error(`Mandate template load failed (${response.status})`);
-      }
-      mandateTemplateHtmlCache = await response.text();
-      return mandateTemplateHtmlCache;
-    };
-
     const getMandateDataSource = (profileId, onboardingRow = {}) => {
       const fromOnboarding = parseJsonSafe(onboardingRow?.sumsub_raw);
       if (fromOnboarding) return fromOnboarding;
@@ -4989,192 +4976,298 @@
       };
     };
 
-    const applyMandateCheckboxes = (doc, data) => {
-      const setChecked = (id, shouldCheck) => {
-        const input = doc.getElementById(id);
-        if (!input) return;
-        if (shouldCheck) {
-          input.setAttribute('checked', 'checked');
-        } else {
-          input.removeAttribute('checked');
+    /* ================================================================
+       buildMandatePdfReport  –  jsPDF-primitive mandate generator
+       Same pattern as buildPackPdfReport: no html2canvas, no sandbox.
+       ================================================================ */
+    const buildMandatePdfReport = (profile, onboardingRow = {}) => {
+      const JsPdf = window.jspdf?.jsPDF;
+      if (!JsPdf) return null;
+
+      const d = getMandatePrefillData(profile, onboardingRow);
+      const doc = new JsPdf({ unit: 'pt', format: 'a4' });
+      const pw  = doc.internal.pageSize.getWidth();
+      const ph  = doc.internal.pageSize.getHeight();
+      const m   = 40;
+      const cw  = pw - m * 2;
+      let y = m;
+
+      /* ---------- helpers ---------- */
+      const ensureSpace = (need = 20) => {
+        if (y + need > ph - 60) { doc.addPage(); y = m; }
+      };
+
+      const drawCheckbox = (x, cy, checked, label) => {
+        const sz = 10;
+        doc.setDrawColor(60, 60, 60);
+        doc.setLineWidth(0.5);
+        doc.rect(x, cy - sz + 2, sz, sz);
+        if (checked) {
+          doc.setLineWidth(1.4);
+          doc.line(x + 2, cy - 2, x + 4.5, cy + 1);
+          doc.line(x + 4.5, cy + 1, x + sz - 1.5, cy - sz + 4);
+          doc.setLineWidth(0.5);
+        }
+        if (label) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(10);
+          doc.setTextColor(30, 30, 30);
+          doc.text(String(label), x + sz + 6, cy);
         }
       };
 
-      const text = data.jsonCorpus;
-      const localMentioned = text.includes('local');
-      const offshoreMentioned = text.includes('offshore') || text.includes('off-shore');
-      const bothJurisdictions = localMentioned && offshoreMentioned;
+      const drawField = (label, value) => {
+        ensureSpace(24);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(80, 80, 80);
+        doc.text(String(label), m + 4, y + 12);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(20, 20, 20);
+        const lines = doc.splitTextToSize(String(value || '-'), cw - 180);
+        doc.text(lines, m + 175, y + 12);
+        doc.setDrawColor(210, 210, 210);
+        doc.line(m + 4, y + 18, m + cw - 4, y + 18);
+        y += Math.max(22, lines.length * 12 + 10);
+      };
 
-      setChecked('full-local', !bothJurisdictions && localMentioned);
-      setChecked('full-offshore', !bothJurisdictions && offshoreMentioned);
-      setChecked('full-both', bothJurisdictions || (!localMentioned && !offshoreMentioned));
+      const drawHeading = (text) => {
+        ensureSpace(30);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(13);
+        doc.setTextColor(30, 30, 30);
+        doc.text(text, pw / 2, y + 14, { align: 'center' });
+        y += 28;
+      };
 
-      setChecked('lim-local', !bothJurisdictions && localMentioned);
-      setChecked('lim-offshore', !bothJurisdictions && offshoreMentioned);
-      setChecked('lim-both', bothJurisdictions || (!localMentioned && !offshoreMentioned));
+      const drawSubHeading = (text) => {
+        ensureSpace(20);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(30, 30, 30);
+        doc.text(text, m + 4, y + 10);
+        y += 18;
+      };
 
-      const growthMentioned = text.includes('growth');
-      const incomeMentioned = text.includes('income');
+      const drawInitials = () => {
+        const bx = pw - m - 100;
+        const by = ph - 55;
+        doc.setDrawColor(60, 60, 60);
+        doc.rect(bx, by, 90, 28);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
+        doc.setTextColor(60, 60, 60);
+        doc.text('Initials:', bx + 4, by + 10);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(20, 20, 20);
+        doc.text(d.initials, bx + 4, by + 22);
+      };
+
+      const drawHorizonBlock = (prefix) => {
+        drawSubHeading('Long Term (5 years or longer)');
+        drawCheckbox(m + 10, y, useGrowth, 'Capital Growth'); y += 18;
+        drawCheckbox(m + 10, y, useIncome, 'Income Generation'); y += 22;
+        drawSubHeading('Medium Term (2 to 5 years)');
+        drawCheckbox(m + 10, y, useGrowth, 'Capital Growth'); y += 18;
+        drawCheckbox(m + 10, y, useIncome, 'Income Generation'); y += 22;
+        drawSubHeading('Short Term (3 months to 2 years)');
+        drawCheckbox(m + 10, y, useGrowth, 'Capital Growth'); y += 18;
+        drawCheckbox(m + 10, y, useIncome, 'Income Generation'); y += 22;
+        drawSubHeading('Risk Preference*');
+        riskEntries.forEach((r) => {
+          drawCheckbox(m + 10, y, r.id === matchedRisk, r.label); y += 18;
+        });
+        y += 4;
+      };
+
+      /* ---------- checkbox state determination ---------- */
+      const corpus = d.jsonCorpus;
+      const localMentioned    = corpus.includes('local');
+      const offshoreMentioned = corpus.includes('offshore') || corpus.includes('off-shore');
+      const bothJuris         = localMentioned && offshoreMentioned;
+      const checkLocal     = !bothJuris && localMentioned;
+      const checkOffshore  = !bothJuris && offshoreMentioned;
+      const checkBoth      = bothJuris || (!localMentioned && !offshoreMentioned);
+
+      const growthMentioned = corpus.includes('growth');
+      const incomeMentioned = corpus.includes('income');
       const useGrowth = growthMentioned || !incomeMentioned;
       const useIncome = incomeMentioned;
 
-      ['full-lt-growth', 'full-mt-growth', 'full-st-growth', 'lim-lt-growth', 'lim-mt-growth', 'lim-st-growth', 'add-lt-growth', 'add-mt-growth', 'add-st-growth']
-        .forEach(id => setChecked(id, useGrowth));
-      ['full-lt-income', 'full-mt-income', 'full-st-income', 'lim-lt-income', 'lim-mt-income', 'lim-st-income', 'add-lt-income', 'add-mt-income', 'add-st-income']
-        .forEach(id => setChecked(id, useIncome));
-
-      const riskMap = [
-        { id: 'vcons', keys: ['very conservative'] },
-        { id: 'cons', keys: ['conservative'] },
-        { id: 'mod', keys: ['moderate', 'balanced'] },
-        { id: 'agg', keys: ['aggressive'] },
-        { id: 'vagg', keys: ['very aggressive'] }
+      const riskEntries = [
+        { id: 'vcons', label: 'Very Conservative', keys: ['very conservative'] },
+        { id: 'cons',  label: 'Conservative',      keys: ['conservative'] },
+        { id: 'mod',   label: 'Moderate',           keys: ['moderate', 'balanced'] },
+        { id: 'agg',   label: 'Aggressive',         keys: ['aggressive'] },
+        { id: 'vagg',  label: 'Very Aggressive',    keys: ['very aggressive'] }
       ];
-      const matchedRisk = riskMap.find((entry) => entry.keys.some(key => text.includes(key)))?.id || 'mod';
+      const matchedRisk = riskEntries.find((r) => r.keys.some((k) => corpus.includes(k)))?.id || 'mod';
 
-      ['full', 'lim', 'add'].forEach((prefix) => {
-        ['vcons', 'cons', 'mod', 'agg', 'vagg'].forEach((risk) => {
-          setChecked(`${prefix}-risk-${risk}`, risk === matchedRisk);
+      const instruction = corpus.includes('prior consent') || corpus.includes('on my instruction');
+      const advisor     = corpus.includes('advisor') || corpus.includes('adviser');
+      const payout      = corpus.includes('paid out') || corpus.includes('payout') || corpus.includes('withdraw');
+
+      /* ===== PAGE 1 — Cover ===== */
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(26);
+      doc.setTextColor(30, 30, 30);
+      doc.text('DISCRETIONARY FSP MANDATE', pw / 2, ph / 2 - 50, { align: 'center' });
+      doc.setFontSize(18);
+      doc.text('(Mandate)', pw / 2, ph / 2 - 18, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(12);
+      doc.setTextColor(80, 80, 80);
+      doc.text('Prepared by ALGOHIVE (PTY) LTD', pw / 2, ph / 2 + 30, { align: 'center' });
+      doc.text('An Authorised Financial Services Provider', pw / 2, ph / 2 + 48, { align: 'center' });
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 30, 30);
+      doc.text('FSP NO 55118', pw / 2, ph / 2 + 76, { align: 'center' });
+
+      /* ===== PAGE 2 — Client Details ===== */
+      doc.addPage(); y = m;
+      drawHeading('DISCRETIONARY INVESTMENT MANAGEMENT MANDATE');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(30, 30, 30);
+      doc.text('ENTERED INTO BETWEEN', pw / 2, y, { align: 'center' });
+      y += 22;
+
+      doc.setFontSize(12);
+      doc.text('ALGOHIVE (PTY) LTD', pw / 2, y, { align: 'center' });
+      y += 14;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(80, 80, 80);
+      doc.text('(Registration Number: 2024/644796/07)', pw / 2, y, { align: 'center' });
+      y += 18;
+
+      drawField('Street Address',    '3 Gwen Lane, Sandown, Sandton, 2031');
+      drawField('Telephone Number',  '+27 (0) 73 781 3375');
+      drawField('Email Address',     'info@thealgohive.com');
+      y += 4;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(80, 80, 80);
+      doc.text('(hereinafter referred to as ALGOHIVE)', pw / 2, y, { align: 'center' });
+      y += 14;
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 30, 30);
+      doc.text('and', pw / 2, y, { align: 'center' });
+      y += 20;
+
+      doc.setFontSize(11);
+      doc.text('CLIENT DETAILS', m + 4, y);
+      y += 16;
+
+      drawField('Surname',              d.lastName);
+      drawField('First Name/s',         d.firstName);
+      drawField('ID / Passport Number', d.identityNumber);
+      drawField('Company/Trust Reg No', '-');
+      drawField('Postal Address',       d.postalAddress);
+      drawField('Postal Code',          d.postalCode);
+      drawField('Residential Address',  d.residentialAddress);
+
+      const phoneFull = d.countryCode
+        ? `+${d.countryCode} ${d.areaOrCellCode} ${d.phoneBody}`
+        : (d.phone || '-');
+      drawField('Tel Number (H)',       phoneFull);
+      drawField('Tel Number (W)',       phoneFull);
+      drawField('Cell Number',          phoneFull);
+      drawField('Email (Confidential)', d.email);
+      drawField('Email (Other)',        d.email);
+      drawInitials();
+
+      /* ===== PAGE 3 — Full Discretion ===== */
+      doc.addPage(); y = m;
+      drawHeading('SCHEDULE \u2013 FULL DISCRETION');
+
+      ensureSpace(38);
+      doc.setDrawColor(60, 60, 60);
+      doc.setLineWidth(1.5);
+      doc.rect(m, y, cw, 30);
+      doc.setLineWidth(0.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(30, 30, 30);
+      const warnLines = doc.splitTextToSize(
+        'This schedule delegates authority to ALGOHIVE to effect transactions in your name without limitation.',
+        cw - 16
+      );
+      doc.text(warnLines, m + 8, y + 12);
+      y += 40;
+
+      drawCheckbox(m + 10, y, checkLocal, 'Local jurisdictions only'); y += 20;
+      drawCheckbox(m + 10, y, checkOffshore, 'Off-shore jurisdictions only'); y += 20;
+      drawCheckbox(m + 10, y, checkBoth, 'Both local and off-shore jurisdictions'); y += 26;
+      drawHorizonBlock('full');
+      drawInitials();
+
+      /* ===== PAGE 4 — Limited Discretion ===== */
+      doc.addPage(); y = m;
+      drawHeading('SCHEDULE \u2013 LIMITED DISCRETION');
+
+      drawCheckbox(m + 10, y, instruction, 'On my instruction and prior consent'); y += 20;
+      drawCheckbox(m + 10, y, !instruction && advisor, 'On the instruction of my investment advisor'); y += 20;
+      drawCheckbox(m + 10, y, !instruction && !advisor, 'Upon me receiving advice and consent'); y += 26;
+
+      drawCheckbox(m + 10, y, checkLocal, 'Local jurisdictions only'); y += 20;
+      drawCheckbox(m + 10, y, checkOffshore, 'Off-shore jurisdictions only'); y += 20;
+      drawCheckbox(m + 10, y, checkBoth, 'Both local and off-shore jurisdictions'); y += 26;
+
+      drawCheckbox(m + 10, y, !payout, 'Reinvested as and when they fall due'); y += 20;
+      drawCheckbox(m + 10, y, payout, 'Paid out to client account'); y += 26;
+      drawHorizonBlock('lim');
+      drawInitials();
+
+      /* ===== PAGE 5 — Addendum ===== */
+      doc.addPage(); y = m;
+      drawHeading('ADDENDUM TO MANDATE');
+
+      const drawAddendumSection = (title, rows) => {
+        ensureSpace(30 + rows.length * 22);
+        doc.setFillColor(224, 224, 224);
+        doc.rect(m, y, cw, 20, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(30, 30, 30);
+        doc.text(title, pw / 2, y + 14, { align: 'center' });
+        y += 22;
+        rows.forEach(([label, checked]) => {
+          doc.setDrawColor(51, 51, 51);
+          doc.rect(m, y, cw, 20);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(10);
+          doc.setTextColor(30, 30, 30);
+          doc.text(label, m + 8, y + 14);
+          drawCheckbox(m + cw - 30, y + 13, checked, '');
+          y += 20;
         });
-      });
-
-      const instruction = text.includes('prior consent') || text.includes('on my instruction');
-      const advisor = text.includes('advisor') || text.includes('adviser');
-      setChecked('lim-instruction', instruction);
-      setChecked('lim-advisor', !instruction && advisor);
-      setChecked('lim-advice', !instruction && !advisor);
-
-      const payout = text.includes('paid out') || text.includes('payout') || text.includes('withdraw');
-      setChecked('lim-payout', payout);
-      setChecked('lim-reinvest', !payout);
-    };
-
-    const buildFilledMandateHtml = async (profile, onboardingRow = {}) => {
-      const templateHtml = await getMandateTemplateHtml();
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(templateHtml, 'text/html');
-      const prefill = getMandatePrefillData(profile, onboardingRow);
-
-      const clientTable = doc.querySelectorAll('table.info-table')[1];
-      const inputs = clientTable ? Array.from(clientTable.querySelectorAll('input[type="text"]')) : [];
-      const setAt = (index, value) => {
-        if (!inputs[index]) return;
-        inputs[index].setAttribute('value', String(value || '').trim());
+        y += 8;
       };
 
-      setAt(0, prefill.lastName);
-      setAt(1, prefill.firstName);
-      setAt(2, prefill.identityNumber);
-      setAt(3, '-');
-      setAt(4, prefill.postalAddress);
-      setAt(5, prefill.postalCode);
-      setAt(6, prefill.residentialAddress);
-      setAt(7, prefill.residentialAddress);
-      setAt(8, prefill.countryCode || '27');
-      setAt(9, prefill.areaOrCellCode || '-');
-      setAt(10, prefill.phoneBody || '-');
-      setAt(11, prefill.countryCode || '27');
-      setAt(12, prefill.areaOrCellCode || '-');
-      setAt(13, prefill.phoneBody || '-');
-      setAt(14, prefill.countryCode || '27');
-      setAt(15, '-');
-      setAt(16, '-');
-      setAt(17, prefill.countryCode || '27');
-      setAt(18, '-');
-      setAt(19, '-');
-      setAt(20, prefill.countryCode || '27');
-      setAt(21, prefill.areaOrCellCode || '-');
-      setAt(22, prefill.phoneBody || '-');
-      setAt(23, prefill.email);
-      setAt(24, prefill.email);
+      drawAddendumSection('Long Term (5 years or longer)', [
+        ['Capital Growth',     useGrowth],
+        ['Income Generation',  useIncome]
+      ]);
+      drawAddendumSection('Medium Term (2 to 5 years)', [
+        ['Capital Growth',     useGrowth],
+        ['Income Generation',  useIncome]
+      ]);
+      drawAddendumSection('Short Term (3 months to 2 years)', [
+        ['Capital Growth',     useGrowth],
+        ['Income Generation',  useIncome]
+      ]);
+      drawAddendumSection('Risk Preference', riskEntries.map((r) => [r.label, r.id === matchedRisk]));
+      drawInitials();
 
-      applyMandateCheckboxes(doc, prefill);
+      /* ---------- filename ---------- */
+      const safeBase = sanitizeFilename(
+        [profile?.first_name, profile?.last_name].filter(Boolean).join('_') || profile?.id || 'client'
+      ) || 'client';
 
-      doc.querySelectorAll('input[type="text"]').forEach((input) => {
-        if (input.classList.contains('initials-input')) return;
-        if (!String(input.getAttribute('value') || '').trim()) input.setAttribute('value', '-');
-      });
-
-      doc.querySelectorAll('.initials-input').forEach((input) => {
-        input.setAttribute('value', prefill.initials);
-      });
-
-      const masterInitials = doc.getElementById('master-initials');
-      if (masterInitials) masterInitials.setAttribute('value', prefill.initials);
-
-      return `<!DOCTYPE html>\n${doc.documentElement.outerHTML}`;
-    };
-
-    const viewMandateHtml = (htmlText) => {
-      const printWindow = window.open('', '_blank', 'noopener');
-      if (!printWindow) return false;
-      printWindow.document.open();
-      printWindow.document.write(htmlText);
-      printWindow.document.close();
-      return true;
-    };
-
-    const buildMandatePdfBlob = async (htmlText) => {
-      const JsPdf = window.jspdf?.jsPDF;
-      if (!JsPdf) {
-        throw new Error('jsPDF is not available.');
-      }
-
-      const parser = new DOMParser();
-      const parsed = parser.parseFromString(htmlText, 'text/html');
-      /* Save scroll position so html2canvas doesn't shift the viewport */
-      const savedScrollX = window.scrollX;
-      const savedScrollY = window.scrollY;
-
-      const sandbox = document.createElement('div');
-      sandbox.style.cssText = 'position:fixed;left:-10000px;top:0;width:800px;background:#fff;z-index:-9999;pointer-events:none;';
-      sandbox.setAttribute('aria-hidden', 'true');
-
-      const styleEls = Array.from(parsed.head.querySelectorAll('style, link[rel="stylesheet"]'));
-      styleEls.forEach((node) => {
-        sandbox.appendChild(node.cloneNode(true));
-      });
-
-      const bodyWrapper = document.createElement('div');
-      bodyWrapper.innerHTML = parsed.body.innerHTML;
-      sandbox.appendChild(bodyWrapper);
-      document.body.appendChild(sandbox);
-
-      /* Let styles settle before capturing */
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-      try {
-        const doc = new JsPdf({ orientation: 'p', unit: 'pt', format: 'a4' });
-        const pdfWidth = doc.internal.pageSize.getWidth() - 20;
-        await new Promise((resolve) => {
-          doc.html(sandbox, {
-            x: 10,
-            y: 10,
-            margin: [10, 10, 10, 10],
-            autoPaging: 'text',
-            width: pdfWidth,
-            windowWidth: 800,
-            html2canvas: {
-              scale: 0.75,
-              useCORS: true,
-              backgroundColor: '#ffffff',
-              windowWidth: 800,
-              scrollX: 0,
-              scrollY: -sandbox.getBoundingClientRect().top,
-              onclone: () => {
-                /* Restore scroll immediately when html2canvas clones */
-                window.scrollTo(savedScrollX, savedScrollY);
-              }
-            },
-            callback: () => resolve()
-          });
-        });
-        return doc.output('blob');
-      } finally {
-        sandbox.remove();
-        /* Double-ensure scroll is restored */
-        window.scrollTo(savedScrollX, savedScrollY);
-      }
+      return { doc, filename: `mandate-${safeBase}.pdf` };
     };
 
     const openPdfBlobInNewTab = (blob) => {
@@ -5595,18 +5688,15 @@
         mandateActionBtn.textContent = 'Preparing PDF...';
 
         try {
-          const mandateHtml = await buildFilledMandateHtml(profile, onboardingRow);
-          const safeBase = sanitizeFilename([profile.first_name, profile.last_name].filter(Boolean).join('_') || profileId || 'client') || 'client';
-          const pdfFilename = `mandate-${safeBase}.pdf`;
-          const pdfBlob = await buildMandatePdfBlob(mandateHtml);
+          const report = buildMandatePdfReport(profile, onboardingRow);
+          if (!report) throw new Error('Could not build mandate PDF.');
 
           if (mandateViewBtn) {
-            const opened = openPdfBlobInNewTab(pdfBlob);
-            if (!opened) {
-              downloadBlobFile(pdfBlob, pdfFilename);
-            }
+            const blob = report.doc.output('blob');
+            const opened = openPdfBlobInNewTab(blob);
+            if (!opened) report.doc.save(report.filename);
           } else {
-            downloadBlobFile(pdfBlob, pdfFilename);
+            report.doc.save(report.filename);
           }
         } catch (error) {
           console.error('Mandate generation failed:', error);
