@@ -4990,9 +4990,14 @@
     };
 
     const applyMandateCheckboxes = (doc, data) => {
-      const setChecked = (id, checked) => {
+      const setChecked = (id, shouldCheck) => {
         const input = doc.getElementById(id);
-        if (input) input.checked = Boolean(checked);
+        if (!input) return;
+        if (shouldCheck) {
+          input.setAttribute('checked', 'checked');
+        } else {
+          input.removeAttribute('checked');
+        }
       };
 
       const text = data.jsonCorpus;
@@ -5054,7 +5059,7 @@
       const inputs = clientTable ? Array.from(clientTable.querySelectorAll('input[type="text"]')) : [];
       const setAt = (index, value) => {
         if (!inputs[index]) return;
-        inputs[index].value = String(value || '').trim();
+        inputs[index].setAttribute('value', String(value || '').trim());
       };
 
       setAt(0, prefill.lastName);
@@ -5087,15 +5092,15 @@
 
       doc.querySelectorAll('input[type="text"]').forEach((input) => {
         if (input.classList.contains('initials-input')) return;
-        if (!String(input.value || '').trim()) input.value = '-';
+        if (!String(input.getAttribute('value') || '').trim()) input.setAttribute('value', '-');
       });
 
       doc.querySelectorAll('.initials-input').forEach((input) => {
-        input.value = prefill.initials;
+        input.setAttribute('value', prefill.initials);
       });
 
       const masterInitials = doc.getElementById('master-initials');
-      if (masterInitials) masterInitials.value = prefill.initials;
+      if (masterInitials) masterInitials.setAttribute('value', prefill.initials);
 
       return `<!DOCTYPE html>\n${doc.documentElement.outerHTML}`;
     };
@@ -5117,16 +5122,12 @@
 
       const parser = new DOMParser();
       const parsed = parser.parseFromString(htmlText, 'text/html');
+      /* Save scroll position so html2canvas doesn't shift the viewport */
+      const savedScrollX = window.scrollX;
+      const savedScrollY = window.scrollY;
+
       const sandbox = document.createElement('div');
-      sandbox.style.position = 'absolute';
-      sandbox.style.left = '-100000px';
-      sandbox.style.top = '-100000px';
-      sandbox.style.width = '210mm';
-      sandbox.style.height = '0';
-      sandbox.style.overflow = 'hidden';
-      sandbox.style.background = '#ffffff';
-      sandbox.style.zIndex = '-9999';
-      sandbox.style.pointerEvents = 'none';
+      sandbox.style.cssText = 'position:fixed;left:-10000px;top:0;width:800px;background:#fff;z-index:-9999;pointer-events:none;';
       sandbox.setAttribute('aria-hidden', 'true');
 
       const styleEls = Array.from(parsed.head.querySelectorAll('style, link[rel="stylesheet"]'));
@@ -5139,23 +5140,31 @@
       sandbox.appendChild(bodyWrapper);
       document.body.appendChild(sandbox);
 
+      /* Let styles settle before capturing */
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
       try {
         const doc = new JsPdf({ orientation: 'p', unit: 'pt', format: 'a4' });
+        const pdfWidth = doc.internal.pageSize.getWidth() - 20;
         await new Promise((resolve) => {
           doc.html(sandbox, {
-            x: 0,
-            y: 0,
+            x: 10,
+            y: 10,
             margin: [10, 10, 10, 10],
             autoPaging: 'text',
-            width: 575,
+            width: pdfWidth,
             windowWidth: 800,
             html2canvas: {
-              scale: 0.55,
+              scale: 0.75,
               useCORS: true,
               backgroundColor: '#ffffff',
               windowWidth: 800,
               scrollX: 0,
-              scrollY: 0
+              scrollY: -sandbox.getBoundingClientRect().top,
+              onclone: () => {
+                /* Restore scroll immediately when html2canvas clones */
+                window.scrollTo(savedScrollX, savedScrollY);
+              }
             },
             callback: () => resolve()
           });
@@ -5163,6 +5172,8 @@
         return doc.output('blob');
       } finally {
         sandbox.remove();
+        /* Double-ensure scroll is restored */
+        window.scrollTo(savedScrollX, savedScrollY);
       }
     };
 
