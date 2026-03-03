@@ -301,6 +301,29 @@
       border-bottom: none;
     }
 
+    .profile-group-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-soft);
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .profile-group-divider::before,
+    .profile-group-divider::after {
+      content: '';
+      height: 1px;
+      flex: 1;
+      background: var(--border);
+    }
+
     .simple-row {
       background: var(--surface);
       border: none;
@@ -2580,6 +2603,7 @@
     const holdingsByUserMap = {};
     const securitiesByIdMap = {};
     const PACK_SECTIONS_PAGE_SIZE = 4;
+    const NEWLY_ONBOARDED_WINDOW_DAYS = 14;
 
     const getInitials = (name = '') => {
       const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -2770,6 +2794,41 @@
       const signInTimestamp = getProfileSignInTimestamp(profile);
       if (signInTimestamp <= 0) return false;
       return isSameLocalDay(new Date(signInTimestamp), new Date());
+    };
+
+    const getProfileOnboardingTimestamp = (profile = {}) => {
+      const profileId = profile?.id;
+      const onboardingRow = onboardingMap[profileId] || {};
+      const packRow = packDetailsRowMap[profileId] || {};
+      const candidateValues = [
+        onboardingRow.updated_at,
+        onboardingRow.created_at,
+        onboardingRow.completed_at,
+        onboardingRow.kyc_completed_at,
+        packRow.updated_at,
+        packRow.created_at,
+        profile.created_at
+      ];
+
+      return candidateValues.reduce((latest, value) => Math.max(latest, toTimestamp(value)), 0);
+    };
+
+    const hasProfileOnboarded = (profile = {}) => {
+      const profileId = profile?.id;
+      if (!profileId) return false;
+      if (onboardingMap[profileId] || packDetailsRowMap[profileId]) return true;
+
+      const effectiveKycState = getEffectiveKycState(profileId, allKycMap[profileId]?.status || 'Not initiated');
+      return effectiveKycState.completed || effectiveKycState.pending || effectiveKycState.rejected;
+    };
+
+    const isProfileNewlyOnboarded = (profile = {}) => {
+      if (!hasProfileOnboarded(profile)) return false;
+      const onboardingTimestamp = getProfileOnboardingTimestamp(profile);
+      if (onboardingTimestamp <= 0) return false;
+      const ageMs = Date.now() - onboardingTimestamp;
+      const windowMs = NEWLY_ONBOARDED_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+      return ageMs >= 0 && ageMs <= windowMs;
     };
 
     const escapeHtml = (value) => String(value ?? '')
@@ -3755,7 +3814,7 @@
       if (userCount) userCount.textContent = String(totalUsers);
       if (userCountLabel) userCountLabel.textContent = totalUsers === 1 ? 'user' : 'users';
 
-      profiles.forEach(profile => {
+      const renderProfileItem = (profile) => {
         const clone = profileTemplate.content.firstElementChild.cloneNode(true);
         const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'Unknown User';
         const uid = profile.id;
@@ -3816,7 +3875,29 @@
         }
 
         profilesList.appendChild(clone);
+      };
+
+      const newlyOnboarded = [];
+      const existingUsers = [];
+      profiles.forEach((profile) => {
+        if (isProfileNewlyOnboarded(profile)) {
+          newlyOnboarded.push(profile);
+          return;
+        }
+        existingUsers.push(profile);
       });
+
+      newlyOnboarded.forEach(renderProfileItem);
+
+      if (newlyOnboarded.length && existingUsers.length) {
+        const divider = document.createElement('div');
+        divider.className = 'profile-group-divider';
+        divider.setAttribute('role', 'separator');
+        divider.textContent = `Existing users (${existingUsers.length})`;
+        profilesList.appendChild(divider);
+      }
+
+      existingUsers.forEach(renderProfileItem);
     };
 
     const applySearchFilter = () => {
