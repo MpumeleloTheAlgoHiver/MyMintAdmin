@@ -5102,49 +5102,59 @@
         doc.text(d.initials, bx + 4, by + 22);
       };
 
-      const drawHorizonBlock = (prefix) => {
+      /* ---------- checkbox state determination ---------- */
+      const rawSource = getMandateDataSource(profile?.id, onboardingRow);
+      const mandateData    = (rawSource && rawSource.mandate_data) ? rawSource.mandate_data : {};
+      const checkedBoxes   = mandateData.checkedBoxes || {};
+      const discretionType = mandateData.discretionType || 'full';
+      const isBoxChecked   = (key) => checkedBoxes[key] === true;
+
+      const fullLocal    = isBoxChecked('full-local');
+      const fullOffshore = isBoxChecked('full-offshore');
+      const fullBoth     = isBoxChecked('full-both');
+
+      const limInstrSelf    = isBoxChecked('lim-instr-0');
+      const limInstrAdvisor = isBoxChecked('lim-instr-1');
+      const limInstrAdvice  = isBoxChecked('lim-instr-2');
+      const limLocal        = isBoxChecked('lim-local');
+      const limOffshore     = isBoxChecked('lim-offshore');
+      const limBoth         = isBoxChecked('lim-both');
+      const limReinvest     = isBoxChecked('lim-payout-0');
+      const limPayout       = isBoxChecked('lim-payout-1');
+
+      const pfx    = discretionType === 'limited' ? 'lim' : 'full';
+      const ltGrowth = isBoxChecked(`${pfx}-lt-0`);
+      const ltIncome = isBoxChecked(`${pfx}-lt-1`);
+      const mtGrowth = isBoxChecked(`${pfx}-mt-0`);
+      const mtIncome = isBoxChecked(`${pfx}-mt-1`);
+      const stGrowth = isBoxChecked(`${pfx}-st-0`);
+      const stIncome = isBoxChecked(`${pfx}-st-1`);
+
+      const riskEntries = [
+        { id: 'vcons', label: 'Very Conservative' },
+        { id: 'cons',  label: 'Conservative' },
+        { id: 'mod',   label: 'Moderate' },
+        { id: 'agg',   label: 'Aggressive' },
+        { id: 'vagg',  label: 'Very Aggressive' }
+      ];
+      const riskChecked = riskEntries.map((r, i) => isBoxChecked(`${pfx}-rp-${i}`));
+
+      const drawHorizonBlock = () => {
         drawSubHeading('Long Term (5 years or longer)');
-        drawCheckbox(m + 10, y, useGrowth, 'Capital Growth'); y += 18;
-        drawCheckbox(m + 10, y, useIncome, 'Income Generation'); y += 22;
+        drawCheckbox(m + 10, y, ltGrowth, 'Capital Growth'); y += 18;
+        drawCheckbox(m + 10, y, ltIncome, 'Income Generation'); y += 22;
         drawSubHeading('Medium Term (2 to 5 years)');
-        drawCheckbox(m + 10, y, useGrowth, 'Capital Growth'); y += 18;
-        drawCheckbox(m + 10, y, useIncome, 'Income Generation'); y += 22;
+        drawCheckbox(m + 10, y, mtGrowth, 'Capital Growth'); y += 18;
+        drawCheckbox(m + 10, y, mtIncome, 'Income Generation'); y += 22;
         drawSubHeading('Short Term (3 months to 2 years)');
-        drawCheckbox(m + 10, y, useGrowth, 'Capital Growth'); y += 18;
-        drawCheckbox(m + 10, y, useIncome, 'Income Generation'); y += 22;
+        drawCheckbox(m + 10, y, stGrowth, 'Capital Growth'); y += 18;
+        drawCheckbox(m + 10, y, stIncome, 'Income Generation'); y += 22;
         drawSubHeading('Risk Preference*');
-        riskEntries.forEach((r) => {
-          drawCheckbox(m + 10, y, r.id === matchedRisk, r.label); y += 18;
+        riskEntries.forEach((r, i) => {
+          drawCheckbox(m + 10, y, riskChecked[i], r.label); y += 18;
         });
         y += 4;
       };
-
-      /* ---------- checkbox state determination ---------- */
-      const corpus = d.jsonCorpus;
-      const localMentioned    = corpus.includes('local');
-      const offshoreMentioned = corpus.includes('offshore') || corpus.includes('off-shore');
-      const bothJuris         = localMentioned && offshoreMentioned;
-      const checkLocal     = !bothJuris && localMentioned;
-      const checkOffshore  = !bothJuris && offshoreMentioned;
-      const checkBoth      = bothJuris || (!localMentioned && !offshoreMentioned);
-
-      const growthMentioned = corpus.includes('growth');
-      const incomeMentioned = corpus.includes('income');
-      const useGrowth = growthMentioned || !incomeMentioned;
-      const useIncome = incomeMentioned;
-
-      const riskEntries = [
-        { id: 'vcons', label: 'Very Conservative', keys: ['very conservative'] },
-        { id: 'cons',  label: 'Conservative',      keys: ['conservative'] },
-        { id: 'mod',   label: 'Moderate',           keys: ['moderate', 'balanced'] },
-        { id: 'agg',   label: 'Aggressive',         keys: ['aggressive'] },
-        { id: 'vagg',  label: 'Very Aggressive',    keys: ['very aggressive'] }
-      ];
-      const matchedRisk = riskEntries.find((r) => r.keys.some((k) => corpus.includes(k)))?.id || 'mod';
-
-      const instruction = corpus.includes('prior consent') || corpus.includes('on my instruction');
-      const advisor     = corpus.includes('advisor') || corpus.includes('adviser');
-      const payout      = corpus.includes('paid out') || corpus.includes('payout') || corpus.includes('withdraw');
 
       /* ===== PAGE 1 — Cover ===== */
       doc.setFont('helvetica', 'bold');
@@ -5236,27 +5246,27 @@
       doc.text(warnLines, m + 8, y + 12);
       y += 40;
 
-      drawCheckbox(m + 10, y, checkLocal, 'Local jurisdictions only'); y += 20;
-      drawCheckbox(m + 10, y, checkOffshore, 'Off-shore jurisdictions only'); y += 20;
-      drawCheckbox(m + 10, y, checkBoth, 'Both local and off-shore jurisdictions'); y += 26;
-      drawHorizonBlock('full');
+      drawCheckbox(m + 10, y, fullLocal, 'Local jurisdictions only'); y += 20;
+      drawCheckbox(m + 10, y, fullOffshore, 'Off-shore jurisdictions only'); y += 20;
+      drawCheckbox(m + 10, y, fullBoth, 'Both local and off-shore jurisdictions'); y += 26;
+      drawHorizonBlock();
       drawInitials();
 
       /* ===== PAGE 4 — Limited Discretion ===== */
       doc.addPage(); y = m;
       drawHeading('SCHEDULE \u2013 LIMITED DISCRETION');
 
-      drawCheckbox(m + 10, y, instruction, 'On my instruction and prior consent'); y += 20;
-      drawCheckbox(m + 10, y, !instruction && advisor, 'On the instruction of my investment advisor'); y += 20;
-      drawCheckbox(m + 10, y, !instruction && !advisor, 'Upon me receiving advice and consent'); y += 26;
+      drawCheckbox(m + 10, y, limInstrSelf, 'On my instruction and prior consent'); y += 20;
+      drawCheckbox(m + 10, y, limInstrAdvisor, 'On the instruction of my investment advisor'); y += 20;
+      drawCheckbox(m + 10, y, limInstrAdvice, 'Upon me receiving advice and consent'); y += 26;
 
-      drawCheckbox(m + 10, y, checkLocal, 'Local jurisdictions only'); y += 20;
-      drawCheckbox(m + 10, y, checkOffshore, 'Off-shore jurisdictions only'); y += 20;
-      drawCheckbox(m + 10, y, checkBoth, 'Both local and off-shore jurisdictions'); y += 26;
+      drawCheckbox(m + 10, y, limLocal, 'Local jurisdictions only'); y += 20;
+      drawCheckbox(m + 10, y, limOffshore, 'Off-shore jurisdictions only'); y += 20;
+      drawCheckbox(m + 10, y, limBoth, 'Both local and off-shore jurisdictions'); y += 26;
 
-      drawCheckbox(m + 10, y, !payout, 'Reinvested as and when they fall due'); y += 20;
-      drawCheckbox(m + 10, y, payout, 'Paid out to client account'); y += 26;
-      drawHorizonBlock('lim');
+      drawCheckbox(m + 10, y, limReinvest, 'Reinvested as and when they fall due'); y += 20;
+      drawCheckbox(m + 10, y, limPayout, 'Paid out to client account'); y += 26;
+      drawHorizonBlock();
       drawInitials();
 
       /* ===== PAGE 5 — Addendum ===== */
@@ -5286,18 +5296,18 @@
       };
 
       drawAddendumSection('Long Term (5 years or longer)', [
-        ['Capital Growth',     useGrowth],
-        ['Income Generation',  useIncome]
+        ['Capital Growth',    ltGrowth],
+        ['Income Generation', ltIncome]
       ]);
       drawAddendumSection('Medium Term (2 to 5 years)', [
-        ['Capital Growth',     useGrowth],
-        ['Income Generation',  useIncome]
+        ['Capital Growth',    mtGrowth],
+        ['Income Generation', mtIncome]
       ]);
       drawAddendumSection('Short Term (3 months to 2 years)', [
-        ['Capital Growth',     useGrowth],
-        ['Income Generation',  useIncome]
+        ['Capital Growth',    stGrowth],
+        ['Income Generation', stIncome]
       ]);
-      drawAddendumSection('Risk Preference', riskEntries.map((r) => [r.label, r.id === matchedRisk]));
+      drawAddendumSection('Risk Preference', riskEntries.map((r, i) => [r.label, riskChecked[i]]));
       drawInitials();
 
       /* ---------- filename ---------- */
