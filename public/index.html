@@ -191,12 +191,13 @@
       display: inline-flex;
       align-items: center;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 8px;
       order: 1;
     }
 
     .quick-filter-pill {
-      padding: 8px 14px;
+      min-height: 30px;
+      padding: 0 13px;
       background: transparent;
       border: 1px solid #e5e7eb;
       border-radius: 999px;
@@ -211,7 +212,7 @@
     .quick-filter-pill:hover {
       background: #f9fafb;
       border-color: #d1d5db;
-      box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
+      box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.08), 0 3px 10px rgba(124, 58, 237, 0.08);
     }
 
     .quick-filter-pill.active {
@@ -287,10 +288,10 @@
       flex-direction: column;
       gap: 0;
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 14px;
       overflow: hidden;
       background: var(--surface);
-      box-shadow: var(--shadow);
+      box-shadow: 0 8px 20px rgba(80, 38, 157, 0.08);
     }
 
     .simple-item {
@@ -310,6 +311,11 @@
       align-items: center;
       justify-content: space-between;
       gap: 20px;
+      transition: background-color 0.2s ease;
+    }
+
+    .simple-row:hover {
+      background: #faf7ff;
     }
 
     .simple-left {
@@ -416,8 +422,8 @@
     }
 
     .simple-avatar {
-      width: 40px;
-      height: 40px;
+      width: 38px;
+      height: 38px;
       border-radius: 50%;
       background: linear-gradient(135deg, #a477ff 0%, var(--primary) 60%, var(--primary-strong) 100%);
       display: flex;
@@ -425,7 +431,8 @@
       justify-content: center;
       color: #ffffff;
       font-weight: 600;
-      font-size: 0.9rem;
+      font-size: 0.84rem;
+      box-shadow: 0 6px 14px rgba(124, 58, 237, 0.22);
     }
 
     .simple-text {
@@ -440,6 +447,43 @@
       color: var(--text);
     }
 
+    .simple-name-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .signed-in-today-badge {
+      display: none;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      color: #166534;
+      background: #ecfdf3;
+      border: 1px solid #bbf7d0;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .signed-in-today-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #16a34a;
+      box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.12);
+      flex-shrink: 0;
+    }
+
+    .signed-in-today-badge.active {
+      display: inline-flex;
+    }
+
     .simple-uid {
       font-size: 0.8rem;
       color: var(--text-muted);
@@ -451,7 +495,7 @@
     }
 
     .simple-item:hover {
-      background: #fbf8ff;
+      background: #fdfcff;
     }
 
     .ellipsis-btn {
@@ -464,12 +508,13 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.3s ease;
+      transition: all 0.2s ease;
     }
 
     .ellipsis-btn:hover {
       background: #f9fafb;
-      border-color: #d1d5db;
+      border-color: #cfd6e2;
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
     }
 
     .ellipsis-btn svg {
@@ -523,10 +568,13 @@
       background: rgba(255, 255, 255, 0.82);
       backdrop-filter: blur(8px);
       border-bottom: 1px solid var(--border);
-      padding: 20px 40px;
+      padding: 16px 32px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 40;
     }
 
     .top-search {
@@ -537,11 +585,11 @@
 
     .top-search input {
       width: 100%;
-      height: 42px;
+      height: 40px;
       border-radius: 12px;
       border: 1px solid #e5e7eb;
       background: #f9fafb;
-      padding: 0 14px;
+      padding: 0 12px;
       font-size: 0.9rem;
       color: #111827;
       outline: none;
@@ -561,8 +609,9 @@
     }
 
     .signout-btn {
-      padding: 8px 14px;
-      border-radius: 10px;
+      min-height: 34px;
+      padding: 0 14px;
+      border-radius: 9px;
       border: 1px solid #e5e7eb;
       background: #ffffff;
       color: #374151;
@@ -573,8 +622,9 @@
     }
 
     .signout-btn:hover {
-      background: #f9fafb;
-      border-color: #d1d5db;
+      background: #f7f8fc;
+      border-color: #cfd6e2;
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
     }
 
     .nav-arrows {
@@ -2107,7 +2157,10 @@
             <div class="simple-left">
               <div class="simple-avatar" data-initials>AA</div>
               <div class="simple-text">
-                <div class="simple-name" data-name>Alex Adams</div>
+                <div class="simple-name-row">
+                  <div class="simple-name" data-name>Alex Adams</div>
+                  <span class="signed-in-today-badge" data-signed-in-today>Signed in today</span>
+                </div>
                 <div class="simple-uid" data-uid>UID: AA-0000-XX</div>
               </div>
             </div>
@@ -2690,6 +2743,56 @@
       if (!value) return 0;
       const parsed = new Date(value).getTime();
       return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const isSameLocalDay = (dateA, dateB) => dateA.getFullYear() === dateB.getFullYear()
+      && dateA.getMonth() === dateB.getMonth()
+      && dateA.getDate() === dateB.getDate();
+
+    const getProfileSignInTimestamp = (profile = {}) => {
+      const candidateKeys = [
+        'last_sign_in_at',
+        'last_login_at',
+        'last_login',
+        'last_signed_in_at',
+        'signed_in_at',
+        'signin_at',
+        'last_seen_at'
+      ];
+
+      for (const key of candidateKeys) {
+        const value = profile?.[key];
+        const timestamp = toTimestamp(value);
+        if (timestamp > 0) return timestamp;
+      }
+
+      return 0;
+    };
+
+    const sortProfilesForDisplay = (profiles = []) => {
+      const now = new Date();
+      const todaySignedIn = [];
+      const everyoneElse = [];
+
+      profiles.forEach((profile) => {
+        const signInTimestamp = getProfileSignInTimestamp(profile);
+        if (signInTimestamp > 0 && isSameLocalDay(new Date(signInTimestamp), now)) {
+          todaySignedIn.push(profile);
+          return;
+        }
+        everyoneElse.push(profile);
+      });
+
+      todaySignedIn.sort((a, b) => getProfileSignInTimestamp(b) - getProfileSignInTimestamp(a));
+      everyoneElse.sort((a, b) => toTimestamp(b.created_at) - toTimestamp(a.created_at));
+
+      return [...todaySignedIn, ...everyoneElse];
+    };
+
+    const isProfileSignedInToday = (profile = {}) => {
+      const signInTimestamp = getProfileSignInTimestamp(profile);
+      if (signInTimestamp <= 0) return false;
+      return isSameLocalDay(new Date(signInTimestamp), new Date());
     };
 
     const escapeHtml = (value) => String(value ?? '')
@@ -3693,6 +3796,10 @@
         setText(clone, '[data-created]', profile.created_at);
         setText(clone, '[data-website]', profile.email);
         setText(clone, '[data-phone]', profile.phone_number);
+        const signedInTodayBadge = clone.querySelector('[data-signed-in-today]');
+        if (signedInTodayBadge) {
+          signedInTodayBadge.classList.toggle('active', isProfileSignedInToday(profile));
+        }
         const kycEntry = kycMap[profile.id] || {};
         const effectiveKycState = getEffectiveKycState(profile.id, kycEntry.status || 'Not initiated');
         setText(clone, '[data-kyc-status]', effectiveKycState.label);
@@ -4034,7 +4141,7 @@
         }
       }
 
-      allProfiles = profiles;
+      allProfiles = sortProfilesForDisplay(profiles);
       allKycMap = kycMap;
       renderProfiles(allProfiles, allKycMap);
       applySearchFilter();
