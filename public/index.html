@@ -5105,6 +5105,7 @@
       /* ---------- checkbox state determination ---------- */
       const sumsubRaw  = parseJsonSafe(onboardingRow?.sumsub_raw) || {};
       const mandateData    = sumsubRaw.mandate_data || {};
+      const mandateNotSigned = !mandateData.checkedBoxes;
       const checkedBoxes   = mandateData.checkedBoxes || {};
       const discretionType = mandateData.discretionType || 'full';
       const isBoxChecked   = (key) => checkedBoxes[key] === true;
@@ -5171,6 +5172,15 @@
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(30, 30, 30);
       doc.text('FSP NO 55118', pw / 2, ph / 2 + 76, { align: 'center' });
+
+      if (mandateNotSigned) {
+        doc.setFillColor(220, 53, 69);
+        doc.rect(m, ph / 2 + 100, cw, 26, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(255, 255, 255);
+        doc.text('CLIENT HAS NOT YET COMPLETED THE MANDATE SIGNING PROCESS', pw / 2, ph / 2 + 117, { align: 'center' });
+      }
 
       /* ===== PAGE 2 — Client Details ===== */
       doc.addPage(); y = m;
@@ -5246,6 +5256,19 @@
       doc.text(warnLines, m + 8, y + 12);
       y += 40;
 
+      if (mandateNotSigned) {
+        doc.setFillColor(255, 243, 205);
+        doc.setDrawColor(255, 193, 7);
+        doc.setLineWidth(1);
+        doc.rect(m, y, cw, 22, 'FD');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(102, 77, 3);
+        doc.text('Client has not yet completed the mandate signing process — no selections recorded.', m + 8, y + 14);
+        doc.setLineWidth(0.5);
+        y += 30;
+      }
+
       drawCheckbox(m + 10, y, fullLocal, 'Local jurisdictions only'); y += 20;
       drawCheckbox(m + 10, y, fullOffshore, 'Off-shore jurisdictions only'); y += 20;
       drawCheckbox(m + 10, y, fullBoth, 'Both local and off-shore jurisdictions'); y += 26;
@@ -5255,6 +5278,19 @@
       /* ===== PAGE 4 — Limited Discretion ===== */
       doc.addPage(); y = m;
       drawHeading('SCHEDULE \u2013 LIMITED DISCRETION');
+
+      if (mandateNotSigned) {
+        doc.setFillColor(255, 243, 205);
+        doc.setDrawColor(255, 193, 7);
+        doc.setLineWidth(1);
+        doc.rect(m, y, cw, 22, 'FD');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(102, 77, 3);
+        doc.text('Client has not yet completed the mandate signing process — no selections recorded.', m + 8, y + 14);
+        doc.setLineWidth(0.5);
+        y += 30;
+      }
 
       drawCheckbox(m + 10, y, limInstrSelf, 'On my instruction and prior consent'); y += 20;
       drawCheckbox(m + 10, y, limInstrAdvisor, 'On the instruction of my investment advisor'); y += 20;
