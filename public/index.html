@@ -5137,13 +5137,6 @@
       const limPayout       = isBoxChecked('lim-payout-1');
 
       const pfx    = discretionType === 'limited' ? 'lim' : 'full';
-      const ltGrowth = isBoxChecked(`${pfx}-lt-0`);
-      const ltIncome = isBoxChecked(`${pfx}-lt-1`);
-      const mtGrowth = isBoxChecked(`${pfx}-mt-0`);
-      const mtIncome = isBoxChecked(`${pfx}-mt-1`);
-      const stGrowth = isBoxChecked(`${pfx}-st-0`);
-      const stIncome = isBoxChecked(`${pfx}-st-1`);
-
       const riskEntries = [
         { id: 'vcons', label: 'Very Conservative' },
         { id: 'cons',  label: 'Conservative' },
@@ -5151,24 +5144,38 @@
         { id: 'agg',   label: 'Aggressive' },
         { id: 'vagg',  label: 'Very Aggressive' }
       ];
-      const riskChecked = riskEntries.map((r, i) => isBoxChecked(`${pfx}-rp-${i}`));
 
-      const drawHorizonBlock = () => {
+      const drawHorizonBlock = (blockPfx) => {
+        const bLtGrowth = isBoxChecked(`${blockPfx}-lt-0`);
+        const bLtIncome = isBoxChecked(`${blockPfx}-lt-1`);
+        const bMtGrowth = isBoxChecked(`${blockPfx}-mt-0`);
+        const bMtIncome = isBoxChecked(`${blockPfx}-mt-1`);
+        const bStGrowth = isBoxChecked(`${blockPfx}-st-0`);
+        const bStIncome = isBoxChecked(`${blockPfx}-st-1`);
+        const bRisk    = riskEntries.map((r, i) => isBoxChecked(`${blockPfx}-rp-${i}`));
         drawSubHeading('Long Term (5 years or longer)');
-        drawCheckbox(m + 10, y, ltGrowth, 'Capital Growth'); y += 18;
-        drawCheckbox(m + 10, y, ltIncome, 'Income Generation'); y += 22;
+        drawCheckbox(m + 10, y, bLtGrowth, 'Capital Growth'); y += 18;
+        drawCheckbox(m + 10, y, bLtIncome, 'Income Generation'); y += 22;
         drawSubHeading('Medium Term (2 to 5 years)');
-        drawCheckbox(m + 10, y, mtGrowth, 'Capital Growth'); y += 18;
-        drawCheckbox(m + 10, y, mtIncome, 'Income Generation'); y += 22;
+        drawCheckbox(m + 10, y, bMtGrowth, 'Capital Growth'); y += 18;
+        drawCheckbox(m + 10, y, bMtIncome, 'Income Generation'); y += 22;
         drawSubHeading('Short Term (3 months to 2 years)');
-        drawCheckbox(m + 10, y, stGrowth, 'Capital Growth'); y += 18;
-        drawCheckbox(m + 10, y, stIncome, 'Income Generation'); y += 22;
+        drawCheckbox(m + 10, y, bStGrowth, 'Capital Growth'); y += 18;
+        drawCheckbox(m + 10, y, bStIncome, 'Income Generation'); y += 22;
         drawSubHeading('Risk Preference*');
         riskEntries.forEach((r, i) => {
-          drawCheckbox(m + 10, y, riskChecked[i], r.label); y += 18;
+          drawCheckbox(m + 10, y, bRisk[i], r.label); y += 18;
         });
         y += 4;
       };
+
+      const ltGrowth = isBoxChecked(`${pfx}-lt-0`);
+      const ltIncome = isBoxChecked(`${pfx}-lt-1`);
+      const mtGrowth = isBoxChecked(`${pfx}-mt-0`);
+      const mtIncome = isBoxChecked(`${pfx}-mt-1`);
+      const stGrowth = isBoxChecked(`${pfx}-st-0`);
+      const stIncome = isBoxChecked(`${pfx}-st-1`);
+      const riskChecked = riskEntries.map((r, i) => isBoxChecked(`${pfx}-rp-${i}`));
 
       /* ===== PAGE 1 — Cover ===== */
       doc.setFont('helvetica', 'bold');
@@ -5285,7 +5292,7 @@
       drawCheckbox(m + 10, y, fullLocal, 'Local jurisdictions only'); y += 20;
       drawCheckbox(m + 10, y, fullOffshore, 'Off-shore jurisdictions only'); y += 20;
       drawCheckbox(m + 10, y, fullBoth, 'Both local and off-shore jurisdictions'); y += 26;
-      drawHorizonBlock();
+      drawHorizonBlock('full');
       drawInitials();
 
       /* ===== PAGE 4 — Limited Discretion ===== */
@@ -5315,7 +5322,7 @@
 
       drawCheckbox(m + 10, y, limReinvest, 'Reinvested as and when they fall due'); y += 20;
       drawCheckbox(m + 10, y, limPayout, 'Paid out to client account'); y += 26;
-      drawHorizonBlock();
+      drawHorizonBlock('lim');
       drawInitials();
 
       /* ===== PAGE 5 — Addendum ===== */
