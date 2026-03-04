@@ -327,6 +327,37 @@
       background: var(--border);
     }
 
+    .profile-group-divider.profile-group-divider-action {
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .profile-group-divider.profile-group-divider-action::before,
+    .profile-group-divider.profile-group-divider-action::after {
+      content: none;
+      display: none;
+    }
+
+    .profile-group-action-btn {
+      margin-left: auto;
+      border: 1px solid #d8b4fe;
+      background: #faf5ff;
+      color: #6d28d9;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .profile-group-action-btn:hover {
+      background: #f3e8ff;
+      border-color: #c084fc;
+    }
+
     .simple-row {
       background: var(--surface);
       border: none;
@@ -3265,6 +3296,38 @@
     const holdingsByUserMap = {};
     const securitiesByIdMap = {};
     const PACK_SECTIONS_PAGE_SIZE = 4;
+    const NEW_USERS_READ_STORAGE_KEY = 'mymint:new-users-read:v1';
+    let latestNewlyOnboardedProfiles = [];
+
+    const loadReadNewUserIds = () => {
+      try {
+        const raw = window.localStorage.getItem(NEW_USERS_READ_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(parsed)) return new Set();
+        return new Set(parsed.map((value) => String(value || '')).filter(Boolean));
+      } catch {
+        return new Set();
+      }
+    };
+
+    let readNewUserIds = loadReadNewUserIds();
+
+    const persistReadNewUserIds = () => {
+      try {
+        window.localStorage.setItem(NEW_USERS_READ_STORAGE_KEY, JSON.stringify(Array.from(readNewUserIds)));
+      } catch {
+        // Ignore storage errors.
+      }
+    };
+
+    const markProfilesAsRead = (profiles = []) => {
+      profiles.forEach((profile) => {
+        const profileId = String(profile?.id || '').trim();
+        if (!profileId) return;
+        readNewUserIds.add(profileId);
+      });
+      persistReadNewUserIds();
+    };
 
     const getInitials = (name = '') => {
       const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -3468,9 +3531,101 @@
 
     const isProfileNewlyOnboarded = (profile = {}) => {
       if (!hasProfileOnboarded(profile)) return false;
+      const profileId = String(profile?.id || '').trim();
+      if (profileId && readNewUserIds.has(profileId)) return false;
       const createdTimestamp = toTimestamp(profile?.created_at);
       if (createdTimestamp <= 0) return false;
       return isSameLocalDay(new Date(createdTimestamp), new Date());
+    };
+
+    const downloadNewUsersSummaryPdf = (profiles = []) => {
+      const JsPdf = window.jspdf?.jsPDF;
+      if (!JsPdf || !profiles.length) return false;
+
+      try {
+        const doc = new JsPdf({ unit: 'pt', format: 'a4' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 40;
+        const contentWidth = pageWidth - (margin * 2);
+        let y = margin;
+
+        const ensureSpace = (needed = 20) => {
+          if (y + needed <= pageHeight - 40) return;
+          doc.addPage();
+          y = margin;
+        };
+
+        const drawText = (label, value) => {
+          const labelText = String(label || '').trim();
+          const valueText = String(value || '-').trim() || '-';
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          doc.setTextColor(70, 70, 70);
+          const prefix = `${labelText}: `;
+          const prefixWidth = doc.getTextWidth(prefix);
+          const wrapped = doc.splitTextToSize(valueText, Math.max(80, contentWidth - prefixWidth));
+          ensureSpace(Math.max(20, wrapped.length * 12 + 8));
+          doc.text(prefix, margin, y + 11);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(30, 30, 30);
+          doc.text(wrapped[0] || '-', margin + prefixWidth, y + 11);
+          for (let index = 1; index < wrapped.length; index += 1) {
+            doc.text(wrapped[index], margin, y + 11 + (index * 12));
+          }
+          y += Math.max(20, wrapped.length * 12 + 8);
+        };
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(15);
+        doc.setTextColor(20, 20, 20);
+        doc.text('New Users Summary', margin, y);
+        y += 18;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(90, 90, 90);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, margin, y);
+        y += 22;
+
+        profiles.forEach((profile, index) => {
+          const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ').trim() || 'Unknown User';
+          const onboardingRow = onboardingMap[profile?.id] || {};
+          const mandatePrefill = getMandatePrefillData(profile, onboardingRow);
+          const sumsubRaw = parseJsonSafe(onboardingRow?.sumsub_raw) || {};
+          const hasMandateData = Boolean(sumsubRaw?.mandate_data?.checkedBoxes);
+          const bankBits = [
+            profile?.bank_name ? `Bank: ${profile.bank_name}` : null,
+            (profile?.bank_account_number || profile?.bank_account) ? `Account: ${profile.bank_account_number || profile.bank_account}` : null,
+            profile?.bank_account_type ? `Type: ${profile.bank_account_type}` : null,
+            profile?.bank_branch_code ? `Branch: ${profile.bank_branch_code}` : null
+          ].filter(Boolean);
+
+          ensureSpace(36);
+          doc.setDrawColor(220, 220, 220);
+          doc.line(margin, y, margin + contentWidth, y);
+          y += 12;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(11);
+          doc.setTextColor(30, 30, 30);
+          doc.text(`User ${index + 1}: ${fullName}`, margin, y);
+          y += 8;
+
+          drawText('Full Names', fullName);
+          drawText('Telephone Number', mandatePrefill?.phone || profile?.phone_number || '-');
+          drawText('Fax Number', profile?.fax_number || '-');
+          drawText('Postal Address', mandatePrefill?.postalAddress || profile?.address || '-');
+          drawText('Physical Address', mandatePrefill?.residentialAddress || profile?.address || '-');
+          drawText('Banking Details', bankBits.length ? bankBits.join(' | ') : 'Not available');
+          drawText('Copy of mandate signed by Client', hasMandateData ? 'Signed mandate data available (use Mandate Download/View for full signed copy).' : 'Not available');
+        });
+
+        const dateTag = new Date().toISOString().slice(0, 10);
+        doc.save(`new-users-summary-${dateTag}.pdf`);
+        return true;
+      } catch (error) {
+        console.error('New users PDF export failed:', error);
+        return false;
+      }
     };
 
     const escapeHtml = (value) => String(value ?? '')
@@ -4534,6 +4689,24 @@
         }
         existingUsers.push(profile);
       });
+
+      latestNewlyOnboardedProfiles = [...newlyOnboarded];
+
+      if (newlyOnboarded.length) {
+        const newUsersDivider = document.createElement('div');
+        newUsersDivider.className = 'profile-group-divider profile-group-divider-action';
+        newUsersDivider.setAttribute('role', 'separator');
+        newUsersDivider.textContent = `New users (${newlyOnboarded.length})`;
+
+        const markReadBtn = document.createElement('button');
+        markReadBtn.type = 'button';
+        markReadBtn.className = 'profile-group-action-btn';
+        markReadBtn.dataset.markNewUsersRead = 'true';
+        markReadBtn.textContent = 'Mark read';
+        newUsersDivider.appendChild(markReadBtn);
+
+        profilesList.appendChild(newUsersDivider);
+      }
 
       newlyOnboarded.forEach(renderProfileItem);
 
@@ -5877,6 +6050,19 @@
 
 
     document.addEventListener('click', async (event) => {
+      const markNewUsersBtn = event.target.closest('[data-mark-new-users-read]');
+      if (markNewUsersBtn) {
+        if (!latestNewlyOnboardedProfiles.length) return;
+        const ok = downloadNewUsersSummaryPdf(latestNewlyOnboardedProfiles);
+        if (!ok) {
+          alert('Could not generate the New Users PDF. Please try again.');
+          return;
+        }
+        markProfilesAsRead(latestNewlyOnboardedProfiles);
+        applySearchFilter();
+        return;
+      }
+
       const packDownloadBtn = event.target.closest('[data-pack-download]');
       if (packDownloadBtn) {
         const container = packDownloadBtn.closest('.tabs-container');
