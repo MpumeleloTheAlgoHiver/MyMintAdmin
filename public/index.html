@@ -2901,6 +2901,7 @@
               </div>
             </div>
             <button class="quick-filter-pill table-view-toggle-btn" id="completedTableViewBtn" type="button" aria-expanded="false" aria-controls="completedTablePanel">Table view ▾</button>
+            <button class="quick-filter-pill table-view-toggle-btn" id="notCompletedEmailViewBtn" type="button" aria-expanded="false" aria-controls="notCompletedEmailPanel">Email view ▾</button>
           </div>
           <button class="user-count-badge" id="userCountBadge" type="button" aria-live="polite" aria-atomic="true">
             <span class="user-count-dot" aria-hidden="true"></span>
@@ -2931,6 +2932,25 @@
             </thead>
             <tbody id="completedTableBody">
               <tr><td class="completed-table-empty" colspan="8">Switch to Completed filter and open Table view.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="completed-table-panel" id="notCompletedEmailPanel" aria-hidden="true">
+        <div class="completed-table-toolbar">
+          <div class="completed-table-title">Not completed user emails</div>
+          <button class="completed-table-download-all" type="button" data-download-all-not-completed-email-csv>Download all</button>
+        </div>
+        <div class="completed-table-wrap">
+          <table class="completed-table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="notCompletedEmailTableBody">
+              <tr><td class="completed-table-empty" colspan="2">Switch to Not completed filter and open Email view.</td></tr>
             </tbody>
           </table>
         </div>
@@ -3386,8 +3406,11 @@
     const bankFilterMenu = document.getElementById('bankFilterMenu');
     const bankFilterOptions = Array.from(document.querySelectorAll('[data-bank-filter]'));
     const completedTableViewBtn = document.getElementById('completedTableViewBtn');
+    const notCompletedEmailViewBtn = document.getElementById('notCompletedEmailViewBtn');
     const completedTablePanel = document.getElementById('completedTablePanel');
     const completedTableBody = document.getElementById('completedTableBody');
+    const notCompletedEmailPanel = document.getElementById('notCompletedEmailPanel');
+    const notCompletedEmailTableBody = document.getElementById('notCompletedEmailTableBody');
     const searchInput = document.querySelector('.top-search input');
     const activeProfileFilters = {
       kyc: 'all',
@@ -3403,6 +3426,8 @@
     const PACK_SECTIONS_PAGE_SIZE = 4;
     let completedTableOpen = false;
     let completedTableEntries = [];
+    let notCompletedEmailOpen = false;
+    let notCompletedEmailEntries = [];
 
     const getInitials = (name = '') => {
       const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -3718,6 +3743,46 @@
           <td><button type="button" class="completed-table-download-row" data-download-completed-csv="${escapeHtml(entry.profileId)}">Download CSV</button></td>
         </tr>
       `).join('');
+    };
+
+    const buildNotCompletedEmailEntry = (profile = {}) => {
+      const profileId = String(profile?.id || '').trim();
+      const email = String(profile?.email || '').trim() || '-';
+      return { profileId, email };
+    };
+
+    const renderNotCompletedEmailTable = (entries = []) => {
+      if (!notCompletedEmailTableBody) return;
+
+      if (!entries.length) {
+        notCompletedEmailTableBody.innerHTML = '<tr><td class="completed-table-empty" colspan="2">No not-completed users found for current filters.</td></tr>';
+        return;
+      }
+
+      notCompletedEmailTableBody.innerHTML = entries.map((entry) => `
+        <tr>
+          <td>${escapeHtml(entry.email)}</td>
+          <td><button type="button" class="completed-table-download-row" data-download-not-completed-email-csv="${escapeHtml(entry.profileId)}">Download CSV</button></td>
+        </tr>
+      `).join('');
+    };
+
+    const notCompletedEmailEntriesToCsv = (entries = []) => {
+      const lines = [[csvEscape('Email')].join(',')];
+      entries.forEach((entry) => {
+        lines.push([csvEscape(entry.email)].join(','));
+      });
+      return lines.join('\n');
+    };
+
+    const syncCompletedViewVisibility = () => {
+      const completedFilterActive = activeProfileFilters.kyc === 'completed';
+      const notCompletedFilterActive = activeProfileFilters.kyc === 'not-completed';
+      const showTableOnly = (completedFilterActive && completedTableOpen)
+        || (notCompletedFilterActive && notCompletedEmailOpen);
+      if (profilesList) {
+        profilesList.style.display = showTableOnly ? 'none' : '';
+      }
     };
 
     const escapeHtml = (value) => String(value ?? '')
@@ -4895,9 +4960,16 @@
       });
 
       const completedFilterActive = activeProfileFilters.kyc === 'completed';
+      const notCompletedFilterActive = activeProfileFilters.kyc === 'not-completed';
       if (completedTableViewBtn) {
         completedTableViewBtn.classList.toggle('visible', completedFilterActive);
         completedTableViewBtn.setAttribute('aria-expanded', completedFilterActive && completedTableOpen ? 'true' : 'false');
+        completedTableViewBtn.textContent = completedTableOpen && completedFilterActive ? 'Table view ▴' : 'Table view ▾';
+      }
+      if (notCompletedEmailViewBtn) {
+        notCompletedEmailViewBtn.classList.toggle('visible', notCompletedFilterActive);
+        notCompletedEmailViewBtn.setAttribute('aria-expanded', notCompletedFilterActive && notCompletedEmailOpen ? 'true' : 'false');
+        notCompletedEmailViewBtn.textContent = notCompletedEmailOpen && notCompletedFilterActive ? 'Email view ▴' : 'Email view ▾';
       }
 
       if (!completedFilterActive) {
@@ -4917,6 +4989,26 @@
           renderCompletedTable(completedTableEntries);
         }
       }
+
+      if (!notCompletedFilterActive) {
+        notCompletedEmailOpen = false;
+        notCompletedEmailEntries = [];
+        if (notCompletedEmailPanel) {
+          notCompletedEmailPanel.classList.remove('active');
+          notCompletedEmailPanel.setAttribute('aria-hidden', 'true');
+        }
+      } else {
+        notCompletedEmailEntries = filtered.map(buildNotCompletedEmailEntry);
+        if (notCompletedEmailOpen) {
+          if (notCompletedEmailPanel) {
+            notCompletedEmailPanel.classList.add('active');
+            notCompletedEmailPanel.setAttribute('aria-hidden', 'false');
+          }
+          renderNotCompletedEmailTable(notCompletedEmailEntries);
+        }
+      }
+
+      syncCompletedViewVisibility();
 
       renderProfiles(filtered, allKycMap, {
         showNewUsersGrouping: activeProfileFilters.kyc === 'completed'
@@ -6179,6 +6271,26 @@
         if (completedTableOpen) {
           renderCompletedTable(completedTableEntries);
         }
+        syncCompletedViewVisibility();
+        return;
+      }
+
+      const emailToggleBtn = event.target.closest('#notCompletedEmailViewBtn');
+      if (emailToggleBtn) {
+        if (activeProfileFilters.kyc !== 'not-completed') return;
+        notCompletedEmailOpen = !notCompletedEmailOpen;
+        if (notCompletedEmailPanel) {
+          notCompletedEmailPanel.classList.toggle('active', notCompletedEmailOpen);
+          notCompletedEmailPanel.setAttribute('aria-hidden', notCompletedEmailOpen ? 'false' : 'true');
+        }
+        if (notCompletedEmailViewBtn) {
+          notCompletedEmailViewBtn.textContent = notCompletedEmailOpen ? 'Email view ▴' : 'Email view ▾';
+          notCompletedEmailViewBtn.setAttribute('aria-expanded', notCompletedEmailOpen ? 'true' : 'false');
+        }
+        if (notCompletedEmailOpen) {
+          renderNotCompletedEmailTable(notCompletedEmailEntries);
+        }
+        syncCompletedViewVisibility();
         return;
       }
 
@@ -6199,6 +6311,26 @@
         const csv = tableEntriesToCsv(completedTableEntries);
         const dateTag = new Date().toISOString().slice(0, 10);
         downloadCsvContent(`completed-users-${dateTag}.csv`, csv);
+        return;
+      }
+
+      const rowEmailCsvBtn = event.target.closest('[data-download-not-completed-email-csv]');
+      if (rowEmailCsvBtn) {
+        const profileId = String(rowEmailCsvBtn.getAttribute('data-download-not-completed-email-csv') || '').trim();
+        const entry = notCompletedEmailEntries.find((item) => String(item.profileId) === profileId);
+        if (!entry) return;
+        const csv = notCompletedEmailEntriesToCsv([entry]);
+        const safeName = sanitizeFilename(entry.email || profileId || 'user-email') || 'user-email';
+        downloadCsvContent(`${safeName}.csv`, csv);
+        return;
+      }
+
+      const allEmailCsvBtn = event.target.closest('[data-download-all-not-completed-email-csv]');
+      if (allEmailCsvBtn) {
+        if (!notCompletedEmailEntries.length) return;
+        const csv = notCompletedEmailEntriesToCsv(notCompletedEmailEntries);
+        const dateTag = new Date().toISOString().slice(0, 10);
+        downloadCsvContent(`not-completed-user-emails-${dateTag}.csv`, csv);
         return;
       }
 
