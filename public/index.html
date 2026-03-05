@@ -270,6 +270,113 @@
       font-weight: 600;
     }
 
+    .table-view-toggle-btn {
+      display: none;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .table-view-toggle-btn.visible {
+      display: inline-flex;
+    }
+
+    .completed-table-panel {
+      margin-top: 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      max-height: 0;
+      opacity: 0;
+      transform: translateY(-6px);
+      transition: max-height 0.35s ease, opacity 0.25s ease, transform 0.25s ease;
+      pointer-events: none;
+    }
+
+    .completed-table-panel.active {
+      max-height: 70vh;
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .completed-table-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      background: #fafafa;
+    }
+
+    .completed-table-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    .completed-table-download-all,
+    .completed-table-download-row {
+      border: 1px solid #d8b4fe;
+      background: #faf5ff;
+      color: #6d28d9;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .completed-table-download-all:hover,
+    .completed-table-download-row:hover {
+      background: #f3e8ff;
+      border-color: #c084fc;
+    }
+
+    .completed-table-wrap {
+      overflow: auto;
+      max-height: calc(70vh - 58px);
+    }
+
+    .completed-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1100px;
+      font-size: 0.78rem;
+    }
+
+    .completed-table th,
+    .completed-table td {
+      border-bottom: 1px solid #eee;
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+      color: #374151;
+    }
+
+    .completed-table th {
+      position: sticky;
+      top: 0;
+      background: #fff;
+      z-index: 1;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #6b7280;
+    }
+
+    .completed-table-empty {
+      text-align: center;
+      color: #9ca3af;
+      font-style: italic;
+      padding: 18px 10px;
+    }
+
     .user-count-dot {
       width: 9px;
       height: 9px;
@@ -325,37 +432,6 @@
       height: 1px;
       flex: 1;
       background: var(--border);
-    }
-
-    .profile-group-divider.profile-group-divider-action {
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    .profile-group-divider.profile-group-divider-action::before,
-    .profile-group-divider.profile-group-divider-action::after {
-      content: none;
-      display: none;
-    }
-
-    .profile-group-action-btn {
-      margin-left: auto;
-      border: 1px solid #d8b4fe;
-      background: #faf5ff;
-      color: #6d28d9;
-      border-radius: 999px;
-      padding: 5px 10px;
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: background 0.2s ease, border-color 0.2s ease;
-    }
-
-    .profile-group-action-btn:hover {
-      background: #f3e8ff;
-      border-color: #c084fc;
     }
 
     .simple-row {
@@ -2824,6 +2900,7 @@
                 <button class="bank-filter-option" type="button" data-bank-filter="unlinked" role="menuitem">Unlinked bank</button>
               </div>
             </div>
+            <button class="quick-filter-pill table-view-toggle-btn" id="completedTableViewBtn" type="button" aria-expanded="false" aria-controls="completedTablePanel">Table view ▾</button>
           </div>
           <button class="user-count-badge" id="userCountBadge" type="button" aria-live="polite" aria-atomic="true">
             <span class="user-count-dot" aria-hidden="true"></span>
@@ -2833,6 +2910,31 @@
         </div>
       </div>
       <div class="simple-list" id="profilesList"></div>
+      <div class="completed-table-panel" id="completedTablePanel" aria-hidden="true">
+        <div class="completed-table-toolbar">
+          <div class="completed-table-title">Completed users table</div>
+          <button class="completed-table-download-all" type="button" data-download-all-completed-csv>Download all</button>
+        </div>
+        <div class="completed-table-wrap">
+          <table class="completed-table">
+            <thead>
+              <tr>
+                <th>Full Names</th>
+                <th>Telephone Number</th>
+                <th>Fax Number</th>
+                <th>Postal Address</th>
+                <th>Physical Address</th>
+                <th>Banking Details</th>
+                <th>Copy of mandate signed by Client</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="completedTableBody">
+              <tr><td class="completed-table-empty" colspan="8">Switch to Completed filter and open Table view.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       <template id="profileItemTemplate">
         <div class="simple-item">
@@ -3283,6 +3385,9 @@
     const bankFilterBtn = document.getElementById('bankFilterBtn');
     const bankFilterMenu = document.getElementById('bankFilterMenu');
     const bankFilterOptions = Array.from(document.querySelectorAll('[data-bank-filter]'));
+    const completedTableViewBtn = document.getElementById('completedTableViewBtn');
+    const completedTablePanel = document.getElementById('completedTablePanel');
+    const completedTableBody = document.getElementById('completedTableBody');
     const searchInput = document.querySelector('.top-search input');
     const activeProfileFilters = {
       kyc: 'all',
@@ -3296,38 +3401,8 @@
     const holdingsByUserMap = {};
     const securitiesByIdMap = {};
     const PACK_SECTIONS_PAGE_SIZE = 4;
-    const NEW_USERS_READ_STORAGE_KEY = 'mymint:new-users-read:v1';
-    let latestNewlyOnboardedProfiles = [];
-
-    const loadReadNewUserIds = () => {
-      try {
-        const raw = window.localStorage.getItem(NEW_USERS_READ_STORAGE_KEY);
-        const parsed = raw ? JSON.parse(raw) : [];
-        if (!Array.isArray(parsed)) return new Set();
-        return new Set(parsed.map((value) => String(value || '')).filter(Boolean));
-      } catch {
-        return new Set();
-      }
-    };
-
-    let readNewUserIds = loadReadNewUserIds();
-
-    const persistReadNewUserIds = () => {
-      try {
-        window.localStorage.setItem(NEW_USERS_READ_STORAGE_KEY, JSON.stringify(Array.from(readNewUserIds)));
-      } catch {
-        // Ignore storage errors.
-      }
-    };
-
-    const markProfilesAsRead = (profiles = []) => {
-      profiles.forEach((profile) => {
-        const profileId = String(profile?.id || '').trim();
-        if (!profileId) return;
-        readNewUserIds.add(profileId);
-      });
-      persistReadNewUserIds();
-    };
+    let completedTableOpen = false;
+    let completedTableEntries = [];
 
     const getInitials = (name = '') => {
       const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -3531,101 +3606,118 @@
 
     const isProfileNewlyOnboarded = (profile = {}) => {
       if (!hasProfileOnboarded(profile)) return false;
-      const profileId = String(profile?.id || '').trim();
-      if (profileId && readNewUserIds.has(profileId)) return false;
       const createdTimestamp = toTimestamp(profile?.created_at);
       if (createdTimestamp <= 0) return false;
       return isSameLocalDay(new Date(createdTimestamp), new Date());
     };
 
-    const downloadNewUsersSummaryPdf = (profiles = []) => {
-      const JsPdf = window.jspdf?.jsPDF;
-      if (!JsPdf || !profiles.length) return false;
-
-      try {
-        const doc = new JsPdf({ unit: 'pt', format: 'a4' });
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        const margin = 40;
-        const contentWidth = pageWidth - (margin * 2);
-        let y = margin;
-
-        const ensureSpace = (needed = 20) => {
-          if (y + needed <= pageHeight - 40) return;
-          doc.addPage();
-          y = margin;
-        };
-
-        const drawText = (label, value) => {
-          const labelText = String(label || '').trim();
-          const valueText = String(value || '-').trim() || '-';
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(9);
-          doc.setTextColor(70, 70, 70);
-          const prefix = `${labelText}: `;
-          const prefixWidth = doc.getTextWidth(prefix);
-          const wrapped = doc.splitTextToSize(valueText, Math.max(80, contentWidth - prefixWidth));
-          ensureSpace(Math.max(20, wrapped.length * 12 + 8));
-          doc.text(prefix, margin, y + 11);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(30, 30, 30);
-          doc.text(wrapped[0] || '-', margin + prefixWidth, y + 11);
-          for (let index = 1; index < wrapped.length; index += 1) {
-            doc.text(wrapped[index], margin, y + 11 + (index * 12));
-          }
-          y += Math.max(20, wrapped.length * 12 + 8);
-        };
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(15);
-        doc.setTextColor(20, 20, 20);
-        doc.text('New Users Summary', margin, y);
-        y += 18;
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(90, 90, 90);
-        doc.text(`Generated: ${new Date().toLocaleString()}`, margin, y);
-        y += 22;
-
-        profiles.forEach((profile, index) => {
-          const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ').trim() || 'Unknown User';
-          const onboardingRow = onboardingMap[profile?.id] || {};
-          const mandatePrefill = getMandatePrefillData(profile, onboardingRow);
-          const sumsubRaw = parseJsonSafe(onboardingRow?.sumsub_raw) || {};
-          const hasMandateData = Boolean(sumsubRaw?.mandate_data?.checkedBoxes);
-          const bankBits = [
-            profile?.bank_name ? `Bank: ${profile.bank_name}` : null,
-            (profile?.bank_account_number || profile?.bank_account) ? `Account: ${profile.bank_account_number || profile.bank_account}` : null,
-            profile?.bank_account_type ? `Type: ${profile.bank_account_type}` : null,
-            profile?.bank_branch_code ? `Branch: ${profile.bank_branch_code}` : null
-          ].filter(Boolean);
-
-          ensureSpace(36);
-          doc.setDrawColor(220, 220, 220);
-          doc.line(margin, y, margin + contentWidth, y);
-          y += 12;
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(11);
-          doc.setTextColor(30, 30, 30);
-          doc.text(`User ${index + 1}: ${fullName}`, margin, y);
-          y += 8;
-
-          drawText('Full Names', fullName);
-          drawText('Telephone Number', mandatePrefill?.phone || profile?.phone_number || '-');
-          drawText('Fax Number', profile?.fax_number || '-');
-          drawText('Postal Address', mandatePrefill?.postalAddress || profile?.address || '-');
-          drawText('Physical Address', mandatePrefill?.residentialAddress || profile?.address || '-');
-          drawText('Banking Details', bankBits.length ? bankBits.join(' | ') : 'Not available');
-          drawText('Copy of mandate signed by Client', hasMandateData ? 'Signed mandate data available (use Mandate Download/View for full signed copy).' : 'Not available');
-        });
-
-        const dateTag = new Date().toISOString().slice(0, 10);
-        doc.save(`new-users-summary-${dateTag}.pdf`);
-        return true;
-      } catch (error) {
-        console.error('New users PDF export failed:', error);
-        return false;
+    const getFaxForProfile = (profile = {}) => {
+      const keys = ['fax_number', 'faxNumber', 'fax', 'work_fax', 'home_fax'];
+      for (const key of keys) {
+        if (profile?.[key]) return String(profile[key]);
       }
+      return '';
+    };
+
+    const getBankingDetailsForProfile = (profile = {}) => {
+      const parts = [
+        profile?.bank_name ? `Bank: ${profile.bank_name}` : null,
+        (profile?.bank_account_number || profile?.bank_account)
+          ? `Account: ${profile.bank_account_number || profile.bank_account}`
+          : null,
+        profile?.bank_account_type ? `Type: ${profile.bank_account_type}` : null,
+        profile?.bank_branch_code ? `Branch: ${profile.bank_branch_code}` : null,
+        profile?.bank_linked !== undefined ? `Linked: ${profile.bank_linked ? 'Yes' : 'No'}` : null
+      ].filter(Boolean);
+      return parts.join(' | ');
+    };
+
+    const hasSignedMandateForProfile = (profileId) => {
+      const onboardingRow = onboardingMap[profileId] || {};
+      const sumsubRaw = parseJsonSafe(onboardingRow?.sumsub_raw) || {};
+      const checkedBoxes = sumsubRaw?.mandate_data?.checkedBoxes;
+      return Boolean(checkedBoxes && typeof checkedBoxes === 'object' && Object.keys(checkedBoxes).length > 0);
+    };
+
+    const buildCompletedTableEntry = (profile = {}) => {
+      const profileId = String(profile?.id || '').trim();
+      const onboardingRow = onboardingMap[profileId] || {};
+      const mandatePrefill = getMandatePrefillData(profile, onboardingRow);
+      const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() || 'Unknown User';
+
+      return {
+        profileId,
+        fullName,
+        telephone: String(mandatePrefill?.phone || profile?.phone_number || '-'),
+        fax: String(getFaxForProfile(profile) || '-'),
+        postalAddress: String(mandatePrefill?.postalAddress || profile?.address || '-'),
+        physicalAddress: String(mandatePrefill?.residentialAddress || profile?.address || '-'),
+        bankingDetails: String(getBankingDetailsForProfile(profile) || '-'),
+        mandateSigned: hasSignedMandateForProfile(profileId) ? 'Yes' : 'No'
+      };
+    };
+
+    const csvEscape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+    const tableEntriesToCsv = (entries = []) => {
+      const header = [
+        'Full Names',
+        'Telephone Number',
+        'Fax Number',
+        'Postal Address',
+        'Physical Address',
+        'Banking Details',
+        'Copy of mandate signed by Client'
+      ];
+
+      const lines = [header.map(csvEscape).join(',')];
+      entries.forEach((entry) => {
+        lines.push([
+          entry.fullName,
+          entry.telephone,
+          entry.fax,
+          entry.postalAddress,
+          entry.physicalAddress,
+          entry.bankingDetails,
+          entry.mandateSigned
+        ].map(csvEscape).join(','));
+      });
+
+      return lines.join('\n');
+    };
+
+    const downloadCsvContent = (filename, csvText) => {
+      const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+
+    const renderCompletedTable = (entries = []) => {
+      if (!completedTableBody) return;
+
+      if (!entries.length) {
+        completedTableBody.innerHTML = '<tr><td class="completed-table-empty" colspan="8">No completed users found for current filters.</td></tr>';
+        return;
+      }
+
+      completedTableBody.innerHTML = entries.map((entry) => `
+        <tr>
+          <td>${escapeHtml(entry.fullName)}</td>
+          <td>${escapeHtml(entry.telephone)}</td>
+          <td>${escapeHtml(entry.fax)}</td>
+          <td>${escapeHtml(entry.postalAddress)}</td>
+          <td>${escapeHtml(entry.physicalAddress)}</td>
+          <td>${escapeHtml(entry.bankingDetails)}</td>
+          <td>${escapeHtml(entry.mandateSigned)}</td>
+          <td><button type="button" class="completed-table-download-row" data-download-completed-csv="${escapeHtml(entry.profileId)}">Download CSV</button></td>
+        </tr>
+      `).join('');
     };
 
     const escapeHtml = (value) => String(value ?? '')
@@ -4604,7 +4696,8 @@
       }
     };
 
-    const renderProfiles = (profiles = [], kycMap = {}) => {
+    const renderProfiles = (profiles = [], kycMap = {}, options = {}) => {
+      const showNewUsersGrouping = options.showNewUsersGrouping === true;
       if (!profilesList || !profileTemplate) return;
       profilesList.innerHTML = '';
       const totalUsers = profiles.length;
@@ -4680,6 +4773,11 @@
         profilesList.appendChild(clone);
       };
 
+      if (!showNewUsersGrouping) {
+        profiles.forEach(renderProfileItem);
+        return;
+      }
+
       const newlyOnboarded = [];
       const existingUsers = [];
       profiles.forEach((profile) => {
@@ -4690,21 +4788,11 @@
         existingUsers.push(profile);
       });
 
-      latestNewlyOnboardedProfiles = [...newlyOnboarded];
-
       if (newlyOnboarded.length) {
         const newUsersDivider = document.createElement('div');
-        newUsersDivider.className = 'profile-group-divider profile-group-divider-action';
+        newUsersDivider.className = 'profile-group-divider';
         newUsersDivider.setAttribute('role', 'separator');
         newUsersDivider.textContent = `New users (${newlyOnboarded.length})`;
-
-        const markReadBtn = document.createElement('button');
-        markReadBtn.type = 'button';
-        markReadBtn.className = 'profile-group-action-btn';
-        markReadBtn.dataset.markNewUsersRead = 'true';
-        markReadBtn.textContent = 'Mark read';
-        newUsersDivider.appendChild(markReadBtn);
-
         profilesList.appendChild(newUsersDivider);
       }
 
@@ -4806,7 +4894,33 @@
         return matchesQuery && matchesKyc && matchesBank;
       });
 
-      renderProfiles(filtered, allKycMap);
+      const completedFilterActive = activeProfileFilters.kyc === 'completed';
+      if (completedTableViewBtn) {
+        completedTableViewBtn.classList.toggle('visible', completedFilterActive);
+        completedTableViewBtn.setAttribute('aria-expanded', completedFilterActive && completedTableOpen ? 'true' : 'false');
+      }
+
+      if (!completedFilterActive) {
+        completedTableOpen = false;
+        completedTableEntries = [];
+        if (completedTablePanel) {
+          completedTablePanel.classList.remove('active');
+          completedTablePanel.setAttribute('aria-hidden', 'true');
+        }
+      } else {
+        completedTableEntries = filtered.map(buildCompletedTableEntry);
+        if (completedTableOpen) {
+          if (completedTablePanel) {
+            completedTablePanel.classList.add('active');
+            completedTablePanel.setAttribute('aria-hidden', 'false');
+          }
+          renderCompletedTable(completedTableEntries);
+        }
+      }
+
+      renderProfiles(filtered, allKycMap, {
+        showNewUsersGrouping: activeProfileFilters.kyc === 'completed'
+      });
     };
 
     const renderHoldingAllocationCard = (row) => {
@@ -6050,16 +6164,41 @@
 
 
     document.addEventListener('click', async (event) => {
-      const markNewUsersBtn = event.target.closest('[data-mark-new-users-read]');
-      if (markNewUsersBtn) {
-        if (!latestNewlyOnboardedProfiles.length) return;
-        const ok = downloadNewUsersSummaryPdf(latestNewlyOnboardedProfiles);
-        if (!ok) {
-          alert('Could not generate the New Users PDF. Please try again.');
-          return;
+      const tableToggleBtn = event.target.closest('#completedTableViewBtn');
+      if (tableToggleBtn) {
+        if (activeProfileFilters.kyc !== 'completed') return;
+        completedTableOpen = !completedTableOpen;
+        if (completedTablePanel) {
+          completedTablePanel.classList.toggle('active', completedTableOpen);
+          completedTablePanel.setAttribute('aria-hidden', completedTableOpen ? 'false' : 'true');
         }
-        markProfilesAsRead(latestNewlyOnboardedProfiles);
-        applySearchFilter();
+        if (completedTableViewBtn) {
+          completedTableViewBtn.textContent = completedTableOpen ? 'Table view ▴' : 'Table view ▾';
+          completedTableViewBtn.setAttribute('aria-expanded', completedTableOpen ? 'true' : 'false');
+        }
+        if (completedTableOpen) {
+          renderCompletedTable(completedTableEntries);
+        }
+        return;
+      }
+
+      const rowCsvBtn = event.target.closest('[data-download-completed-csv]');
+      if (rowCsvBtn) {
+        const profileId = String(rowCsvBtn.getAttribute('data-download-completed-csv') || '').trim();
+        const entry = completedTableEntries.find((item) => String(item.profileId) === profileId);
+        if (!entry) return;
+        const csv = tableEntriesToCsv([entry]);
+        const safeName = sanitizeFilename(entry.fullName || profileId || 'completed-user') || 'completed-user';
+        downloadCsvContent(`${safeName}.csv`, csv);
+        return;
+      }
+
+      const allCsvBtn = event.target.closest('[data-download-all-completed-csv]');
+      if (allCsvBtn) {
+        if (!completedTableEntries.length) return;
+        const csv = tableEntriesToCsv(completedTableEntries);
+        const dateTag = new Date().toISOString().slice(0, 10);
+        downloadCsvContent(`completed-users-${dateTag}.csv`, csv);
         return;
       }
 
