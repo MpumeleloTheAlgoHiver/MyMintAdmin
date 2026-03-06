@@ -710,7 +710,7 @@
     let timerHighlightUntil = 0;
     let isCapturingFilledOrderbook = false;
     const FILLED_ARCHIVE_KEY = 'filled-orderbooks-archive-v1';
-    const ARCHIVE_BACKFILL_KEY = 'orderbook-archive-backfill-v1';
+    const ARCHIVE_BACKFILL_KEY = 'orderbook-archive-backfill-v2';
     let filledOrderbooksArchive = [];
 
     const requireSession = async () => {
@@ -1412,9 +1412,12 @@
 
       const updatedRows = rows.map((row) => {
         const needsBndRows = !Array.isArray(row?.bndRows) || !row.bndRows.length;
+        const hasUnknownClient = Array.isArray(row?.bndRows) && row.bndRows.some((r) => r.clientName === 'Unknown Client');
+        const topLevelUnknown = row?.clientName === 'Unknown Client';
         const needsClientAccountId = !String(row?.clientAccountId || '').trim();
+        const needsEnrichment = needsBndRows || hasUnknownClient || topLevelUnknown || needsClientAccountId;
 
-        if (!needsBndRows && !needsClientAccountId) {
+        if (!needsEnrichment) {
           return row;
         }
 
@@ -1442,10 +1445,14 @@
 
         const builtBndRows = buildBackfillBndRows(relatedRawRows, sequence);
         const firstClientAccountId = builtBndRows[0]?.clientAccountId || '';
+        const enrichedClientName = relatedRawRows[0]?.clientName || row.clientName || 'Unknown Client';
+        const enrichedIdRegNo = relatedRawRows[0]?.clientIdRegNo || row.clientIdRegNo || '-';
         changed = true;
 
         return {
           ...row,
+          clientName: (topLevelUnknown && enrichedClientName !== 'Unknown Client') ? enrichedClientName : row.clientName,
+          clientIdRegNo: (String(row?.clientIdRegNo || '').trim() === '-' && enrichedIdRegNo !== '-') ? enrichedIdRegNo : row.clientIdRegNo,
           clientAccountId: String(row?.clientAccountId || '').trim() || firstClientAccountId,
           sourceIds: Array.isArray(row?.sourceIds) && row.sourceIds.length
             ? row.sourceIds
