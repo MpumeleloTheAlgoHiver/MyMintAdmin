@@ -34,7 +34,7 @@ module.exports = async (req, res) => {
       return sendJson(res, 400, { error: 'Invalid snapshot date' });
     }
 
-    const sequence = Number(snapshot.sequence || 0) || null;
+    const sequence = Number(snapshot.sequence || 0) || 1;
     const rows = Array.isArray(snapshot.rows) ? snapshot.rows : [];
     const status = snapshot.emailStatus === 'sent'
       ? 'sent'
@@ -45,7 +45,7 @@ module.exports = async (req, res) => {
       status,
       row_count: rows.length,
       sequence_number: sequence,
-      title: snapshot.title || (sequence ? `Order Book ${sequence}` : null),
+      title: snapshot.title || `Order Book ${sequence}`,
       date_label: snapshot.dateLabel || null,
       snapshot_rows: rows,
       error_message: snapshot.emailError || null,
@@ -54,7 +54,7 @@ module.exports = async (req, res) => {
     };
 
     await requestSupabaseJson(
-      '/rest/v1/orderbook_email_runs?on_conflict=run_date',
+      '/rest/v1/orderbook_email_runs?on_conflict=run_date,sequence_number',
       {
         method: 'POST',
         body: upsertBody,

@@ -14,6 +14,7 @@ const normalizeArchiveRows = (rows) => {
         title: row.title || `Order Book ${sequence}`,
         dateLabel: row.date_label || dateKey,
         createdAt,
+        sentAt: row.sent_at || null,
         rows: row.snapshot_rows || [],
         emailStatus: row.status === 'sent' ? 'sent' : (row.status === 'failed' ? 'failed' : ''),
         emailError: row.error_message || '',

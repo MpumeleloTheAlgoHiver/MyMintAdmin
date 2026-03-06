@@ -23,6 +23,24 @@ alter table public.orderbook_email_runs
 
 create index if not exists idx_orderbook_email_runs_sequence_number on public.orderbook_email_runs (sequence_number);
 
+-- Backfill any existing rows that have NULL sequence_number.
+update public.orderbook_email_runs
+  set sequence_number = 1
+  where sequence_number is null;
+
+-- Make sequence_number non-nullable with a default of 1.
+alter table public.orderbook_email_runs
+  alter column sequence_number set default 1,
+  alter column sequence_number set not null;
+
+-- Allow multiple order books per day (one per sequence).
+-- Drop the old single-column unique on run_date and add a composite unique.
+alter table public.orderbook_email_runs
+  drop constraint if exists orderbook_email_runs_run_date_key;
+
+create unique index if not exists idx_orderbook_email_runs_run_date_seq
+  on public.orderbook_email_runs (run_date, sequence_number);
+
 create or replace function public.set_orderbook_email_runs_updated_at()
 returns trigger
 language plpgsql

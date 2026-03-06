@@ -888,6 +888,26 @@
       return '';
     };
 
+    const extractNameFromPackDetails = (packDetails) => {
+      const pack = normalizePackDetailsObject(packDetails);
+      if (!pack) return '';
+
+      const firstName = pickNestedValue(pack, [
+        'info.firstNameEn', 'info.firstName', 'info.first_name',
+        'fixedInfo.firstNameEn', 'fixedInfo.firstName', 'fixedInfo.first_name',
+        'firstName', 'first_name', 'personalDetails.firstName',
+        'personal_details.first_name'
+      ]);
+      const lastName = pickNestedValue(pack, [
+        'info.lastNameEn', 'info.lastName', 'info.last_name',
+        'fixedInfo.lastNameEn', 'fixedInfo.lastName', 'fixedInfo.last_name',
+        'lastName', 'last_name', 'personalDetails.lastName',
+        'personal_details.last_name'
+      ]);
+
+      return [firstName, lastName].filter(Boolean).map(v => String(v).trim()).filter(Boolean).join(' ');
+    };
+
     const getBndSuffix = (orderbookSequence, lineNumber) => {
       const seq = Number(orderbookSequence || 0);
       const line = Number(lineNumber || 0);
@@ -1604,6 +1624,7 @@
               <span>${escapeHtml(formatBookTitle(book))}</span>
               <span class="filled-orderbook-meta">
                 <span>${escapeHtml(book.dateLabel || '-')}</span>
+                ${book.sentAt ? `<span>Sent: ${escapeHtml(new Date(book.sentAt).toLocaleString())}</span>` : ''}
                 <span data-book-id="${escapeHtml(String(book.id || ''))}">${emailStatusChip(book.emailStatus)}</span>
               </span>
             </summary>
@@ -1696,6 +1717,9 @@
       const emailResult = await sendFilledOrderbookEmail(snapshot);
       snapshot.emailStatus = emailResult.status;
       snapshot.emailError = emailResult.details || '';
+      if (emailResult.status === 'sent') {
+        snapshot.sentAt = new Date().toISOString();
+      }
 
       try {
         await upsertFilledArchiveToDb(snapshot);
@@ -1713,12 +1737,23 @@
 
     const maybeCaptureFilledOrderbook = async () => {
       const now = new Date();
-      const dateKey = getArchiveDateKey(now);
 
       if (!isPastFilledCutoff(now)) return;
-      if (hasFilledOrderbookForDate(dateKey)) return;
       if (!allOrderbookRows.length) return;
       if (isCapturingFilledOrderbook) return;
+
+      // Check if these exact rows were already captured (same sourceIds)
+      const currentSourceIds = new Set(
+        allOrderbookRows.flatMap((row) => {
+          const ids = [];
+          if (row.sourceId) ids.push(String(row.sourceId));
+          if (Array.isArray(row.sourceIds)) row.sourceIds.forEach((id) => { if (id) ids.push(String(id)); });
+          return ids;
+        })
+      );
+      const archivedIds = getArchivedSourceIds();
+      const hasNewRows = [...currentSourceIds].some((id) => !archivedIds.has(id));
+      if (!hasNewRows) return;
 
       isCapturingFilledOrderbook = true;
       try {
@@ -1861,7 +1896,7 @@
       if (userIds.length) {
         const { data: profileRows, error: profileError } = await supabaseClient
           .from('profiles')
-          .select('id, first_name, last_name, mint_number')
+          .select('id, first_name, last_name, mint_number, id_number')
           .in('id', userIds);
 
         if (profileError) {
@@ -1898,8 +1933,9 @@
         const packDetails = onboardingPackDetailsMap[row.user_id] || null;
         const instrumentName = security.name || '-';
         const ticker = security.symbol ?? '-';
-        const timestamp = row.updated_at || row.created_at || row.as_of_date || null;
-        const clientName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() || 'Unknown Client';
+        const timestamp = row.updated_at || row.created_at || row.as_of_date || row.fill_date || null;
+        const profileName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+        const clientName = profileName || extractNameFromPackDetails(packDetails) || 'Unknown Client';
         const accountSeed = deterministicNumberFromText(row.user_id || row.id || `${index + 1}`);
         const profileMintNumber = String(profile.mint_number || '').trim();
         const clientAccountId = profileMintNumber || `MINT-${String(accountSeed % 1000000).padStart(6, '0')}`;
@@ -1910,7 +1946,8 @@
         });
         const clientIdFromPack = extractIdFromPackDetails(packDetails);
         const mintNumber = String(profile.mint_number || '').trim();
-        const clientIdRegNoValue = mintNumber || clientIdFromPack || '-';
+        const profileIdNumber = String(profile.id_number || '').trim();
+        const clientIdRegNoValue = profileIdNumber || mintNumber || clientIdFromPack || '-';
         const settlementAccount = 'mint nominies';
         const settlementAccountOptions = ['mint nominies'];
         const brokerRef = 'Longmark';
