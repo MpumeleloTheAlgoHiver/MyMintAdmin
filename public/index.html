@@ -3459,6 +3459,7 @@
     let completedTableEntries = [];
     let notCompletedEmailOpen = false;
     let notCompletedEmailEntries = [];
+    let isAutoSyncingVerifiedPacks = false;
 
     const getInitials = (name = '') => {
       const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -4367,6 +4368,91 @@
       };
     };
 
+    const persistPackForProfileId = async (profileId, applicantJson, sourceLabel = 'auto-sync') => {
+      const normalizedProfileId = String(profileId || '').trim();
+      if (!normalizedProfileId || !applicantJson) return false;
+
+      packJsonMap[normalizedProfileId] = applicantJson;
+      packDetailsRowMap[normalizedProfileId] = {
+        ...(packDetailsRowMap[normalizedProfileId] || {}),
+        user_id: normalizedProfileId,
+        pack_details: applicantJson,
+        updated_at: new Date().toISOString()
+      };
+
+      const phoneFromPack = extractPhoneFromPack(applicantJson);
+      if (phoneFromPack) {
+        const profileRef = allProfiles.find((profile) => String(profile.id) === normalizedProfileId);
+        const existingPhone = String(profileRef?.phone_number || '').trim();
+        if (profileRef) {
+          profileRef.phone_number = phoneFromPack;
+        }
+
+        if (existingPhone !== phoneFromPack) {
+          const { error: phoneUpdateError } = await supabaseClient
+            .from('profiles')
+            .update({ phone_number: phoneFromPack })
+            .eq('id', normalizedProfileId);
+
+          if (phoneUpdateError) {
+            console.error('Phone sync from pack failed:', phoneUpdateError);
+          }
+        }
+      }
+
+      const { error: packSaveError } = await supabaseClient
+        .from('user_onboarding_pack_details')
+        .upsert({ user_id: normalizedProfileId, pack_details: applicantJson }, { onConflict: 'user_id' });
+
+      if (packSaveError) {
+        console.error(`Pack details save error (${sourceLabel}):`, packSaveError);
+        return false;
+      }
+
+      return true;
+    };
+
+    const syncVerifiedUsersPackDetails = async (trigger = 'manual') => {
+      if (isAutoSyncingVerifiedPacks) return { synced: 0, scanned: 0 };
+      if (!Array.isArray(allProfiles) || !allProfiles.length) return { synced: 0, scanned: 0 };
+
+      isAutoSyncingVerifiedPacks = true;
+      try {
+        const candidates = allProfiles.filter((profile) => {
+          const profileId = String(profile?.id || '').trim();
+          if (!profileId) return false;
+
+          const effectiveKycState = getEffectiveKycState(profileId, allKycMap[profileId]?.status || 'Not initiated');
+          if (!effectiveKycState.completed) return false;
+
+          const alreadyHasPack = Boolean(packJsonMap[profileId] || packDetailsRowMap[profileId]?.pack_details);
+          if (alreadyHasPack) return false;
+
+          const externalUserId = String(allKycMap[profileId]?.externalUserId || onboardingMap[profileId]?.user_id || '').trim();
+          return Boolean(externalUserId);
+        });
+
+        let synced = 0;
+        for (const profile of candidates) {
+          const profileId = String(profile.id || '').trim();
+          const externalUserId = String(allKycMap[profileId]?.externalUserId || onboardingMap[profileId]?.user_id || '').trim();
+          if (!externalUserId) continue;
+
+          try {
+            const applicantJson = await fetchApplicantByExternalId(externalUserId);
+            const didSave = await persistPackForProfileId(profileId, applicantJson, trigger);
+            if (didSave) synced += 1;
+          } catch (error) {
+            console.error(`Sumsub auto-sync failed for ${profileId}:`, error?.message || error);
+          }
+        }
+
+        return { synced, scanned: candidates.length };
+      } finally {
+        isAutoSyncingVerifiedPacks = false;
+      }
+    };
+
     const updateReviewPulseForItem = (item, profileId) => {
       if (!item || !profileId) return;
       const pulseEl = item.querySelector('[data-review-pulse-dropdown]');
@@ -5256,6 +5342,7 @@
 
       allProfiles = sortProfilesForDisplay(profiles);
       allKycMap = kycMap;
+      await syncVerifiedUsersPackDetails('launch');
       renderProfiles(allProfiles, allKycMap);
       applySearchFilter();
     };
@@ -6702,10 +6789,15 @@
 
     if (kycFilterPills.length) {
       kycFilterPills.forEach((pill) => {
-        pill.addEventListener('click', () => {
+        pill.addEventListener('click', async () => {
           const value = pill.dataset.kycPill || 'all';
           activeProfileFilters.kyc = value;
           kycFilterPills.forEach((item) => item.classList.toggle('active', item === pill));
+
+          if (value === 'all' || value === 'completed') {
+            await syncVerifiedUsersPackDetails(`filter-${value}`);
+          }
+
           applySearchFilter();
         });
       });
