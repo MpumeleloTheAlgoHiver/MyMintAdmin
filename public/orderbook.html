@@ -150,15 +150,20 @@
     }
 
     .orderbook-tabs {
-      display: inline-flex;
+      display: flex;
       align-items: center;
       gap: 8px;
+      width: 100%;
       margin-bottom: 16px;
       padding: 4px;
       border-radius: 12px;
       border: 1px solid #e5e7eb;
       background: #ffffff;
       box-shadow: var(--shadow);
+    }
+
+    .orderbook-tab-btn.strate-bir-tab {
+      margin-left: auto;
     }
 
     .orderbook-tab-btn {
@@ -630,8 +635,8 @@
     <section class="orderbook-wrap">
       <div class="orderbook-tabs" role="tablist" aria-label="Orderbook tabs">
         <button class="orderbook-tab-btn active" id="activeBooksTab" type="button" role="tab" aria-selected="true" aria-controls="activeBooksPanel">Active Books</button>
-        <button class="orderbook-tab-btn" id="strateBirTab" type="button" role="tab" aria-selected="false" aria-controls="strateBirPanel">Strate BIR</button>
         <button class="orderbook-tab-btn" id="closedBooksTab" type="button" role="tab" aria-selected="false" aria-controls="closedBooksPanel">Closed Books</button>
+        <button class="orderbook-tab-btn strate-bir-tab" id="strateBirTab" type="button" role="tab" aria-selected="false" aria-controls="strateBirPanel">Strate BIR</button>
       </div>
 
       <div class="orderbook-tab-panel active" id="activeBooksPanel" role="tabpanel" aria-labelledby="activeBooksTab">
