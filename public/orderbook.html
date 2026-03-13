@@ -1300,7 +1300,7 @@
         ].join('|');
 
         if (!groups.has(key)) {
-          const initialAvgFillNumber = Number(row.avgFillNumber);
+          const initialAvgFillNumber = (row.avgFillNumber != null) ? Number(row.avgFillNumber) : NaN;
           const initialQtyWeight = Math.abs(Number(row.quantityValue || 0));
           const hasInitialAvgFill = Number.isFinite(initialAvgFillNumber);
           groups.set(key, {
@@ -1320,7 +1320,7 @@
         group.quantityValue += Number(row.quantityValue || 0);
         group.marketValueNumber += Number(row.marketValueNumber || 0);
         group.unrealizedPnlNumber += Number(row.unrealizedPnlNumber || 0);
-        const rowAvgFillNumber = Number(row.avgFillNumber);
+        const rowAvgFillNumber = (row.avgFillNumber != null) ? Number(row.avgFillNumber) : NaN;
         if (Number.isFinite(rowAvgFillNumber)) {
           const rowQtyWeight = Math.abs(Number(row.quantityValue || 0));
           const weight = rowQtyWeight > 0 ? rowQtyWeight : 1;
@@ -2887,7 +2887,7 @@
         const brokerRefOptions = ['Longmark'];
         const quantityValue = Number(row.quantity);
         const isQuantityNumeric = Number.isFinite(quantityValue);
-        const avgFillValue = Number(row.avg_fill);
+        const avgFillValue = (row.avg_fill != null && row.avg_fill !== '') ? Number(row.avg_fill) : NaN;
         const hasAvgFill = Number.isFinite(avgFillValue);
         const lastPrice = Number(security.last_price);
         const hasLastPrice = Number.isFinite(lastPrice);
