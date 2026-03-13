@@ -3094,7 +3094,8 @@
         const brokerRefOptions = ['Longmark'];
         const quantityValue = Number(row.quantity);
         const isQuantityNumeric = Number.isFinite(quantityValue);
-        const avgFillValue = (row.avg_fill != null && row.avg_fill !== '') ? Number(row.avg_fill) : NaN;
+        const avgFillRaw = (row.avg_fill != null && row.avg_fill !== '') ? Number(row.avg_fill) : NaN;
+        const avgFillValue = Number.isFinite(avgFillRaw) ? (avgFillRaw / 100) : NaN;
         const hasAvgFill = Number.isFinite(avgFillValue);
         const lastPrice = Number(security.last_price);
         const hasLastPrice = Number.isFinite(lastPrice);
