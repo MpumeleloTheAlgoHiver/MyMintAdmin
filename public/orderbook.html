@@ -752,13 +752,9 @@
           <div class="orderbook-toolbar">
             <div class="orderbook-count" id="strateBirCount">0 records</div>
             <div class="orderbook-toolbar-actions">
-              <select class="strate-bir-filter-select" id="strateBirTypeFilter" aria-label="Filter Strate record type">
-                <option value="all">All record types</option>
-                <option value="h1">H1 Header</option>
-                <option value="b1">B1 Identity</option>
-                <option value="b2">B2 Address</option>
-                <option value="b3">B3 Holding</option>
-                <option value="t1">T1 Trailer</option>
+              <select class="strate-bir-filter-select" id="strateBirTypeFilter" aria-label="Select Strate table view style">
+                <option value="simple">Simple view</option>
+                <option value="accurate">Accurate view</option>
               </select>
               <button class="orderbook-export-btn" id="toggleStrateBirViewBtn" type="button">Table view</button>
               <button class="orderbook-export-btn" id="exportStrateBirBtn" type="button" disabled>Generate TXT</button>
@@ -812,7 +808,7 @@
     let allOrderbookRawRows = [];
     let allBirSourceRows = [];
     let strateBirPreviewMode = 'table';
-    let strateBirTypeFilterValue = 'all';
+    let strateBirTableViewMode = 'simple';
     const strateBirCollapsedGroups = {
       H1: false,
       B1: false,
@@ -1756,7 +1752,48 @@
       }).join('');
     };
 
-    const renderStrateBirTablePreview = (lines) => {
+    const renderStrateBirTablePreviewAccurate = (lines) => {
+      if (!strateBirPreviewBody || !strateBirPreviewHead) return;
+
+      const headers = getStrateBirTableHeaders();
+      strateBirPreviewHead.innerHTML = `<tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr>`;
+
+      const rows = lines.map((line, index) => parseStrateBirLine(line, index + 1));
+      strateBirPreviewBody.innerHTML = rows.map((row) => {
+        return `
+          <tr>
+            <td>${escapeHtml(String(row.lineNumber))}</td>
+            <td>${escapeHtml(row.recordType)}</td>
+            <td>${escapeHtml(row.participantCode)}</td>
+            <td>${escapeHtml(row.fileCreationDate)}</td>
+            <td>${escapeHtml(row.fileCreationTime)}</td>
+            <td>${escapeHtml(row.fileReference)}</td>
+            <td>${escapeHtml(row.participantAccount)}</td>
+            <td>${escapeHtml(row.beneficialOwnerRef)}</td>
+            <td>${escapeHtml(row.ownerType)}</td>
+            <td>${escapeHtml(row.beneficialOwnerName)}</td>
+            <td>${escapeHtml(row.idType)}</td>
+            <td>${escapeHtml(row.idNumber)}</td>
+            <td>${escapeHtml(row.addressType)}</td>
+            <td>${escapeHtml(row.addressLine1)}</td>
+            <td>${escapeHtml(row.addressLine2)}</td>
+            <td>${escapeHtml(row.city)}</td>
+            <td>${escapeHtml(row.postalCode)}</td>
+            <td>${escapeHtml(row.country)}</td>
+            <td>${escapeHtml(row.isin)}</td>
+            <td>${escapeHtml(row.securityDescription)}</td>
+            <td>${escapeHtml(row.quantity)}</td>
+            <td>${escapeHtml(row.balanceType)}</td>
+            <td>${escapeHtml(row.marketValue)}</td>
+            <td>${escapeHtml(row.recordDate)}</td>
+            <td>${escapeHtml(row.settlementRef)}</td>
+            <td>${escapeHtml(row.trailerTotalRecords)}</td>
+          </tr>
+        `;
+      }).join('');
+    };
+
+    const renderStrateBirTablePreviewSimple = (lines) => {
       if (!strateBirPreviewBody || !strateBirPreviewHead) return;
 
       const headers = getStrateBirTableHeaders();
@@ -1784,9 +1821,6 @@
       recordTypeOrder.forEach((recordType) => {
         const typeRows = grouped[recordType] || [];
         if (!typeRows.length) return;
-        if (strateBirTypeFilterValue !== 'all' && strateBirTypeFilterValue !== recordType.toLowerCase()) {
-          return;
-        }
 
         const isCollapsed = Boolean(strateBirCollapsedGroups[recordType]);
         rowsHtml.push(`
@@ -1836,7 +1870,7 @@
       });
 
       if (!rowsHtml.length) {
-        strateBirPreviewBody.innerHTML = `<tr><td class="orderbook-empty-row" colspan="${headers.length}">No entries for the selected record type.</td></tr>`;
+        strateBirPreviewBody.innerHTML = `<tr><td class="orderbook-empty-row" colspan="${headers.length}">No BIR records generated yet.</td></tr>`;
         return;
       }
 
@@ -1852,6 +1886,7 @@
 
       if (strateBirTypeFilter) {
         strateBirTypeFilter.style.display = tableMode ? '' : 'none';
+        strateBirTypeFilter.value = strateBirTableViewMode;
       }
     };
 
@@ -1879,7 +1914,11 @@
       }
 
       if (strateBirPreviewMode === 'table') {
-        renderStrateBirTablePreview(lines);
+        if (strateBirTableViewMode === 'accurate') {
+          renderStrateBirTablePreviewAccurate(lines);
+        } else {
+          renderStrateBirTablePreviewSimple(lines);
+        }
         return;
       }
 
@@ -2854,7 +2893,8 @@
 
     if (strateBirTypeFilter) {
       strateBirTypeFilter.addEventListener('change', () => {
-        strateBirTypeFilterValue = String(strateBirTypeFilter.value || 'all').toLowerCase();
+        const selected = String(strateBirTypeFilter.value || 'simple').toLowerCase();
+        strateBirTableViewMode = selected === 'accurate' ? 'accurate' : 'simple';
         renderStrateBirPreview();
       });
     }
