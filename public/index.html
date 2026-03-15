@@ -3095,25 +3095,6 @@
                   </div>
                 </div>
               </div>
-
-              <div class="detail-card" data-account-pdf-card style="display: none;">
-                <div class="card-header">
-                  <div class="card-title">
-                    <svg viewBox="0 0 24 24">
-                      <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm1 7V3.5L18.5 9H15z"/>
-                    </svg>
-                    Account details PDF
-                  </div>
-                </div>
-                <div class="detail-row">
-                  <div class="detail-label">Actions</div>
-                  <div class="detail-value">
-                    <div class="mandate-actions">
-                      <button class="mandate-action-btn" type="button" data-account-pdf-generate>Generate PDF</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
 
             <div class="right-column">
@@ -3436,7 +3417,6 @@
   </div>
 
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -3467,6 +3447,8 @@
       kyc: 'all',
       bank: 'all'
     };
+    const JSPDF_PRIMARY_SRC = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+    const JSPDF_FALLBACK_SRC = 'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js';
     let allProfiles = [];
     let allKycMap = {};
     const onboardingMap = {};
@@ -3479,6 +3461,46 @@
     let completedTableEntries = [];
     let notCompletedEmailOpen = false;
     let notCompletedEmailEntries = [];
+
+    const getJsPdfConstructor = () => window.jspdf?.jsPDF || window.jsPDF || null;
+
+    const loadScriptOnce = (src, id) => new Promise((resolve, reject) => {
+      const existing = document.getElementById(id);
+      if (existing) {
+        if (existing.dataset.loaded === 'true') {
+          resolve();
+          return;
+        }
+        existing.addEventListener('load', () => resolve(), { once: true });
+        existing.addEventListener('error', () => reject(new Error(`Script failed to load: ${src}`)), { once: true });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.id = id;
+      script.src = src;
+      script.async = true;
+      script.addEventListener('load', () => {
+        script.dataset.loaded = 'true';
+        resolve();
+      }, { once: true });
+      script.addEventListener('error', () => reject(new Error(`Script failed to load: ${src}`)), { once: true });
+      document.head.appendChild(script);
+    });
+
+    const ensureJsPdfLoaded = async () => {
+      const existing = getJsPdfConstructor();
+      if (existing) return existing;
+
+      try {
+        await loadScriptOnce(JSPDF_PRIMARY_SRC, 'jspdf-primary');
+      } catch (primaryError) {
+        console.warn('Primary jsPDF source failed, trying fallback.', primaryError);
+        await loadScriptOnce(JSPDF_FALLBACK_SRC, 'jspdf-fallback');
+      }
+
+      return getJsPdfConstructor();
+    };
     let isAutoSyncingVerifiedPacks = false;
 
     const getInitials = (name = '') => {
@@ -4724,9 +4746,10 @@
       nextBtn.disabled = safePage >= totalPages - 1;
     };
 
-    const buildPackPdfReport = (pack, sections = []) => {
-      const JsPdf = window.jspdf?.jsPDF;
-      if (!JsPdf || !pack) return null;
+    const buildPackPdfReport = (pack, sections = [], JsPdfCtor = getJsPdfConstructor()) => {
+      if (!JsPdfCtor || !pack) return null;
+
+      const JsPdf = JsPdfCtor;
 
       const doc = new JsPdf({ unit: 'pt', format: 'a4' });
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -4867,9 +4890,11 @@
       };
     };
 
-    const downloadPackPdf = (pack, sections = []) => {
-      const report = buildPackPdfReport(pack, sections);
-      if (!report) return;
+    const downloadPackPdf = async (pack, sections = []) => {
+      const JsPdfCtor = await ensureJsPdfLoaded();
+      if (!JsPdfCtor) throw new Error('PDF library unavailable. Please refresh and try again.');
+      const report = buildPackPdfReport(pack, sections, JsPdfCtor);
+      if (!report) throw new Error('Could not build account details PDF for this user.');
       report.doc.save(report.filename);
     };
 
@@ -5041,11 +5066,6 @@
         if (mandateActionsRow) {
           const hasOnboardingRow = Boolean(onboardingMap[profile.id]);
           mandateActionsRow.style.display = hasOnboardingRow ? '' : 'none';
-        }
-
-        const accountPdfCard = clone.querySelector('[data-account-pdf-card]');
-        if (accountPdfCard) {
-          accountPdfCard.style.display = effectiveKycState.completed ? '' : 'none';
         }
 
         if (packJsonMap[profile.id]) {
@@ -5670,136 +5690,6 @@
         phoneBody,
         jsonCorpus
       };
-    };
-
-    const getAccountDetailsForPdf = (profile = {}, onboardingRow = {}) => {
-      const source = getMandateDataSource(profile?.id, onboardingRow);
-      const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ').trim() || 'Unknown User';
-      const prefill = getMandatePrefillData(profile, onboardingRow);
-
-      const dateOfBirth = String(pickPackValue(source, [
-        'info.dob',
-        'info.dateOfBirth',
-        'fixedInfo.dob',
-        'fixedInfo.dateOfBirth',
-        'dateOfBirth',
-        'dob',
-        'birthDate'
-      ]) || profile?.date_of_birth || '').trim();
-
-      const city = String(pickPackValue(source, [
-        'info.addresses.0.town',
-        'info.addresses.0.city',
-        'fixedInfo.city',
-        'city',
-        'address.city',
-        'addresses.0.city',
-        'addresses.residential.city'
-      ]) || profile?.city || '').trim();
-
-      const country = String(pickPackValue(source, [
-        'country',
-        'countryCode',
-        'info.country',
-        'fixedInfo.country',
-        'info.nationality',
-        'addresses.0.country',
-        'addresses.residential.country'
-      ]) || profile?.country || '').trim();
-
-      return {
-        fullName,
-        idNumber: prefill.identityNumber,
-        dateOfBirth,
-        email: prefill.email,
-        phone: prefill.phone,
-        address: prefill.residentialAddress || prefill.postalAddress,
-        city,
-        country
-      };
-    };
-
-    const generateAccountDetailsPdf = async (profile = {}, onboardingRow = {}) => {
-      if (!window.html2pdf) {
-        throw new Error('html2pdf is not available');
-      }
-
-      const details = getAccountDetailsForPdf(profile, onboardingRow);
-      const filenameSeed = sanitizeFilename(details.fullName || profile?.id || 'mint_account_details');
-
-      const tempContainer = document.createElement('div');
-      tempContainer.style.position = 'fixed';
-      tempContainer.style.left = '-10000px';
-      tempContainer.style.top = '0';
-      tempContainer.style.width = '880px';
-      tempContainer.style.height = 'auto';
-      tempContainer.style.opacity = '1';
-      tempContainer.style.pointerEvents = 'none';
-      tempContainer.style.background = '#ffffff';
-      tempContainer.style.zIndex = '-1';
-      tempContainer.innerHTML = `
-        <style>
-          .mint-account-pdf-preview{width:800px;background:white;padding:40px;font-family:Arial,sans-serif;box-shadow:0 0 15px rgba(0,0,0,0.08);}
-          .mint-account-pdf-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;}
-          .mint-account-pdf-logo{width:120px;}
-          .mint-account-pdf-title{font-size:22px;font-weight:bold;}
-          .mint-account-pdf-section{margin-bottom:18px;}
-          .mint-account-pdf-label{font-weight:bold;font-size:13px;}
-          .mint-account-pdf-value{border-bottom:1px solid #ccc;padding:5px 0;min-height:20px;}
-        </style>
-        <div class="mint-account-pdf-preview" id="pdf">
-          <div class="mint-account-pdf-header">
-            <div class="mint-account-pdf-title">Account Details</div>
-            <img class="mint-account-pdf-logo" crossorigin="anonymous" src="https://mfxnghmuccevsxwcetej.supabase.co/storage/v1/object/public/Mint%20Assets/tMOmeIOo4KE20Yh1bIuk8PFMlFHZ421rVESa2dcn.jpg" alt="MINT logo">
-          </div>
-          <div class="mint-account-pdf-section"><div class="mint-account-pdf-label">Full Name</div><div class="mint-account-pdf-value" id="p_name"></div></div>
-          <div class="mint-account-pdf-section"><div class="mint-account-pdf-label">ID Number</div><div class="mint-account-pdf-value" id="p_id"></div></div>
-          <div class="mint-account-pdf-section"><div class="mint-account-pdf-label">Date of Birth</div><div class="mint-account-pdf-value" id="p_dob"></div></div>
-          <div class="mint-account-pdf-section"><div class="mint-account-pdf-label">Email</div><div class="mint-account-pdf-value" id="p_email"></div></div>
-          <div class="mint-account-pdf-section"><div class="mint-account-pdf-label">Phone</div><div class="mint-account-pdf-value" id="p_phone"></div></div>
-          <div class="mint-account-pdf-section"><div class="mint-account-pdf-label">Address</div><div class="mint-account-pdf-value" id="p_address"></div></div>
-          <div class="mint-account-pdf-section"><div class="mint-account-pdf-label">City</div><div class="mint-account-pdf-value" id="p_city"></div></div>
-          <div class="mint-account-pdf-section"><div class="mint-account-pdf-label">Country</div><div class="mint-account-pdf-value" id="p_country"></div></div>
-        </div>
-      `;
-
-      document.body.appendChild(tempContainer);
-
-      const setPreviewText = (selector, value) => {
-        const el = tempContainer.querySelector(selector);
-        if (el) el.innerText = value || 'Not provided';
-      };
-
-      setPreviewText('#p_name', details.fullName);
-      setPreviewText('#p_id', details.idNumber);
-      setPreviewText('#p_dob', details.dateOfBirth);
-      setPreviewText('#p_email', details.email);
-      setPreviewText('#p_phone', details.phone);
-      setPreviewText('#p_address', details.address);
-      setPreviewText('#p_city', details.city);
-      setPreviewText('#p_country', details.country);
-
-      const pdfElement = tempContainer.querySelector('#pdf');
-      const logoImg = tempContainer.querySelector('.mint-account-pdf-logo');
-      if (logoImg && !logoImg.complete) {
-        await new Promise((resolve) => {
-          logoImg.onload = () => resolve();
-          logoImg.onerror = () => resolve();
-          setTimeout(resolve, 1200);
-        });
-      }
-      await new Promise((resolve) => requestAnimationFrame(() => resolve()));
-
-      try {
-        await window.html2pdf().set({
-          margin: 10,
-          filename: `${filenameSeed || 'mint_account_details'}.pdf`,
-          html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        }).from(pdfElement).save();
-      } finally {
-        tempContainer.remove();
-      }
     };
 
     /* ================================================================
@@ -6543,7 +6433,7 @@
       const zip = new JsZip();
       zip.file(`sumsub-${safeBase}.json`, JSON.stringify(applicant, null, 2));
       const pdfSections = buildCompletePackSections(applicant);
-      const pdfReport = buildPackPdfReport(applicant, pdfSections);
+      const pdfReport = buildPackPdfReport(applicant, pdfSections, getJsPdfConstructor());
       if (pdfReport) {
         zip.file(pdfReport.filename, pdfReport.doc.output('blob'));
       }
@@ -6718,7 +6608,19 @@
         const pack = container?.__activePackDetails;
         const sections = container?.__packSections || [];
         if (!pack) return;
-        downloadPackPdf(pack, sections);
+
+        const originalLabel = packDownloadBtn.textContent;
+        packDownloadBtn.disabled = true;
+        packDownloadBtn.textContent = 'Preparing PDF...';
+        downloadPackPdf(pack, sections)
+          .catch((error) => {
+            console.error('Pack PDF generation failed:', error);
+            alert(error?.message || 'Unable to generate account details PDF right now. Please try again.');
+          })
+          .finally(() => {
+            packDownloadBtn.disabled = false;
+            packDownloadBtn.textContent = originalLabel;
+          });
         return;
       }
 
@@ -6998,30 +6900,6 @@
         } finally {
           mandateActionBtn.disabled = false;
           mandateActionBtn.textContent = originalLabel;
-        }
-      }
-
-      const accountPdfBtn = event.target.closest('[data-account-pdf-generate]');
-      if (accountPdfBtn) {
-        const item = accountPdfBtn.closest('.simple-item');
-        const profileId = item?.dataset?.profileId;
-        if (!profileId) return;
-
-        const profile = allProfiles.find((row) => String(row.id) === String(profileId));
-        if (!profile) return;
-
-        const onboardingRow = onboardingMap[profileId] || {};
-        const originalLabel = accountPdfBtn.textContent;
-        accountPdfBtn.disabled = true;
-        accountPdfBtn.textContent = 'Generating...';
-
-        try {
-          await generateAccountDetailsPdf(profile, onboardingRow);
-        } catch (error) {
-          console.error('Account details PDF generation failed:', error);
-        } finally {
-          accountPdfBtn.disabled = false;
-          accountPdfBtn.textContent = originalLabel;
         }
       }
 
