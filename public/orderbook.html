@@ -1757,7 +1757,7 @@
       const looksLikeSaid = numericOnly.length === 13;
 
       if (isCorpByName || isCorpById || !looksLikeSaid) {
-        return { ownerType: 'CORP', idType: 'REG' };
+        return { ownerType: 'IND', idType: 'REG' };
       }
       return { ownerType: 'IND', idType: 'SAID' };
     };
