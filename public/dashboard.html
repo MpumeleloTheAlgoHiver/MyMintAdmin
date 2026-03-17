@@ -728,61 +728,16 @@
                   <input id="strategyName" name="name" type="hidden" />
                   <input id="strategyShortName" name="short_name" type="hidden" />
                   <textarea id="strategyDescription" name="description" style="display:none;"></textarea>
-                  <!-- Strategy metadata header -->
-                  <div style="padding: 14px 16px; border-bottom: 1px solid #e8edf3; background: #fafbfe;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start;">
-                      <select
-                        id="strategyRisk"
-                        name="risk_level"
-                        style="width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 11px; font-size: 13px; color: #1e293b; outline: none; background: #fff; cursor: pointer; box-sizing: border-box;"
-                        onfocus="this.style.borderColor='#7c3aed'"
-                        onblur="this.style.borderColor='#e2e8f0'"
-                      >
-                        <option value="">Risk level…</option>
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                      </select>
-                      <div style="display: flex; gap: 6px; align-items: center;">
-                        <select
-                          id="strategySector"
-                          name="sector"
-                          style="flex: 1; min-width: 0; border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 8px; font-size: 13px; color: #1e293b; outline: none; background: #fff; cursor: pointer;"
-                          onfocus="this.style.borderColor='#7c3aed'"
-                          onblur="this.style.borderColor='#e2e8f0'"
-                        >
-                          <option value="">Sector…</option>
-                        </select>
-                        <button
-                          type="button"
-                          id="addSectorBtn"
-                          style="padding: 6px 11px; font-size: 12px; font-weight: 600; color: #7c3aed; border: 1px solid #ddd6fe; border-radius: 8px; background: #fff; cursor: pointer; white-space: nowrap;"
-                          onmouseenter="this.style.background='#f5f3ff'"
-                          onmouseleave="this.style.background='#fff'"
-                        >+ Add</button>
-                      </div>
-                    </div>
-                    <div id="newSectorRow" style="display: none; margin-top: 8px;">
-                      <div style="display: flex; gap: 6px; max-width: 340px;">
-                        <input
-                          id="newSectorInput"
-                          type="text"
-                          placeholder="New sector…"
-                          style="flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 10px; font-size: 12px; outline: none;"
-                        />
-                        <button
-                          type="button"
-                          id="confirmSectorBtn"
-                          style="padding: 6px 12px; font-size: 12px; font-weight: 600; color: #fff; background: #7c3aed; border: none; border-radius: 8px; cursor: pointer;"
-                        >Save</button>
-                        <button
-                          type="button"
-                          id="cancelSectorBtn"
-                          style="padding: 6px 12px; font-size: 12px; color: #64748b; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; cursor: pointer;"
-                        >Cancel</button>
-                      </div>
-                    </div>
-                  </div>
+                  <!-- Hidden form fields for details managed via the Strategy Details modal -->
+                  <select id="strategyRisk" name="risk_level" style="display:none;">
+                    <option value=""></option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                  <select id="strategySector" name="sector" style="display:none;">
+                    <option value="">Sector…</option>
+                  </select>
 
                   <!-- Holdings table -->
                   <div style="overflow-x: auto">
@@ -817,14 +772,8 @@
                                 <p style="font-size: 10px; font-weight: 500; color: #7c3aed; margin: 0 0 1px;">Min. Investment</p>
                                 <p id="minInvestmentDisplay" style="font-size: 13px; font-weight: 700; color: #6d28d9; margin: 0;">R 0</p>
                               </div>
-                              <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 12px; color: #475569;">
-                                <input id="strategyIsPublic" name="is_public" type="checkbox" style="accent-color: #7c3aed;" />
-                                Public
-                              </label>
-                              <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 12px; color: #475569;">
-                                <input id="strategyIsFeatured" name="is_featured" type="checkbox" style="accent-color: #7c3aed;" />
-                                Featured
-                              </label>
+                              <input id="strategyIsPublic" name="is_public" type="checkbox" style="display:none;" />
+                              <input id="strategyIsFeatured" name="is_featured" type="checkbox" style="display:none;" />
                               <p id="strategyFormMessage" style="font-size: 11px; color: #64748b; margin: 0; max-width: 160px;"></p>
                               <button
                                 type="submit"
