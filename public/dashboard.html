@@ -3996,8 +3996,6 @@
           const tabsList = document.getElementById("strategyTabsList");
           if (!tabsList) return;
 
-          const hiddenName = document.getElementById("strategyName");
-
           const draftWrap = document.createElement("div");
           draftWrap.className = "draft-strategy-tab";
           draftWrap.style.cssText = "position:relative;display:flex;align-items:flex-end;";
@@ -4022,14 +4020,50 @@
             font-size:12.5px;font-weight:600;color:#6d28d9;
             width:140px;min-width:60px;padding:0;margin:0;`;
 
-          tabInput.addEventListener("input", () => {
-            if (hiddenName) hiddenName.value = tabInput.value;
-          });
+          /* On confirm (Enter or blur): if name is non-empty, immediately
+             create a skeleton strategy record so the tab is permanently saved */
+          let _committing = false;
+          const commitDraft = async () => {
+            if (_committing) return;
+            const name = tabInput.value.trim();
+            if (!name) {
+              /* Empty name — discard the draft */
+              draftWrap.remove();
+              setStrategyWorkspaceVisible(false);
+              return;
+            }
+            _committing = true;
+            tabInput.disabled = true;
+            const { data: insertData, error } = await supabaseClient
+              .from("strategies")
+              .insert([{ name, status: "active" }])
+              .select("id")
+              .single();
+            if (error || !insertData?.id) {
+              console.error("Could not create strategy:", error);
+              tabInput.disabled = false;
+              _committing = false;
+              return;
+            }
+            activeStrategyTabId = insertData.id;
+            const hiddenName = document.getElementById("strategyName");
+            if (hiddenName) hiddenName.value = name;
+            await loadStrategies();
+            const saved = (allStrategiesFullData || []).find(
+              (s) => s.id === activeStrategyTabId,
+            );
+            if (saved) {
+              setStrategyWorkspaceVisible(true);
+              await editStrategy(saved, globalSecuritiesMap);
+            }
+          };
 
           tabInput.addEventListener("keydown", (e) => {
             if (e.key === "Enter") { e.preventDefault(); tabInput.blur(); }
-            if (e.key === "Escape") { cancelEdit(); renderStrategyTabs(); }
+            if (e.key === "Escape") { draftWrap.remove(); setStrategyWorkspaceVisible(false); }
           });
+
+          tabInput.addEventListener("blur", () => commitDraft());
 
           draftTab.appendChild(tabInput);
           draftWrap.appendChild(draftTab);
