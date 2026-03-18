@@ -5071,9 +5071,11 @@
                 id: r.userId,
                 name: r.name,
                 instruments: new Set(),
+                totalCurrentHolding: 0,
               };
             }
             byClient[r.userId].instruments.add(code);
+            byClient[r.userId].totalCurrentHolding += qty;
           });
         });
         return Object.values(byClient)
@@ -5081,6 +5083,7 @@
             id: c.id,
             name: c.name,
             instrumentCount: c.instruments.size,
+            totalCurrentHolding: c.totalCurrentHolding,
           }))
           .sort((a, b) => a.name.localeCompare(b.name));
       }
@@ -5294,9 +5297,9 @@
               <p class="text-[10px] text-slate-400 font-mono">${client.id}</p>
             </td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-500">${client.instrumentCount}</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-400">—</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-400">—</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-400">—</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">${client.totalCurrentHolding.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-700">${client.totalCurrentHolding.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-400">0</td>
           </tr>`).join("");
           return;
         }
@@ -5312,17 +5315,18 @@
         if (!rebSelectedStep) {
           if (metaEl) metaEl.textContent = `${rebSelectedIsin.code} · ${clients.length} clients · select reduction step`;
           tbody.innerHTML = clients.map(client => {
-            const currentHolding = client.currentLots * rebSelectedIsin.unitsPerLot;
+            const lots = Number(client.lots) || 0;
+            const currentHolding = lots * rebSelectedIsin.unitsPerLot;
             return `
           <tr class="hover:bg-slate-50">
             <td class="px-4 py-2.5">
               <p class="font-medium text-slate-800">${client.name}</p>
               <p class="text-[10px] text-slate-400 font-mono">${client.id}</p>
             </td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-400">${client.currentLots}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-400">${lots}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">${currentHolding.toLocaleString()}</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-400">—</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-400">—</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-700">${currentHolding.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-400">0</td>
           </tr>`;
           }).join("");
           return;
