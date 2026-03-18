@@ -359,6 +359,31 @@ const getSumsubAuthHeaders = (method, pathWithQuery) => {
 
 const SECURITIES_SYNC_INTERVAL_MS = 60 * 60 * 1000; // every hour
 
+/* Fetch a Yahoo Finance crumb + cookie needed for authenticated API calls */
+const getYahooCrumb = async () => {
+  const cookieRes = await fetch('https://finance.yahoo.com/quote/AAPL', {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+    },
+    redirect: 'follow',
+  });
+
+  const cookies = cookieRes.headers.get('set-cookie') || '';
+  const cookieHeader = cookies.split(',').map(c => c.split(';')[0].trim()).join('; ');
+
+  const crumbRes = await fetch('https://query1.finance.yahoo.com/v1/test/getcrumb', {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      'Cookie': cookieHeader,
+    },
+  });
+  const crumb = await crumbRes.text();
+  if (!crumb || crumb.includes('<')) throw new Error('Failed to get Yahoo crumb');
+  return { crumb: crumb.trim(), cookie: cookieHeader };
+};
+
 const syncSecuritiesFundamentals = async () => {
   if (!supabaseUrl || !supabaseServiceRoleKey) {
     console.log('[securities-sync] Skipped — Supabase credentials not configured');
@@ -372,7 +397,17 @@ const syncSecuritiesFundamentals = async () => {
     return { updated: 0 };
   }
 
-  const CHUNK = 50;
+  /* Get crumb once for all requests */
+  let crumb, cookie;
+  try {
+    ({ crumb, cookie } = await getYahooCrumb());
+    console.log('[securities-sync] Got Yahoo crumb');
+  } catch (e) {
+    console.error('[securities-sync] Could not get Yahoo crumb:', e.message);
+    return { updated: 0, errors: [`Crumb fetch failed: ${e.message}`] };
+  }
+
+  const CHUNK = 20; // smaller chunks are more reliable
   const updates = [];
   const errors = [];
 
@@ -384,28 +419,44 @@ const syncSecuritiesFundamentals = async () => {
     let yahooData = null;
     try {
       const yahooRes = await fetch(
-        `https://query1.finance.yahoo.com/v8/finance/quote?symbols=${encodeURIComponent(symbolList)}&fields=trailingPE,dividendRate,dividendYield,ytdReturn,regularMarketPrice,regularMarketChangePercent,marketCap`,
-        { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MintCRM/1.0)' } }
+        `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbolList)}&crumb=${encodeURIComponent(crumb)}&fields=trailingPE,dividendRate,dividendYield,ytdReturn,regularMarketPrice,regularMarketChangePercent,marketCap`,
+        {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Cookie': cookie,
+            'Accept': 'application/json',
+          },
+        }
       );
-      if (yahooRes.ok) yahooData = await yahooRes.json();
+      if (yahooRes.ok) {
+        yahooData = await yahooRes.json();
+      } else {
+        const errText = await yahooRes.text();
+        errors.push(`Yahoo HTTP ${yahooRes.status} for chunk ${i}`);
+        console.error(`[securities-sync] Yahoo error chunk ${i}:`, errText.slice(0, 300));
+        continue;
+      }
     } catch (e) {
       errors.push(`Yahoo chunk ${i}: ${e.message}`);
       continue;
     }
 
     const quotes = yahooData?.quoteResponse?.result || [];
+    console.log(`[securities-sync] chunk ${i}: sent ${chunk.length} symbols, got ${quotes.length} quotes back`);
+
     for (const q of quotes) {
-      const sec = chunk.find(s => s.symbol === q.symbol);
+      const sec = chunk.find(s => s.symbol === q.symbol)
+        || chunk.find(s => s.symbol.replace('.JO','') === q.symbol.replace('.JO',''));
       if (!sec) continue;
 
       const patch = {};
-      if (q.trailingPE                 != null) patch.pe_ratio           = parseFloat(q.trailingPE.toFixed(4));
-      if (q.dividendRate               != null) patch.dividend_per_share = parseFloat(q.dividendRate.toFixed(4));
-      if (q.dividendYield              != null) patch.dividend_yield      = parseFloat((q.dividendYield * 100).toFixed(4));
-      if (q.ytdReturn                  != null) patch.ytd_performance     = parseFloat((q.ytdReturn * 100).toFixed(4));
+      if (q.trailingPE                 != null) patch.pe_ratio           = parseFloat(Number(q.trailingPE).toFixed(4));
+      if (q.dividendRate               != null) patch.dividend_per_share = parseFloat(Number(q.dividendRate).toFixed(4));
+      if (q.dividendYield              != null) patch.dividend_yield      = parseFloat((Number(q.dividendYield) * 100).toFixed(4));
+      if (q.ytdReturn                  != null) patch.ytd_performance     = parseFloat((Number(q.ytdReturn) * 100).toFixed(4));
       if (q.marketCap                  != null) patch.market_cap          = q.marketCap;
-      if (q.regularMarketPrice         != null) patch.last_price          = Math.round(q.regularMarketPrice * 100);
-      if (q.regularMarketChangePercent != null) patch.change_percent      = parseFloat(q.regularMarketChangePercent.toFixed(4));
+      if (q.regularMarketPrice         != null) patch.last_price          = Math.round(Number(q.regularMarketPrice) * 100);
+      if (q.regularMarketChangePercent != null) patch.change_percent      = parseFloat(Number(q.regularMarketChangePercent).toFixed(4));
 
       if (Object.keys(patch).length === 0) continue;
 
@@ -429,6 +480,9 @@ const syncSecuritiesFundamentals = async () => {
         errors.push(`PATCH ${q.symbol}: ${e.message}`);
       }
     }
+
+    /* Small delay between chunks to avoid rate limiting */
+    if (i + CHUNK < securities.length) await new Promise(r => setTimeout(r, 300));
   }
 
   console.log(`[securities-sync] Done — ${updates.length} updated, ${errors.length} errors`);
