@@ -219,6 +219,34 @@
         width: 6px;
       }
 
+      .reb-composition-card {
+        position: relative;
+      }
+
+      .reb-composition-accent {
+        height: 4px;
+        background: linear-gradient(90deg, #c4b5fd 0%, #8b5cf6 50%, #c4b5fd 100%);
+      }
+
+      .reb-composition-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: #8b5cf6 #ede9fe;
+      }
+
+      .reb-composition-scroll::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .reb-composition-scroll::-webkit-scrollbar-track {
+        background: #ede9fe;
+        border-radius: 999px;
+      }
+
+      .reb-composition-scroll::-webkit-scrollbar-thumb {
+        background: #8b5cf6;
+        border-radius: 999px;
+      }
+
       .holdings-list::-webkit-scrollbar-thumb {
         background: #cbd5e1;
         border-radius: 999px;
@@ -872,12 +900,13 @@
             <!-- Three-pane workspace -->
             <div class="flex gap-4" style="height:520px">
               <!-- LEFT: ISINs / Holdings (40%) -->
-              <div class="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden" style="width:42%">
+              <div class="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden reb-composition-card" style="width:42%">
+                <div class="reb-composition-accent"></div>
                 <div class="px-5 py-3 border-b border-slate-100 shrink-0">
                   <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Strategy Composition</p>
                   <p id="rebCompositionMeta" class="text-xs text-slate-400 mt-0.5">Select a strategy to begin</p>
                 </div>
-                <div class="flex-1 overflow-auto">
+                <div class="flex-1 overflow-auto reb-composition-scroll">
                   <table class="w-full text-xs" id="rebIsinsTable">
                     <thead class="sticky top-0 bg-white z-10 border-b border-slate-100">
                       <tr class="text-slate-400 font-medium">
@@ -5172,21 +5201,33 @@
             return { code, fullSymbol: sym, description: h.name || sym, unitsPerLot: units, currentPrice: price, weightPercent: Number(h.weight) || 0 };
           });
 
-        /* Fetch actual client holdings — query by strategy_id directly */
-        try {
-          const { data: holdRows } = await supabaseClient
-            .from("stock_holdings")
-            .select("security_id, user_id, quantity")
-            .eq("strategy_id", strategyId)
-            .eq("is_active", true)
-            .gt("quantity", 0);
-
-          if (holdRows && holdRows.length) {
-            /* Resolve security_id → ISIN code via the ISINs we already built */
-            const symbols = rebIsins.map(i => i.fullSymbol).filter(Boolean);
-            const { data: secRows } = await supabaseClient.from("securities").select("id, symbol").in("symbol", symbols);
+        /* Fetch actual client holdings from Supabase */
+        const symbols = rebIsins.map(i => i.fullSymbol).filter(Boolean);
+        if (symbols.length) {
+          try {
+            const { data: secRows } = await supabaseClient.from("securities").select("id, symbol, name, last_price").in("symbol", symbols);
             const codeBySecId = {};
             (secRows || []).forEach(s => { codeBySecId[s.id] = s.symbol.replace(/\.[A-Z]+$/, ""); });
+
+            const secBySymbol = new Map();
+            (secRows || []).forEach(s => {
+              if (!s?.symbol) return;
+              secBySymbol.set(String(s.symbol), s);
+            });
+
+            rebIsins = rebIsins.map((isin) => {
+              const sec = secBySymbol.get(isin.fullSymbol);
+              const secPrice = Number(sec?.last_price || 0) / 100;
+              const resolvedPrice = isin.currentPrice > 0
+                ? isin.currentPrice
+                : (Number.isFinite(secPrice) && secPrice > 0 ? secPrice : 0);
+              return {
+                ...isin,
+                currentPrice: resolvedPrice,
+                description: isin.description || sec?.name || isin.code,
+              };
+            });
+
             const secIds = Object.keys(codeBySecId);
             if (secIds.length) {
               let holdingsQuery = supabaseClient
@@ -5261,12 +5302,13 @@
           const holders = rebRawHoldings[isin.code] || [];
           const totalQty = holders.reduce((s, r) => s + r.quantity, 0);
           const holderCount = holders.filter(r => r.quantity > 0).length;
+          const positionValue = isin.currentPrice > 0 && totalQty > 0 ? isin.currentPrice * totalQty : 0;
           return `<tr data-isin="${isin.code}" class="cursor-pointer transition-colors ${isSelected ? "bg-violet-50" : "hover:bg-slate-50"}">
             <td class="px-4 py-2.5 font-mono font-semibold ${isSelected ? "text-violet-700" : "text-slate-800"}">${isin.code}</td>
             <td class="px-4 py-2.5 text-slate-700 max-w-[120px] truncate">${isin.description}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-600">${isin.unitsPerLot}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-400">${isin.weightPercent.toFixed(1)}%</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">${isin.currentPrice > 0 ? isin.currentPrice.toLocaleString("en-ZA", { minimumFractionDigits: 2 }) : "—"}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">${isin.currentPrice > 0 ? `R ${isin.currentPrice.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<div class="text-[10px] font-normal text-violet-600">${positionValue > 0 ? `Total R ${positionValue.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ""}</div>` : "—"}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums font-medium text-slate-800">${totalQty > 0 ? totalQty.toLocaleString() : "—"}<span class="text-slate-400 font-normal text-[10px] ml-1">${holderCount > 0 ? `${holderCount}c` : ""}</span></td>
           </tr>`;
         }).join("");
