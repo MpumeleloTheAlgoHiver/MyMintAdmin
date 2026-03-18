@@ -744,14 +744,21 @@
                     <table style="width: 100%; border-collapse: collapse; min-width: 560px;">
                       <thead>
                         <tr style="background: #f8fafc; border-bottom: 1.5px solid #e8edf3;">
-                          <th style="padding: 9px 16px; text-align: left; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap; min-width: 220px;">
+                          <th style="padding: 9px 16px; text-align: left; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap; min-width: 200px;">
                             Ticker &nbsp;<span
                               id="holdingsCount"
                               style="font-size: 10px; font-weight: 500; color: #94a3b8; background: #f1f5f9; padding: 1px 7px; border-radius: 20px;"
                             >0 assets</span>
                           </th>
                           <th style="padding: 9px 16px; text-align: left; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Shares</th>
+                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Stock Price</th>
+                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Daily %</th>
                           <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Market Value</th>
+                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Market Cap</th>
+                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">P/E</th>
+                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Div/Share</th>
+                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Div Yield</th>
+                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">YTD</th>
                           <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px;">Weight</th>
                           <th style="width: 44px;"></th>
                         </tr>
@@ -762,7 +769,9 @@
                         <tr style="background: #f8fafc; border-top: 1.5px solid #e8edf3;">
                           <td style="padding: 10px 16px; font-size: 12px; font-weight: 600; color: #64748b; white-space: nowrap;">Total Position</td>
                           <td></td>
+                          <td colspan="2"></td>
                           <td style="padding: 10px 16px; text-align: right; font-size: 13px; font-weight: 600; color: #334155;" id="totalMvFooter">R 0.00</td>
+                          <td colspan="5"></td>
                           <td style="padding: 10px 16px; text-align: right;">
                             <span id="totalWeightDisplay" style="font-size: 13px; font-weight: 700; color: #7c3aed;">0%</span>
                           </td>
@@ -1749,7 +1758,7 @@
         const [securitiesResult, strategiesResult] = await Promise.all([
           supabaseClient
             .from("securities")
-            .select("id, symbol, name, logo_url, last_price, change_percent")
+            .select("id, symbol, name, logo_url, last_price, change_percent, market_cap, pe_ratio, dividend_per_share, dividend_yield, ytd_performance")
             .order("name", { ascending: true })
             .limit(500),
           supabaseClient
@@ -1862,13 +1871,21 @@
 
         securityDropdown.querySelectorAll("button").forEach((btn) => {
           btn.addEventListener("click", () => {
+            const sym = btn.dataset.symbol;
+            const cached = (allSecuritiesCache || []).find((s) => s.symbol === sym) || {};
             addHolding({
-              symbol: btn.dataset.symbol,
+              symbol: sym,
               name: btn.dataset.name,
               last_price: Number(btn.dataset.price) || 0,
               logo_url: btn.dataset.logo || null,
               shares: 1,
               weight: 0,
+              market_cap: cached.market_cap || null,
+              pe_ratio: cached.pe_ratio || null,
+              dividend_per_share: cached.dividend_per_share || null,
+              dividend_yield: cached.dividend_yield || null,
+              ytd_performance: cached.ytd_performance || null,
+              change_percent: cached.change_percent || null,
             });
             securitySearchInput.value = "";
             renderSecuritiesDropdown("");
@@ -1930,11 +1947,30 @@
         });
       };
 
+      const fmtCompact = (val) => {
+        if (val == null || isNaN(val)) return "—";
+        const n = Number(val);
+        if (Math.abs(n) >= 1e12) return "R " + (n / 1e12).toFixed(1) + "T";
+        if (Math.abs(n) >= 1e9)  return "R " + (n / 1e9).toFixed(1) + "B";
+        if (Math.abs(n) >= 1e6)  return "R " + (n / 1e6).toFixed(1) + "M";
+        if (Math.abs(n) >= 1e3)  return "R " + (n / 1e3).toFixed(1) + "K";
+        return "R " + n.toFixed(2);
+      };
+      const fmtPct = (val, showSign = false) => {
+        if (val == null || isNaN(val)) return "—";
+        const n = Number(val);
+        return (showSign && n > 0 ? "+" : "") + n.toFixed(2) + "%";
+      };
+      const fmtPrice = (val) => {
+        if (val == null || isNaN(val)) return "—";
+        return "R " + (Number(val) / 100).toFixed(2);
+      };
+
       const renderFormHoldings = () => {
         if (formHoldings.length === 0) {
           holdingsContainer.innerHTML = `
           <tr>
-            <td colspan="5" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;">
+            <td colspan="12" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;">
               No holdings yet — search and add securities above
             </td>
           </tr>`;
@@ -1949,6 +1985,23 @@
                onerror="this.parentElement.innerHTML='<span style=\\'font-size:10px;font-weight:700;color:#fff;\\'>${initials}</span>'">`
               : `<span style="font-size:10px;font-weight:700;color:#fff;">${initials}</span>`;
             const mv = (h.market_value || 0).toFixed(2);
+
+            /* Daily % */
+            const chg = h.change_percent != null ? Number(h.change_percent) : null;
+            const chgStr = chg != null ? (chg >= 0 ? "+" : "") + chg.toFixed(2) + "%" : "—";
+            const chgColor = chg == null ? "#94a3b8" : chg >= 0 ? "#16a34a" : "#dc2626";
+
+            /* YTD */
+            const ytd = h.ytd_performance != null ? Number(h.ytd_performance) : null;
+            const ytdStr = ytd != null ? (ytd >= 0 ? "+" : "") + ytd.toFixed(2) + "%" : "—";
+            const ytdColor = ytd == null ? "#94a3b8" : ytd >= 0 ? "#16a34a" : "#dc2626";
+
+            const priceFmt = h.last_price ? "R " + (Number(h.last_price) / 100).toFixed(2) : "—";
+            const mcFmt = fmtCompact(h.market_cap);
+            const peFmt = h.pe_ratio != null ? Number(h.pe_ratio).toFixed(1) : "—";
+            const divShareFmt = h.dividend_per_share != null ? "R " + Number(h.dividend_per_share).toFixed(2) : "—";
+            const divYldFmt = h.dividend_yield != null ? Number(h.dividend_yield).toFixed(2) + "%" : "—";
+
             return `
         <tr style="border-bottom:1px solid #f1f5f9;transition:background 0.12s;"
             onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
@@ -1972,7 +2025,28 @@
             </div>
           </td>
           <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
+            <span style="font-size:13px;font-weight:500;color:#334155;">${priceFmt}</span>
+          </td>
+          <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
+            <span style="font-size:12px;font-weight:600;color:${chgColor};">${chgStr}</span>
+          </td>
+          <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
             <span class="holding-mv" style="font-size:13px;font-weight:500;color:#334155;">R ${mv}</span>
+          </td>
+          <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
+            <span style="font-size:12px;font-weight:500;color:#334155;">${mcFmt}</span>
+          </td>
+          <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
+            <span style="font-size:12px;font-weight:500;color:#334155;">${peFmt}</span>
+          </td>
+          <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
+            <span style="font-size:12px;font-weight:500;color:#334155;">${divShareFmt}</span>
+          </td>
+          <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
+            <span style="font-size:12px;font-weight:500;color:#334155;">${divYldFmt}</span>
+          </td>
+          <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
+            <span style="font-size:12px;font-weight:600;color:${ytdColor};">${ytdStr}</span>
           </td>
           <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
             <span class="holding-weight" style="font-size:13px;font-weight:700;color:#7c3aed;">${h.weight.toFixed(1)}%</span>
@@ -4166,6 +4240,12 @@
                   logo_url: sec.logo_url || null,
                   shares: 1,
                   weight: 0,
+                  market_cap: sec.market_cap || null,
+                  pe_ratio: sec.pe_ratio || null,
+                  dividend_per_share: sec.dividend_per_share || null,
+                  dividend_yield: sec.dividend_yield || null,
+                  ytd_performance: sec.ytd_performance || null,
+                  change_percent: sec.change_percent || null,
                 });
                 renderTopAssetsRow();
               }
