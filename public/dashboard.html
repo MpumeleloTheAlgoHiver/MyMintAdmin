@@ -229,12 +229,16 @@
       }
 
       .reb-composition-scroll {
+        overflow-x: auto;
+        overflow-y: auto;
+        scrollbar-gutter: stable both-edges;
         scrollbar-width: thin;
         scrollbar-color: #8b5cf6 #ede9fe;
       }
 
       .reb-composition-scroll::-webkit-scrollbar {
         width: 8px;
+        height: 10px;
       }
 
       .reb-composition-scroll::-webkit-scrollbar-track {
@@ -907,7 +911,7 @@
                   <p id="rebCompositionMeta" class="text-xs text-slate-400 mt-0.5">Select a strategy to begin</p>
                 </div>
                 <div class="flex-1 overflow-auto reb-composition-scroll">
-                  <table class="w-full text-xs" id="rebIsinsTable">
+                  <table class="w-full min-w-[880px] text-xs" id="rebIsinsTable">
                     <thead class="sticky top-0 bg-white z-10 border-b border-slate-100">
                       <tr class="text-slate-400 font-medium">
                         <th class="text-left px-4 py-2">Code</th>
