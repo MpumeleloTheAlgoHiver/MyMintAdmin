@@ -616,22 +616,6 @@
               <!-- Sheet tabs -->
               <div id="strategyTabsList" class="flex items-end gap-0.5"></div>
 
-              <!-- Sync market data button -->
-              <div class="flex-1"></div>
-              <button
-                id="syncFundamentalsBtn"
-                type="button"
-                title="Pull latest price, P/E, dividend and YTD data from Yahoo Finance for all securities"
-                style="flex-shrink:0;display:flex;align-items:center;gap:6px;padding:5px 12px;margin-bottom:4px;margin-right:4px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;white-space:nowrap;transition:all 0.15s;"
-                onmouseenter="this.style.background='#ede9fe';this.style.borderColor='#c4b5fd';this.style.color='#7c3aed'"
-                onmouseleave="this.style.background='#f8fafc';this.style.borderColor='#e2e8f0';this.style.color='#64748b'"
-              >
-                <svg id="syncFundamentalsIcon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                </svg>
-                <span id="syncFundamentalsLabel">Sync market data</span>
-              </button>
-
               <!-- hidden compat elements -->
               <div class="hidden">
                 <span id="strategiesTotalBadge"></span>
@@ -4355,53 +4339,6 @@
           draftWrap.appendChild(draftTab);
           tabsList.insertBefore(draftWrap, tabsList.firstChild);
           tabInput.focus();
-        });
-      }
-
-      /* ── Sync market data button ── */
-      const syncFundamentalsBtn   = document.getElementById("syncFundamentalsBtn");
-      const syncFundamentalsLabel = document.getElementById("syncFundamentalsLabel");
-      const syncFundamentalsIcon  = document.getElementById("syncFundamentalsIcon");
-      let syncFundamentalsRunning = false;
-
-      if (syncFundamentalsBtn) {
-        syncFundamentalsBtn.addEventListener("click", async () => {
-          if (syncFundamentalsRunning) return;
-          syncFundamentalsRunning = true;
-          syncFundamentalsLabel.textContent = "Syncing…";
-          syncFundamentalsIcon.style.animation = "spin 1s linear infinite";
-          syncFundamentalsBtn.style.opacity = "0.7";
-          syncFundamentalsBtn.style.pointerEvents = "none";
-
-          try {
-            const session = supabaseClient.auth.session
-              ? supabaseClient.auth.session()
-              : (await supabaseClient.auth.getSession())?.data?.session;
-            const token = session?.access_token;
-            if (!token) throw new Error("Not authenticated");
-
-            const res = await fetch("/api/securities/sync-fundamentals", {
-              method: "POST",
-              headers: { "Authorization": `Bearer ${token}` }
-            });
-            const json = await res.json();
-            if (!res.ok) throw new Error(json.error || "Sync failed");
-
-            syncFundamentalsLabel.textContent = `✓ ${json.updated} updated`;
-            setTimeout(() => { syncFundamentalsLabel.textContent = "Sync market data"; }, 4000);
-
-            /* Bust the cache so next dropdown open re-fetches fresh data */
-            allSecuritiesCache = null;
-          } catch (e) {
-            syncFundamentalsLabel.textContent = "Sync failed";
-            console.error("Fundamentals sync error:", e);
-            setTimeout(() => { syncFundamentalsLabel.textContent = "Sync market data"; }, 4000);
-          } finally {
-            syncFundamentalsRunning = false;
-            syncFundamentalsIcon.style.animation = "";
-            syncFundamentalsBtn.style.opacity = "";
-            syncFundamentalsBtn.style.pointerEvents = "";
-          }
         });
       }
 
