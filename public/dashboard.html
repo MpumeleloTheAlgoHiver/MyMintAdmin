@@ -690,7 +690,7 @@
                   Add stocks to your strategy
                 </h2>
                 <p class="text-sm text-slate-400 mb-5">
-                  Select from top performers above or search for any JSE
+                  Select from the most-used assets above or search for any JSE
                   security below
                 </p>
                 <div class="relative max-w-lg mx-auto">
@@ -3149,6 +3149,7 @@
         );
         allStrategiesData = strategies;
         allStrategiesFullData = strategies;
+        renderTopAssetsRow(); // re-rank cards now that strategy usage counts are known
 
         // Build live securities price map for overview min investment display
         const _allSyms = [
@@ -4093,26 +4094,44 @@
           formHoldings.map((h) => h.symbol || h.ticker).filter(Boolean),
         );
 
-        /* Only show Mint platform assets: must have logo_url, last_price, and change_percent */
+        /* Build usage count: how many strategies contain each symbol */
+        const usageCount = {};
+        (allStrategiesFullData || []).forEach((strategy) => {
+          const holdings = Array.isArray(strategy.holdings) ? strategy.holdings : [];
+          const seen = new Set();
+          holdings.forEach((h) => {
+            const sym = h.ticker || h.symbol || (typeof h === "string" ? h : "");
+            if (sym && !seen.has(sym)) {
+              seen.add(sym);
+              usageCount[sym] = (usageCount[sym] || 0) + 1;
+              const norm = normalizeSymbol(sym);
+              if (norm !== sym) usageCount[norm] = (usageCount[norm] || 0) + 1;
+            }
+          });
+        });
+
+        const byUsage = (a, b) => {
+          const ua = usageCount[a.symbol] || usageCount[normalizeSymbol(a.symbol)] || 0;
+          const ub = usageCount[b.symbol] || usageCount[normalizeSymbol(b.symbol)] || 0;
+          if (ub !== ua) return ub - ua;
+          /* tiebreak by price change */
+          return (typeof b.change_percent === "number" ? b.change_percent : -Infinity) -
+                 (typeof a.change_percent === "number" ? a.change_percent : -Infinity);
+        };
+
+        /* Prefer assets with logo + price; sort by strategy usage */
         const top7 = [...allSecuritiesCache]
-          .filter(
-            (s) =>
-              s.logo_url &&
-              typeof s.change_percent === "number" &&
-              s.last_price,
-          )
-          .sort((a, b) => b.change_percent - a.change_percent)
+          .filter((s) => s.logo_url && s.last_price)
+          .sort(byUsage)
           .slice(0, 7);
 
-        /* Fallback: any with change_percent if no logos exist */
+        /* Fallback: any with a price if not enough logos */
         const display =
           top7.length >= 3
             ? top7
             : [...allSecuritiesCache]
-                .filter(
-                  (s) => typeof s.change_percent === "number" && s.last_price,
-                )
-                .sort((a, b) => b.change_percent - a.change_percent)
+                .filter((s) => s.last_price)
+                .sort(byUsage)
                 .slice(0, 7);
 
         if (!display.length) {
@@ -4183,6 +4202,11 @@
         </div>`
               : "";
 
+            const symUsage = usageCount[s.symbol] || usageCount[normalizeSymbol(s.symbol)] || 0;
+            const usageBadge = symUsage > 0
+              ? `<span style="font-size:9.5px;font-weight:600;color:#64748b;white-space:nowrap;">Used in ${symUsage} ${symUsage === 1 ? "strategy" : "strategies"}</span>`
+              : "";
+
             return `<button type="button" data-sym="${s.symbol}"
           style="flex-shrink:0;width:192px;display:flex;flex-direction:column;padding:14px;border-radius:16px;cursor:pointer;text-align:left;background:${cardBg};border:${cardBorder};box-shadow:${cardShadow};transition:all 0.18s;gap:10px;position:relative;overflow:hidden;outline:none;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none;">
           <!-- subtle top accent bar -->
@@ -4199,9 +4223,10 @@
           </div>
           <!-- price -->
           <div style="font-size:19px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;line-height:1;"><span style="font-size:12px;font-weight:600;color:#64748b;margin-right:1px;">R</span>${price}</div>
-          <!-- change pill -->
-          <div style="display:flex;align-items:center;gap:6px;">
+          <!-- change pill + usage -->
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
             <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;background:${pillBg};color:#fff;letter-spacing:0.1px;">${chgStr}</span>
+            ${usageBadge}
           </div>
         </button>`;
           })
