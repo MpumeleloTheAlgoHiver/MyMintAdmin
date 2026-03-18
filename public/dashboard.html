@@ -1755,12 +1755,7 @@
         securityDropdown.innerHTML = `<div class="px-3 py-3 text-sm text-slate-400 text-center">Loading assets...</div>`;
         securityDropdown.classList.remove("hidden");
 
-        const [securitiesResult, strategiesResult] = await Promise.all([
-          supabaseClient
-            .from("securities")
-            .select("id, symbol, name, logo_url, last_price, change_percent, market_cap, pe_ratio, dividend_per_share, dividend_yield, ytd_performance")
-            .order("name", { ascending: true })
-            .limit(500),
+        const [strategiesResult] = await Promise.all([
           supabaseClient
             .from("strategies")
             .select("holdings, created_at")
@@ -1768,23 +1763,24 @@
             .limit(200),
         ]);
 
+        /* Probe for columns progressively so partial schemas still show price data */
+        const _secSelectVariants = [
+          "id, symbol, name, logo_url, last_price, change_percent, market_cap, pe_ratio, dividend_per_share, dividend_yield, ytd_performance",
+          "id, symbol, name, logo_url, last_price, change_percent, market_cap",
+          "id, symbol, name, logo_url, last_price, change_percent",
+          "id, symbol, name, logo_url, last_price",
+          "id, symbol, name",
+        ];
         let data = null;
-        if (!securitiesResult.error && securitiesResult.data) {
-          data = securitiesResult.data;
-        } else {
-          const r2 = await supabaseClient
+        for (const _cols of _secSelectVariants) {
+          const _r = await supabaseClient
             .from("securities")
-            .select("id, symbol, name")
+            .select(_cols)
             .order("name", { ascending: true })
             .limit(500);
-          if (!r2.error && r2.data) data = r2.data;
-          else
-            console.error(
-              "Failed to load securities:",
-              securitiesResult.error,
-              r2.error,
-            );
+          if (!_r.error && _r.data) { data = _r.data; break; }
         }
+        if (!data) console.error("Failed to load securities from any column variant");
 
         const symbolHoldingsMap = {};
         if (!strategiesResult.error && strategiesResult.data) {
