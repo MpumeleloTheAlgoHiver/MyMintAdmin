@@ -448,6 +448,13 @@
               Strategy Management
             </button>
             <button
+              id="tabRebalancing"
+              type="button"
+              class="text-sm pb-2 tab-inactive hover:text-slate-800"
+            >
+              Rebalancing
+            </button>
+            <button
               id="tabFactsheets"
               type="button"
               class="text-sm pb-2 tab-inactive hover:text-slate-800"
@@ -818,6 +825,169 @@
           </div>
 
           <!-- ═══════════════ FACTSHEETS TAB ═══════════════ -->
+          <!-- ═══════════════ REBALANCING TAB ═══════════════ -->
+          <div id="tabRebalancingPanel" class="hidden">
+            <!-- Header bar: strategy selector + commit button -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-4 px-5 py-4 flex flex-wrap items-center gap-4">
+              <div class="flex-1 min-w-[200px]">
+                <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Strategy</label>
+                <select id="rebStrategySelect" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white">
+                  <option value="">Select a strategy…</option>
+                </select>
+              </div>
+              <div id="rebNegativeBadge" class="hidden items-center gap-1.5 text-red-600 text-xs font-semibold">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>
+                Negative holdings detected
+              </div>
+              <button id="rebCommitBtn" class="hidden px-5 py-2 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-700 transition">
+                Commit Trade Sequence
+              </button>
+            </div>
+
+            <!-- Three-pane workspace -->
+            <div class="flex gap-4" style="height:520px">
+              <!-- LEFT: ISINs / Holdings (40%) -->
+              <div class="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden" style="width:42%">
+                <div class="px-5 py-3 border-b border-slate-100 shrink-0">
+                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Strategy Composition</p>
+                  <p id="rebCompositionMeta" class="text-xs text-slate-400 mt-0.5">Select a strategy to begin</p>
+                </div>
+                <div class="flex-1 overflow-auto">
+                  <table class="w-full text-xs" id="rebIsinsTable">
+                    <thead class="sticky top-0 bg-white z-10 border-b border-slate-100">
+                      <tr class="text-slate-400 font-medium">
+                        <th class="text-left px-4 py-2">Code</th>
+                        <th class="text-left px-4 py-2">Name</th>
+                        <th class="text-right px-4 py-2">Units/Lot</th>
+                        <th class="text-right px-4 py-2">Weight</th>
+                        <th class="text-right px-4 py-2">Price (R)</th>
+                        <th class="text-right px-4 py-2">Total Units</th>
+                      </tr>
+                    </thead>
+                    <tbody id="rebIsinsBody">
+                      <tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">No strategy selected</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- RIGHT: stacked panes -->
+              <div class="flex-1 flex flex-col gap-4 min-w-0">
+                <!-- TOP-RIGHT: Divisibility Engine -->
+                <div class="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+                  <div class="px-5 py-3 border-b border-slate-100 shrink-0 flex items-center justify-between">
+                    <div>
+                      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Divisibility Engine</p>
+                      <p id="rebEngineMeta" class="text-xs text-slate-400 mt-0.5">Select an instrument</p>
+                    </div>
+                    <p id="rebEnginePrice" class="text-xs font-mono text-slate-400"></p>
+                  </div>
+                  <div class="flex-1 overflow-auto px-4 py-3">
+                    <div id="rebStepsList">
+                      <p class="text-xs text-slate-400 text-center pt-6">Select an instrument from the left panel to see valid rebalance steps</p>
+                    </div>
+                  </div>
+                  <div id="rebAggregateBar" class="hidden px-5 py-3 border-t border-slate-100 bg-slate-50 shrink-0">
+                    <div class="flex items-center justify-between text-xs">
+                      <span class="text-slate-500 font-medium">Aggregate Trade</span>
+                      <span id="rebAggregateText" class="font-mono font-semibold text-slate-800"></span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- BOTTOM-RIGHT: Client Impact -->
+                <div class="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+                  <div class="px-5 py-3 border-b border-slate-100 shrink-0 flex items-center justify-between">
+                    <div>
+                      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Client Impact Preview</p>
+                      <p id="rebImpactMeta" class="text-xs text-slate-400 mt-0.5">Select instrument + step</p>
+                    </div>
+                  </div>
+                  <div class="flex-1 overflow-auto">
+                    <table class="w-full text-xs">
+                      <thead class="sticky top-0 bg-white z-10 border-b border-slate-100">
+                        <tr class="text-slate-400 font-medium">
+                          <th class="text-left px-4 py-2">Client</th>
+                          <th class="text-right px-4 py-2">Lots</th>
+                          <th class="text-right px-4 py-2">Current</th>
+                          <th class="text-right px-4 py-2">New</th>
+                          <th class="text-right px-4 py-2">Δ</th>
+                        </tr>
+                      </thead>
+                      <tbody id="rebImpactBody">
+                        <tr><td colspan="5" class="px-4 py-8 text-center text-slate-400">No impact data yet</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Clients panel -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mt-4 px-5 py-4">
+              <div class="flex items-center justify-between mb-3">
+                <div>
+                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Client Lots</p>
+                  <p class="text-xs text-slate-400 mt-0.5">Define how many lots each client holds in this strategy</p>
+                </div>
+                <button id="rebAddClientBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+                  Add Client
+                </button>
+              </div>
+              <div id="rebClientsGrid" class="flex flex-wrap gap-2"></div>
+              <div id="rebAddClientForm" class="hidden mt-3 flex gap-2 items-center">
+                <input id="rebClientName" type="text" placeholder="Client name" class="border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 w-48"/>
+                <input id="rebClientId" type="text" placeholder="ID (e.g. CLI-007)" class="border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 w-32"/>
+                <input id="rebClientLots" type="number" min="1" placeholder="Lots" class="border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 w-20"/>
+                <button id="rebClientSaveBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-700 transition">Add</button>
+                <button id="rebClientCancelBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- SELL MODAL -->
+          <div id="rebSellModal" class="hidden fixed inset-0 z-[9000] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/30" id="rebSellOverlay"></div>
+            <div class="relative bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md z-10">
+              <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <p class="font-semibold text-slate-900 text-sm">Sell Execution</p>
+                  <p id="rebSellModalMeta" class="text-xs text-slate-400 mt-0.5"></p>
+                </div>
+                <button id="rebSellCloseBtn" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition">
+                  <svg class="w-3.5 h-3.5 text-slate-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                </button>
+              </div>
+              <div id="rebSellModalBody" class="px-6 py-5 space-y-3 text-sm"></div>
+              <div class="px-6 py-4 border-t border-slate-100 flex gap-3">
+                <button id="rebSellCancelBtn" class="flex-1 py-2 rounded-xl text-sm font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 transition">Cancel</button>
+                <button id="rebSellConfirmBtn" class="flex-1 py-2 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-700 transition">Confirm & Proceed to Buy</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- BUY MODAL -->
+          <div id="rebBuyModal" class="hidden fixed inset-0 z-[9000] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/30" id="rebBuyOverlay"></div>
+            <div class="relative bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg z-10">
+              <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <p class="font-semibold text-slate-900 text-sm">Buy Execution</p>
+                  <p id="rebBuyModalMeta" class="text-xs text-slate-400 mt-0.5">Reinvest net proceeds</p>
+                </div>
+                <button id="rebBuyCloseBtn" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition">
+                  <svg class="w-3.5 h-3.5 text-slate-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                </button>
+              </div>
+              <div id="rebBuyModalBody" class="px-6 py-5"></div>
+              <div class="px-6 py-4 border-t border-slate-100 flex gap-3">
+                <button id="rebBuyResetBtn" class="flex-1 py-2 rounded-xl text-sm font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 transition">Start Over</button>
+                <button id="rebBuyCommitBtn" class="flex-1 py-2 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-700 transition">Commit Trade Sequence</button>
+              </div>
+            </div>
+          </div>
+
           <div id="tabFactsheetsPanel" class="hidden">
             <div id="factsheetSelectView">
               <div class="flex items-center justify-between mb-4">
@@ -1183,11 +1353,15 @@
       ];
 
       /* ─────────────────────── TAB SWITCHING ─────────────────────── */
+      const tabRebalancing = document.getElementById("tabRebalancing");
+      const tabRebalancingPanel = document.getElementById("tabRebalancingPanel");
+
       const switchTab = (activeTab) => {
-        const tabs = [tabOverview, tabStrategies, tabFactsheets];
+        const tabs = [tabOverview, tabStrategies, tabRebalancing, tabFactsheets];
         const panels = [
           tabOverviewPanel,
           tabStrategiesPanel,
+          tabRebalancingPanel,
           tabFactsheetsPanel,
         ];
         tabs.forEach((tab, i) => {
@@ -1209,6 +1383,10 @@
       tabFactsheets.addEventListener("click", () => {
         switchTab(tabFactsheets);
         renderFactsheetStrategyList();
+      });
+      tabRebalancing.addEventListener("click", () => {
+        switchTab(tabRebalancing);
+        rebInitStrategySelector();
       });
 
       /* ─────────────────────── OVERVIEW TAB LOGIC ─────────────────────── */
@@ -4569,6 +4747,511 @@
         loadStrategies();
         loadTopHoldings();
         loadUserStats();
+      });
+
+      /* ═══════════════════════════════════════════════════════════════════
+         REBALANCING ENGINE
+         Ported from mint-harmony-engine (TypeScript → plain JS)
+      ═══════════════════════════════════════════════════════════════════ */
+
+      /* ── Constants ── */
+      const REB_BROKERAGE_RATE = 0.005; // 0.5%
+      const REB_OFF_CUSTODY_FEE = 69;   // R69
+
+      /* ── Engine functions ── */
+      function rebGetDivisors(n) {
+        if (n <= 0) return [];
+        const divs = [];
+        for (let i = 1; i <= n; i++) { if (n % i === 0) divs.push(i); }
+        return divs;
+      }
+
+      function rebGetRebalanceSteps(currentUnits) {
+        const divisors = rebGetDivisors(currentUnits);
+        const steps = [];
+        for (const d of divisors) {
+          if (d === currentUnits) {
+            steps.push({ divisor: d, newUnitsPerLot: 0, reductionUnits: currentUnits, reductionPercent: 100 });
+          } else if (d > 0 && d < currentUnits) {
+            steps.push({ divisor: d, newUnitsPerLot: currentUnits - d, reductionUnits: d, reductionPercent: Math.round((d / currentUnits) * 100) });
+          }
+        }
+        return steps.sort((a, b) => a.reductionUnits - b.reductionUnits);
+      }
+
+      function rebComputeClientImpacts(clients, currentUnits, newUnits) {
+        return clients.map(c => {
+          const currentHolding = c.lots * currentUnits;
+          const newHolding = c.lots * newUnits;
+          const delta = newHolding - currentHolding;
+          return { clientId: c.id, clientName: c.name, currentLots: c.lots, currentHolding, newHolding, delta, hasNegative: newHolding < 0 };
+        });
+      }
+
+      function rebComputeAggregateTrade(clients, reductionPerLot) {
+        const totalLots = clients.reduce((s, c) => s + c.lots, 0);
+        return { totalSharesDelta: reductionPerLot * totalLots, totalLots, deltaPerLot: reductionPerLot };
+      }
+
+      function rebComputeSellExecution(isin, reductionPerLot, totalLots) {
+        const totalShares = reductionPerLot * totalLots;
+        const grossProceeds = totalShares * isin.currentPrice;
+        const brokerage = grossProceeds * REB_BROKERAGE_RATE;
+        const netProceeds = grossProceeds - brokerage - REB_OFF_CUSTODY_FEE;
+        return { isinCode: isin.code, isinDescription: isin.description, totalShares, pricePerShare: isin.currentPrice, grossProceeds, brokerage, offCustodyFee: REB_OFF_CUSTODY_FEE, netProceeds };
+      }
+
+      function rebComputeBuyExecution(isinCode, isinDescription, pricePerShare, netCapital, clients, applyBuffer) {
+        const totalLots = clients.reduce((s, c) => s + c.lots, 0);
+        const bufferedPrice = applyBuffer ? pricePerShare * 1.08 : pricePerShare;
+        const buyPerLot = Math.floor(netCapital / (totalLots * bufferedPrice));
+        const totalShares = buyPerLot * totalLots;
+        const grossCost = totalShares * pricePerShare;
+        const brokerage = grossCost * REB_BROKERAGE_RATE;
+        const totalCost = grossCost + brokerage + REB_OFF_CUSTODY_FEE;
+        const residualCash = netCapital - totalCost;
+        const clientAllocations = clients.map(c => {
+          const shares = buyPerLot * c.lots;
+          const clientResidual = (c.lots / totalLots) * residualCash;
+          return { clientId: c.id, clientName: c.name, lots: c.lots, shares, residualCash: clientResidual };
+        });
+        return { isinCode, isinDescription, pricePerShare, bufferedPrice, buyPerLot, totalShares, grossCost, brokerage, custodyFee: REB_OFF_CUSTODY_FEE, totalCost, residualCash, clientAllocations };
+      }
+
+      /* ── State ── */
+      let rebIsins = [];           // [{code, description, unitsPerLot, currentPrice, weightPercent}]
+      let rebClients = [];         // [{id, name, lots}]
+      let rebSelectedIsin = null;
+      let rebSelectedStep = null;
+      let rebSellNetProceeds = 0;
+      let rebApplyBuffer = true;
+
+      /* ── Helpers ── */
+      const rebFmtZAR = n => `R\u00A0${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const rebTotalLots = () => rebClients.reduce((s, c) => s + c.lots, 0);
+
+      /* ── Init strategy selector ── */
+      function rebInitStrategySelector() {
+        const sel = document.getElementById("rebStrategySelect");
+        if (!sel) return;
+        const currentVal = sel.value;
+        sel.innerHTML = '<option value="">Select a strategy…</option>';
+        (allStrategiesFullData || []).forEach(s => {
+          const opt = document.createElement("option");
+          opt.value = s.id;
+          opt.textContent = s.short_name || s.name || `Strategy ${s.id}`;
+          sel.appendChild(opt);
+        });
+        if (currentVal) sel.value = currentVal;
+      }
+
+      /* ── Load strategy holdings into ISINs ── */
+      function rebLoadStrategy(strategyId) {
+        rebSelectedIsin = null;
+        rebSelectedStep = null;
+        const strategy = (allStrategiesFullData || []).find(s => String(s.id) === String(strategyId));
+        if (!strategy) { rebIsins = []; rebRenderAll(); return; }
+
+        const holdings = Array.isArray(strategy.holdings) ? strategy.holdings : [];
+        rebIsins = holdings
+          .filter(h => h.symbol || h.ticker)
+          .map(h => {
+            const sym = h.symbol || h.ticker || "";
+            const price = h.last_price ? h.last_price / 100 : 0;
+            const units = Math.max(1, Math.round(Number(h.shares) || 1));
+            return {
+              code: sym.replace(".JO", ""),
+              fullSymbol: sym,
+              description: h.name || sym,
+              unitsPerLot: units,
+              currentPrice: price,
+              weightPercent: Number(h.weight) || 0,
+            };
+          });
+
+        const metaEl = document.getElementById("rebCompositionMeta");
+        if (metaEl) metaEl.textContent = `${strategy.short_name || strategy.name} · ${rebTotalLots()} total lots · ${rebIsins.length} instruments`;
+        rebRenderAll();
+      }
+
+      /* ── Master render ── */
+      function rebRenderAll() {
+        rebRenderIsinsTable();
+        rebRenderSteps();
+        rebRenderImpact();
+        rebRenderClients();
+        rebUpdateHeader();
+      }
+
+      /* ── ISINs table ── */
+      function rebRenderIsinsTable() {
+        const tbody = document.getElementById("rebIsinsBody");
+        if (!tbody) return;
+        const totalLots = rebTotalLots();
+        if (!rebIsins.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">No holdings in this strategy</td></tr>';
+          return;
+        }
+        tbody.innerHTML = rebIsins.map(isin => {
+          const isSelected = rebSelectedIsin && rebSelectedIsin.code === isin.code;
+          const totalUnits = isin.unitsPerLot * totalLots;
+          return `<tr data-isin="${isin.code}" class="cursor-pointer transition-colors ${isSelected ? "bg-violet-50" : "hover:bg-slate-50"}">
+            <td class="px-4 py-2.5 font-mono font-semibold ${isSelected ? "text-violet-700" : "text-slate-800"}">${isin.code}</td>
+            <td class="px-4 py-2.5 text-slate-700 max-w-[120px] truncate">${isin.description}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-600">${isin.unitsPerLot}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-400">${isin.weightPercent.toFixed(1)}%</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">${isin.currentPrice > 0 ? isin.currentPrice.toLocaleString("en-ZA", { minimumFractionDigits: 2 }) : "—"}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-medium text-slate-800">${totalLots > 0 ? totalUnits.toLocaleString() : "—"}</td>
+          </tr>`;
+        }).join("");
+
+        tbody.querySelectorAll("tr[data-isin]").forEach(row => {
+          row.addEventListener("click", () => {
+            const code = row.dataset.isin;
+            rebSelectedIsin = rebIsins.find(i => i.code === code) || null;
+            rebSelectedStep = null;
+            rebRenderAll();
+          });
+        });
+      }
+
+      /* ── Divisibility steps ── */
+      function rebRenderSteps() {
+        const container = document.getElementById("rebStepsList");
+        const metaEl = document.getElementById("rebEngineMeta");
+        const priceEl = document.getElementById("rebEnginePrice");
+        const aggBar = document.getElementById("rebAggregateBar");
+        if (!container) return;
+
+        if (!rebSelectedIsin) {
+          container.innerHTML = '<p class="text-xs text-slate-400 text-center pt-6">Select an instrument from the left panel to see valid rebalance steps</p>';
+          if (metaEl) metaEl.textContent = "Select an instrument";
+          if (priceEl) priceEl.textContent = "";
+          if (aggBar) aggBar.classList.add("hidden");
+          return;
+        }
+
+        if (metaEl) metaEl.textContent = `${rebSelectedIsin.code} · ${rebSelectedIsin.description} · ${rebSelectedIsin.unitsPerLot} units/lot`;
+        if (priceEl) priceEl.textContent = rebSelectedIsin.currentPrice > 0 ? `ZAR ${rebSelectedIsin.currentPrice.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "";
+
+        const steps = rebGetRebalanceSteps(rebSelectedIsin.unitsPerLot);
+        if (!steps.length) {
+          container.innerHTML = '<p class="text-xs text-slate-400 text-center pt-6">No valid reduction steps (units/lot = 1)</p>';
+          if (aggBar) aggBar.classList.add("hidden");
+          return;
+        }
+
+        container.innerHTML = steps.map(step => {
+          const isActive = rebSelectedStep && rebSelectedStep.divisor === step.divisor;
+          const isFull = step.reductionPercent === 100;
+          return `<button type="button" data-divisor="${step.divisor}"
+            class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl mb-1.5 text-xs transition-all
+              ${isActive ? "bg-slate-900 text-white" : "hover:bg-slate-50 border border-slate-100 text-slate-700"}">
+            <div class="flex items-center gap-3">
+              <span class="font-mono font-semibold">${rebSelectedIsin.unitsPerLot} → ${step.newUnitsPerLot}</span>
+              <span class="${isActive ? "text-slate-300" : "text-slate-400"}">−${step.reductionUnits} units/lot</span>
+            </div>
+            <div class="flex items-center gap-2">
+              ${isFull ? `<svg class="w-3.5 h-3.5 ${isActive ? "text-yellow-300" : "text-amber-500"}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>` : ""}
+              <span class="font-mono ${isFull ? (isActive ? "text-yellow-300" : "text-red-500") : (isActive ? "text-slate-300" : "text-slate-400")}">−${step.reductionPercent}%</span>
+            </div>
+          </button>`;
+        }).join("");
+
+        container.querySelectorAll("button[data-divisor]").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const d = Number(btn.dataset.divisor);
+            rebSelectedStep = rebGetRebalanceSteps(rebSelectedIsin.unitsPerLot).find(s => s.divisor === d) || null;
+            rebRenderAll();
+          });
+        });
+
+        if (aggBar) {
+          if (rebSelectedStep && rebClients.length) {
+            const agg = rebComputeAggregateTrade(rebClients, rebSelectedStep.reductionUnits);
+            document.getElementById("rebAggregateText").textContent = `−${agg.totalSharesDelta.toLocaleString()} shares across ${agg.totalLots} lots`;
+            aggBar.classList.remove("hidden");
+          } else {
+            aggBar.classList.add("hidden");
+          }
+        }
+      }
+
+      /* ── Client impact preview ── */
+      function rebRenderImpact() {
+        const tbody = document.getElementById("rebImpactBody");
+        const metaEl = document.getElementById("rebImpactMeta");
+        if (!tbody) return;
+
+        if (!rebSelectedIsin || !rebSelectedStep || !rebClients.length) {
+          tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-slate-400">${
+            !rebClients.length ? "Add clients below to preview impact" : "Select instrument + reduction step"
+          }</td></tr>`;
+          if (metaEl) metaEl.textContent = !rebClients.length ? "Add clients below" : "Select instrument + step";
+          return;
+        }
+
+        const impacts = rebComputeClientImpacts(rebClients, rebSelectedIsin.unitsPerLot, rebSelectedStep.newUnitsPerLot);
+        const hasErrors = impacts.some(i => i.hasNegative);
+        if (metaEl) metaEl.textContent = `${rebSelectedIsin.code} · ${impacts.length} clients${hasErrors ? " · ⚠ Negative holdings" : ""}`;
+
+        tbody.innerHTML = impacts.map(imp => `
+          <tr class="${imp.hasNegative ? "bg-red-50" : "hover:bg-slate-50"}">
+            <td class="px-4 py-2.5">
+              <p class="font-medium text-slate-800">${imp.clientName}</p>
+              <p class="text-[10px] text-slate-400 font-mono">${imp.clientId}</p>
+            </td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-400">${imp.currentLots}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">${imp.currentHolding.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-800">${imp.newHolding.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold ${imp.delta < 0 ? "text-red-600" : imp.delta > 0 ? "text-green-600" : "text-slate-400"}">
+              ${imp.delta > 0 ? "+" : ""}${imp.delta.toLocaleString()}
+            </td>
+          </tr>`).join("");
+      }
+
+      /* ── Client list ── */
+      function rebRenderClients() {
+        const grid = document.getElementById("rebClientsGrid");
+        if (!grid) return;
+        if (!rebClients.length) {
+          grid.innerHTML = '<p class="text-xs text-slate-400">No clients added yet. Click "Add Client" to start.</p>';
+          return;
+        }
+        grid.innerHTML = rebClients.map((c, idx) => `
+          <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+            <div class="min-w-0">
+              <p class="text-xs font-semibold text-slate-800 truncate max-w-[120px]">${c.name}</p>
+              <p class="text-[10px] text-slate-400 font-mono">${c.id}</p>
+            </div>
+            <div class="flex items-center gap-1 ml-2">
+              <button type="button" data-reb-lot-dec="${idx}" class="w-5 h-5 rounded flex items-center justify-center bg-slate-200 hover:bg-slate-300 text-slate-600 font-bold text-xs transition">−</button>
+              <span class="font-mono text-xs font-semibold text-slate-800 w-6 text-center">${c.lots}</span>
+              <button type="button" data-reb-lot-inc="${idx}" class="w-5 h-5 rounded flex items-center justify-center bg-slate-200 hover:bg-slate-300 text-slate-600 font-bold text-xs transition">+</button>
+            </div>
+            <button type="button" data-reb-remove="${idx}" class="ml-1 text-slate-300 hover:text-red-400 transition text-xs">✕</button>
+          </div>`).join("");
+
+        grid.querySelectorAll("[data-reb-lot-inc]").forEach(btn => {
+          btn.addEventListener("click", () => { const i = Number(btn.dataset.rebLotInc); rebClients[i].lots++; rebRenderAll(); });
+        });
+        grid.querySelectorAll("[data-reb-lot-dec]").forEach(btn => {
+          btn.addEventListener("click", () => { const i = Number(btn.dataset.rebLotDec); if (rebClients[i].lots > 1) { rebClients[i].lots--; rebRenderAll(); } });
+        });
+        grid.querySelectorAll("[data-reb-remove]").forEach(btn => {
+          btn.addEventListener("click", () => { rebClients.splice(Number(btn.dataset.rebRemove), 1); rebRenderAll(); });
+        });
+      }
+
+      /* ── Header state (commit btn + negative badge) ── */
+      function rebUpdateHeader() {
+        const commitBtn = document.getElementById("rebCommitBtn");
+        const negBadge = document.getElementById("rebNegativeBadge");
+        if (!commitBtn || !negBadge) return;
+
+        const hasStep = !!rebSelectedStep;
+        let hasNeg = false;
+        if (rebSelectedIsin && rebSelectedStep && rebClients.length) {
+          const impacts = rebComputeClientImpacts(rebClients, rebSelectedIsin.unitsPerLot, rebSelectedStep.newUnitsPerLot);
+          hasNeg = impacts.some(i => i.hasNegative);
+        }
+
+        if (hasStep && !hasNeg && rebClients.length && rebSelectedIsin) {
+          commitBtn.classList.remove("hidden");
+        } else {
+          commitBtn.classList.add("hidden");
+        }
+
+        if (hasNeg && hasStep) {
+          negBadge.classList.remove("hidden");
+          negBadge.classList.add("flex");
+        } else {
+          negBadge.classList.add("hidden");
+          negBadge.classList.remove("flex");
+        }
+      }
+
+      /* ── Sell Modal ── */
+      function rebShowSellModal() {
+        if (!rebSelectedIsin || !rebSelectedStep) return;
+        const totalLots = rebTotalLots();
+        const exec = rebComputeSellExecution(rebSelectedIsin, rebSelectedStep.reductionUnits, totalLots);
+        const modal = document.getElementById("rebSellModal");
+        const meta = document.getElementById("rebSellModalMeta");
+        const body = document.getElementById("rebSellModalBody");
+        if (!modal || !body) return;
+
+        if (meta) meta.textContent = `${exec.isinCode} · ${exec.isinDescription} · ${exec.totalShares.toLocaleString()} shares`;
+        body.innerHTML = `
+          <div class="space-y-3">
+            ${[
+              ["Total Shares to Sell", exec.totalShares.toLocaleString(), false],
+              ["Price per Share", rebFmtZAR(exec.pricePerShare), false],
+              ["Gross Proceeds", rebFmtZAR(exec.grossProceeds), false],
+              ["Brokerage (0.5%)", `−${rebFmtZAR(exec.brokerage)}`, true],
+              ["Off-Custody Fee", `−${rebFmtZAR(exec.offCustodyFee)}`, true],
+            ].map(([label, val, isDeduct]) => `
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-slate-500">${label}</span>
+                <span class="font-mono ${isDeduct ? "text-red-600" : "text-slate-800"}">${val}</span>
+              </div>`).join("")}
+            <div class="border-t border-slate-100 pt-3 flex items-center justify-between">
+              <span class="font-semibold text-slate-900 text-sm">Net Proceeds</span>
+              <span class="font-mono font-bold text-slate-900">${rebFmtZAR(exec.netProceeds)}</span>
+            </div>
+          </div>`;
+
+        modal._execData = exec;
+        modal.classList.remove("hidden");
+      }
+
+      /* ── Buy Modal ── */
+      function rebShowBuyModal(netCapital) {
+        const modal = document.getElementById("rebBuyModal");
+        const metaEl = document.getElementById("rebBuyModalMeta");
+        const body = document.getElementById("rebBuyModalBody");
+        if (!modal || !body) return;
+        if (metaEl) metaEl.textContent = `Net capital: ${rebFmtZAR(netCapital)}`;
+
+        if (!rebIsins.length) {
+          body.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">No instruments available</p>';
+          modal.classList.remove("hidden");
+          return;
+        }
+
+        let selectedBuyIsin = null;
+        let applyBuffer = true;
+
+        const render = () => {
+          body.innerHTML = `
+            <div class="space-y-4">
+              <div>
+                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Instrument to Buy</label>
+                <select id="rebBuyIsinSelect" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white">
+                  <option value="">Select instrument…</option>
+                  ${rebIsins.map(i => `<option value="${i.code}" ${selectedBuyIsin === i.code ? "selected" : ""}>${i.code} — ${i.description}${i.currentPrice > 0 ? ` (R${i.currentPrice.toLocaleString("en-ZA", { minimumFractionDigits: 2 })})` : ""}</option>`).join("")}
+                </select>
+              </div>
+              <div class="flex items-center gap-2">
+                <input type="checkbox" id="rebBufferChk" ${applyBuffer ? "checked" : ""} class="rounded"/>
+                <label for="rebBufferChk" class="text-xs text-slate-600">Apply 8% buffer to price (conservative)</label>
+              </div>
+              ${selectedBuyIsin ? (() => {
+                const isin = rebIsins.find(i => i.code === selectedBuyIsin);
+                if (!isin || isin.currentPrice <= 0) return '<p class="text-xs text-amber-600">No price available for this instrument.</p>';
+                const exec = rebComputeBuyExecution(isin.code, isin.description, isin.currentPrice, netCapital, rebClients, applyBuffer);
+                return `<div class="bg-slate-50 rounded-xl p-4 space-y-2.5 text-sm border border-slate-100">
+                  ${[
+                    ["Buffered Price", rebFmtZAR(exec.bufferedPrice), false],
+                    ["Buy per Lot", exec.buyPerLot.toLocaleString() + " shares", false],
+                    ["Total Shares", exec.totalShares.toLocaleString(), false],
+                    ["Gross Cost", rebFmtZAR(exec.grossCost), false],
+                    ["Brokerage", `−${rebFmtZAR(exec.brokerage)}`, true],
+                    ["Custody Fee", `−${rebFmtZAR(exec.custodyFee)}`, true],
+                    ["Total Cost", rebFmtZAR(exec.totalCost), false],
+                    ["Residual Cash", rebFmtZAR(exec.residualCash), false],
+                  ].map(([l, v, d]) => `<div class="flex items-center justify-between">
+                    <span class="text-slate-500">${l}</span>
+                    <span class="font-mono ${d ? "text-red-600" : "text-slate-800"}">${v}</span>
+                  </div>`).join("")}
+                  <div class="pt-2 border-t border-slate-100">
+                    <p class="text-xs font-semibold text-slate-500 mb-2">Per-Client Allocation</p>
+                    ${exec.clientAllocations.map(ca => `<div class="flex items-center justify-between mb-1">
+                      <span class="text-xs text-slate-700">${ca.clientName}</span>
+                      <span class="font-mono text-xs">${ca.shares.toLocaleString()} shares · ${rebFmtZAR(ca.residualCash)} residual</span>
+                    </div>`).join("")}
+                  </div>
+                </div>`;
+              })() : ""}
+            </div>`;
+
+          const isinSel = body.querySelector("#rebBuyIsinSelect");
+          if (isinSel) isinSel.addEventListener("change", () => { selectedBuyIsin = isinSel.value || null; render(); });
+          const bufChk = body.querySelector("#rebBufferChk");
+          if (bufChk) bufChk.addEventListener("change", () => { applyBuffer = bufChk.checked; render(); });
+        };
+
+        render();
+        modal.classList.remove("hidden");
+      }
+
+      /* ── Wire up rebalancing event listeners (deferred) ── */
+      window.addEventListener("DOMContentLoaded", () => {
+        /* Strategy selector */
+        const stratSel = document.getElementById("rebStrategySelect");
+        if (stratSel) stratSel.addEventListener("change", () => {
+          if (stratSel.value) rebLoadStrategy(stratSel.value);
+          else { rebIsins = []; rebSelectedIsin = null; rebSelectedStep = null; rebRenderAll(); }
+        });
+
+        /* Commit button → sell modal */
+        const commitBtn = document.getElementById("rebCommitBtn");
+        if (commitBtn) commitBtn.addEventListener("click", rebShowSellModal);
+
+        /* Add client form */
+        const addClientBtn = document.getElementById("rebAddClientBtn");
+        const addClientForm = document.getElementById("rebAddClientForm");
+        if (addClientBtn && addClientForm) {
+          addClientBtn.addEventListener("click", () => addClientForm.classList.toggle("hidden"));
+        }
+        const clientSaveBtn = document.getElementById("rebClientSaveBtn");
+        if (clientSaveBtn) clientSaveBtn.addEventListener("click", () => {
+          const name = document.getElementById("rebClientName").value.trim();
+          const id = document.getElementById("rebClientId").value.trim();
+          const lots = parseInt(document.getElementById("rebClientLots").value, 10);
+          if (!name || !id || !lots || lots < 1) return;
+          rebClients.push({ id, name, lots });
+          document.getElementById("rebClientName").value = "";
+          document.getElementById("rebClientId").value = "";
+          document.getElementById("rebClientLots").value = "";
+          addClientForm.classList.add("hidden");
+          rebRenderAll();
+        });
+        const clientCancelBtn = document.getElementById("rebClientCancelBtn");
+        if (clientCancelBtn) clientCancelBtn.addEventListener("click", () => addClientForm.classList.add("hidden"));
+
+        /* Sell modal buttons */
+        const sellModal = document.getElementById("rebSellModal");
+        const sellClose = document.getElementById("rebSellCloseBtn");
+        const sellCancel = document.getElementById("rebSellCancelBtn");
+        const sellConfirm = document.getElementById("rebSellConfirmBtn");
+        const sellOverlay = document.getElementById("rebSellOverlay");
+        const closeSell = () => { if (sellModal) sellModal.classList.add("hidden"); };
+        if (sellClose) sellClose.addEventListener("click", closeSell);
+        if (sellCancel) sellCancel.addEventListener("click", closeSell);
+        if (sellOverlay) sellOverlay.addEventListener("click", closeSell);
+        if (sellConfirm) sellConfirm.addEventListener("click", () => {
+          const net = sellModal?._execData?.netProceeds || 0;
+          closeSell();
+          rebShowBuyModal(net);
+        });
+
+        /* Buy modal buttons */
+        const buyModal = document.getElementById("rebBuyModal");
+        const buyClose = document.getElementById("rebBuyCloseBtn");
+        const buyOverlay = document.getElementById("rebBuyOverlay");
+        const buyReset = document.getElementById("rebBuyResetBtn");
+        const buyCommit = document.getElementById("rebBuyCommitBtn");
+        const closeBuy = () => { if (buyModal) buyModal.classList.add("hidden"); };
+        if (buyClose) buyClose.addEventListener("click", closeBuy);
+        if (buyOverlay) buyOverlay.addEventListener("click", closeBuy);
+        if (buyReset) buyReset.addEventListener("click", () => {
+          closeBuy();
+          rebSelectedStep = null;
+          rebRenderAll();
+        });
+        if (buyCommit) buyCommit.addEventListener("click", () => {
+          closeBuy();
+          /* success toast */
+          const t = document.createElement("div");
+          t.style.cssText = "position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:99999;display:flex;align-items:center;gap:10px;background:#1e293b;color:#f8fafc;font-size:13px;font-weight:600;padding:12px 20px;border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.22);pointer-events:none;white-space:nowrap;animation:toast-in 0.22s ease forwards";
+          t.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Trade sequence committed`;
+          document.body.appendChild(t);
+          setTimeout(() => { t.style.animation = "toast-out 0.22s ease forwards"; setTimeout(() => t.remove(), 230); }, 2800);
+          rebSelectedIsin = null;
+          rebSelectedStep = null;
+          rebRenderAll();
+        });
       });
     </script>
   </body>
