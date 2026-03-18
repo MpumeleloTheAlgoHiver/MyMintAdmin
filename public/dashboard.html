@@ -914,7 +914,7 @@
                         <th class="text-left px-4 py-2">Name</th>
                         <th class="text-right px-4 py-2">Units/Lot</th>
                         <th class="text-right px-4 py-2">Weight</th>
-                        <th class="text-right px-4 py-2">Price (R)</th>
+                        <th id="rebPriceHeader" class="text-right px-4 py-2 cursor-pointer select-none" title="Click to toggle total/unit price">Price (R)</th>
                         <th class="text-right px-4 py-2">Total Units</th>
                       </tr>
                     </thead>
@@ -5077,6 +5077,7 @@
       let rebApplyBuffer = true;
       let rebBuySecuritiesCache = null;
       let rebBuySecuritiesPromise = null;
+      let rebShowUnitPrice = false; // false = show total value by default
 
       /* ── Helpers ── */
       const rebFmtZAR = n => `R\u00A0${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -5292,6 +5293,10 @@
       /* ── ISINs table ── */
       function rebRenderIsinsTable() {
         const tbody = document.getElementById("rebIsinsBody");
+        const priceHeader = document.getElementById("rebPriceHeader");
+        if (priceHeader) {
+          priceHeader.textContent = rebShowUnitPrice ? "Price (R)" : "Total Price (R)";
+        }
         if (!tbody) return;
         if (!rebIsins.length) {
           tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">No holdings in this strategy</td></tr>';
@@ -5303,12 +5308,13 @@
           const totalQty = holders.reduce((s, r) => s + r.quantity, 0);
           const holderCount = holders.filter(r => r.quantity > 0).length;
           const positionValue = isin.currentPrice > 0 && totalQty > 0 ? isin.currentPrice * totalQty : 0;
+          const displayPrice = rebShowUnitPrice ? isin.currentPrice : positionValue;
           return `<tr data-isin="${isin.code}" class="cursor-pointer transition-colors ${isSelected ? "bg-violet-50" : "hover:bg-slate-50"}">
             <td class="px-4 py-2.5 font-mono font-semibold ${isSelected ? "text-violet-700" : "text-slate-800"}">${isin.code}</td>
             <td class="px-4 py-2.5 text-slate-700 max-w-[120px] truncate">${isin.description}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-600">${isin.unitsPerLot}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-400">${isin.weightPercent.toFixed(1)}%</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">${isin.currentPrice > 0 ? `R ${isin.currentPrice.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<div class="text-[10px] font-normal text-violet-600">${positionValue > 0 ? `Total R ${positionValue.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ""}</div>` : "—"}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">${displayPrice > 0 ? `R ${displayPrice.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}<div class="text-[10px] font-normal text-violet-600">${rebShowUnitPrice ? "Unit" : "Total"}</div></td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums font-medium text-slate-800">${totalQty > 0 ? totalQty.toLocaleString() : "—"}<span class="text-slate-400 font-normal text-[10px] ml-1">${holderCount > 0 ? `${holderCount}c` : ""}</span></td>
           </tr>`;
         }).join("");
@@ -5645,6 +5651,14 @@
 
       /* ── Wire up rebalancing event listeners (deferred) ── */
       window.addEventListener("DOMContentLoaded", () => {
+        const rebPriceHeader = document.getElementById("rebPriceHeader");
+        if (rebPriceHeader) {
+          rebPriceHeader.addEventListener("click", () => {
+            rebShowUnitPrice = !rebShowUnitPrice;
+            rebRenderIsinsTable();
+          });
+        }
+
         /* Strategy selector */
         const stratSel = document.getElementById("rebStrategySelect");
         if (stratSel) stratSel.addEventListener("change", () => {
