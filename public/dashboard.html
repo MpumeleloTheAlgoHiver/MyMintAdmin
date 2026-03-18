@@ -5060,6 +5060,31 @@
           }));
       }
 
+      function rebClientsForStrategy() {
+        const byClient = {};
+        Object.entries(rebRawHoldings || {}).forEach(([code, rows]) => {
+          (rows || []).forEach((r) => {
+            const qty = Number(r.quantity) || 0;
+            if (qty <= 0) return;
+            if (!byClient[r.userId]) {
+              byClient[r.userId] = {
+                id: r.userId,
+                name: r.name,
+                instruments: new Set(),
+              };
+            }
+            byClient[r.userId].instruments.add(code);
+          });
+        });
+        return Object.values(byClient)
+          .map((c) => ({
+            id: c.id,
+            name: c.name,
+            instrumentCount: c.instruments.size,
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+      }
+
       /* ── Init strategy selector ── */
       function rebInitStrategySelector() {
         const sel = document.getElementById("rebStrategySelect");
@@ -5251,11 +5276,36 @@
         if (!tbody) return;
 
         const clients = rebClientsForIsin(rebSelectedIsin);
-        if (!rebSelectedIsin || !clients.length) {
+        if (!rebSelectedIsin) {
+          const strategyClients = rebClientsForStrategy();
+          if (!strategyClients.length) {
+            tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-slate-400">${
+              rebIsins.length ? "No clients hold this strategy" : "Select a strategy"
+            }</td></tr>`;
+            if (metaEl) metaEl.textContent = rebIsins.length ? "No holders" : "Select strategy";
+            return;
+          }
+
+          if (metaEl) metaEl.textContent = `Strategy-level preview · ${strategyClients.length} clients · select instrument + step for impact`;
+          tbody.innerHTML = strategyClients.map(client => `
+          <tr class="hover:bg-slate-50">
+            <td class="px-4 py-2.5">
+              <p class="font-medium text-slate-800">${client.name}</p>
+              <p class="text-[10px] text-slate-400 font-mono">${client.id}</p>
+            </td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-500">${client.instrumentCount}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-400">—</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-400">—</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-400">—</td>
+          </tr>`).join("");
+          return;
+        }
+
+        if (!clients.length) {
           tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-slate-400">${
-            !rebSelectedIsin ? "Select an instrument" : "No clients hold this instrument"
+            "No clients hold this instrument"
           }</td></tr>`;
-          if (metaEl) metaEl.textContent = !rebSelectedIsin ? "Select instrument + step" : "No holders";
+          if (metaEl) metaEl.textContent = "No holders";
           return;
         }
 
