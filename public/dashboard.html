@@ -5568,6 +5568,22 @@
           const selectedInstrument = selectedBuySecurityId
             ? buyUniverse.find(i => i.id === selectedBuySecurityId) || null
             : null;
+          let selectedExec = null;
+          let selectedExecMessage = "";
+          if (selectedInstrument) {
+            if (selectedInstrument.currentPrice <= 0) {
+              selectedExecMessage = '<p class="text-xs text-amber-600">No price available for this instrument.</p>';
+            } else {
+              selectedExec = rebComputeBuyExecution(
+                selectedInstrument.code,
+                selectedInstrument.description,
+                selectedInstrument.currentPrice,
+                netCapital,
+                rebClientsForIsin(rebSelectedIsin),
+                applyBuffer,
+              );
+            }
+          }
 
           body.innerHTML = `
             <div class="space-y-4">
@@ -5604,26 +5620,24 @@
                 <label for="rebBufferChk" class="text-xs text-slate-600">Apply 8% buffer to price (conservative)</label>
               </div>
               ${selectedBuySecurityId ? (() => {
-                const instrument = buyUniverse.find(i => i.id === selectedBuySecurityId);
-                if (!instrument || instrument.currentPrice <= 0) return '<p class="text-xs text-amber-600">No price available for this instrument.</p>';
-                const exec = rebComputeBuyExecution(instrument.code, instrument.description, instrument.currentPrice, netCapital, rebClientsForIsin(rebSelectedIsin), applyBuffer);
+                if (!selectedExec) return selectedExecMessage || "";
                 return `<div class="bg-slate-50 rounded-xl p-4 space-y-2.5 text-sm border border-slate-100">
                   ${[
-                    ["Buffered Price", rebFmtZAR(exec.bufferedPrice), false],
-                    ["Buy per Lot", exec.buyPerLot.toLocaleString() + " shares", false],
-                    ["Total Shares", exec.totalShares.toLocaleString(), false],
-                    ["Gross Cost", rebFmtZAR(exec.grossCost), false],
-                    ["Brokerage", `−${rebFmtZAR(exec.brokerage)}`, true],
-                    ["Custody Fee", `−${rebFmtZAR(exec.custodyFee)}`, true],
-                    ["Total Cost", rebFmtZAR(exec.totalCost), false],
-                    ["Residual Cash", rebFmtZAR(exec.residualCash), false],
+                    ["Buffered Price", rebFmtZAR(selectedExec.bufferedPrice), false],
+                    ["Buy per Lot", selectedExec.buyPerLot.toLocaleString() + " shares", false],
+                    ["Total Shares", selectedExec.totalShares.toLocaleString(), false],
+                    ["Gross Cost", rebFmtZAR(selectedExec.grossCost), false],
+                    ["Brokerage", `−${rebFmtZAR(selectedExec.brokerage)}`, true],
+                    ["Custody Fee", `−${rebFmtZAR(selectedExec.custodyFee)}`, true],
+                    ["Total Cost", rebFmtZAR(selectedExec.totalCost), false],
+                    ["Residual Cash", rebFmtZAR(selectedExec.residualCash), false],
                   ].map(([l, v, d]) => `<div class="flex items-center justify-between">
                     <span class="text-slate-500">${l}</span>
                     <span class="font-mono ${d ? "text-red-600" : "text-slate-800"}">${v}</span>
                   </div>`).join("")}
                   <div class="pt-2 border-t border-slate-100">
                     <p class="text-xs font-semibold text-slate-500 mb-2">Per-Client Allocation</p>
-                    ${exec.clientAllocations.map(ca => `<div class="flex items-center justify-between mb-1">
+                    ${selectedExec.clientAllocations.map(ca => `<div class="flex items-center justify-between mb-1">
                       <span class="text-xs text-slate-700">${ca.clientName}</span>
                       <span class="font-mono text-xs">${ca.shares.toLocaleString()} shares · ${rebFmtZAR(ca.residualCash)} residual</span>
                     </div>`).join("")}
@@ -5631,6 +5645,20 @@
                 </div>`;
               })() : ""}
             </div>`;
+
+          const buyCommitBtn = document.getElementById("rebBuyCommitBtn");
+          if (buyCommitBtn) {
+            const notEnoughCredits = !!selectedExec && Number(selectedExec.buyPerLot) === 0;
+            if (notEnoughCredits) {
+              buyCommitBtn.disabled = true;
+              buyCommitBtn.textContent = "Not enough credits";
+              buyCommitBtn.className = "flex-1 py-2 rounded-xl text-sm font-semibold bg-red-50 text-red-600 border border-red-200 cursor-not-allowed";
+            } else {
+              buyCommitBtn.disabled = false;
+              buyCommitBtn.textContent = "Commit Trade Sequence";
+              buyCommitBtn.className = "flex-1 py-2 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-700 transition";
+            }
+          }
 
           const searchInput = body.querySelector("#rebBuySearch");
           if (searchInput) searchInput.addEventListener("input", () => { searchTerm = searchInput.value || ""; render(); });
