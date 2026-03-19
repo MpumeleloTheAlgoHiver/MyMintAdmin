@@ -4182,44 +4182,16 @@
         const strategies = allStrategiesFullData || [];
         if (!strategies.length) return;
 
-        /* Collect all unique symbols from all strategies */
-        const allSymbols = [
-          ...new Set(
-            strategies.flatMap(s => {
-              const h = Array.isArray(s.holdings) ? s.holdings : [];
-              return h.map(hld => hld.symbol || hld.ticker || "").filter(Boolean);
-            }),
-          ),
-        ];
-        if (!allSymbols.length) return;
-
         try {
-          /* symbol → security_id */
-          const { data: secRows } = await supabaseClient.from("securities").select("id, symbol").in("symbol", allSymbols);
-          const secIdBySymbol = {};
-          (secRows || []).forEach(s => { secIdBySymbol[s.symbol] = s.id; });
-
-          const secIds = Object.values(secIdBySymbol).filter(Boolean);
-          if (!secIds.length) return;
-
-          /* Which security IDs have any holder with quantity > 0 */
+          /* stock_holdings has a strategy_id column — query it directly */
           const { data: holdRows } = await supabaseClient
             .from("stock_holdings")
-            .select("security_id")
-            .in("security_id", secIds)
+            .select("strategy_id")
+            .eq("is_active", true)
             .gt("quantity", 0);
 
-          const investedSecIds = new Set((holdRows || []).map(r => r.security_id));
-
-          /* Map invested securities back to strategies */
-          strategies.forEach(s => {
-            const holdings = Array.isArray(s.holdings) ? s.holdings : [];
-            const hasInvestor = holdings.some(hld => {
-              const sym = hld.symbol || hld.ticker || "";
-              const sid = secIdBySymbol[sym];
-              return sid && investedSecIds.has(sid);
-            });
-            if (hasInvestor) strategyInvestedIds.add(String(s.id));
+          (holdRows || []).forEach(r => {
+            if (r.strategy_id) strategyInvestedIds.add(String(r.strategy_id));
           });
         } catch (e) {
           console.warn("loadStrategyInvestorData failed:", e);
@@ -4963,38 +4935,45 @@
             return { code, fullSymbol: sym, description: h.name || sym, unitsPerLot: units, currentPrice: price, weightPercent: Number(h.weight) || 0 };
           });
 
-        /* Fetch actual client holdings from Supabase */
-        const symbols = rebIsins.map(i => i.fullSymbol).filter(Boolean);
-        if (symbols.length) {
-          try {
+        /* Fetch actual client holdings — query by strategy_id directly */
+        try {
+          const { data: holdRows } = await supabaseClient
+            .from("stock_holdings")
+            .select("security_id, user_id, quantity")
+            .eq("strategy_id", strategyId)
+            .eq("is_active", true)
+            .gt("quantity", 0);
+
+          if (holdRows && holdRows.length) {
+            /* Resolve security_id → ISIN code via the ISINs we already built */
+            const symbols = rebIsins.map(i => i.fullSymbol).filter(Boolean);
             const { data: secRows } = await supabaseClient.from("securities").select("id, symbol").in("symbol", symbols);
             const codeBySecId = {};
             (secRows || []).forEach(s => { codeBySecId[s.id] = s.symbol.replace(/\.[A-Z]+$/, ""); });
-            const secIds = Object.keys(codeBySecId);
-            if (secIds.length) {
-              const { data: holdRows } = await supabaseClient.from("stock_holdings").select("security_id, user_id, quantity").in("security_id", secIds);
-              const userIds = [...new Set((holdRows || []).filter(r => r.user_id).map(r => String(r.user_id)))];
-              let nameById = {};
-              if (userIds.length) {
-                const { data: profRows } = await supabaseClient.from("profiles").select("id, first_name, last_name, email").in("id", userIds);
-                nameById = (profRows || []).reduce((acc, p) => {
-                  acc[String(p.id)] = [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || p.email || String(p.id);
-                  return acc;
-                }, {});
-              }
-              (holdRows || []).forEach(r => {
-                if (!r.user_id || !r.security_id) return;
-                const code = codeBySecId[r.security_id];
-                if (!code) return;
-                if (!rebRawHoldings[code]) rebRawHoldings[code] = [];
-                const uid = String(r.user_id);
-                const existing = rebRawHoldings[code].find(x => x.userId === uid);
-                if (existing) { existing.quantity += Number(r.quantity) || 0; }
-                else { rebRawHoldings[code].push({ userId: uid, name: nameById[uid] || uid, quantity: Number(r.quantity) || 0 }); }
-              });
+
+            /* Resolve user_id → display name */
+            const userIds = [...new Set(holdRows.filter(r => r.user_id).map(r => String(r.user_id)))];
+            let nameById = {};
+            if (userIds.length) {
+              const { data: profRows } = await supabaseClient.from("profiles").select("id, first_name, last_name, email").in("id", userIds);
+              nameById = (profRows || []).reduce((acc, p) => {
+                acc[String(p.id)] = [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || p.email || String(p.id);
+                return acc;
+              }, {});
             }
-          } catch (e) { console.warn("rebLoadStrategy: holdings fetch failed", e); }
-        }
+
+            holdRows.forEach(r => {
+              if (!r.user_id || !r.security_id) return;
+              const code = codeBySecId[r.security_id];
+              if (!code) return;
+              if (!rebRawHoldings[code]) rebRawHoldings[code] = [];
+              const uid = String(r.user_id);
+              const existing = rebRawHoldings[code].find(x => x.userId === uid);
+              if (existing) { existing.quantity += Number(r.quantity) || 0; }
+              else { rebRawHoldings[code].push({ userId: uid, name: nameById[uid] || uid, quantity: Number(r.quantity) || 0 }); }
+            });
+          }
+        } catch (e) { console.warn("rebLoadStrategy: holdings fetch failed", e); }
 
         const metaEl = document.getElementById("rebCompositionMeta");
         const totalClients = new Set(Object.values(rebRawHoldings).flatMap(arr => arr.map(x => x.userId))).size;
