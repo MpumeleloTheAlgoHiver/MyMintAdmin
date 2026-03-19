@@ -3656,7 +3656,9 @@
         const { data: holdingsRows, error: holdingsError } =
           await supabaseClient
             .from("stock_holdings")
-            .select("security_id, user_id, quantity");
+            .select("security_id, user_id, quantity")
+            .eq("is_active", true)
+            .eq("trade_side", "BUY");
         if (holdingsError) {
           console.error("Holdings load error:", holdingsError);
           renderHoldings([]);
@@ -5236,6 +5238,8 @@
               let holdingsQuery = supabaseClient
                 .from("stock_holdings")
                 .select("security_id, user_id, quantity, strategy_id")
+                .eq("is_active", true)
+                .eq("trade_side", "BUY")
                 .in("security_id", secIds);
 
               if (strategy?.id) {
@@ -5915,69 +5919,141 @@
           buyExec,
         });
 
-        const deltas = new Map();
-        const pushDelta = (userId, securityId, qtyDelta) => {
-          const key = `${userId}|${securityId}`;
-          deltas.set(key, (deltas.get(key) || 0) + Number(qtyDelta || 0));
-        };
-
-        (buyExec.clientAllocations || []).forEach((alloc) => {
-          const buyQty = Number(alloc.shares || 0);
-          if (buyQty > 0) pushDelta(String(alloc.clientId), buySecurityId, buyQty);
-        });
+        const rebalanceBatchId = (window.crypto && typeof window.crypto.randomUUID === "function")
+          ? window.crypto.randomUUID()
+          : `reb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const strategyRef = (allStrategiesFullData || []).find((s) => String(s.id) === String(strategyId));
+        const strategyNameSnapshot = strategyRef?.short_name || strategyRef?.name || "";
 
         const userIds = [...new Set([...clients.map((c) => String(c.id)), ...(buyExec.clientAllocations || []).map((a) => String(a.clientId))])];
         const securityIds = [...new Set([sellSecurityId, buySecurityId])];
 
         const { data: existingRows, error: existingErr } = await supabaseClient
           .from("stock_holdings")
-          .select("id, user_id, security_id, quantity")
+          .select("id, user_id, security_id, quantity, trade_side, is_active")
           .eq("strategy_id", strategyId)
+          .eq("is_active", true)
+          .eq("trade_side", "BUY")
           .in("user_id", userIds)
           .in("security_id", securityIds);
         if (existingErr) throw new Error(existingErr.message || "Failed to load existing holdings.");
 
-        // Replacement mode: once a different instrument is bought, fully remove
-        // the sold instrument rows from this strategy for impacted users.
-        const { error: sellDeleteErr } = await supabaseClient
-          .from("stock_holdings")
-          .delete()
-          .eq("strategy_id", strategyId)
-          .eq("security_id", sellSecurityId)
-          .in("user_id", userIds);
-        if (sellDeleteErr) throw new Error(sellDeleteErr.message || "Failed to remove sold instrument holdings.");
-
-        const rowByKey = {};
-        (existingRows || []).forEach((row) => {
-          if (String(row.security_id) === String(sellSecurityId)) return;
-          const key = `${row.user_id}|${row.security_id}`;
-          if (!rowByKey[key]) rowByKey[key] = row;
+        const nowIso = new Date().toISOString();
+        const activeSellRows = (existingRows || []).filter((row) => {
+          return String(row.security_id) === String(sellSecurityId)
+            && Number(row.quantity || 0) > 0;
         });
 
-        const nowIso = new Date().toISOString();
-        for (const [key, delta] of deltas.entries()) {
-          if (!delta) continue;
-          const [userId, securityId] = key.split("|");
-          const existing = rowByKey[key];
-          if (existing) {
-            const currentQty = Number(existing.quantity || 0);
-            const nextQty = Math.max(0, currentQty + delta);
+        if (!activeSellRows.length) {
+          throw new Error("No active position found for selected sell instrument.");
+        }
+
+        // Persist SELL order history rows first for broker/audit visibility.
+        const sellEventRows = activeSellRows.map((row) => ({
+          user_id: row.user_id,
+          security_id: sellSecurityId,
+          quantity: Math.abs(Number(row.quantity || 0)),
+          strategy_id: strategyId,
+          updated_at: nowIso,
+          trade_side: "SELL",
+          is_active: false,
+          closed_reason: "REBALANCE_EVENT_SELL",
+          closed_at: nowIso,
+          rebalance_batch_id: rebalanceBatchId,
+          strategy_name_snapshot: strategyNameSnapshot,
+        }));
+        if (sellEventRows.length) {
+          const { error: sellEventErr } = await supabaseClient
+            .from("stock_holdings")
+            .insert(sellEventRows);
+          if (sellEventErr) throw new Error(sellEventErr.message || "Failed to insert sell order events.");
+        }
+
+        // Close old held position rows so holdings bucket can fully replace instrument.
+        const soldPositionIds = activeSellRows.map((row) => row.id).filter(Boolean);
+        if (soldPositionIds.length) {
+          const { error: closeErr } = await supabaseClient
+            .from("stock_holdings")
+            .update({
+              is_active: false,
+              closed_reason: "POSITION_REPLACED",
+              closed_at: nowIso,
+              updated_at: nowIso,
+              rebalance_batch_id: rebalanceBatchId,
+            })
+            .in("id", soldPositionIds);
+          if (closeErr) throw new Error(closeErr.message || "Failed to close replaced positions.");
+        }
+
+        // Persist BUY order history rows for orderbook audit trail.
+        const buyEventRows = (buyExec.clientAllocations || [])
+          .map((alloc) => ({
+            user_id: String(alloc.clientId),
+            security_id: buySecurityId,
+            quantity: Number(alloc.shares || 0),
+            strategy_id: strategyId,
+            updated_at: nowIso,
+            trade_side: "BUY",
+            is_active: false,
+            closed_reason: "REBALANCE_EVENT_BUY",
+            closed_at: nowIso,
+            rebalance_batch_id: rebalanceBatchId,
+            strategy_name_snapshot: strategyNameSnapshot,
+          }))
+          .filter((row) => row.quantity > 0);
+        if (buyEventRows.length) {
+          const { error: buyEventErr } = await supabaseClient
+            .from("stock_holdings")
+            .insert(buyEventRows);
+          if (buyEventErr) throw new Error(buyEventErr.message || "Failed to insert buy order events.");
+        }
+
+        // Keep a live active BUY bucket per user for current holdings state.
+        const activeBuyRows = (existingRows || []).filter((row) => {
+          return String(row.security_id) === String(buySecurityId)
+            && Number(row.quantity || 0) >= 0;
+        });
+        const activeBuyByUserId = activeBuyRows.reduce((acc, row) => {
+          const userId = String(row.user_id || "");
+          if (!userId || acc[userId]) return acc;
+          acc[userId] = row;
+          return acc;
+        }, {});
+
+        for (const alloc of (buyExec.clientAllocations || [])) {
+          const userId = String(alloc.clientId || "");
+          const buyQty = Number(alloc.shares || 0);
+          if (!userId || buyQty <= 0) continue;
+
+          const existingBuy = activeBuyByUserId[userId];
+          if (existingBuy) {
+            const nextQty = Math.max(0, Number(existingBuy.quantity || 0) + buyQty);
             const { error: updateErr } = await supabaseClient
               .from("stock_holdings")
-              .update({ quantity: nextQty, updated_at: nowIso })
-              .eq("id", existing.id);
-            if (updateErr) throw new Error(updateErr.message || "Failed to update holding row.");
-          } else if (delta > 0) {
+              .update({
+                quantity: nextQty,
+                updated_at: nowIso,
+                trade_side: "BUY",
+                is_active: true,
+                strategy_name_snapshot: strategyNameSnapshot,
+              })
+              .eq("id", existingBuy.id);
+            if (updateErr) throw new Error(updateErr.message || "Failed to update active buy bucket.");
+          } else {
             const { error: insertErr } = await supabaseClient
               .from("stock_holdings")
               .insert({
                 user_id: userId,
-                security_id: securityId,
-                quantity: delta,
+                security_id: buySecurityId,
+                quantity: buyQty,
                 strategy_id: strategyId,
                 updated_at: nowIso,
+                trade_side: "BUY",
+                is_active: true,
+                rebalance_batch_id: rebalanceBatchId,
+                strategy_name_snapshot: strategyNameSnapshot,
               });
-            if (insertErr) throw new Error(insertErr.message || "Failed to insert holding row.");
+            if (insertErr) throw new Error(insertErr.message || "Failed to insert active buy bucket row.");
           }
         }
 

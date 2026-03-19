@@ -3636,7 +3636,7 @@
     const loadOrderbookClientSideFallback = async () => {
       const { data: holdingsRows, error: holdingsError } = await supabaseClient
         .from('stock_holdings')
-        .select('id, user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, as_of_date, created_at, updated_at, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", avg_exit, strategy_id')
+        .select('id, user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, as_of_date, created_at, updated_at, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", avg_exit, strategy_id, trade_side, is_active, closed_reason, closed_at, rebalance_batch_id, strategy_name_snapshot')
         .order('updated_at', { ascending: false });
 
       if (holdingsError) {
@@ -3760,9 +3760,12 @@
           : 0;
         const unrealizedPnlValue = Number(row.unrealized_pnl);
         const normalizedUnrealizedPnlNumber = Number.isFinite(unrealizedPnlValue) ? unrealizedPnlValue : 0;
-        const side = isQuantityNumeric
-          ? (quantityValue < 0 ? 'SELL' : 'BUY')
-          : '-';
+        const explicitSide = String(row.trade_side || '').trim().toUpperCase();
+        const side = (explicitSide === 'BUY' || explicitSide === 'SELL')
+          ? explicitSide
+          : (isQuantityNumeric
+            ? (quantityValue < 0 ? 'SELL' : 'BUY')
+            : '-');
         const orderType = 'Market';
         const totalQuantity = isQuantityNumeric
           ? quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 })
@@ -3809,11 +3812,17 @@
           brokerRef,
           brokerRefOptions,
           strategyId: row.strategy_id || null,
-          strategyName: strategy?.name || null,
+          strategyName: row.strategy_name_snapshot || strategy?.name || null,
           strategyShortName: strategy?.short_name || null,
           strategySlug: strategy?.slug || null,
+          strategyNameSnapshot: row.strategy_name_snapshot || null,
           timestamp,
-          fillDate: row.fill_date || null
+          fillDate: row.fill_date || null,
+          tradeSide: side,
+          isActive: row.is_active,
+          closedReason: String(row.closed_reason || ''),
+          closedAt: row.closed_at || null,
+          rebalanceBatchId: row.rebalance_batch_id || null
         };
       });
 
@@ -3822,9 +3831,15 @@
           return false;
         }
 
-        // Keep live holdings visible unless explicitly archived by source id.
-        // Timestamp-based cutoffs can hide valid inserts that arrive with older dates.
-        return true;
+        // Keep active holdings and explicit rebalance event rows.
+        // Hide inactive BUY rows that are old replaced bucket positions.
+        const isActive = row.isActive !== false;
+        const side = String(row.tradeSide || row.side || '').toUpperCase();
+        const reason = String(row.closedReason || '').toUpperCase();
+        if (isActive) return true;
+        if (side === 'SELL') return true;
+        if (side === 'BUY' && reason === 'REBALANCE_EVENT_BUY') return true;
+        return false;
       });
 
       allBirSourceRows = rawRows;
