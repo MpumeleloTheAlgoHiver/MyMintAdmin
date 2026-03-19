@@ -5066,9 +5066,13 @@
       function rebComputeBuyExecution(isinCode, isinDescription, pricePerShare, netCapital, clients, applyBuffer) {
         const totalLots = clients.reduce((s, c) => s + c.lots, 0);
         const bufferedPrice = applyBuffer ? pricePerShare * 1.08 : pricePerShare;
-        const buyPerLot = Math.floor(netCapital / (totalLots * bufferedPrice));
         const affectedClientCount = Math.max(1, clients.filter((c) => Number(c.lots) > 0).length);
         const custodyFee = REB_OFF_CUSTODY_FEE * affectedClientCount;
+        const perShareTradingCost = bufferedPrice * (1 + REB_BROKERAGE_RATE);
+        const affordableCapitalAfterFees = Math.max(0, Number(netCapital || 0) - custodyFee);
+        const buyPerLot = (totalLots > 0 && perShareTradingCost > 0)
+          ? Math.max(0, Math.floor(affordableCapitalAfterFees / (totalLots * perShareTradingCost)))
+          : 0;
 
         const baseClientAllocations = clients.map((c) => ({
           clientId: c.id,
@@ -5081,8 +5085,8 @@
         const baseTotalShares = baseClientAllocations.reduce((sum, c) => sum + c.shares, 0);
         const baseGrossCost = baseTotalShares * bufferedPrice;
         const baseBrokerage = baseGrossCost * REB_BROKERAGE_RATE;
-        const baseTotalCost = baseGrossCost + baseBrokerage + custodyFee;
-        const perShareTradingCost = bufferedPrice * (1 + REB_BROKERAGE_RATE);
+        const baseAppliedCustodyFee = baseTotalShares > 0 ? custodyFee : 0;
+        const baseTotalCost = baseGrossCost + baseBrokerage + baseAppliedCustodyFee;
         const remainingBudgetAfterBase = Math.max(0, netCapital - baseTotalCost);
         const maxExtraShares = perShareTradingCost > 0
           ? Math.floor(remainingBudgetAfterBase / perShareTradingCost)
@@ -5134,8 +5138,9 @@
         const totalShares = clientAllocations.reduce((sum, c) => sum + c.shares, 0);
         const grossCost = totalShares * bufferedPrice;
         const brokerage = grossCost * REB_BROKERAGE_RATE;
-        const totalCost = grossCost + brokerage + custodyFee;
-        const residualCash = netCapital - totalCost;
+        const appliedCustodyFee = totalShares > 0 ? custodyFee : 0;
+        const totalCost = grossCost + brokerage + appliedCustodyFee;
+        const residualCash = Math.max(0, netCapital - totalCost);
 
         clientAllocations.forEach((alloc) => {
           const clientResidual = totalLots > 0 ? (alloc.lots / totalLots) * residualCash : 0;
@@ -5153,7 +5158,7 @@
           totalShares,
           grossCost,
           brokerage,
-          custodyFee,
+          custodyFee: appliedCustodyFee,
           custodyFeeMultiplier: affectedClientCount,
           totalCost,
           residualCash,
@@ -5314,7 +5319,7 @@
         const brokerage = grossCost * REB_BROKERAGE_RATE;
         const appliedCustodyFee = totalShares > 0 ? custodyFee : 0;
         const totalCost = grossCost + brokerage + appliedCustodyFee;
-        const residualCash = totalCapital - totalCost;
+        const residualCash = Math.max(0, totalCapital - totalCost);
 
         const perShareActualCost = bufferedPrice * (1 + REB_BROKERAGE_RATE);
         const custodyByClient = rebDistributeMoneyByLots(appliedCustodyFee, clients);
@@ -5326,7 +5331,7 @@
             lots: c.lots,
             shares: c.floor,
             spent: rebRoundMoney(spent),
-            remainingCredits: rebRoundMoney(c.budget - spent),
+            remainingCredits: rebRoundMoney(Math.max(0, c.budget - spent)),
           };
         });
 
@@ -6241,11 +6246,16 @@
           const buyResetBtn = document.getElementById("rebBuyResetBtn");
           if (buyCommitBtn) {
             const notEnoughCredits = !!selectedExec && Number(selectedExec.buyPerLot) === 0;
+            const hasNegativeResidual = !!selectedExec && Number(selectedExec.residualCash) < 0;
             const missingSecondarySelection = useWalletForExtraBuy && !selectedExtraSecurityId;
-            const commitDisabled = !selectedExec || notEnoughCredits || missingSecondarySelection;
+            const commitDisabled = !selectedExec || notEnoughCredits || hasNegativeResidual || missingSecondarySelection;
             if (commitDisabled) {
               buyCommitBtn.disabled = true;
-              buyCommitBtn.textContent = missingSecondarySelection ? "Select secondary buy" : "Not enough credits";
+              buyCommitBtn.textContent = missingSecondarySelection
+                ? "Select secondary buy"
+                : hasNegativeResidual
+                  ? "Residual cannot be negative"
+                  : "Not enough credits";
               buyCommitBtn.className = "flex-1 py-2 rounded-xl text-sm font-semibold bg-red-50 text-red-600 border border-red-200 cursor-not-allowed";
             } else {
               buyCommitBtn.disabled = false;
@@ -6552,6 +6562,9 @@
         const buyExec = buySelection.exec;
         if (Number(buyExec.buyPerLot) <= 0) {
           throw new Error("Not enough credits for purchase.");
+        }
+        if (Number(buyExec.residualCash) < 0) {
+          throw new Error("Residual cannot be negative. Reduce buy quantity before committing.");
         }
         const extraBuySelection = buySelection.extraBuy || null;
         const extraBuyExec = extraBuySelection?.exec || null;
