@@ -1260,8 +1260,9 @@
           _strategyTabPwInput.focus();
           return;
         }
+        const cb = _strategyTabPwCallback;
         closeStrategyTabPwModal();
-        if (_strategyTabPwCallback) _strategyTabPwCallback();
+        if (cb) cb();
       };
 
       _strategyTabPwSubmitBtn.addEventListener("click", submitStrategyTabPw);
