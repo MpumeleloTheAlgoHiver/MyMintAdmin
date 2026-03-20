@@ -203,6 +203,7 @@
 
       .strategy-item-desc {
         display: -webkit-box;
+        line-clamp: 2;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
@@ -5676,19 +5677,8 @@
                 else { rebRawHoldings[code].push({ userId: uid, name: nameById[uid] || uid, quantity: Number(r.quantity) || 0 }); }
               });
             }
-
-            holdRows.forEach(r => {
-              if (!r.user_id || !r.security_id) return;
-              const code = codeBySecId[r.security_id];
-              if (!code) return;
-              if (!rebRawHoldings[code]) rebRawHoldings[code] = [];
-              const uid = String(r.user_id);
-              const existing = rebRawHoldings[code].find(x => x.userId === uid);
-              if (existing) { existing.quantity += Number(r.quantity) || 0; }
-              else { rebRawHoldings[code].push({ userId: uid, name: nameById[uid] || uid, quantity: Number(r.quantity) || 0 }); }
-            });
-          }
         } catch (e) { console.warn("rebLoadStrategy: holdings fetch failed", e); }
+          }
 
         const metaEl = document.getElementById("rebCompositionMeta");
         const totalClients = new Set(Object.values(rebRawHoldings).flatMap(arr => arr.map(x => x.userId))).size;
