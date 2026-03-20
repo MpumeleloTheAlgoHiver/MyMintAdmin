@@ -429,6 +429,12 @@
           </svg>
         </a>
 
+        <a class="nav-icon" id="sidebarEft" href="#" aria-label="EFT Payments">
+          <svg viewBox="0 0 24 24">
+            <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4V6h16v12zM12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+          </svg>
+        </a>
+
         <a class="nav-icon" href="/orderbook.html" aria-label="Orderbook">
           <svg viewBox="0 0 24 24">
             <path d="M4 5h16v2H4V5zm0 6h16v2H4v-2zm0 6h10v2H4v-2z" />
@@ -489,6 +495,13 @@
               class="text-sm pb-2 tab-inactive hover:text-slate-800"
             >
               Factsheets
+            </button>
+            <button
+              id="tabEft"
+              type="button"
+              class="text-sm pb-2 tab-inactive hover:text-slate-800"
+            >
+              EFT Confirmations
             </button>
           </div>
 
@@ -1075,6 +1088,114 @@
               </div>
             </div>
           </div>
+
+          <!-- ═══════════════ EFT CONFIRMATIONS TAB ═══════════════ -->
+          <div id="tabEftPanel" class="hidden">
+            <!-- Stats Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div
+                class="bg-white rounded-3xl p-5 shadow-sm border border-slate-100"
+              >
+                <p class="text-xs text-slate-500 mb-1">
+                  Pending EFT Transactions
+                </p>
+                <p class="text-2xl font-bold text-slate-800" id="eftPendingCount">
+                  0
+                </p>
+              </div>
+              <div
+                class="bg-white rounded-3xl p-5 shadow-sm border border-slate-100"
+              >
+                <p class="text-xs text-slate-500 mb-1">
+                  Total Amount Awaiting Release
+                </p>
+                <p
+                  class="text-2xl font-bold text-slate-800"
+                  id="eftPendingTotal"
+                >
+                  R 0.00
+                </p>
+              </div>
+            </div>
+
+            <div
+              class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden"
+            >
+              <div
+                class="px-6 py-4 border-b border-slate-50 flex justify-between items-center bg-slate-50/50"
+              >
+                <h3 class="text-sm font-semibold text-slate-700">
+                  Awaiting Payment Confirmation
+                </h3>
+                <button
+                  id="eftRefreshBtn"
+                  class="p-2 hover:bg-slate-200 rounded-full transition-colors"
+                  title="Refresh list"
+                >
+                  <svg
+                    class="w-4 h-4 text-slate-500"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                  </svg>
+                </button>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                  <thead class="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                      <th
+                        class="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider"
+                      >
+                        Date
+                      </th>
+                      <th
+                        class="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider"
+                      >
+                        User
+                      </th>
+                      <th
+                        class="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider"
+                      >
+                        Asset/Strategy
+                      </th>
+                      <th
+                        class="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider"
+                      >
+                        Amount
+                      </th>
+                      <th
+                        class="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider"
+                      >
+                        Reference
+                      </th>
+                      <th
+                        class="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider"
+                      >
+                        Status
+                      </th>
+                      <th
+                        class="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right"
+                      >
+                        Action
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody id="eftTableBody" class="divide-y divide-slate-50">
+                    <!-- Rows injected here -->
+                  </tbody>
+                </table>
+                <div id="eftEmptyState" class="hidden py-20 text-center">
+                  <p class="text-slate-400 text-sm">No pending EFT payments</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </main>
@@ -1191,6 +1312,7 @@
       const tabOverviewPanel = document.getElementById("tabOverviewPanel");
       const tabStrategiesPanel = document.getElementById("tabStrategiesPanel");
       const tabFactsheetsPanel = document.getElementById("tabFactsheetsPanel");
+      const tabEftPanel = document.getElementById("tabEftPanel");
 
       const strategyChart = document.getElementById("strategyChart");
       const featuredStrategies = document.getElementById("featuredStrategies");
@@ -1247,6 +1369,13 @@
         "factsheetStrategyList",
       );
       const factsheetBackBtn = document.getElementById("factsheetBackBtn");
+      const tabEft = document.getElementById("tabEft");
+      const sidebarEft = document.getElementById("sidebarEft");
+      const eftTableBody = document.getElementById("eftTableBody");
+      const eftRefreshBtn = document.getElementById("eftRefreshBtn");
+      const eftEmptyState = document.getElementById("eftEmptyState");
+      const eftPendingCount = document.getElementById("eftPendingCount");
+      const eftPendingTotal = document.getElementById("eftPendingTotal");
 
       let allStrategiesData = [];
       let _overviewSecMap = null;
@@ -1512,12 +1641,19 @@
       const tabRebalancingPanel = document.getElementById("tabRebalancingPanel");
 
       const switchTab = (activeTab) => {
-        const tabs = [tabOverview, tabStrategies, tabRebalancing, tabFactsheets];
+        const tabs = [
+          tabOverview,
+          tabStrategies,
+          tabRebalancing,
+          tabFactsheets,
+          tabEft,
+        ];
         const panels = [
           tabOverviewPanel,
           tabStrategiesPanel,
           tabRebalancingPanel,
           tabFactsheetsPanel,
+          tabEftPanel,
         ];
         tabs.forEach((tab, i) => {
           if (tab === activeTab) {
@@ -1528,6 +1664,21 @@
             panels[i].classList.add("hidden");
           }
         });
+
+        /* Sync side-nav active state */
+        const navIcons = document.querySelectorAll(".nav-icon");
+        if (activeTab === tabStrategies || activeTab === tabOverview || activeTab === tabRebalancing || activeTab === tabFactsheets) {
+          navIcons.forEach(icon => {
+            if (icon.getAttribute("aria-label") === "Dashboard") icon.classList.add("active");
+            else if (icon.id !== "sidebarEft") icon.classList.remove("active");
+          });
+          sidebarEft.classList.remove("active");
+        } else if (activeTab === tabEft) {
+          navIcons.forEach(icon => {
+            if (icon.id === "sidebarEft") icon.classList.add("active");
+            else icon.classList.remove("active");
+          });
+        }
       };
 
       tabOverview.addEventListener("click", () => switchTab(tabOverview));
@@ -1543,6 +1694,18 @@
         switchTab(tabRebalancing);
         rebInitStrategySelector();
       });
+      tabEft.addEventListener("click", () => {
+        switchTab(tabEft);
+        loadPendingEft();
+      });
+      sidebarEft.addEventListener("click", (e) => {
+        e.preventDefault();
+        switchTab(tabEft);
+        loadPendingEft();
+      });
+      if (eftRefreshBtn) {
+        eftRefreshBtn.addEventListener("click", loadPendingEft);
+      }
 
       /* ── Investor filter pills ── */
       document.querySelectorAll(".inv-filter-pill").forEach(btn => {
@@ -4566,6 +4729,149 @@
         });
       };
 
+      /* ─────────────────────── EFT CONFIRMATIONS LOGIC ─────────────────────── */
+      const loadPendingEft = async () => {
+        if (!eftTableBody) return;
+        eftTableBody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-400">Loading pending payments...</td></tr>`;
+        eftEmptyState.classList.add("hidden");
+
+        /* query transactions where status = 'pending' and type is related to EFT if possible, else just all pending */
+        const { data: txs, error } = await supabaseClient
+          .from("transactions")
+          .select("*, profiles!inner(first_name, last_name, email)")
+          .eq("status", "pending")
+          .ilike("store_reference", "EFT-%")
+          .order("created_at", { ascending: false });
+
+        if (error) {
+          console.error("EFT load error:", error);
+          eftTableBody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-rose-600">Failed to load: ${error.message}</td></tr>`;
+          return;
+        }
+
+        if (!txs || txs.length === 0) {
+          eftTableBody.innerHTML = "";
+          eftEmptyState.classList.remove("hidden");
+          eftPendingCount.textContent = "0";
+          eftPendingTotal.textContent = "R 0.00";
+          return;
+        }
+
+        let totalRand = 0;
+        eftTableBody.innerHTML = "";
+        txs.forEach((tx) => {
+          totalRand += Number(tx.amount || 0);
+          const row = document.createElement("tr");
+          row.className = "hover:bg-slate-50/50 transition-colors group";
+          row.dataset.ref = tx.store_reference;
+
+          const date = new Date(tx.created_at).toLocaleDateString("en-ZA", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          });
+          const amountStr = formatCurrencyDetailed(tx.amount);
+          const userName = [tx.profiles?.first_name, tx.profiles?.last_name]
+            .filter(Boolean)
+            .join(" ") || "Unknown User";
+          const assetName = tx.description || tx.metadata?.asset_name || "Investment";
+          const ref = tx.store_reference || "—";
+
+          row.innerHTML = `
+            <td class="px-6 py-4 text-xs text-slate-500">${date}</td>
+            <td class="px-6 py-4">
+              <div class="flex flex-col">
+                <span class="text-xs font-semibold text-slate-800">${userName}</span>
+                <span class="text-[10px] text-slate-400">${tx.profiles?.email || ""}</span>
+              </div>
+            </td>
+            <td class="px-6 py-4 text-xs text-slate-600">${assetName}</td>
+            <td class="px-6 py-4 text-xs font-bold text-slate-800">${amountStr}</td>
+            <td class="px-6 py-4">
+              <span class="px-2 py-1 bg-slate-100 rounded text-[10px] font-mono text-slate-600">${ref}</span>
+            </td>
+            <td class="px-6 py-4">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">Awaiting confirmation</span>
+            </td>
+            <td class="px-6 py-4 text-right">
+              <button class="confirm-eft-btn opacity-0 group-hover:opacity-100 transition-opacity px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg shadow-sm">
+                Confirm
+              </button>
+            </td>
+          `;
+
+          const confirmBtn = row.querySelector(".confirm-eft-btn");
+          confirmBtn.addEventListener("click", () => handleEftConfirmRequest(tx));
+          eftTableBody.appendChild(row);
+        });
+
+        eftPendingCount.textContent = txs.length.toString();
+        eftPendingTotal.textContent = totalRand.toLocaleString("en-ZA", {
+          style: "currency",
+          currency: "ZAR",
+        });
+      };
+
+      const handleEftConfirmRequest = async (tx) => {
+        const amountStr = formatCurrencyDetailed(tx.amount);
+        const ref = tx.store_reference;
+
+        const confirmed = await confirmWithPassword(
+          "Confirm release",
+          `Confirm payment of ${amountStr} for reference ${ref}? This will release the investment and notify the user by email. This cannot be undone.`
+        );
+
+        if (!confirmed) return;
+
+        // Find the row to show loading state
+        const row = document.querySelector(`tr[data-ref="${ref}"]`);
+        const btn = row?.querySelector(".confirm-eft-btn");
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = `<span class="flex items-center gap-1.5"><div class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Releasing...</span>`;
+        }
+
+        try {
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          const response = await fetch("/api/confirm-eft-deposit", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session?.access_token}`,
+            },
+            body: JSON.stringify({ reference: ref }),
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            throw new Error(result.error || result.message || "Failed to confirm payment");
+          }
+
+          // Show success toast or alert
+          alert("Payment confirmed — user notified by email");
+          
+          // Fade out and remove row
+          if (row) {
+            row.style.transition = "all 0.4s ease";
+            row.style.opacity = "0";
+            row.style.transform = "translateX(20px)";
+            setTimeout(() => {
+              loadPendingEft();
+            }, 400);
+          } else {
+            loadPendingEft();
+          }
+
+        } catch (err) {
+          alert(`Error: ${err.message}`);
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = "Confirm";
+          }
+        }
+      };
+
       const renderTopAssetsRow = () => {
         const row = document.getElementById("topAssetsRow");
         if (!row || !allSecuritiesCache) return;
@@ -5034,7 +5340,8 @@
           if (d === currentUnits) {
             steps.push({ divisor: d, newUnitsPerLot: 0, reductionUnits: currentUnits, reductionPercent: 100 });
           } else if (d > 0 && d < currentUnits) {
-            steps.push({ divisor: d, newUnitsPerLot: currentUnits - d, reductionUnits: d, reductionPercent: Math.round((d / currentUnits) * 100) });
+            // divisor d = the new lot size; reduction = currentUnits - d shares per lot being sold
+            steps.push({ divisor: d, newUnitsPerLot: d, reductionUnits: currentUnits - d, reductionPercent: Math.round(((currentUnits - d) / currentUnits) * 100) });
           }
         }
         return steps.sort((a, b) => a.reductionUnits - b.reductionUnits);
@@ -5405,6 +5712,7 @@
       let rebRawHoldings = {};     // code → [{userId, name, quantity}]
       let rebSelectedIsin = null;
       let rebSelectedStep = null;
+<<<<<<< HEAD
       let rebSellNetProceeds = 0;
       let rebApplyBuffer = true;
       let rebBuySecuritiesCache = null;
@@ -5413,18 +5721,23 @@
       let rebSelectedStrategyId = null;
       let rebWalletByClient = {};   // userId -> stored credits balance
       let rebImpactChangeView = false;
+=======
+      // rebSellNetProceeds and rebApplyBuffer removed — both were unused module-level dead state
+>>>>>>> fix/rebalancing-engine-bugs
 
       /* ── Helpers ── */
       const rebFmtZAR = n => `R\u00A0${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       function rebClientsForIsin(isin) {
         if (!isin) return [];
         return (rebRawHoldings[isin.code] || [])
-          .filter(r => r.quantity > 0)
           .map(r => ({
             id: r.userId,
             name: r.name,
-            lots: Math.max(1, Math.round(r.quantity / isin.unitsPerLot)),
-          }));
+            // Use floor so a client with fewer shares than one full lot gets 0 lots
+            // (not inflated to 1) — then filter those out entirely
+            lots: Math.floor(r.quantity / isin.unitsPerLot),
+          }))
+          .filter(r => r.lots > 0);
       }
 
       function rebClientsForStrategy() {
@@ -6176,6 +6489,7 @@
                 <input type="checkbox" id="rebBufferChk" ${applyBuffer ? "checked" : ""} class="rounded"/>
                 <label for="rebBufferChk" class="text-xs text-slate-600">Apply 8% buffer to price (conservative)</label>
               </div>
+<<<<<<< HEAD
               <div class="rounded-xl border border-slate-200 bg-white px-3 py-3 space-y-2">
                 <label class="flex items-center gap-2 text-xs text-slate-700">
                   <input type="checkbox" id="rebUseWalletExtraChk" ${useWalletForExtraBuy ? "checked" : ""} class="rounded"/>
@@ -6206,6 +6520,21 @@
               </div>
               ${selectedBuySecurityId ? (() => {
                 if (!selectedExec) return selectedExecMessage || "";
+=======
+              ${selectedBuyIsin ? (() => {
+                const isin = rebIsins.find(i => i.code === selectedBuyIsin);
+                if (!isin || isin.currentPrice <= 0) return '<p class="text-xs text-amber-600">No price available for this instrument.</p>';
+                // Use the BUY instrument's own lot structure for client allocation,
+                // not the sell instrument's — each client's lot count is derived from
+                // how many of the buy instrument they currently hold (or 1 if none yet).
+                const buyClients = rebClientsForIsin(isin);
+                // Fallback: if no existing holders for buy instrument, distribute proportionally
+                // using sell-side clients with 1 lot each so capital still gets deployed.
+                const clientsForBuy = buyClients.length > 0
+                  ? buyClients
+                  : (rebClientsForIsin(rebSelectedIsin) || []).map(c => ({ ...c, lots: 1 }));
+                const exec = rebComputeBuyExecution(isin.code, isin.description, isin.currentPrice, netCapital, clientsForBuy, applyBuffer);
+>>>>>>> fix/rebalancing-engine-bugs
                 return `<div class="bg-slate-50 rounded-xl p-4 space-y-2.5 text-sm border border-slate-100">
                   ${[
                     ["Execution Price", rebFmtZAR(selectedExec.bufferedPrice), false],
