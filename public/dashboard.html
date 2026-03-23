@@ -4730,7 +4730,7 @@
       };
 
       /* ─────────────────────── EFT CONFIRMATIONS LOGIC ─────────────────────── */
-      const loadPendingEft = async () => {
+      async function loadPendingEft() {
         if (!eftTableBody) return;
         eftTableBody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-400">Loading pending payments...</td></tr>`;
         eftEmptyState.classList.add("hidden");
@@ -4810,7 +4810,7 @@
           style: "currency",
           currency: "ZAR",
         });
-      };
+      }
 
       const handleEftConfirmRequest = async (tx) => {
         const amountStr = formatCurrencyDetailed(tx.amount);
