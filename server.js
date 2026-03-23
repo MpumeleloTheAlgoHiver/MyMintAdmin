@@ -1,4 +1,4 @@
-﻿require('dotenv').config();
+require('dotenv').config();
 const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
@@ -243,6 +243,40 @@ const fetchSupabaseJson = async (path, token, useServiceRoleAuth = true) => {
   }
 
   return payload;
+};
+
+const mutateSupabaseJson = async (path, payload, token, method = 'PATCH', useServiceRoleAuth = true) => {
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    throw new Error('Supabase server credentials are not configured');
+  }
+
+  const url = `${supabaseUrl}${path}`;
+  const authToken = useServiceRoleAuth ? supabaseServiceRoleKey : token;
+  const response = await fetch(url, {
+    method,
+    headers: {
+      'apikey': supabaseServiceRoleKey,
+      'Authorization': `Bearer ${authToken}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+      'Accept': 'application/json'
+    },
+    body: payload ? JSON.stringify(payload) : undefined
+  });
+
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    const message = data?.message || data?.error || `Supabase mutation failed with status ${response.status}`;
+    throw new Error(message);
+  }
+
+  return data;
 };
 
 const buildInFilter = (values) => values
@@ -608,6 +642,48 @@ const server = http.createServer((req, res) => {
         });
       }
     })();
+    return;
+  }
+
+  if (req.url.startsWith('/api/confirm-eft-deposit') && req.method === 'POST') {
+    const token = parseBearerToken(req.headers.authorization);
+    if (!token) {
+      sendJson(res, 401, { error: 'Missing Authorization bearer token' });
+      return;
+    }
+
+    (async () => {
+      try {
+        await fetchSupabaseJson('/auth/v1/user', token, false);
+        const body = await readJsonBody(req);
+        const ref = body?.reference;
+        
+        if (!ref) {
+          sendJson(res, 400, { error: 'Missing reference' });
+          return;
+        }
+
+        const updatePayload = {
+          status: 'completed',
+          updated_at: new Date().toISOString()
+        };
+
+        const result = await mutateSupabaseJson(
+          `/rest/v1/transactions?store_reference=eq.${encodeURIComponent(ref)}&status=eq.pending`,
+          updatePayload,
+          token,
+          'PATCH'
+        );
+
+        sendJson(res, 200, { ok: true, data: result });
+      } catch (error) {
+        sendJson(res, 500, {
+          error: 'Could not confirm EFT deposit',
+          details: error?.message || 'Unknown error'
+        });
+      }
+    })();
+
     return;
   }
 
