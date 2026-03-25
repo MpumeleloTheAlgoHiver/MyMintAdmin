@@ -1900,6 +1900,10 @@
       color: #ef4444;
     }
 
+    .holding-change.neutral {
+      color: #6b7280;
+    }
+
     .strategy-group-card {
       cursor: pointer;
       transition: box-shadow 0.2s ease, border-color 0.2s ease;
@@ -5379,18 +5383,26 @@
       const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
 
       let liveMarketValue = qty * currentPrice;
-      let bottomValue = row.unrealized_pnl !== null && row.unrealized_pnl !== undefined
-        ? Number(row.unrealized_pnl) / 100
-        : (avgFill > 0 ? avgFill * qty : 0);
-
       if (!currentPrice && row.market_value) liveMarketValue = Number(row.market_value);
 
-      const isNegative = bottomValue < liveMarketValue;
-      const showPlus = bottomValue > liveMarketValue;
-      const pnlColorClass = isNegative ? 'holding-change negative' : 'holding-change';
+      // PnL: use unrealized_pnl from DB if present, otherwise compute live
+      let livePnl;
+      if (row.unrealized_pnl !== null && row.unrealized_pnl !== undefined && Number(row.unrealized_pnl) !== 0) {
+        livePnl = Number(row.unrealized_pnl);
+      } else if (avgFill > 0 && currentPrice) {
+        livePnl = (currentPrice - avgFill) * qty;
+      } else {
+        livePnl = null;
+      }
+
+      const isPositive = livePnl !== null && livePnl > 0;
+      const isNegative = livePnl !== null && livePnl < 0;
+      const pnlColorClass = isNegative
+        ? 'holding-change negative'
+        : (isPositive ? 'holding-change' : 'holding-change neutral');
       const marketValue = liveMarketValue ? `R ${formatNumber(liveMarketValue, 2)}` : 'R -';
-      const pnl = bottomValue
-        ? `${showPlus ? '+' : ''}R ${formatNumber(Math.abs(bottomValue), 2)}`
+      const pnl = livePnl !== null
+        ? `${isPositive ? '+' : ''}R ${formatNumber(Math.abs(livePnl), 2)}`
         : '-';
       const priceStr = currentPrice ? `R ${formatNumber(currentPrice, 2)}/share` : '';
       const status = row.status || row.Status || 'Stock';
@@ -5430,18 +5442,27 @@
         const qty = Number(row.quantity) || 0;
         const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
         const mv = currentPrice ? qty * currentPrice : (Number(row.market_value) || 0);
-        const bottom = row.unrealized_pnl !== null && row.unrealized_pnl !== undefined
-          ? Number(row.unrealized_pnl) / 100
-          : (avgFill > 0 ? avgFill * qty : 0);
+        let rowPnl;
+        if (row.unrealized_pnl !== null && row.unrealized_pnl !== undefined && Number(row.unrealized_pnl) !== 0) {
+          rowPnl = Number(row.unrealized_pnl);
+        } else if (avgFill > 0 && currentPrice) {
+          rowPnl = (currentPrice - avgFill) * qty;
+        } else {
+          rowPnl = 0;
+        }
         totalValue += mv;
-        totalBottomValue += bottom;
+        totalBottomValue += rowPnl;
       });
 
-      const isNegative = totalBottomValue < totalValue;
-      const showPlus = totalBottomValue > totalValue;
-      const pnlColorClass = isNegative ? 'holding-change negative' : 'holding-change';
+      const isPositive = totalBottomValue > 0;
+      const isNegative = totalBottomValue < 0;
+      const pnlColorClass = isNegative
+        ? 'holding-change negative'
+        : (isPositive ? 'holding-change' : 'holding-change neutral');
       const valueStr = totalValue ? `R ${formatNumber(totalValue, 2)}` : 'R -';
-      const pnlStr = totalBottomValue ? `${showPlus ? '+' : ''}R ${formatNumber(Math.abs(totalBottomValue), 2)}` : '-';
+      const pnlStr = totalBottomValue !== 0
+        ? `${isPositive ? '+' : ''}R ${formatNumber(Math.abs(totalBottomValue), 2)}`
+        : '-';
       const holdingCount = holdings.length;
       const safeGroupId = escapeHtml(groupId);
 
