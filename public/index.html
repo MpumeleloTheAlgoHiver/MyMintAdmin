@@ -4016,13 +4016,18 @@
         const security = securitiesByIdMap[row.security_id] || {};
         const label = security.symbol || security.name || row.security_id || '-';
         const status = row.status || row.Status || '-';
+        const currentPrice = security.last_price ? Number(security.last_price) / 100 : 0;
+        const qty = Number(row.quantity) || 0;
+        const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
+        const mv = currentPrice ? qty * currentPrice : (Number(row.market_value) || 0);
+        const pnl = avgFill > 0 && currentPrice ? (currentPrice - avgFill) * qty : (Number(row.unrealized_pnl) || 0);
         return `
           <tr>
             <td>${escapeHtml(label)}</td>
-            <td>${formatNumber(row.quantity, 2)}</td>
-            <td>R ${formatNumber(row.avg_fill, 2)}</td>
-            <td>R ${formatNumber(row.market_value, 2)}</td>
-            <td>R ${formatNumber(row.unrealized_pnl, 2)}</td>
+            <td>${formatNumber(qty, 2)}</td>
+            <td>R ${formatNumber(avgFill, 2)}</td>
+            <td>R ${formatNumber(mv, 2)}</td>
+            <td>R ${formatNumber(pnl, 2)}</td>
             <td>${escapeHtml(status)}</td>
             <td>${escapeHtml(row.as_of_date || '-')}</td>
           </tr>
@@ -4064,7 +4069,9 @@
             status: row.status || row.Status || null,
             avg_fill: row.avg_fill,
             as_of_date: row.as_of_date || row.Fill_date || row.fill_date || null,
-            updated_at: row.updated_at || row.created_at || row.as_of_date || null
+            updated_at: row.updated_at || row.created_at || row.as_of_date || null,
+            strategy_id: row.strategy_id || null,
+            strategy_name_snapshot: row.strategy_name_snapshot || null
           };
         }
 
@@ -4075,6 +4082,11 @@
         if (Number.isFinite(quantity)) grouped[key].quantity += quantity;
         if (Number.isFinite(marketValue)) grouped[key].market_value += marketValue;
         if (Number.isFinite(unrealizedPnl)) grouped[key].unrealized_pnl += unrealizedPnl;
+
+        if (!grouped[key].strategy_id && row.strategy_id) {
+          grouped[key].strategy_id = row.strategy_id;
+          grouped[key].strategy_name_snapshot = row.strategy_name_snapshot || null;
+        }
 
         if (!grouped[key].status && (row.status || row.Status)) {
           grouped[key].status = row.status || row.Status;
@@ -4161,12 +4173,17 @@
         const security = securitiesByIdMap[row.security_id] || {};
         const label = security.name || security.symbol || row.security_id || '-';
         const status = row.status || row.Status || '-';
+        const currentPrice = security.last_price ? Number(security.last_price) / 100 : 0;
+        const qty = Number(row.quantity) || 0;
+        const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
+        const mv = currentPrice ? qty * currentPrice : (Number(row.market_value) || 0);
+        const pnl = avgFill > 0 && currentPrice ? (currentPrice - avgFill) * qty : (Number(row.unrealized_pnl) || 0);
         return `
           <tr>
             <td>${escapeHtml(label)}</td>
-            <td>${formatNumber(row.quantity, 2)}</td>
-            <td>R ${formatNumber(row.market_value, 2)}</td>
-            <td>R ${formatNumber(row.unrealized_pnl, 2)}</td>
+            <td>${formatNumber(qty, 2)}</td>
+            <td>R ${formatNumber(mv, 2)}</td>
+            <td>R ${formatNumber(pnl, 2)}</td>
             <td>${escapeHtml(status)}</td>
           </tr>
         `;
@@ -5316,12 +5333,25 @@
       const logoUrl = security.logo_url || '';
       const titleInitial = String(title || 'S').trim().charAt(0) || 'S';
       const asOf = row.as_of_date || '-';
-      const quantity = row.quantity === null || row.quantity === undefined ? '-' : formatNumber(row.quantity, 2);
-      const marketValue = row.market_value === null || row.market_value === undefined ? 'R -' : `R ${formatNumber(row.market_value, 2)}`;
-      const pnl = row.unrealized_pnl === null || row.unrealized_pnl === undefined
-        ? '-'
-        : `${Number(row.unrealized_pnl) >= 0 ? '+' : ''}R ${formatNumber(row.unrealized_pnl, 2)}`;
+      const qty = row.quantity === null || row.quantity === undefined ? 0 : Number(row.quantity);
+      const quantityStr = qty ? formatNumber(qty, 2) : '-';
+
+      const currentPrice = security.last_price ? Number(security.last_price) / 100 : 0;
+      const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
+
+      let liveMarketValue = qty * currentPrice;
+      let livePnl = avgFill > 0 ? (currentPrice - avgFill) * qty : 0;
+
+      if (!currentPrice && row.market_value) liveMarketValue = Number(row.market_value);
+      if (!currentPrice && row.unrealized_pnl) livePnl = Number(row.unrealized_pnl);
+
+      const marketValue = liveMarketValue ? `R ${formatNumber(liveMarketValue, 2)}` : 'R -';
+      const pnl = liveMarketValue
+        ? `${livePnl >= 0 ? '+' : ''}R ${formatNumber(livePnl, 2)}`
+        : '-';
+      const priceStr = currentPrice ? `R ${formatNumber(currentPrice, 2)}/share` : '';
       const status = row.status || row.Status || 'Stock';
+      const strategyLabel = row.strategy_name_snapshot || '';
 
       return `
         <div class="holding-card">
@@ -5337,11 +5367,51 @@
               <div class="holding-change">${escapeHtml(pnl)}</div>
             </div>
           </div>
-          <div class="holding-desc">Quantity ${escapeHtml(quantity)} • As of ${escapeHtml(asOf)}</div>
+          <div class="holding-desc">Qty ${escapeHtml(quantityStr)}${priceStr ? ` • ${escapeHtml(priceStr)}` : ''} • As of ${escapeHtml(asOf)}</div>
           <div class="holding-footer">
-            <div class="holding-tag">${escapeHtml(status)}</div>
+            <div class="holding-tag">${escapeHtml(strategyLabel || status)}</div>
             <div class="holdings-container">
               <span class="holding-label">Holding</span>
+            </div>
+          </div>
+        </div>
+      `;
+    };
+
+    const renderStrategyGroupCard = (strategyName, holdings) => {
+      let totalValue = 0;
+      let totalPnl = 0;
+      holdings.forEach(row => {
+        const security = securitiesByIdMap[row.security_id] || {};
+        const currentPrice = security.last_price ? Number(security.last_price) / 100 : 0;
+        const qty = Number(row.quantity) || 0;
+        const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
+        const mv = currentPrice ? qty * currentPrice : (Number(row.market_value) || 0);
+        const pnl = avgFill > 0 && currentPrice ? (currentPrice - avgFill) * qty : (Number(row.unrealized_pnl) || 0);
+        totalValue += mv;
+        totalPnl += pnl;
+      });
+
+      const valueStr = totalValue ? `R ${formatNumber(totalValue, 2)}` : 'R -';
+      const pnlStr = totalValue ? `${totalPnl >= 0 ? '+' : ''}R ${formatNumber(totalPnl, 2)}` : '-';
+      const holdingCount = holdings.length;
+
+      return `
+        <div class="holding-card">
+          <div class="holding-header">
+            <div>
+              <div class="holding-title">${escapeHtml(strategyName)}</div>
+            </div>
+            <div>
+              <div class="holding-price">${escapeHtml(valueStr)}</div>
+              <div class="holding-change">${escapeHtml(pnlStr)}</div>
+            </div>
+          </div>
+          <div class="holding-desc">${holdingCount} holding${holdingCount === 1 ? '' : 's'} in this strategy</div>
+          <div class="holding-footer">
+            <div class="holding-tag">${escapeHtml(strategyName)}</div>
+            <div class="holdings-container">
+              <span class="holding-label">Strategy</span>
             </div>
           </div>
         </div>
@@ -5360,14 +5430,26 @@
       const sections = Array.from(holdingsView.querySelectorAll('.holdings-section'));
       if (!summaryEl || !emptyStateEl || !strategyContainer || !stocksContainer) return;
 
-      const strategyRows = (allocationsByUserMap[profileId] || []).slice();
-      strategyRows.sort((a, b) => new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime());
-
-      const stockRows = aggregateCurrentStockRows((holdingsByUserMap[profileId] || []).slice())
+      const allStockRows = aggregateCurrentStockRows((holdingsByUserMap[profileId] || []).slice())
         .filter((row) => Number(row.quantity) > 0);
-      stockRows.sort((a, b) => new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime());
 
-      const total = strategyRows.length + stockRows.length;
+      const strategyGrouped = {};
+      const individualRows = [];
+      allStockRows.forEach(row => {
+        if (row.strategy_id) {
+          const sName = row.strategy_name_snapshot || 'Strategy';
+          if (!strategyGrouped[row.strategy_id]) strategyGrouped[row.strategy_id] = { name: sName, holdings: [] };
+          strategyGrouped[row.strategy_id].holdings.push(row);
+        } else {
+          individualRows.push(row);
+        }
+      });
+
+      const strategyGroups = Object.values(strategyGrouped);
+      strategyGroups.sort((a, b) => b.holdings.length - a.holdings.length);
+      individualRows.sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime());
+
+      const total = allStockRows.length;
       summaryEl.textContent = total ? `Showing ${total} holding${total === 1 ? '' : 's'}` : 'Showing 0 holdings';
 
       if (!total) {
@@ -5385,13 +5467,20 @@
         section.style.display = '';
       });
 
-      strategyContainer.innerHTML = strategyRows.length
-        ? strategyRows.map(row => renderHoldingAllocationCard(row)).join('')
-        : '<div class="holding-card holding-card-muted"><div class="holding-desc">No strategy allocations.</div></div>';
+      if (strategyGroups.length) {
+        let strategyHtml = '';
+        strategyGroups.forEach(group => {
+          strategyHtml += renderStrategyGroupCard(group.name, group.holdings);
+          strategyHtml += group.holdings.map(row => renderStockHoldingCard(row)).join('');
+        });
+        strategyContainer.innerHTML = strategyHtml;
+      } else {
+        strategyContainer.innerHTML = '<div class="holding-card holding-card-muted"><div class="holding-desc">No strategy allocations.</div></div>';
+      }
 
-      stocksContainer.innerHTML = stockRows.length
-        ? stockRows.map(row => renderStockHoldingCard(row)).join('')
-        : '<div class="holding-card holding-card-muted"><div class="holding-desc">No stock holdings.</div></div>';
+      stocksContainer.innerHTML = individualRows.length
+        ? individualRows.map(row => renderStockHoldingCard(row)).join('')
+        : '<div class="holding-card holding-card-muted"><div class="holding-desc">No individual stock holdings.</div></div>';
     };
 
     const loadProfiles = async () => {
@@ -5431,7 +5520,7 @@
             supabaseClient.from('user_onboarding').select('*').in('user_id', userIds),
             supabaseClient.from('user_onboarding_pack_details').select('*').in('user_id', userIds),
             supabaseClient.from('allocations').select('user_id, asset_class, weight, value, return_1d, return_1w, return_1m, return_ytd, return_1y, as_of_date, security_id, created_at, updated_at').in('user_id', userIds).order('updated_at', { ascending: false }),
-            supabaseClient.from('stock_holdings').select('user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", as_of_date, created_at, updated_at').in('user_id', userIds).order('updated_at', { ascending: false })
+            supabaseClient.from('stock_holdings').select('user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", as_of_date, strategy_id, strategy_name_snapshot, trade_side, is_active, created_at, updated_at').eq('is_active', true).eq('trade_side', 'BUY').in('user_id', userIds).order('updated_at', { ascending: false })
           ]);
 
           if (!onboardingRes.error && onboardingRes.data) {
@@ -5464,27 +5553,25 @@
           const holdingsRows = (!holdingsRes.error && holdingsRes.data) ? holdingsRes.data : [];
           const allocationsRows = (!allocationsRes.error && allocationsRes.data) ? allocationsRes.data : [];
 
-          if (holdingsRows.length) {
-            holdingsRows.forEach((row) => {
-              if (!holdingsByUserMap[row.user_id]) holdingsByUserMap[row.user_id] = [];
-              holdingsByUserMap[row.user_id].push(row);
-            });
+          holdingsRows.forEach((row) => {
+            if (!holdingsByUserMap[row.user_id]) holdingsByUserMap[row.user_id] = [];
+            holdingsByUserMap[row.user_id].push(row);
+          });
 
-            const securityIds = [...new Set([
-              ...holdingsRows.map(row => row.security_id),
-              ...allocationsRows.map(row => row.security_id)
-            ].filter(Boolean))];
-            if (securityIds.length) {
-              const { data: securityRows, error: securitiesError } = await supabaseClient
-                .from('securities')
-                .select('id, symbol, name, logo_url')
-                .in('id', securityIds);
+          const securityIds = [...new Set([
+            ...holdingsRows.map(row => row.security_id),
+            ...allocationsRows.map(row => row.security_id)
+          ].filter(Boolean))];
+          if (securityIds.length) {
+            const { data: securityRows, error: securitiesError } = await supabaseClient
+              .from('securities')
+              .select('id, symbol, name, logo_url, last_price')
+              .in('id', securityIds);
 
-              if (!securitiesError && securityRows) {
-                securityRows.forEach((security) => {
-                  securitiesByIdMap[security.id] = security;
-                });
-              }
+            if (!securitiesError && securityRows) {
+              securityRows.forEach((security) => {
+                securitiesByIdMap[security.id] = security;
+              });
             }
           }
         }
