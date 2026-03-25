@@ -5395,6 +5395,9 @@
         bottomValue = liveMarketValue;
       }
 
+      // Display bottom value divided by 100
+      bottomValue = bottomValue / 100;
+
       // Color: compare bottom vs black top (market value)
       const isPositive = liveMarketValue > 0 && bottomValue > liveMarketValue;
       const isNegative = liveMarketValue > 0 && bottomValue < liveMarketValue;
@@ -5455,6 +5458,9 @@
         totalValue += mv;
         totalBottomValue += rowBottom;
       });
+
+      // Display total bottom value divided by 100
+      totalBottomValue = totalBottomValue / 100;
 
       // Color: compare total bottom vs total black top (market value)
       const isPositive = totalValue > 0 && totalBottomValue > totalValue;
