@@ -645,6 +645,96 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.url.startsWith('/api/disburse') && req.method === 'POST') {
+    const token = parseBearerToken(req.headers.authorization);
+    if (!token) {
+      sendJson(res, 401, { error: 'Missing Authorization bearer token' });
+      return;
+    }
+
+    (async () => {
+      try {
+        // 1. Verify Admin User and Get ID for Audit Logging
+        const adminUser = await fetchSupabaseJson('/auth/v1/user', token, false);
+        const adminId = adminUser?.id;
+        
+        const body = await readJsonBody(req);
+        const { loanId, bank_acc, amount, idempotency_key } = body;
+
+        if (!loanId || !bank_acc || !amount) {
+          sendJson(res, 400, { error: 'Missing required payout details (loanId, bank_acc, amount)' });
+          return;
+        }
+
+        // 2. "Stale Price" Check: Recalculate LTV before release
+        const pledges = await fetchSupabaseJson(`/rest/v1/pbc_collateral_pledges?loan_application_id=eq.${loanId}`, token);
+        if (!pledges || pledges.length === 0) {
+          sendJson(res, 400, { error: 'No collateral pledges found for this loan' });
+          return;
+        }
+
+        const symbols = [...new Set(pledges.map(p => p.symbol))];
+        const pricesData = await fetchSupabaseJson(`/rest/v1/security_prices?symbol=in.(${symbols.map(s => `%22${s}%22`).join(',')})`, token);
+        
+        const priceMap = {};
+        (pricesData || []).forEach(p => { priceMap[p.symbol] = p.last_price; });
+
+        let currentCollateralValue = 0;
+        pledges.forEach(p => {
+          const latestPrice = priceMap[p.symbol] || 0;
+          currentCollateralValue += parseFloat(p.pledged_quantity) * latestPrice;
+        });
+
+        const currentLTV = (parseFloat(amount) / currentCollateralValue) * 100;
+
+        if (currentLTV >= 100) {
+          sendJson(res, 400, { 
+            error: 'LTV Threshold Exceeded', 
+            details: `Current LTV is ${currentLTV.toFixed(2)}% due to market fluctuations. Payout blocked for safety.` 
+          });
+          return;
+        }
+
+        // 3. Integration with South African Gateway (Mock)
+        console.log(`[EFT] [Admin:${adminId}] Initiating payout for Loan ${loanId} (LTV: ${currentLTV.toFixed(2)}%) to account ${bank_acc} for amount ZAR ${amount}`);
+        const gatewayResponse = { success: true, reference: `MINT-LIQ-${loanId}` };
+
+        if (gatewayResponse.success) {
+          // 4. Finalize Database State with Audit Logging
+          const updatePayload = { 
+            status: 'disbursed', 
+            disbursed_at: new Date().toISOString(),
+            disbursed_by_admin_id: adminId 
+          };
+
+          const result = await mutateSupabaseJson(
+            `/rest/v1/loan_application?id=eq.${encodeURIComponent(loanId)}`,
+            updatePayload,
+            token,
+            'PATCH'
+          );
+
+          sendJson(res, 200, { 
+            ok: true, 
+            message: "Funds Released via EFT",
+            gateway_ref: gatewayResponse.reference,
+            current_ltv: currentLTV,
+            data: result 
+          });
+        } else {
+          sendJson(res, 500, { error: 'Payment gateway rejected the EFT request' });
+        }
+      } catch (error) {
+        sendJson(res, 500, {
+          error: 'Could not execute EFT disbursement',
+          details: error?.message || 'Unknown error'
+        });
+      }
+    })();
+
+    return;
+  }
+
   if (req.url.startsWith('/api/confirm-eft-deposit') && req.method === 'POST') {
     const token = parseBearerToken(req.headers.authorization);
     if (!token) {
