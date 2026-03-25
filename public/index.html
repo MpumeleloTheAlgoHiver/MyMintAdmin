@@ -1896,6 +1896,44 @@
       margin-top: 2px;
     }
 
+    .holding-change.negative {
+      color: #ef4444;
+    }
+
+    .strategy-group-card {
+      cursor: pointer;
+      transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+
+    .strategy-group-card:hover {
+      border-color: #c4b5fd;
+      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.1);
+    }
+
+    .strategy-group-chevron {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: #9ca3af;
+      transition: transform 0.25s ease;
+      margin-left: 6px;
+    }
+
+    .strategy-group-card.expanded .strategy-group-chevron {
+      transform: rotate(180deg);
+    }
+
+    .strategy-assets-list {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s ease, opacity 0.25s ease;
+      opacity: 0;
+    }
+
+    .strategy-assets-list.expanded {
+      max-height: 2000px;
+      opacity: 1;
+    }
+
     .holding-desc {
       font-size: 0.85rem;
       color: #6b7280;
@@ -5343,11 +5381,15 @@
       let livePnl = avgFill > 0 ? (currentPrice - avgFill) * qty : 0;
 
       if (!currentPrice && row.market_value) liveMarketValue = Number(row.market_value);
-      if (!currentPrice && row.unrealized_pnl) livePnl = Number(row.unrealized_pnl);
+      if (!currentPrice && row.unrealized_pnl) livePnl = Number(row.unrealized_pnl) / 100;
 
+      livePnl = livePnl / 100;
+
+      const isNegative = livePnl < 0;
+      const pnlColorClass = isNegative ? 'holding-change negative' : 'holding-change';
       const marketValue = liveMarketValue ? `R ${formatNumber(liveMarketValue, 2)}` : 'R -';
       const pnl = liveMarketValue
-        ? `${livePnl >= 0 ? '+' : ''}R ${formatNumber(livePnl, 2)}`
+        ? `${isNegative ? '' : '+'}R ${formatNumber(Math.abs(livePnl), 2)}`
         : '-';
       const priceStr = currentPrice ? `R ${formatNumber(currentPrice, 2)}/share` : '';
       const status = row.status || row.Status || 'Stock';
@@ -5364,7 +5406,7 @@
             </div>
             <div>
               <div class="holding-price">${escapeHtml(marketValue)}</div>
-              <div class="holding-change">${escapeHtml(pnl)}</div>
+              <div class="${pnlColorClass}">${escapeHtml(pnl)}</div>
             </div>
           </div>
           <div class="holding-desc">Qty ${escapeHtml(quantityStr)}${priceStr ? ` • ${escapeHtml(priceStr)}` : ''} • As of ${escapeHtml(asOf)}</div>
@@ -5378,7 +5420,7 @@
       `;
     };
 
-    const renderStrategyGroupCard = (strategyName, holdings) => {
+    const renderStrategyGroupCard = (strategyName, holdings, groupId) => {
       let totalValue = 0;
       let totalPnl = 0;
       holdings.forEach(row => {
@@ -5392,19 +5434,26 @@
         totalPnl += pnl;
       });
 
+      totalPnl = totalPnl / 100;
+
+      const isNegative = totalPnl < 0;
+      const pnlColorClass = isNegative ? 'holding-change negative' : 'holding-change';
       const valueStr = totalValue ? `R ${formatNumber(totalValue, 2)}` : 'R -';
-      const pnlStr = totalValue ? `${totalPnl >= 0 ? '+' : ''}R ${formatNumber(totalPnl, 2)}` : '-';
+      const pnlStr = totalValue ? `${isNegative ? '' : '+'}R ${formatNumber(Math.abs(totalPnl), 2)}` : '-';
       const holdingCount = holdings.length;
+      const safeGroupId = escapeHtml(groupId);
+
+      const assetsHtml = holdings.map(row => renderStockHoldingCard(row)).join('');
 
       return `
-        <div class="holding-card">
+        <div class="holding-card strategy-group-card" data-strategy-group="${safeGroupId}">
           <div class="holding-header">
             <div>
-              <div class="holding-title">${escapeHtml(strategyName)}</div>
+              <div class="holding-title">${escapeHtml(strategyName)} <span class="strategy-group-chevron">▾</span></div>
             </div>
             <div>
               <div class="holding-price">${escapeHtml(valueStr)}</div>
-              <div class="holding-change">${escapeHtml(pnlStr)}</div>
+              <div class="${pnlColorClass}">${escapeHtml(pnlStr)}</div>
             </div>
           </div>
           <div class="holding-desc">${holdingCount} holding${holdingCount === 1 ? '' : 's'} in this strategy</div>
@@ -5414,6 +5463,9 @@
               <span class="holding-label">Strategy</span>
             </div>
           </div>
+        </div>
+        <div class="strategy-assets-list" data-strategy-assets="${safeGroupId}">
+          ${assetsHtml}
         </div>
       `;
     };
@@ -5469,11 +5521,22 @@
 
       if (strategyGroups.length) {
         let strategyHtml = '';
-        strategyGroups.forEach(group => {
-          strategyHtml += renderStrategyGroupCard(group.name, group.holdings);
-          strategyHtml += group.holdings.map(row => renderStockHoldingCard(row)).join('');
+        strategyGroups.forEach((group, idx) => {
+          const groupId = 'sg-' + profileId + '-' + idx;
+          strategyHtml += renderStrategyGroupCard(group.name, group.holdings, groupId);
         });
         strategyContainer.innerHTML = strategyHtml;
+
+        strategyContainer.querySelectorAll('.strategy-group-card').forEach(card => {
+          card.addEventListener('click', () => {
+            const gid = card.dataset.strategyGroup;
+            const assetsList = strategyContainer.querySelector('[data-strategy-assets="' + gid + '"]');
+            if (!assetsList) return;
+            const isExpanded = assetsList.classList.contains('expanded');
+            assetsList.classList.toggle('expanded', !isExpanded);
+            card.classList.toggle('expanded', !isExpanded);
+          });
+        });
       } else {
         strategyContainer.innerHTML = '<div class="holding-card holding-card-muted"><div class="holding-desc">No strategy allocations.</div></div>';
       }
