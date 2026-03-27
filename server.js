@@ -777,6 +777,101 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Admin Approval API Routes
+  if (req.url.startsWith('/api/admin/approvals') || req.url.startsWith('/api/admin/templates')) {
+    const token = parseBearerToken(req.headers.authorization);
+    if (!token) {
+      sendJson(res, 401, { error: 'Missing Authorization bearer token' });
+      return;
+    }
+
+    (async () => {
+      try {
+        const method = req.method;
+        const url = req.url;
+
+        // 1. GET /api/admin/templates
+        if (url.startsWith('/api/admin/templates') && method === 'GET') {
+          const data = await fetchSupabaseJson('/rest/v1/approval_templates?select=*&order=name', token);
+          sendJson(res, 200, data);
+          return;
+        }
+
+        // 2. GET /api/admin/approvals (Pending list)
+        if (url === '/api/admin/approvals' && method === 'GET') {
+          const data = await fetchSupabaseJson('/rest/v1/admin_approvals?select=*,loan:loan_application_id(*),profile:user_id(first_name,last_name,email)&status=eq.pending&order=created_at.desc', token);
+          sendJson(res, 200, data);
+          return;
+        }
+
+        // 3. POST /api/admin/approvals/:id/approve
+        if (url.includes('/approve') && method === 'POST') {
+          const parts = url.split('/');
+          const approvalId = parts[4];
+          const body = await readJsonBody(req);
+          
+          const updateResult = await mutateSupabaseJson(
+            `/rest/v1/admin_approvals?id=eq.${approvalId}`,
+            {
+              status: 'approved',
+              interest_rate: body.interestRate,
+              tenure_months: body.tenureMonths,
+              admin_notes: body.adminNotes,
+              approved_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            },
+            token,
+            'PATCH'
+          );
+
+          // Audit Log
+          await mutateSupabaseJson('/rest/v1/approval_audit_log', {
+            approval_id: approvalId,
+            action: 'approve',
+            details: { interestRate: body.interestRate, tenure: body.tenureMonths }
+          }, token, 'POST');
+
+          sendJson(res, 200, { ok: true, data: updateResult });
+          return;
+        }
+
+        // 4. POST /api/admin/approvals/:id/reject
+        if (url.includes('/reject') && method === 'POST') {
+          const parts = url.split('/');
+          const approvalId = parts[4];
+          const body = await readJsonBody(req);
+
+          const updateResult = await mutateSupabaseJson(
+            `/rest/v1/admin_approvals?id=eq.${approvalId}`,
+            {
+              status: 'rejected',
+              rejection_reason: body.reason,
+              updated_at: new Date().toISOString()
+            },
+            token,
+            'PATCH'
+          );
+
+          // Audit Log
+          await mutateSupabaseJson('/rest/v1/approval_audit_log', {
+            approval_id: approvalId,
+            action: 'reject',
+            details: { reason: body.reason }
+          }, token, 'POST');
+
+          sendJson(res, 200, { ok: true, data: updateResult });
+          return;
+        }
+
+        sendJson(res, 404, { error: 'Admin route not found' });
+      } catch (error) {
+        console.error('[AdminAPI] Error:', error.message);
+        sendJson(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
   const requestPath = req.url === '/' ? '/index.html' : req.url;
   const safePath = path.normalize(requestPath).replace(/^([/\\])+/, '');
   const filePath = path.join(publicDir, safePath);
