@@ -1888,6 +1888,18 @@
       text-align: right;
     }
 
+    .holding-price.positive {
+      color: #10b981;
+    }
+
+    .holding-price.negative {
+      color: #ef4444;
+    }
+
+    .holding-price.neutral {
+      color: #6b7280;
+    }
+
     .holding-change {
       font-size: 0.8rem;
       font-weight: 600;
@@ -4014,6 +4026,20 @@
       });
     };
 
+    const formatSignedCurrency = (value, digits = 2) => {
+      if (value === null || value === undefined || !Number.isFinite(Number(value))) return '-';
+      const parsed = Number(value);
+      const sign = parsed >= 0 ? '+' : '-';
+      return `${sign}R ${formatNumber(Math.abs(parsed), digits)}`;
+    };
+
+    const formatSignedPercent = (value, digits = 2) => {
+      if (value === null || value === undefined || !Number.isFinite(Number(value))) return null;
+      const parsed = Number(value);
+      const sign = parsed >= 0 ? '+' : '-';
+      return `${sign}${formatNumber(Math.abs(parsed), digits)}%`;
+    };
+
     const getLatestTimestamp = (rows = []) => {
       let latest = null;
       rows.forEach((row) => {
@@ -5401,13 +5427,16 @@
       // Color: compare bottom vs black top (market value)
       const isPositive = liveMarketValue > 0 && bottomValue > liveMarketValue;
       const isNegative = liveMarketValue > 0 && bottomValue < liveMarketValue;
-      const pnlColorClass = isNegative
-        ? 'holding-change negative'
-        : (isPositive ? 'holding-change' : 'holding-change neutral');
-      const marketValue = liveMarketValue ? `R ${formatNumber(liveMarketValue, 2)}` : 'R -';
-      const pnl = liveMarketValue
-        ? `${isPositive ? '+' : ''}R ${formatNumber(Math.abs(bottomValue), 2)}`
-        : '-';
+      const pnlPriceClass = isNegative ? 'negative' : (isPositive ? 'positive' : 'neutral');
+      const allTimeChangeAmount = liveMarketValue ? (bottomValue - liveMarketValue) : null;
+      const allTimeChangePct = liveMarketValue
+        ? ((allTimeChangeAmount / liveMarketValue) * 100)
+        : null;
+      const amountLabel = formatSignedCurrency(allTimeChangeAmount, 2);
+      const pctLabel = formatSignedPercent(allTimeChangePct, 2);
+      const pnl = amountLabel !== '-' && pctLabel
+        ? `${amountLabel} (${pctLabel})`
+        : amountLabel;
       const priceStr = currentPrice ? `R ${formatNumber(currentPrice, 2)}/share` : '';
       const status = row.status || row.Status || 'Stock';
       const strategyLabel = row.strategy_name_snapshot || strategiesByIdMap[row.strategy_id] || '';
@@ -5422,8 +5451,8 @@
               <div class="holding-title">${escapeHtml(title)}</div>
             </div>
             <div>
-              <div class="holding-price">${escapeHtml(marketValue)}</div>
-              <div class="${pnlColorClass}">${escapeHtml(pnl)}</div>
+              <div class="holding-price ${escapeHtml(pnlPriceClass)}">${escapeHtml(pnl)}</div>
+              <div class="holding-change neutral">all time</div>
             </div>
           </div>
           <div class="holding-desc">Qty ${escapeHtml(quantityStr)}${priceStr ? ` • ${escapeHtml(priceStr)}` : ''} • As of ${escapeHtml(asOf)}</div>
@@ -5465,13 +5494,16 @@
       // Color: compare total bottom vs total black top (market value)
       const isPositive = totalValue > 0 && totalBottomValue > totalValue;
       const isNegative = totalValue > 0 && totalBottomValue < totalValue;
-      const pnlColorClass = isNegative
-        ? 'holding-change negative'
-        : (isPositive ? 'holding-change' : 'holding-change neutral');
-      const valueStr = totalValue ? `R ${formatNumber(totalValue, 2)}` : 'R -';
-      const pnlStr = totalValue
-        ? `${isPositive ? '+' : ''}R ${formatNumber(Math.abs(totalBottomValue), 2)}`
-        : '-';
+      const pnlPriceClass = isNegative ? 'negative' : (isPositive ? 'positive' : 'neutral');
+      const allTimeChangeAmount = totalValue ? (totalBottomValue - totalValue) : null;
+      const allTimeChangePct = totalValue
+        ? ((allTimeChangeAmount / totalValue) * 100)
+        : null;
+      const amountLabel = formatSignedCurrency(allTimeChangeAmount, 2);
+      const pctLabel = formatSignedPercent(allTimeChangePct, 2);
+      const pnlStr = amountLabel !== '-' && pctLabel
+        ? `${amountLabel} (${pctLabel})`
+        : amountLabel;
       const holdingCount = holdings.length;
       const safeGroupId = escapeHtml(groupId);
 
@@ -5484,8 +5516,8 @@
               <div class="holding-title">${escapeHtml(strategyName)} <span class="strategy-group-chevron">▾</span></div>
             </div>
             <div>
-              <div class="holding-price">${escapeHtml(valueStr)}</div>
-              <div class="${pnlColorClass}">${escapeHtml(pnlStr)}</div>
+              <div class="holding-price ${escapeHtml(pnlPriceClass)}">${escapeHtml(pnlStr)}</div>
+              <div class="holding-change neutral">all time</div>
             </div>
           </div>
           <div class="holding-desc">${holdingCount} holding${holdingCount === 1 ? '' : 's'} in this strategy</div>
