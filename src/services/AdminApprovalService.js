@@ -53,10 +53,28 @@ class AdminApprovalService {
       .select(`
         *,
         loan:loan_application_id (*),
-        profile:user_id (first_name, last_name, email)
+        profile:user_id (first_name, last_name, email, mint_number)
       `)
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Retrieves a list of approved but not yet paid records.
+   */
+  async getApprovedPayouts() {
+    const { data, error } = await supabase
+      .from('admin_approvals')
+      .select(`
+        *,
+        loan:loan_application_id (*),
+        profile:user_id (first_name, last_name, email, mint_number, bank_name, bank_account_number, bank_account_type, bank_branch_code)
+      `)
+      .eq('status', 'approved')
+      .order('approved_at', { ascending: false });
 
     if (error) throw error;
     return data;
@@ -79,7 +97,10 @@ class AdminApprovalService {
         updated_at: new Date().toISOString()
       })
       .eq('id', approvalId)
-      .select()
+      .select(`
+        *,
+        profile:user_id (first_name, last_name, email, mint_number)
+      `)
       .single();
 
     if (error) throw error;

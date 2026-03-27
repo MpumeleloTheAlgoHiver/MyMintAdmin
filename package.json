@@ -9,6 +9,7 @@
     "dev": "node --watch server.js"
   },
   "dependencies": {
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "resend": "^6.9.4"
   }
 }

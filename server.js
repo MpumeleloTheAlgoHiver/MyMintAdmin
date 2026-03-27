@@ -799,8 +799,26 @@ const server = http.createServer((req, res) => {
 
         // 2. GET /api/admin/approvals (Pending list)
         if (url === '/api/admin/approvals' && method === 'GET') {
-          const data = await fetchSupabaseJson('/rest/v1/admin_approvals?select=*,loan:loan_application_id(*),profile:user_id(first_name,last_name,email)&status=eq.pending&order=created_at.desc', token);
-          sendJson(res, 200, data);
+          // Step 1: Fetch approvals with loan and profile data
+          const approvals = await fetchSupabaseJson(
+            '/rest/v1/admin_approvals?select=*,loan:loan_application_id(id,principal_amount,interest_rate,number_of_months),profile:user_id(first_name,last_name,email,mint_number)&status=eq.pending&order=created_at.desc',
+            token
+          );
+
+          // Step 2: For each approval, fetch user_onboarding bank details and merge
+          const approvalsWithBankDetails = await Promise.all(approvals.map(async (approval) => {
+            if (approval.user_id) {
+              const onboardingDetails = await fetchSupabaseJson(
+                `/rest/v1/user_onboarding?select=bank_name,bank_account_number,bank_branch_code&user_id=eq.${approval.user_id}`,
+                token
+              );
+              // Merge onboarding details into the approval object
+              return { ...approval, onboarding: onboardingDetails[0] || null };
+            }
+            return { ...approval, onboarding: null };
+          }));
+
+          sendJson(res, 200, approvalsWithBankDetails);
           return;
         }
 
@@ -809,14 +827,20 @@ const server = http.createServer((req, res) => {
           const parts = url.split('/');
           const approvalId = parts[4];
           const body = await readJsonBody(req);
-          
+
+          // terms come from the loan the user already agreed to (passed from front-end)
+          // admin_notes is the only thing the admin can add
           const updateResult = await mutateSupabaseJson(
             `/rest/v1/admin_approvals?id=eq.${approvalId}`,
             {
               status: 'approved',
-              interest_rate: body.interestRate,
-              tenure_months: body.tenureMonths,
+              interest_rate: body.interestRate,       // echoed from loan record
+              tenure_months: body.tenureMonths,       // echoed from loan record
               admin_notes: body.adminNotes,
+              payout_bank_name: body.payoutBankName,
+              payout_account_number: body.payoutAccountNumber,
+              payout_branch_code: body.payoutBranchCode,
+              payout_account_type: body.payoutAccountType,
               approved_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             },
@@ -828,7 +852,12 @@ const server = http.createServer((req, res) => {
           await mutateSupabaseJson('/rest/v1/approval_audit_log', {
             approval_id: approvalId,
             action: 'approve',
-            details: { interestRate: body.interestRate, tenure: body.tenureMonths }
+            details: {
+              interestRate: body.interestRate,
+              tenure: body.tenureMonths,
+              payoutTo: body.payoutAccountNumber,
+              bank: body.payoutBankName
+            }
           }, token, 'POST');
 
           sendJson(res, 200, { ok: true, data: updateResult });
@@ -857,6 +886,40 @@ const server = http.createServer((req, res) => {
             approval_id: approvalId,
             action: 'reject',
             details: { reason: body.reason }
+          }, token, 'POST');
+
+          sendJson(res, 200, { ok: true, data: updateResult });
+          return;
+        }
+
+        // 5. GET /api/admin/payouts
+        if (url === '/api/admin/payouts' && method === 'GET') {
+          const data = await fetchSupabaseJson('/rest/v1/admin_approvals?select=*,loan:loan_application_id(*),profile:user_id(first_name,last_name,email,mint_number,bank_name,bank_account_number,bank_account_type,bank_branch_code)&status=eq.approved&order=approved_at.desc', token);
+          sendJson(res, 200, data);
+          return;
+        }
+
+        // 6. POST /api/admin/payouts/:id/confirm
+        if (url.includes('/api/admin/payouts') && url.includes('/confirm') && method === 'POST') {
+          const parts = url.split('/');
+          const approvalId = parts[4];
+          
+          const updateResult = await mutateSupabaseJson(
+            `/rest/v1/admin_approvals?id=eq.${approvalId}`,
+            {
+              status: 'completed',
+              paid_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            },
+            token,
+            'PATCH'
+          );
+
+          // Audit Log
+          await mutateSupabaseJson('/rest/v1/approval_audit_log', {
+            approval_id: approvalId,
+            action: 'pay',
+            details: { method: 'EFT' }
           }, token, 'POST');
 
           sendJson(res, 200, { ok: true, data: updateResult });

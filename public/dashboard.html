@@ -503,6 +503,13 @@
             >
               EFT Confirmations
             </button>
+            <button
+              id="tabApprovals"
+              type="button"
+              class="text-sm pb-2 tab-inactive hover:text-slate-800"
+            >
+              Loan Approvals
+            </button>
           </div>
 
           <!-- ═══════════════ OVERVIEW TAB ═══════════════ -->
@@ -1089,8 +1096,41 @@
             </div>
           </div>
 
-          <!-- ═══════════════ EFT CONFIRMATIONS TAB ═══════════════ -->
-          <div id="tabEftPanel" class="hidden">
+            <!-- ═══════════════ LOAN APPROVALS TAB ═══════════════ -->
+            <div id="tabApprovalsPanel" class="hidden">
+              <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-4">
+                <div class="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 class="text-xl font-bold text-slate-800">Pending Loan Approvals</h2>
+                    <p class="text-sm text-slate-500">Review and approve verified loan applications.</p>
+                  </div>
+                  <button id="approvalsRefreshBtn" class="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                  </button>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left border-collapse">
+                    <thead>
+                      <tr class="border-b border-slate-100 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                        <th class="px-4 py-3">User / Application</th>
+                        <th class="px-4 py-3">Amount</th>
+                        <th class="px-4 py-3">Terms</th>
+                        <th class="px-4 py-3">Pay To (Bank)</th>
+                        <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3">Applied At</th>
+                        <th class="px-4 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="approvalsTableBody" class="divide-y divide-slate-50">
+                      <!-- Loaded via JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- ═══════════════ EFT CONFIRMATIONS TAB ═══════════════ -->
+            <div id="tabEftPanel" class="hidden">
             <!-- Stats Row -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div
@@ -1332,6 +1372,109 @@
       <div class="modal-content" id="strategyModalContent"></div>
     </div>
 
+    <!-- Loan Approval Modal — READ-ONLY review of user-selected terms & bank destination -->
+    <div id="approvalModal" class="modal-backdrop hidden">
+      <div class="modal-content max-w-lg w-full p-0 overflow-hidden">
+        <!-- Header -->
+        <div class="px-6 pt-6 pb-4 border-b border-slate-100">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-slate-900">Review &amp; Approve Loan</h3>
+              <p class="text-xs text-slate-500">These are the terms the applicant agreed to. Verify before approving.</p>
+            </div>
+          </div>
+        </div>
+
+        <input type="hidden" id="approvalModalId" />
+        <!-- Hidden fields to carry loan terms through to submit -->
+        <input type="hidden" id="approvalInterestRate" />
+        <input type="hidden" id="approvalTenure" />
+
+        <div class="px-6 py-5 space-y-4">
+
+          <!-- Applicant row -->
+          <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+            <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600" id="approvalUserAvatar">?</div>
+            <div>
+              <p class="text-sm font-semibold text-slate-800" id="approvalUserName">—</p>
+              <p class="text-[11px] text-slate-500" id="approvalUserEmail">—</p>
+            </div>
+            <span class="ml-auto text-[10px] font-bold text-slate-400 uppercase tracking-wider" id="approvalMintNumber"></span>
+          </div>
+
+          <!-- Loan terms (read-only) -->
+          <div class="grid grid-cols-3 gap-3">
+            <div class="p-3 bg-violet-50 rounded-xl text-center">
+              <p class="text-[10px] text-violet-500 font-semibold uppercase tracking-wider mb-1">Loan Amount</p>
+              <p class="text-base font-bold text-violet-800" id="approvalAmount">R —</p>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl text-center">
+              <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1">Interest Rate</p>
+              <p class="text-base font-bold text-slate-800" id="approvalRateDisplay">— %</p>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl text-center">
+              <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1">Tenure</p>
+              <p class="text-base font-bold text-slate-800" id="approvalTenureDisplay">— mo</p>
+            </div>
+          </div>
+
+          <!-- Purpose -->
+          <div id="approvalPurposeRow" class="hidden">
+            <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Loan Purpose</p>
+            <p class="text-sm text-slate-700" id="approvalPurpose">—</p>
+          </div>
+
+          <!-- Bank destination (where money goes) -->
+          <div class="border border-slate-200 rounded-xl p-4">
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+              Payout Destination
+            </p>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <p class="text-[10px] text-slate-400 mb-0.5">Bank</p>
+                <p class="text-sm font-semibold text-slate-800" id="approvalBankName">—</p>
+              </div>
+              <div>
+                <p class="text-[10px] text-slate-400 mb-0.5">Account Number</p>
+                <p class="text-sm font-semibold text-slate-800" id="approvalAccountNumber">—</p>
+              </div>
+              <div>
+                <p class="text-[10px] text-slate-400 mb-0.5">Branch Code</p>
+                <p class="text-sm font-semibold text-slate-800" id="approvalBranchCode">—</p>
+              </div>
+              <div>
+                <p class="text-[10px] text-slate-400 mb-0.5">Account Type</p>
+                <p class="text-sm font-semibold text-slate-800" id="approvalAccountType">—</p>
+              </div>
+            </div>
+            <!-- Warning if bank details missing -->
+            <div id="approvalNoBankWarning" class="hidden mt-3 flex items-center gap-2 text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs font-medium">
+              <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+              No verified bank account on file. Approval will be blocked until the user links their bank.
+            </div>
+          </div>
+
+          <!-- Admin notes -->
+          <div>
+            <label class="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Internal Admin Notes (optional)</label>
+            <textarea id="approvalNotes" rows="2" placeholder="e.g. risk reviewed, documents verified..." class="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-violet-500 outline-none resize-none"></textarea>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 pb-6 flex gap-3">
+          <button id="approvalCancelBtn" class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
+          <button id="approvalConfirmBtn" class="flex-1 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            Confirm Approval
+          </button>
+        </div>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
@@ -1351,6 +1494,10 @@
       const tabStrategiesPanel = document.getElementById("tabStrategiesPanel");
       const tabFactsheetsPanel = document.getElementById("tabFactsheetsPanel");
       const tabEftPanel = document.getElementById("tabEftPanel");
+      const tabApprovals = document.getElementById("tabApprovals");
+      const tabApprovalsPanel = document.getElementById("tabApprovalsPanel");
+      const approvalsTableBody = document.getElementById("approvalsTableBody");
+      const approvalsRefreshBtn = document.getElementById("approvalsRefreshBtn");
 
       const strategyChart = document.getElementById("strategyChart");
       const featuredStrategies = document.getElementById("featuredStrategies");
@@ -1409,6 +1556,14 @@
       const factsheetBackBtn = document.getElementById("factsheetBackBtn");
       const tabEft = document.getElementById("tabEft");
       const sidebarEft = document.getElementById("sidebarEft");
+      
+      const approvalModal = document.getElementById("approvalModal");
+      const approvalModalId = document.getElementById("approvalModalId");
+      const approvalConfirmBtn = document.getElementById("approvalConfirmBtn");
+      const approvalCancelBtn = document.getElementById("approvalCancelBtn");
+      const approvalInterestRate = document.getElementById("approvalInterestRate");
+      const approvalTenure = document.getElementById("approvalTenure");
+      const approvalNotes = document.getElementById("approvalNotes");
       const eftTableBody = document.getElementById("eftTableBody");
       const eftRefreshBtn = document.getElementById("eftRefreshBtn");
       const eftEmptyState = document.getElementById("eftEmptyState");
@@ -1685,6 +1840,7 @@
           tabRebalancing,
           tabFactsheets,
           tabEft,
+          tabApprovals,
         ];
         const panels = [
           tabOverviewPanel,
@@ -1692,6 +1848,7 @@
           tabRebalancingPanel,
           tabFactsheetsPanel,
           tabEftPanel,
+          tabApprovalsPanel,
         ];
         tabs.forEach((tab, i) => {
           if (tab === activeTab) {
@@ -1705,7 +1862,7 @@
 
         /* Sync side-nav active state */
         const navIcons = document.querySelectorAll(".nav-icon");
-        if (activeTab === tabStrategies || activeTab === tabOverview || activeTab === tabRebalancing || activeTab === tabFactsheets) {
+        if (activeTab === tabStrategies || activeTab === tabOverview || activeTab === tabRebalancing || activeTab === tabFactsheets || activeTab === tabApprovals) {
           navIcons.forEach(icon => {
             if (icon.getAttribute("aria-label") === "Dashboard") icon.classList.add("active");
             else if (icon.id !== "sidebarEft") icon.classList.remove("active");
@@ -1736,6 +1893,13 @@
         switchTab(tabEft);
         loadPendingEft();
       });
+      tabApprovals.addEventListener("click", () => {
+        switchTab(tabApprovals);
+        loadApprovals();
+      });
+      if (approvalsRefreshBtn) {
+        approvalsRefreshBtn.addEventListener("click", loadApprovals);
+      }
       sidebarEft.addEventListener("click", (e) => {
         e.preventDefault();
         switchTab(tabEft);
@@ -7424,6 +7588,260 @@
           }
         });
       });
+      /* ─────────────────────── APPROVALS TAB LOGIC ─────────────────────── */
+      // loadApprovals is defined below (cache-aware version)
+
+      function renderApprovals(approvals) {
+        const body = approvalsTableBody;
+        if (!body) return;
+        body.innerHTML = "";
+
+        if (!Array.isArray(approvals)) {
+          console.error("Expected array of approvals, got:", approvals);
+          body.innerHTML = '<tr><td colspan="7" class="py-10 text-center text-rose-500 text-sm">Error: Received invalid data from server.</td></tr>';
+          return;
+        }
+
+        if (approvals.length === 0) {
+          body.innerHTML = '<tr><td colspan="7" class="py-10 text-center text-slate-400 text-sm">No pending loan applications.</td></tr>';
+          return;
+        }
+
+        approvals.forEach(app => {
+          const tr = document.createElement("tr");
+          tr.className = "hover:bg-slate-50 transition-colors";
+
+          const profile   = app.profile   || {};
+          const loan      = app.loan      || {};
+          const onboarding = app.onboarding || {};
+
+          const user  = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'Unknown User';
+          const email = profile.email || '';
+          const date  = new Date(app.created_at).toLocaleDateString();
+
+          // Loan terms: prefer loan record, fall back to approval record
+          const rate   = loan.interest_rate  ?? app.interest_rate  ?? null;
+          const tenure = loan.number_of_months ?? app.tenure_months ?? null;
+          const rateDisplay = rate   !== null ? `${(rate * 100).toFixed(0)}%`  : '—';
+          const tenureDisplay = tenure !== null ? `${tenure} mo` : '—';
+          const termsLabel = (rate !== null || tenure !== null)
+            ? [rateDisplay, tenureDisplay].filter(s => s !== '—').join(' / ')
+            : '—';
+
+          // Bank destination (from user_onboarding join)
+          const bankName = onboarding.bank_name           || '';
+          const acctNo   = onboarding.bank_account_number || '';
+          const hasBankDetails = !!(bankName && acctNo);
+          const bankLabel = hasBankDetails
+            ? `<span class="font-medium text-slate-700">${bankName}</span><br><span class="text-[10px] text-slate-400">${acctNo}</span>`
+            : '<span class="text-amber-600 text-[10px] font-semibold">⚠ No bank linked</span>';
+
+          tr.innerHTML = `
+            <td class="px-4 py-4">
+              <div class="flex flex-col">
+                <span class="text-sm font-semibold text-slate-800">${user}</span>
+                <span class="text-[10px] text-slate-500">${email}</span>
+                ${profile.mint_number ? `<span class="text-[10px] text-slate-400 mt-0.5">${profile.mint_number}</span>` : ''}
+              </div>
+            </td>
+            <td class="px-4 py-4 text-sm font-medium text-slate-600 whitespace-nowrap">
+              R ${Number(app.amount).toLocaleString()}
+            </td>
+            <td class="px-4 py-4 text-xs text-slate-600 whitespace-nowrap">${termsLabel}</td>
+            <td class="px-4 py-4 text-xs">${bankLabel}</td>
+            <td class="px-4 py-4">
+              <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-amber-50 text-amber-600 border border-amber-100">
+                ${app.status}
+              </span>
+            </td>
+            <td class="px-4 py-4 text-xs text-slate-500 whitespace-nowrap">${date}</td>
+            <td class="px-4 py-4 text-right space-x-2 whitespace-nowrap">
+              <button onclick="openApprovalModal('${app.id}')" class="px-3 py-1 bg-violet-600 text-white text-[11px] font-bold rounded-lg shadow-sm hover:bg-violet-700">Review</button>
+              <button onclick="handleReject('${app.id}')" class="px-3 py-1 bg-white border border-slate-200 text-slate-600 text-[11px] font-bold rounded-lg hover:bg-slate-50">Reject</button>
+            </td>
+          `;
+          body.appendChild(tr);
+        });
+      }
+
+      // Store approvals data for modal lookup
+      let _approvalsCache = [];
+
+      async function loadApprovals() {
+        if (!approvalsTableBody) return;
+        approvalsTableBody.innerHTML = '<tr><td colspan="7" class="py-10 text-center text-slate-400 text-sm">Loading applications...</td></tr>';
+
+        try {
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          if (!session) return;
+
+          const response = await fetch('/api/admin/approvals', {
+            headers: { 'Authorization': `Bearer ${session.access_token}` }
+          });
+          const approvals = await response.json();
+          _approvalsCache = Array.isArray(approvals) ? approvals : [];
+          renderApprovals(_approvalsCache);
+        } catch (err) {
+          console.error("Failed to load approvals:", err);
+          approvalsTableBody.innerHTML = '<tr><td colspan="7" class="py-10 text-center text-rose-500 text-sm">Failed to load approvals.</td></tr>';
+        }
+      }
+
+      window.openApprovalModal = (id) => {
+        const app      = _approvalsCache.find(a => String(a.id) === String(id));
+        const profile  = app?.profile   || {};
+        const loan     = app?.loan      || {};
+        const onboarding = app?.onboarding || {};
+
+        // Populate hidden ID
+        document.getElementById('approvalModalId').value = id;
+
+        // Resolve loan terms from the loan record (what the user agreed to on the front-end)
+        const rate   = loan.interest_rate   ?? app?.interest_rate  ?? null;
+        const tenure = loan.number_of_months ?? app?.tenure_months ?? null;
+        // interest_rate is stored as a decimal e.g. 0.15 = 15%
+        const rateDisplay = rate !== null ? `${(rate * 100).toFixed(0)}%` : '—';
+
+        // Store in hidden inputs so confirm handler can send them back
+        document.getElementById('approvalInterestRate').value = rate   ?? '';
+        document.getElementById('approvalTenure').value       = tenure ?? '';
+
+        // User info
+        const firstName = profile.first_name || '';
+        const lastName  = profile.last_name  || '';
+        const fullName  = [firstName, lastName].filter(Boolean).join(' ') || 'Unknown User';
+        const initials  = [(firstName[0] || ''), (lastName[0] || '')].join('').toUpperCase() || '?';
+
+        document.getElementById('approvalUserAvatar').textContent  = initials;
+        document.getElementById('approvalUserName').textContent    = fullName;
+        document.getElementById('approvalUserEmail').textContent   = profile.email || '—';
+        document.getElementById('approvalMintNumber').textContent  = profile.mint_number ? `# ${profile.mint_number}` : '';
+
+        // Amount
+        const amount = app?.amount ?? loan.principal_amount ?? 0;
+        document.getElementById('approvalAmount').textContent = `R ${Number(amount).toLocaleString()}`;
+
+        // Terms display
+        document.getElementById('approvalRateDisplay').textContent   = rateDisplay;
+        document.getElementById('approvalTenureDisplay').textContent = tenure !== null ? `${tenure} mo` : '—';
+
+        // Purpose
+        const purpose = loan.purpose || '';
+        const purposeRow = document.getElementById('approvalPurposeRow');
+        if (purpose) {
+          document.getElementById('approvalPurpose').textContent = purpose;
+          purposeRow.classList.remove('hidden');
+        } else {
+          purposeRow.classList.add('hidden');
+        }
+
+        // Bank details (from user_onboarding join)
+        const bankName   = onboarding.bank_name           || '';
+        const acctNo     = onboarding.bank_account_number || '';
+        const branchCode = onboarding.bank_branch_code    || '';
+        const hasBank    = !!(bankName && acctNo);
+
+        document.getElementById('approvalBankName').textContent      = bankName   || '—';
+        document.getElementById('approvalAccountNumber').textContent = acctNo     || '—';
+        document.getElementById('approvalBranchCode').textContent    = branchCode || '—';
+        document.getElementById('approvalAccountType').textContent   = '—'; // not stored in current schema
+
+        const warning     = document.getElementById('approvalNoBankWarning');
+        const confirmBtn  = document.getElementById('approvalConfirmBtn');
+        if (!hasBank) {
+          warning.classList.remove('hidden');
+          confirmBtn.disabled = true;
+        } else {
+          warning.classList.add('hidden');
+          confirmBtn.disabled = false;
+        }
+
+        // Clear notes
+        document.getElementById('approvalNotes').value = '';
+
+        // Show modal
+        approvalModal.classList.remove('hidden');
+      };
+
+      if (approvalCancelBtn) {
+        approvalCancelBtn.addEventListener('click', () => {
+          approvalModal.classList.add('hidden');
+        });
+      }
+
+      if (approvalConfirmBtn) {
+        approvalConfirmBtn.addEventListener('click', async () => {
+          const id = document.getElementById('approvalModalId').value;
+
+          // Read the pre-resolved loan terms from hidden fields (set when modal opened)
+          const interestRate  = parseFloat(document.getElementById('approvalInterestRate').value) || null;
+          const tenureMonths  = parseInt(document.getElementById('approvalTenure').value)         || null;
+          const adminNotes    = document.getElementById('approvalNotes').value;
+
+          // Bank details for payout record (sourced from the profile shown in modal)
+          const app     = _approvalsCache.find(a => String(a.id) === String(id));
+          const profile = app?.profile || {};
+
+          const payload = {
+            interestRate,
+            tenureMonths,
+            adminNotes,
+            payoutBankName:      onboarding.bank_name           || null,
+            payoutAccountNumber: onboarding.bank_account_number || null,
+            payoutBranchCode:    onboarding.bank_branch_code    || null,
+            payoutAccountType:   null
+          };
+
+          try {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            const res = await fetch(`/api/admin/approvals/${id}/approve`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+              },
+              body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+              approvalModal.classList.add('hidden');
+              loadApprovals();
+              if (window.showToast) window.showToast('Application approved ✓', 'success');
+            } else {
+              const errData = await res.json().catch(() => ({}));
+              alert(errData.error || 'Failed to approve application');
+            }
+          } catch (err) {
+            console.error('Approve error:', err);
+            alert('Network error — please try again.');
+          }
+        });
+      }
+
+      window.handleReject = async (id) => {
+        const reason = prompt('Enter rejection reason:');
+        if (!reason) return;
+
+        try {
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          const res = await fetch(`/api/admin/approvals/${id}/reject`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ reason })
+          });
+
+          if (res.ok) {
+            loadApprovals();
+            if (window.showToast) window.showToast('Application rejected', 'info');
+          }
+        } catch (err) {
+          console.error('Reject error:', err);
+        }
+      };
+
     </script>
   </body>
 </html>

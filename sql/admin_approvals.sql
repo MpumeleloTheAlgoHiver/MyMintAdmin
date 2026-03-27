@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS admin_approvals (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     approved_at TIMESTAMPTZ,
-    paid_at TIMESTAMPTZ
+    paid_at TIMESTAMPTZ,
+    signed_agreement_url TEXT
 );
 
 CREATE TABLE IF NOT EXISTS approval_audit_log (
