@@ -3083,6 +3083,113 @@
     .pack-details-btn { padding: 5px 12px !important; border-radius: 7px !important; font-size: 0.78rem !important; border-color: #ede9fe !important; color: #6b7280 !important; }
     .pack-details-btn.active { background: #7c3aed !important; border-color: #7c3aed !important; color: #fff !important; }
     .pack-details-btn:not(:disabled):hover { border-color: #c4b5fd !important; background: #f5f3ff !important; color: #5b21b6 !important; box-shadow: none !important; }
+
+    /* ══════════════════════════════════════
+       EXPANDED CARD — LAYOUT OVERHAUL
+    ══════════════════════════════════════ */
+
+    /* Tighter expanded zone */
+    .detailed-view.active { background: #eae5ff; }
+    .content-area { padding: 12px !important; gap: 12px !important; align-items: flex-start !important; }
+
+    /* ── LEFT PANEL: unified info sidebar ── */
+    .left-column {
+      flex: 0 0 288px !important;
+      background: #ffffff !important;
+      border: 1px solid #e0d8ff !important;
+      border-radius: 12px !important;
+      overflow: hidden !important;
+      padding: 0 !important;
+      box-shadow: 0 2px 10px rgba(91,33,182,0.08) !important;
+    }
+
+    /* Profile hero — top of left panel */
+    .company-header {
+      border-radius: 0 !important;
+      border: none !important;
+      border-bottom: 1px solid #ede9fe !important;
+      background: linear-gradient(135deg, #ede9ff 0%, #f7f4ff 100%) !important;
+      margin-bottom: 0 !important;
+      padding: 14px 16px !important;
+      box-shadow: none !important;
+    }
+    .company-info { gap: 12px !important; margin-bottom: 6px !important; }
+    .company-avatar { width: 42px !important; height: 42px !important; border-radius: 10px !important; box-shadow: 0 4px 10px rgba(89,35,170,0.28) !important; }
+    .company-avatar svg { width: 21px !important; height: 21px !important; }
+    .company-title h1 { font-size: 0.95rem !important; font-weight: 700 !important; color: #1e1145 !important; letter-spacing: -0.01em !important; margin-bottom: 0 !important; gap: 6px !important; }
+    .company-header > .detail-row { padding: 2px 0 0 !important; border: none !important; }
+    .company-header > .detail-row .detail-label { font-size: 0.67rem !important; color: #a78bfa !important; text-transform: uppercase !important; letter-spacing: 0.05em !important; flex: 0 0 28px !important; }
+    .company-header > .detail-row .detail-value { font-size: 0.76rem !important; color: #5b21b6 !important; font-weight: 600 !important; }
+
+    /* Detail cards inside left panel — flat sections separated by lines */
+    .left-column .detail-card {
+      border: none !important;
+      border-radius: 0 !important;
+      border-bottom: 1px solid #f0ebff !important;
+      margin-bottom: 0 !important;
+      padding: 11px 16px !important;
+      box-shadow: none !important;
+      background: transparent !important;
+      transition: background 0.15s ease !important;
+    }
+    .left-column .detail-card:last-child { border-bottom: none !important; }
+    .left-column .detail-card:hover { transform: none !important; box-shadow: none !important; background: #faf7ff !important; }
+    .left-column .card-header { border-bottom: none !important; padding-bottom: 4px !important; margin-bottom: 1px !important; }
+    .left-column .card-title { font-size: 0.67rem !important; color: #7c6fa0 !important; font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.06em !important; }
+    .left-column .card-title svg { fill: #c4b5fd !important; width: 12px !important; height: 12px !important; }
+    .left-column .card-action { border-color: #ddd6fe !important; width: 26px !important; height: 26px !important; }
+    .left-column .card-action svg { fill: #a78bfa !important; width: 13px !important; height: 13px !important; }
+    .left-column .detail-row { padding: 5px 0 !important; border-bottom-color: #f5f0ff !important; }
+    .left-column .detail-row:last-child { border-bottom: none !important; }
+    .left-column .detail-label { font-size: 0.69rem !important; color: #a8a4c0 !important; font-weight: 600 !important; flex: 0 0 108px !important; padding-top: 2px !important; letter-spacing: 0.01em !important; }
+    .left-column .detail-value { font-size: 0.81rem !important; color: #1e293b !important; font-weight: 500 !important; }
+    .left-column .mandate-action-btn { height: 24px !important; padding: 0 8px !important; font-size: 0.7rem !important; border-color: #ddd6fe !important; border-radius: 5px !important; }
+    .left-column .mandate-action-btn:hover { background: #f5f3ff !important; color: #5b21b6 !important; border-color: #c4b5fd !important; }
+
+    /* ── RIGHT PANEL: tabs container ── */
+    .right-column { flex: 1 !important; min-width: 0 !important; }
+    .tabs-container { border-color: #e0d8ff !important; box-shadow: 0 2px 10px rgba(91,33,182,0.08) !important; }
+    .tabs-header { background: linear-gradient(180deg, #f5f1ff 0%, #fdfbff 100%) !important; border-bottom-color: #ede9fe !important; }
+
+    /* ── TIMELINE: modern feed ── */
+    .timeline { padding: 12px 14px !important; }
+    .timeline-header { font-size: 0.7rem !important; font-weight: 700 !important; color: #b0aacb !important; text-transform: uppercase !important; letter-spacing: 0.08em !important; margin-bottom: 8px !important; }
+    .history-view .timeline-header { background: transparent !important; padding-bottom: 4px !important; }
+    .timeline-item:not(:last-child)::after { display: none !important; }
+    .timeline-item { gap: 10px !important; margin-bottom: 0 !important; padding: 9px 0 !important; border-bottom: 1px solid #f0ebff; align-items: flex-start !important; }
+    .timeline-item:last-child { border-bottom: none !important; }
+    .timeline-icon { width: 30px !important; height: 30px !important; border-radius: 8px !important; background: #f0ecff !important; flex-shrink: 0 !important; }
+    .timeline-icon svg { width: 14px !important; height: 14px !important; fill: #8b5cf6 !important; }
+    .timeline-icon.blue { background: #ede9fe !important; }
+    .timeline-icon.blue svg { fill: #6d28d9 !important; }
+    .timeline-content { padding-top: 0 !important; flex: 1; min-width: 0; }
+    .timeline-title { font-size: 0.81rem !important; font-weight: 500 !important; color: #1e293b !important; margin-bottom: 2px !important; line-height: 1.35 !important; }
+    .timeline-meta { font-size: 0.71rem !important; color: #b0aacb !important; margin-bottom: 2px !important; gap: 4px !important; }
+    .timeline-meta svg { fill: #c4b5fd !important; width: 11px !important; height: 11px !important; }
+    .timeline-time { font-size: 0.68rem !important; color: #c4b5fd !important; top: 9px !important; }
+    .timeline-details { background: #f8f5ff !important; border-radius: 6px !important; padding: 8px 10px !important; border-left: 2px solid #c4b5fd; margin-top: 6px !important; }
+    .timeline-details-toggle { font-size: 0.74rem !important; color: #8b5cf6 !important; }
+    .timeline-details-content { font-size: 0.74rem !important; color: #6b7280 !important; }
+
+    /* ── HOLDINGS: refined cards ── */
+    .holdings-view { padding: 12px 14px !important; }
+    .holdings-header { margin-bottom: 8px !important; }
+    .holdings-header h2 { font-size: 0.7rem !important; font-weight: 700 !important; color: #b0aacb !important; text-transform: uppercase !important; letter-spacing: 0.08em !important; }
+    .holdings-header span { font-size: 0.71rem !important; color: #c4b5fd !important; }
+    .holdings-section { margin-bottom: 10px !important; }
+    .holdings-section-title { font-size: 0.67rem !important; color: #a78bfa !important; letter-spacing: 0.06em !important; }
+    .holdings-section-chevron { color: #c4b5fd !important; font-size: 0.78rem !important; }
+    .holdings-section-toggle:hover { background: #f2eeff !important; }
+    .holdings-section-content { margin-top: 6px !important; }
+    .holding-card { border-color: #e8e0ff !important; border-radius: 10px !important; padding: 11px 13px !important; margin-bottom: 7px !important; background: #ffffff !important; border-left-width: 3px !important; border-left-color: #a78bfa !important; border-left-style: solid !important; }
+    .holding-card:hover { box-shadow: 0 4px 14px rgba(124,58,237,0.12) !important; border-color: #c4b5fd !important; }
+    .holding-title { font-size: 0.85rem !important; color: #1e1145 !important; font-weight: 600 !important; }
+    .holding-price { font-size: 0.85rem !important; }
+    .holding-change { font-size: 0.71rem !important; }
+    .holding-desc { font-size: 0.73rem !important; color: #94a3b8 !important; margin-bottom: 8px !important; }
+    .holding-tag { font-size: 0.66rem !important; font-weight: 700 !important; border-radius: 4px !important; }
+    .holdings-empty-state { padding: 24px 16px !important; }
+    .holding-card-muted { border-color: #ede9fe !important; border-left-color: #ddd6fe !important; }
   </style>
 </head>
 <body>
