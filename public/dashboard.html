@@ -7649,5 +7649,22 @@
         });
       });
     </script>
+  <style>
+    @keyframes pageIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    body { animation: pageIn 0.2s ease forwards; }
+  </style>
+  <script>
+    document.addEventListener('click', function(e) {
+      var link = e.target.closest('a.nav-icon');
+      if (!link) return;
+      var href = link.getAttribute('href');
+      if (!href || href === '#') return;
+      e.preventDefault();
+      document.body.style.transition = 'opacity 0.15s ease, transform 0.15s ease';
+      document.body.style.opacity = '0';
+      document.body.style.transform = 'translateY(-4px)';
+      setTimeout(function() { window.location.href = href; }, 150);
+    });
+  </script>
   </body>
 </html>
