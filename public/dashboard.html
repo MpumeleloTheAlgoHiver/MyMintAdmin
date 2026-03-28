@@ -2473,12 +2473,12 @@
               logo_url: btn.dataset.logo || null,
               shares: 1,
               weight: 0,
-              market_cap: cached.market_cap || null,
-              pe_ratio: cached.pe_ratio || null,
-              dividend_per_share: cached.dividend_per_share || null,
-              dividend_yield: cached.dividend_yield || null,
-              ytd_performance: cached.ytd_performance || null,
-              change_percent: cached.change_percent || null,
+              market_cap: cached.market_cap ?? null,
+              pe_ratio: cached.pe_ratio ?? null,
+              dividend_per_share: cached.dividend_per_share ?? null,
+              dividend_yield: cached.dividend_yield ?? null,
+              ytd_performance: cached.ytd_performance ?? null,
+              change_percent: cached.change_percent ?? null,
             });
             securitySearchInput.value = "";
             renderSecuritiesDropdown("");
@@ -2874,7 +2874,7 @@
           const symbols = holdings.map((h) => h.ticker || h.symbol || h);
           const { data } = await supabaseClient
             .from("securities")
-            .select("symbol, name, logo_url, last_price, change_percent")
+            .select("symbol, name, logo_url, last_price, change_percent, market_cap, pe_ratio, dividend_per_share, dividend_yield, ytd_performance")
             .in("symbol", symbols);
           if (data) {
             securitiesMap = new Map();
@@ -3340,7 +3340,7 @@
           ];
           const { data: secs } = await supabaseClient
             .from("securities")
-            .select("symbol, name, logo_url, last_price, change_percent")
+            .select("symbol, name, logo_url, last_price, change_percent, market_cap, pe_ratio, dividend_per_share, dividend_yield, ytd_performance")
             .in("symbol", allSymbols);
           if (secs)
             secs.forEach((s) => {
@@ -5264,12 +5264,12 @@
                   logo_url: sec.logo_url || null,
                   shares: 1,
                   weight: 0,
-                  market_cap: sec.market_cap || null,
-                  pe_ratio: sec.pe_ratio || null,
-                  dividend_per_share: sec.dividend_per_share || null,
-                  dividend_yield: sec.dividend_yield || null,
-                  ytd_performance: sec.ytd_performance || null,
-                  change_percent: sec.change_percent || null,
+                  market_cap: sec.market_cap ?? null,
+                  pe_ratio: sec.pe_ratio ?? null,
+                  dividend_per_share: sec.dividend_per_share ?? null,
+                  dividend_yield: sec.dividend_yield ?? null,
+                  ytd_performance: sec.ytd_performance ?? null,
+                  change_percent: sec.change_percent ?? null,
                 });
                 renderTopAssetsRow();
               }
@@ -5443,8 +5443,11 @@
           }
           holdings.forEach((h) => {
             const sym = h.ticker || h.symbol || "";
-            const sec =
-              secMap.get(sym) || secMap.get(normalizeSymbol(sym)) || {};
+            const secFromMap = secMap.get(sym) || secMap.get(normalizeSymbol(sym)) || {};
+            // allSecuritiesCache is loaded with ALL securities + all market data columns — use as guaranteed fallback
+            const secFromCache = (allSecuritiesCache || []).find(s => s.symbol === sym || s.symbol === normalizeSymbol(sym)) || {};
+            // Prefer secMap (freshly queried), fall back to cache, then to saved holding value
+            const sec = Object.keys(secFromMap).length > 0 ? secFromMap : secFromCache;
             formHoldings.push({
               symbol: sym,
               name: h.name || sec.name || sym,
