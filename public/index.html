@@ -2868,6 +2868,75 @@
       }
     }
   </style>
+  <style>
+    /* ── Premium Fintech Redesign ── */
+    body { background: #f2f3f7; }
+
+    /* Search icon */
+    .top-search { position: relative; }
+    .search-icon-svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; fill: #9ca3af; pointer-events: none; flex-shrink: 0; }
+    .top-search input { padding-left: 36px; background: #ffffff; border-color: #e5e7eb; }
+    .top-search input:focus { background: #ffffff; }
+
+    /* Page title block */
+    .clients-title-block { display: flex; flex-direction: column; gap: 1px; }
+    .clients-page-title { font-size: 20px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; line-height: 1.2; }
+    .clients-page-sub { font-size: 11.5px; color: #94a3b8; font-weight: 500; }
+
+    /* Stats strip */
+    .client-stats-strip { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 12px; }
+    .client-stat-card { background: #ffffff; border: 1px solid #e8e8f0; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px; transition: box-shadow 0.15s ease, transform 0.15s ease; }
+    .client-stat-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.07); transform: translateY(-1px); }
+    .client-stat-card.stat-total  { border-left: 3px solid #7c3aed; }
+    .client-stat-card.stat-completed { border-left: 3px solid #22c55e; }
+    .client-stat-card.stat-pending { border-left: 3px solid #f59e0b; }
+    .client-stat-card.stat-rejected { border-left: 3px solid #ef4444; }
+    .csc-value { font-size: 28px; font-weight: 700; color: #0f172a; font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -0.03em; }
+    .csc-label { font-size: 10.5px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* Column header */
+    .clients-list-hd { display: flex; align-items: center; gap: 10px; padding: 5px 14px; margin-bottom: 1px; }
+    .clhd-main { flex: 1; font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.07em; }
+    .clhd-kyc { flex: 0 0 130px; font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.07em; text-align: right; }
+    .clhd-action { flex: 0 0 30px; }
+
+    /* Row layout */
+    .simple-row { justify-content: flex-start !important; gap: 10px !important; min-height: 64px; padding: 11px 14px !important; }
+    .simple-left { flex: 1 !important; min-width: 0; gap: 12px !important; }
+    .simple-mid { flex: 0 0 130px; display: flex; align-items: center; justify-content: flex-end; }
+    .simple-right { margin-left: 0 !important; flex: 0 0 30px; justify-content: flex-end; gap: 0 !important; }
+
+    /* Email sub-row */
+    .simple-sub-row { display: flex; align-items: center; gap: 4px; margin-top: 2px; flex-wrap: nowrap; overflow: hidden; }
+    .simple-row-email { font-size: 11px; color: #9ca3af; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 1; }
+    .simple-uid-sep { color: #d1d5db; font-size: 9px; flex-shrink: 0; }
+
+    /* KYC badge */
+    .row-kyc-badge { display: inline-flex; align-items: center; justify-content: center; padding: 3px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; letter-spacing: 0.01em; border: 1px solid transparent; }
+    .row-kyc-badge.kyc-completed { background: #f0fdf4; color: #16a34a; border-color: #bbf7d0; }
+    .row-kyc-badge.kyc-pending   { background: #fffbeb; color: #d97706; border-color: #fde68a; }
+    .row-kyc-badge.kyc-rejected  { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+    .row-kyc-badge.kyc-default   { background: #f8fafc; color: #94a3b8; border-color: #e2e8f0; }
+
+    /* Row hover */
+    .simple-item:hover .simple-row { background: #f7f5ff !important; }
+    .simple-item:hover .simple-name { color: #5b21b6 !important; }
+
+    /* List container */
+    .simple-list { border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04) !important; border-color: #e5e5ee !important; }
+    .simple-item { border-bottom-color: #f0f0f8 !important; }
+
+    /* Avatar refinement */
+    .simple-avatar { width: 38px !important; height: 38px !important; border-radius: 10px !important; font-size: 13px !important; }
+
+    /* Filter pills refinement */
+    .quick-filter-pill { border-radius: 8px !important; padding: 6px 12px !important; font-size: 12px !important; font-weight: 500 !important; }
+    .quick-filter-pill.active { box-shadow: 0 2px 8px rgba(124,58,237,0.3); }
+
+    /* simple-view spacing */
+    .simple-view { padding: 18px 24px 28px !important; }
+    .simple-view-header { margin-bottom: 16px !important; align-items: flex-start !important; }
+  </style>
 </head>
 <body>
   <!-- Sidebar -->
@@ -2941,14 +3010,17 @@
     <!-- Top Navigation -->
     <div class="top-nav">
       <div class="top-search">
-        <input type="search" placeholder="Search profiles..." aria-label="Search profiles">
+        <svg class="search-icon-svg" viewBox="0 0 20 20" aria-hidden="true"><path d="M13 11a5 5 0 10-1.41 1.41l3.54 3.55 1.41-1.42L13 11zm-5 1a4 4 0 110-8 4 4 0 010 8z"/></svg>
+        <input type="search" placeholder="Search clients by name, email or UID…" aria-label="Search profiles">
       </div>
-
     </div>
 
     <section class="simple-view" id="simpleView">
       <div class="simple-view-header">
-        <h2 class="simple-view-title">Profiles</h2>
+        <div class="clients-title-block">
+          <h1 class="clients-page-title">Clients</h1>
+          <p class="clients-page-sub">KYC verification &amp; profile management</p>
+        </div>
         <div class="user-count-wrap">
           <div class="quick-filter-stack" aria-label="User filters">
             <div class="quick-filter-row">
@@ -2978,6 +3050,31 @@
           </div>
         </div>
       </div>
+      <div class="client-stats-strip">
+        <div class="client-stat-card stat-total">
+          <div class="csc-value" id="statsTotal">—</div>
+          <div class="csc-label">Total clients</div>
+        </div>
+        <div class="client-stat-card stat-completed">
+          <div class="csc-value" id="statsCompleted">—</div>
+          <div class="csc-label">KYC Completed</div>
+        </div>
+        <div class="client-stat-card stat-pending">
+          <div class="csc-value" id="statsPending">—</div>
+          <div class="csc-label">KYC Pending</div>
+        </div>
+        <div class="client-stat-card stat-rejected">
+          <div class="csc-value" id="statsRejected">—</div>
+          <div class="csc-label">KYC Rejected</div>
+        </div>
+      </div>
+
+      <div class="clients-list-hd" aria-hidden="true">
+        <span class="clhd-main">Client</span>
+        <span class="clhd-kyc">KYC Status</span>
+        <span class="clhd-action"></span>
+      </div>
+
       <div class="simple-list" id="profilesList"></div>
       <div class="completed-table-panel" id="completedTablePanel" aria-hidden="true">
         <div class="completed-table-toolbar">
@@ -3034,8 +3131,15 @@
                   <div class="simple-name" data-name>Alex Adams</div>
                   <span class="signed-in-today-badge" data-signed-in-today>Signed in today</span>
                 </div>
-                <div class="simple-uid" data-uid>UID: AA-0000-XX</div>
+                <div class="simple-sub-row">
+                  <span class="simple-row-email" data-row-email></span>
+                  <span class="simple-uid-sep" aria-hidden="true">·</span>
+                  <span class="simple-uid" data-uid>UID: AA-0000-XX</span>
+                </div>
               </div>
+            </div>
+            <div class="simple-mid">
+              <span class="row-kyc-badge" data-row-kyc></span>
             </div>
             <div class="simple-right">
               <button class="ellipsis-btn show-details-btn" aria-label="Show profile details">
@@ -5100,6 +5204,25 @@
       }
     };
 
+    const updateClientStats = () => {
+      const elTotal = document.getElementById('statsTotal');
+      const elCompleted = document.getElementById('statsCompleted');
+      const elPending = document.getElementById('statsPending');
+      const elRejected = document.getElementById('statsRejected');
+      if (!elTotal) return;
+      let completed = 0, pending = 0, rejected = 0;
+      allProfiles.forEach(p => {
+        const s = getEffectiveKycState(p.id, allKycMap[p.id]?.status || 'Not initiated');
+        if (s.rejected) rejected++;
+        else if (s.completed) completed++;
+        else if (s.pending) pending++;
+      });
+      elTotal.textContent = allProfiles.length;
+      elCompleted.textContent = completed;
+      elPending.textContent = pending;
+      elRejected.textContent = rejected;
+    };
+
     const renderProfiles = (profiles = [], kycMap = {}, options = {}) => {
       const showNewUsersGrouping = options.showNewUsersGrouping === true;
       if (!profilesList || !profileTemplate) return;
@@ -5134,6 +5257,22 @@
         const effectiveKycState = getEffectiveKycState(profile.id, kycEntry.status || 'Not initiated');
         setText(clone, '[data-kyc-status]', effectiveKycState.label);
         updateReviewPulseForItem(clone, profile.id);
+
+        clone.querySelectorAll('[data-row-email]').forEach(el => {
+          el.textContent = profile.email || '';
+          const sep = el.nextElementSibling;
+          if (sep && sep.classList.contains('simple-uid-sep')) {
+            sep.style.display = profile.email ? '' : 'none';
+          }
+        });
+        clone.querySelectorAll('[data-row-kyc]').forEach(el => {
+          el.textContent = effectiveKycState.label;
+          el.className = 'row-kyc-badge ' + (
+            effectiveKycState.rejected ? 'kyc-rejected' :
+            effectiveKycState.completed ? 'kyc-completed' :
+            effectiveKycState.pending ? 'kyc-pending' : 'kyc-default'
+          );
+        });
 
         const initialsEl = clone.querySelector('[data-initials]');
         if (initialsEl) {
@@ -5719,6 +5858,7 @@
         allProfiles = sortProfilesForDisplay(profiles);
         allKycMap = kycMap;
 
+        updateClientStats();
         applySearchFilter();
 
         try {
