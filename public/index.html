@@ -2287,35 +2287,40 @@
     .filter-bar .top-search {
       position: relative;
       flex: 1;
-      min-width: 160px;
-      max-width: 280px;
+      min-width: 170px;
+      max-width: 260px;
     }
     .filter-bar .top-search .search-icon-svg {
       position: absolute;
-      left: 9px;
+      left: 10px;
       top: 50%;
       transform: translateY(-50%);
       width: 13px;
       height: 13px;
-      fill: #9ca3af;
+      fill: #8b93a7;
       pointer-events: none;
+      transition: fill 0.15s ease;
     }
+    .filter-bar .top-search:focus-within .search-icon-svg { fill: #7c3aed; }
     .filter-bar .top-search input {
       width: 100%;
-      height: 30px;
-      border-radius: 8px;
-      border: 1px solid #e5e7eb;
-      background: #f9fafb;
-      padding: 0 10px 0 28px;
-      font-size: 0.78rem;
+      height: 32px;
+      border-radius: 10px;
+      border: 1px solid #dde1ea;
+      background: #ffffff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      padding: 0 12px 0 30px;
+      font-size: 0.79rem;
+      font-weight: 400;
       color: #111827;
+      letter-spacing: -0.01em;
       outline: none;
-      transition: border-color 0.18s, box-shadow 0.18s;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
-    .filter-bar .top-search input::placeholder { color: #9ca3af; }
+    .filter-bar .top-search input::placeholder { color: #a0a9bb; font-weight: 400; }
     .filter-bar .top-search input:focus {
       border-color: #7c3aed;
-      box-shadow: 0 0 0 2px rgba(124,58,237,0.15);
+      box-shadow: 0 0 0 3px rgba(124,58,237,0.12), 0 1px 2px rgba(0,0,0,0.05);
       background: #fff;
     }
 
