@@ -595,6 +595,12 @@
     </aside>
 
     <main class="main-content">
+      <div id="pageSkeleton">
+        <div class="sk-hd"><div class="sk-p sk-w220"></div><div class="sk-p sk-w100 sk-ml-auto"></div></div>
+        <div class="sk-stat-row"><div class="sk-card"></div><div class="sk-card"></div><div class="sk-card"></div><div class="sk-card"></div></div>
+        <div class="sk-panel" style="height:260px"></div>
+        <div class="sk-rows"><div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div><div class="sk-row" style="width:58%"></div></div>
+      </div>
       <div class="top-nav">
         <div class="top-search">
           <input
@@ -7652,11 +7658,30 @@
         });
       });
     </script>
+  <style>
+    #pageSkeleton{position:fixed;left:220px;top:0;right:0;bottom:0;background:#f8fafc;z-index:50;padding:28px 32px;display:flex;flex-direction:column;gap:20px;pointer-events:none;transition:opacity 0.3s ease}
+    @keyframes skShimmer{from{background-position:-800px 0}to{background-position:800px 0}}
+    .sk-p,.sk-card,.sk-panel,.sk-row{background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);background-size:1600px 100%;animation:skShimmer 1.4s ease infinite;border-radius:8px}
+    .sk-hd{display:flex;align-items:center;height:36px}
+    .sk-w220{width:220px;height:22px}.sk-w100{width:100px;height:22px}.sk-ml-auto{margin-left:auto}
+    .sk-stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.sk-card{height:88px}
+    .sk-panel{border-radius:12px}
+    .sk-rows{display:flex;flex-direction:column;gap:10px}.sk-row{height:44px}
+  </style>
   <script>
     (function() {
       var h = document.documentElement;
+      var sk = document.getElementById('pageSkeleton');
       h.style.transition = 'opacity 0.22s ease';
       h.style.opacity = '1';
+      function hideSkeleton() {
+        if (!sk) return;
+        sk.style.opacity = '0';
+        setTimeout(function() { if (sk) sk.style.display = 'none'; }, 300);
+        sk = null;
+      }
+      window.__hideSkeleton = hideSkeleton;
+      window.addEventListener('load', function() { setTimeout(hideSkeleton, 300); });
       document.addEventListener('click', function(e) {
         var link = e.target.closest('a.nav-icon');
         if (!link) return;
