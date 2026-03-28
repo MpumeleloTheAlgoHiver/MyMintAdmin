@@ -2014,7 +2014,7 @@
         const symbol = security.symbol || "N/A";
         const description = security.description || "No description provided.";
         const website = security.website || "";
-        const marketCap = formatCompactCurrency(security.market_cap);
+        const marketCap = formatCompactCurrency(security.market_cap != null ? Number(security.market_cap) / 100 : null);
         const logoUrl = security.logo_url || "";
         const totalQuantity = Number(security.total_quantity || 0);
         const acquiredByUsers = Array.isArray(
@@ -2581,7 +2581,7 @@
             const ytdColor = ytd == null ? "#94a3b8" : ytd >= 0 ? "#16a34a" : "#dc2626";
 
             const priceFmt = h.last_price ? "R " + (Number(h.last_price) / 100).toFixed(2) : "—";
-            const mcFmt = fmtCompact(h.market_cap);
+            const mcFmt = fmtCompact(h.market_cap != null ? Number(h.market_cap) / 100 : null);
             const peFmt = h.pe_ratio != null ? Number(h.pe_ratio).toFixed(1) : "—";
             const divShareFmt = h.dividend_per_share != null ? "R " + Number(h.dividend_per_share).toFixed(2) : "—";
             const divYldFmt = h.dividend_yield != null ? Number(h.dividend_yield).toFixed(2) + "%" : "—";
