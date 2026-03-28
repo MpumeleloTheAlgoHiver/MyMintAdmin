@@ -4084,6 +4084,7 @@
       return getJsPdfConstructor();
     };
     let isAutoSyncingVerifiedPacks = false;
+    const expandedProfileIds = new Set();
 
     const getInitials = (name = '') => {
       const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -5719,6 +5720,13 @@
         if (packJsonMap[profile.id]) {
           const packBtn = clone.querySelector('[data-pack-details]');
           if (packBtn) packBtn.disabled = false;
+        }
+
+        if (expandedProfileIds.has(String(profile.id))) {
+          const detailsEl = clone.querySelector('.detailed-view');
+          const btnEl = clone.querySelector('.show-details-btn');
+          if (detailsEl) detailsEl.classList.add('active');
+          if (btnEl) btnEl.classList.add('is-open');
         }
 
         profilesList.appendChild(clone);
@@ -7907,6 +7915,11 @@
         if (!details) return;
         const isNowOpen = details.classList.toggle('active');
         button.classList.toggle('is-open', isNowOpen);
+        const profileId = item.dataset.profileId;
+        if (profileId) {
+          if (isNowOpen) expandedProfileIds.add(String(profileId));
+          else expandedProfileIds.delete(String(profileId));
+        }
         if (!isNowOpen) return;
 
         button.classList.add('is-loading');
