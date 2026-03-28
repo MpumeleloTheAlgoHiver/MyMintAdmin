@@ -277,6 +277,27 @@ const syncAllSecuritiesFromYahoo = async () => {
       const rawDivYield = summary.dividendYield?.raw ?? null;
       const rawYtd = keyStats.ytdReturn?.raw ?? keyStats['52WeekChange']?.raw ?? null;
 
+      // If YTD not returned by quoteSummary, calculate it from the chart API
+      let calculatedYtd = null;
+      if (rawYtd == null) {
+        try {
+          const chartRes = await fetch(
+            `https://query1.finance.yahoo.com/v8/finance/chart/${encodedSymbol}?interval=1d&range=ytd`,
+            { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } }
+          );
+          if (chartRes.ok) {
+            const chartData = await chartRes.json();
+            const chartResult = chartData?.chart?.result?.[0];
+            const currentPrice = chartResult?.meta?.regularMarketPrice;
+            const closes = chartResult?.indicators?.quote?.[0]?.close;
+            const firstClose = closes?.find(c => c != null);
+            if (firstClose && currentPrice) {
+              calculatedYtd = ((currentPrice - firstClose) / firstClose) * 100;
+            }
+          }
+        } catch { /* ignore */ }
+      }
+
       const updatePayload = {};
       const lp = price.regularMarketPrice?.raw;
       if (lp != null) updatePayload.last_price = Math.round(lp);
@@ -288,7 +309,8 @@ const syncAllSecuritiesFromYahoo = async () => {
       const dr = summary.dividendRate?.raw;
       if (dr != null) updatePayload.dividend_per_share = dr;
       if (rawDivYield != null) updatePayload.dividend_yield = rawDivYield * 100;
-      if (rawYtd != null) updatePayload.ytd_performance = rawYtd * 100;
+      const ytdFinal = rawYtd != null ? rawYtd * 100 : calculatedYtd;
+      if (ytdFinal != null) updatePayload.ytd_performance = ytdFinal;
 
       if (Object.keys(updatePayload).length > 0) {
         await mutateSupabaseJson(
