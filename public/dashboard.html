@@ -3072,7 +3072,7 @@
             chunks.map((chunk) =>
               supabaseClient
                 .from("securities")
-                .select("symbol, name, logo_url, last_price, change_percent")
+                .select("symbol, name, logo_url, last_price, change_percent, market_cap, pe_ratio, dividend_per_share, dividend_yield, ytd_performance")
                 .in("symbol", chunk),
             ),
           );
@@ -5432,7 +5432,7 @@
           if (!secMap || secMap.size === 0) {
             const { data } = await supabaseClient
               .from("securities")
-              .select("symbol, name, logo_url, last_price")
+              .select("symbol, name, logo_url, last_price, change_percent, market_cap, pe_ratio, dividend_per_share, dividend_yield, ytd_performance")
               .in("symbol", symbols);
             secMap = new Map();
             if (data)
@@ -5449,10 +5449,16 @@
               symbol: sym,
               name: h.name || sec.name || sym,
               shares: h.shares || h.quantity || 1,
-              last_price: h.last_price || sec.last_price || 0,
+              last_price: sec.last_price || h.last_price || 0,
               logo_url: sec.logo_url || null,
               market_value: 0,
               weight: 0,
+              change_percent: sec.change_percent ?? h.change_percent ?? null,
+              market_cap: sec.market_cap ?? h.market_cap ?? null,
+              pe_ratio: sec.pe_ratio ?? h.pe_ratio ?? null,
+              dividend_per_share: sec.dividend_per_share ?? h.dividend_per_share ?? null,
+              dividend_yield: sec.dividend_yield ?? h.dividend_yield ?? null,
+              ytd_performance: sec.ytd_performance ?? h.ytd_performance ?? null,
             });
           });
         }
