@@ -1891,6 +1891,14 @@
         eftRefreshBtn.addEventListener("click", loadPendingEft);
       }
 
+      /* Auto-open tab from URL param e.g. ?tab=eft */
+      const urlTab = new URLSearchParams(window.location.search).get("tab");
+      if (urlTab === "eft") {
+        switchTab(tabEft);
+        loadPendingEft();
+        history.replaceState(null, "", window.location.pathname);
+      }
+
       /* ── Investor filter pills ── */
       document.querySelectorAll(".inv-filter-pill").forEach(btn => {
         btn.addEventListener("click", () => {
