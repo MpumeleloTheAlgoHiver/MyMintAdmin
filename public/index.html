@@ -3318,9 +3318,60 @@
     .holding-tag { font-size: 0.69rem !important; font-weight: 600 !important; }
     .holding-card-muted { background: #fafbfc !important; border-color: #eef0f3 !important; }
     .holdings-empty-state { padding: 32px 20px !important; }
+
+    /* === GOOEY SEARCH PILL === */
+    .gooey-pill { position: relative; overflow: visible; }
+    .gooey-pill .gooey-shapes {
+      position: absolute; inset: -5px; z-index: 0;
+      pointer-events: none;
+      filter: url(#gooey-filter);
+    }
+    .gooey-pill .gs-bar {
+      display: block; position: absolute; inset: 5px;
+      border-radius: 9px; background: #ede9fe;
+      transition: background 0.3s ease, border-radius 0.55s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .gooey-pill:focus-within .gs-bar {
+      background: #ddd6fe;
+      border-radius: 12px 9px 11px 9px / 9px 12px 9px 11px;
+    }
+    .gooey-pill .gs-orb {
+      display: block; position: absolute;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: #ede9fe; top: 50%;
+      transform: translateY(-50%) scale(0);
+      transition: transform 0.45s cubic-bezier(0.34,1.56,0.64,1), background 0.3s;
+    }
+    .gooey-pill .gs-orb.a { left: 3px; }
+    .gooey-pill .gs-orb.b { right: 3px; }
+    .gooey-pill:focus-within .gs-orb.a {
+      transform: translateY(-50%) translateX(-4px) scale(3.2);
+      background: #ddd6fe;
+    }
+    .gooey-pill:focus-within .gs-orb.b {
+      transform: translateY(-50%) translateX(4px) scale(3.2);
+      background: #ddd6fe;
+    }
+    .gooey-pill input {
+      position: relative; z-index: 1;
+      background: transparent !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
+    }
+    .gooey-pill input:focus { box-shadow: none !important; border-color: transparent !important; }
+    .gooey-pill input::placeholder { color: #a78bfa !important; opacity: 1; }
+    .gooey-pill .search-icon-svg { position: absolute; z-index: 1; fill: #7c3aed !important; }
   </style>
 </head>
 <body>
+<svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+  <defs>
+    <filter id="gooey-filter" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 28 -13" result="gooey"/>
+    </filter>
+  </defs>
+</svg>
   <!-- Sidebar -->
   <aside class="sidebar">
     <div class="sidebar-header">
@@ -3432,7 +3483,12 @@
               <button class="bank-filter-option" type="button" data-bank-filter="unlinked" role="menuitem">Unlinked bank</button>
             </div>
           </div>
-          <div class="top-search" style="margin-left:6px;">
+          <div class="top-search gooey-pill" style="margin-left:6px;">
+            <div class="gooey-shapes" aria-hidden="true">
+              <span class="gs-bar"></span>
+              <span class="gs-orb a"></span>
+              <span class="gs-orb b"></span>
+            </div>
             <svg class="search-icon-svg" viewBox="0 0 20 20" aria-hidden="true"><path d="M13 11a5 5 0 10-1.41 1.41l3.54 3.55 1.41-1.42L13 11zm-5 1a4 4 0 110-8 4 4 0 010 8z"/></svg>
             <input type="search" placeholder="Search by name, email or UID…" aria-label="Search profiles">
           </div>
