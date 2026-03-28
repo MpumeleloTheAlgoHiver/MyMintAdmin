@@ -2970,6 +2970,119 @@
     /* Pill icons */
     .fpill-icon { width: 13px; height: 13px; fill: currentColor; flex-shrink: 0; }
     .fpill-chevron { width: 13px; height: 13px; fill: currentColor; flex-shrink: 0; opacity: 0.65; }
+
+    /* ══════════════════════════════════════
+       COLLAPSED CARD ROW — premium polish
+    ══════════════════════════════════════ */
+    .simple-list { background: #ffffff !important; }
+    .simple-item { background: #ffffff; transition: background 0.18s ease; }
+    .simple-item:hover { background: #ffffff !important; }
+    .simple-item:hover .simple-row { background: #faf7ff !important; }
+
+    /* Avatar — sharper square with glow */
+    .simple-avatar {
+      background: linear-gradient(135deg, #c084fc 0%, #7c3aed 55%, #5b21b6 100%) !important;
+      border-radius: 10px !important;
+      box-shadow: 0 3px 9px rgba(124, 58, 237, 0.28) !important;
+      flex-shrink: 0;
+    }
+
+    /* Name — tighter, sharper */
+    .simple-name { font-size: 13.5px !important; font-weight: 600 !important; color: #111827 !important; transition: color 0.15s ease; }
+    .simple-item:hover .simple-name { color: #5b21b6 !important; }
+
+    /* UID — dimmer, smaller */
+    .simple-uid { font-size: 10px !important; color: #c0c8d8 !important; letter-spacing: 0.01em !important; }
+
+    /* Separator dot */
+    .simple-uid-sep { color: #dde2ea !important; font-size: 8px !important; }
+
+    /* Expand button — open = filled purple */
+    .ellipsis-btn { border-radius: 9px !important; width: 32px !important; height: 32px !important; border-color: #ebebf4 !important; transition: background 0.18s ease, border-color 0.18s ease, transform 0.2s ease !important; }
+    .ellipsis-btn svg { fill: #9ca3af !important; width: 15px !important; height: 15px !important; transition: fill 0.18s ease, transform 0.25s ease !important; }
+    .ellipsis-btn:hover { background: #f5f3ff !important; border-color: #c4b5fd !important; }
+    .ellipsis-btn:hover svg { fill: #7c3aed !important; }
+    .ellipsis-btn.is-open { background: #7c3aed !important; border-color: #7c3aed !important; }
+    .ellipsis-btn.is-open svg { fill: #ffffff !important; transform: rotate(180deg); }
+
+    /* Group divider — subtler */
+    .profile-group-divider { background: #f8f7ff !important; border-color: #eeebff !important; color: #b0aac8 !important; font-size: 9.5px !important; padding: 6px 16px !important; }
+
+    /* ══════════════════════════════════════
+       EXPANDED CARD — premium panel
+    ══════════════════════════════════════ */
+
+    /* Expanded area background */
+    .detailed-view { margin: 0 !important; border-top: 1px solid #ede9fe; }
+    .detailed-view.active { background: #f8f6ff; border-radius: 0 0 14px 14px; }
+
+    /* Content area — reduce padding */
+    .content-area { padding: 18px 18px 22px !important; gap: 16px !important; }
+
+    /* Left column narrower */
+    .left-column { flex: 0 0 320px !important; }
+
+    /* Company header — compact + purple tint */
+    .company-header {
+      padding: 16px 18px !important;
+      margin-bottom: 14px !important;
+      border-radius: 12px !important;
+      border-color: #e9d5ff !important;
+      background: linear-gradient(135deg, #faf5ff 0%, #ffffff 60%) !important;
+      box-shadow: 0 2px 8px rgba(91, 33, 182, 0.06) !important;
+    }
+    .company-info { gap: 14px !important; margin-bottom: 10px !important; }
+    .company-avatar { width: 52px !important; height: 52px !important; border-radius: 12px !important; box-shadow: 0 8px 18px rgba(89, 35, 170, 0.22) !important; }
+    .company-avatar svg { width: 26px !important; height: 26px !important; }
+    .company-title h1 { font-size: 1.15rem !important; font-weight: 700 !important; letter-spacing: -0.01em !important; }
+    .info-icon { width: 16px !important; height: 16px !important; }
+
+    /* Detail cards — tighter, cleaner */
+    .detail-card {
+      padding: 14px 16px !important;
+      margin-bottom: 12px !important;
+      border-radius: 12px !important;
+      border-color: #ede9fe !important;
+      box-shadow: 0 1px 4px rgba(91, 33, 182, 0.05) !important;
+    }
+    .detail-card:hover { box-shadow: 0 6px 20px rgba(91, 33, 182, 0.1) !important; transform: translateY(-1px); }
+    .card-header { margin-bottom: 10px !important; padding-bottom: 10px; border-bottom: 1px solid #f3f0ff; }
+    .card-title { font-size: 0.78rem !important; font-weight: 700 !important; color: #4b5563 !important; text-transform: uppercase; letter-spacing: 0.05em; }
+    .card-title svg { width: 14px !important; height: 14px !important; fill: #8b5cf6 !important; }
+    .card-action { border-radius: 7px !important; border-color: #ede9fe !important; }
+    .card-action svg { fill: #a78bfa !important; }
+    .card-action:hover { background: #f5f3ff !important; }
+
+    /* Detail rows — refined label + value */
+    .detail-row { padding: 9px 0 !important; border-bottom-color: #f3f0ff !important; }
+    .detail-label { font-size: 0.73rem !important; font-weight: 600 !important; color: #94a3b8 !important; text-transform: uppercase; letter-spacing: 0.04em; flex: 0 0 120px !important; padding-top: 2px; }
+    .detail-value { font-size: 0.84rem !important; font-weight: 500 !important; color: #1e293b !important; }
+
+    /* Mandate action buttons */
+    .mandate-action-btn { height: 26px !important; padding: 0 9px !important; border-radius: 6px !important; font-size: 0.74rem !important; border-color: #ede9fe !important; }
+    .mandate-action-btn:hover { background: #f5f3ff !important; border-color: #c4b5fd !important; color: #5b21b6 !important; }
+
+    /* Tabs container */
+    .tabs-container { border-radius: 12px !important; border-color: #e9d5ff !important; box-shadow: 0 1px 4px rgba(91, 33, 182, 0.05) !important; }
+
+    /* Tabs header */
+    .tabs-header { padding: 0 16px !important; background: linear-gradient(180deg, #faf5ff 0%, #fdfbff 100%); border-bottom-color: #ede9fe !important; gap: 2px !important; }
+    .tab { padding: 13px 14px !important; font-size: 0.8rem !important; font-weight: 600 !important; color: #9ca3af !important; border-radius: 0; position: relative; }
+    .tab::after { content: ''; position: absolute; bottom: 0; left: 50%; right: 50%; height: 2px; background: #7c3aed; border-radius: 2px 2px 0 0; transition: left 0.2s ease, right 0.2s ease; }
+    .tab.active { color: #5b21b6 !important; }
+    .tab.active::after { left: 10px; right: 10px; }
+    .tab.active svg { fill: #8b5cf6 !important; }
+    .tab:hover:not(.active) { color: #5b21b6 !important; }
+    .tab svg { width: 15px !important; height: 15px !important; fill: #c4b5fd !important; }
+
+    /* Inner filter tabs (History / Current holdings / Client details) */
+    .filter-tabs { padding: 10px 14px !important; gap: 5px !important; border-bottom-color: #ede9fe !important; }
+    .filter-tab { padding: 5px 12px !important; border-radius: 7px !important; font-size: 0.78rem !important; border-color: #ede9fe !important; color: #6b7280 !important; }
+    .filter-tab.active { background: #7c3aed !important; border-color: #7c3aed !important; color: #fff !important; box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3) !important; }
+    .filter-tab:hover:not(.active) { border-color: #c4b5fd !important; background: #f5f3ff !important; color: #5b21b6 !important; box-shadow: none !important; }
+    .pack-details-btn { padding: 5px 12px !important; border-radius: 7px !important; font-size: 0.78rem !important; border-color: #ede9fe !important; color: #6b7280 !important; }
+    .pack-details-btn.active { background: #7c3aed !important; border-color: #7c3aed !important; color: #fff !important; }
+    .pack-details-btn:not(:disabled):hover { border-color: #c4b5fd !important; background: #f5f3ff !important; color: #5b21b6 !important; box-shadow: none !important; }
   </style>
 </head>
 <body>
