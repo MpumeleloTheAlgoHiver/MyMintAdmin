@@ -940,7 +940,8 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  const requestPath = req.url === '/' ? '/index.html' : req.url;
+  const urlWithoutQuery = req.url.split('?')[0];
+  const requestPath = urlWithoutQuery === '/' ? '/index.html' : urlWithoutQuery;
   const safePath = path.normalize(requestPath).replace(/^([/\\])+/, '');
   const filePath = path.join(publicDir, safePath);
 
