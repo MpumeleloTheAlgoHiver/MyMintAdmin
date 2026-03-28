@@ -3035,7 +3035,7 @@
     /* ③ LEFT SIDEBAR — frameless, no border, no shadow
           A clean column of data directly on the white card */
     .left-column {
-      flex: 0 0 264px !important;
+      flex: 0 0 320px !important;
       min-width: 0 !important;
       background: #ffffff !important;
       border: none !important;
@@ -3078,23 +3078,24 @@
       text-overflow: ellipsis !important;
     }
     .info-icon { width: 14px !important; height: 14px !important; fill: #c4c9d4 !important; }
-    /* UID row — shown as a small monospace tag below the name */
+    /* UID row — plain monospace, wraps if needed */
     .company-header > .detail-row {
-      display: flex !important; padding: 0 !important; border: none !important;
+      display: flex !important; padding: 8px 0 0 !important; border: none !important;
     }
     .company-header > .detail-row .detail-label { display: none !important; }
     .company-header > .detail-row .detail-value {
-      font-size: 0.7rem !important;
-      color: #9ca3af !important;
+      font-size: 0.71rem !important;
+      color: #a0a8b8 !important;
       font-family: ui-monospace, 'Cascadia Code', 'Fira Mono', monospace !important;
       font-weight: 400 !important;
-      background: #f7f8fa !important;
-      border: 1px solid #ebebed !important;
-      border-radius: 5px !important;
-      padding: 2px 7px !important;
-      display: inline-block !important;
-      max-width: 100% !important;
-      overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important;
+      background: transparent !important;
+      border: none !important;
+      padding: 0 !important;
+      display: block !important;
+      width: 100% !important;
+      white-space: normal !important;
+      word-break: break-all !important;
+      line-height: 1.5 !important;
     }
 
     /* Section cards — flat, no card look */
@@ -3111,42 +3112,42 @@
     .left-column .detail-card:last-child { border-bottom: none !important; }
     .left-column .detail-card:hover { transform: none !important; box-shadow: none !important; background: transparent !important; }
 
-    /* Section label (e.g. "COMPANY DETAILS") */
+    /* Section heading (Company details / Contact details / Mandate) */
     .left-column .card-header {
       display: flex !important; align-items: center !important;
       justify-content: space-between !important;
-      margin-bottom: 12px !important; padding-bottom: 0 !important;
-      border-bottom: none !important;
+      margin-bottom: 14px !important; padding-bottom: 10px !important;
+      border-bottom: 1px solid #f2f3f5 !important;
     }
     .left-column .card-title {
-      font-size: 0.65rem !important; font-weight: 700 !important;
-      color: #b8bec9 !important; text-transform: uppercase !important;
-      letter-spacing: 0.09em !important; gap: 0 !important;
+      font-size: 0.78rem !important; font-weight: 600 !important;
+      color: #374151 !important; text-transform: none !important;
+      letter-spacing: -0.01em !important; gap: 0 !important;
     }
     .left-column .card-title svg { display: none !important; }
     .left-column .card-action {
       width: 22px !important; height: 22px !important;
-      border-color: #ebebed !important; border-radius: 5px !important;
+      border-color: #e8eaed !important; border-radius: 5px !important;
     }
-    .left-column .card-action svg { fill: #b8bec9 !important; width: 11px !important; height: 11px !important; }
-    .left-column .card-action:hover { background: #f7f8fa !important; border-color: #d8dbe1 !important; }
+    .left-column .card-action svg { fill: #c4c9d4 !important; width: 11px !important; height: 11px !important; }
+    .left-column .card-action:hover { background: #f7f8fa !important; border-color: #cdd0d6 !important; }
 
-    /* Data rows — label stacked above value */
+    /* Data rows — label on left (80px), value on right */
     .left-column .detail-row {
-      display: flex !important; flex-direction: column !important;
-      padding: 0 0 10px 0 !important; border: none !important;
-      gap: 2px !important;
+      display: flex !important; flex-direction: row !important; align-items: baseline !important;
+      padding: 0 0 11px 0 !important; border: none !important; gap: 0 !important;
     }
     .left-column .detail-row:last-child { padding-bottom: 0 !important; }
     .left-column .detail-label {
-      font-size: 0.68rem !important; color: #b8bec9 !important;
-      font-weight: 600 !important; text-transform: uppercase !important;
-      letter-spacing: 0.07em !important; flex: none !important;
+      font-size: 0.73rem !important; color: #9ca3af !important;
+      font-weight: 400 !important; text-transform: none !important;
+      letter-spacing: 0 !important; flex: 0 0 100px !important;
+      padding-top: 1px !important; line-height: 1.4 !important;
     }
     .left-column .detail-value {
-      font-size: 0.83rem !important; color: #1a1d23 !important;
-      font-weight: 500 !important; line-height: 1.4 !important;
-      word-break: break-word !important; flex: none !important;
+      font-size: 0.82rem !important; color: #111827 !important;
+      font-weight: 500 !important; line-height: 1.45 !important;
+      word-break: break-word !important; flex: 1 !important; min-width: 0 !important;
     }
 
     /* Document action buttons */
