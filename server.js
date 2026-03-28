@@ -214,6 +214,127 @@ const startDailyOrderbookScheduler = () => {
   maybeRunDailyOrderbookScheduler();
 };
 
+const syncAllSecuritiesFromYahoo = async () => {
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    console.log('[MarketSync] Skipping — Supabase credentials not configured.');
+    return;
+  }
+
+  console.log('[MarketSync] Starting market data sync…');
+
+  let securities;
+  try {
+    securities = await fetchSupabaseJson('/rest/v1/securities?select=id,symbol,name&is_active=eq.true', null);
+  } catch (err) {
+    console.error('[MarketSync] Failed to load securities:', err.message);
+    return;
+  }
+
+  if (!securities || securities.length === 0) {
+    console.log('[MarketSync] No active securities found.');
+    return;
+  }
+
+  let yfCookie = '';
+  let crumb = '';
+  try {
+    const fcRes = await fetch('https://fc.yahoo.com/', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0' }
+    });
+    yfCookie = fcRes.headers.get('set-cookie') || '';
+    const crumbRes = await fetch('https://query1.finance.yahoo.com/v1/test/getcrumb', {
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Cookie': yfCookie }
+    });
+    crumb = await crumbRes.text();
+  } catch (err) {
+    console.error('[MarketSync] Failed to get Yahoo Finance crumb:', err.message);
+    return;
+  }
+
+  let updated = 0;
+  let failed = 0;
+
+  for (const sec of securities) {
+    if (!sec.symbol) continue;
+    try {
+      const encodedSymbol = encodeURIComponent(sec.symbol);
+      const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodedSymbol}?modules=price%2CsummaryDetail%2CdefaultKeyStatistics&crumb=${encodeURIComponent(crumb)}`;
+      const yfRes = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Cookie': yfCookie, 'Accept': 'application/json' }
+      });
+
+      if (!yfRes.ok) { failed++; continue; }
+
+      const yfData = await yfRes.json();
+      const result = yfData?.quoteSummary?.result?.[0];
+      if (!result) { failed++; continue; }
+
+      const price = result.price || {};
+      const summary = result.summaryDetail || {};
+      const keyStats = result.defaultKeyStatistics || {};
+
+      const rawChangePct = price.regularMarketChangePercent?.raw ?? null;
+      const rawDivYield = summary.dividendYield?.raw ?? null;
+      const rawYtd = keyStats.ytdReturn?.raw ?? keyStats['52WeekChange']?.raw ?? null;
+
+      const updatePayload = {};
+      const lp = price.regularMarketPrice?.raw;
+      if (lp != null) updatePayload.last_price = Math.round(lp);
+      if (rawChangePct != null) updatePayload.change_percent = rawChangePct * 100;
+      const mc = price.marketCap?.raw;
+      if (mc != null) updatePayload.market_cap = Math.round(mc);
+      const pe = summary.trailingPE?.raw ?? keyStats.trailingPE?.raw;
+      if (pe != null) updatePayload.pe_ratio = pe;
+      const dr = summary.dividendRate?.raw;
+      if (dr != null) updatePayload.dividend_per_share = dr;
+      if (rawDivYield != null) updatePayload.dividend_yield = rawDivYield * 100;
+      if (rawYtd != null) updatePayload.ytd_performance = rawYtd * 100;
+
+      if (Object.keys(updatePayload).length > 0) {
+        await mutateSupabaseJson(
+          `/rest/v1/securities?id=eq.${encodeURIComponent(sec.id)}`,
+          updatePayload,
+          null,
+          'PATCH'
+        );
+        updated++;
+      }
+    } catch {
+      failed++;
+    }
+    await new Promise(r => setTimeout(r, 150));
+  }
+
+  console.log(`[MarketSync] Done — ${updated} updated, ${failed} failed out of ${securities.length} securities.`);
+};
+
+const marketSyncDailyHour = Number(process.env.MARKET_SYNC_HOUR || 7);
+const marketSyncDailyMinute = Number(process.env.MARKET_SYNC_MINUTE || 0);
+let lastMarketSyncDateKey = '';
+
+const maybeRunDailyMarketSync = async () => {
+  const now = new Date();
+  const currentMinuteOfDay = (now.getHours() * 60) + now.getMinutes();
+  const targetMinuteOfDay = (marketSyncDailyHour * 60) + marketSyncDailyMinute;
+  const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  if (currentMinuteOfDay < targetMinuteOfDay) return;
+  if (lastMarketSyncDateKey === dateKey) return;
+
+  lastMarketSyncDateKey = dateKey;
+  await syncAllSecuritiesFromYahoo();
+};
+
+const startMarketDataScheduler = () => {
+  setTimeout(() => {
+    syncAllSecuritiesFromYahoo();
+  }, 10000);
+
+  setInterval(() => {
+    maybeRunDailyMarketSync();
+  }, 60000);
+};
+
 const fetchSupabaseJson = async (path, token, useServiceRoleAuth = true) => {
   if (!supabaseUrl || !supabaseServiceRoleKey) {
     throw new Error('Supabase server credentials are not configured');
@@ -745,98 +866,8 @@ const server = http.createServer((req, res) => {
     (async () => {
       try {
         await fetchSupabaseJson('/auth/v1/user', token, false);
-
-        const securities = await fetchSupabaseJson('/rest/v1/securities?select=id,symbol,name&is_active=eq.true', null);
-        if (!securities || securities.length === 0) {
-          sendJson(res, 200, { ok: true, updated: 0, message: 'No securities found' });
-          return;
-        }
-
-        // Get Yahoo Finance crumb (required for quoteSummary)
-        const fcRes = await fetch('https://fc.yahoo.com/', {
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0' }
-        });
-        const yfCookie = fcRes.headers.get('set-cookie') || '';
-        const crumbRes = await fetch('https://query1.finance.yahoo.com/v1/test/getcrumb', {
-          headers: { 'User-Agent': 'Mozilla/5.0', 'Cookie': yfCookie }
-        });
-        const crumb = await crumbRes.text();
-
-        let updated = 0;
-        let skipped = 0;
-        const errors = [];
-
-        for (const sec of securities) {
-          if (!sec.symbol) { skipped++; continue; }
-          try {
-            const encodedSymbol = encodeURIComponent(sec.symbol);
-            const quoteSummaryUrl = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodedSymbol}?modules=price%2CsummaryDetail%2CdefaultKeyStatistics&crumb=${encodeURIComponent(crumb)}`;
-            const yfRes = await fetch(quoteSummaryUrl, {
-              headers: { 'User-Agent': 'Mozilla/5.0', 'Cookie': yfCookie, 'Accept': 'application/json' }
-            });
-
-            if (!yfRes.ok) {
-              errors.push({ symbol: sec.symbol, error: `Yahoo Finance returned ${yfRes.status}` });
-              continue;
-            }
-
-            const yfData = await yfRes.json();
-            const result = yfData?.quoteSummary?.result?.[0];
-            if (!result) {
-              errors.push({ symbol: sec.symbol, error: 'No data returned' });
-              continue;
-            }
-
-            const price = result.price || {};
-            const summary = result.summaryDetail || {};
-            const keyStats = result.defaultKeyStatistics || {};
-
-            // last_price: Yahoo returns in ZAc (ZAR cents) for .JO stocks — store as-is
-            const last_price = price.regularMarketPrice?.raw ?? null;
-            // change_percent: decimal fraction → convert to percentage float
-            const rawChangePct = price.regularMarketChangePercent?.raw ?? null;
-            const change_percent = rawChangePct != null ? rawChangePct * 100 : null;
-            // market_cap: Yahoo returns in ZAR (rand) — store as-is
-            const market_cap = price.marketCap?.raw ?? null;
-            // pe_ratio: raw float
-            const pe_ratio = summary.trailingPE?.raw ?? keyStats.trailingPE?.raw ?? null;
-            // dividend_per_share: in ZAR — store as-is
-            const dividend_per_share = summary.dividendRate?.raw ?? null;
-            // dividend_yield: decimal fraction → convert to percentage float
-            const rawDivYield = summary.dividendYield?.raw ?? null;
-            const dividend_yield = rawDivYield != null ? rawDivYield * 100 : null;
-            // ytd_performance: use ytdReturn if available, else 52WeekChange, as percentage
-            const rawYtd = keyStats.ytdReturn?.raw ?? keyStats['52WeekChange']?.raw ?? null;
-            const ytd_performance = rawYtd != null ? rawYtd * 100 : null;
-
-            const updatePayload = {};
-            if (last_price != null) updatePayload.last_price = Math.round(last_price);
-            if (change_percent != null) updatePayload.change_percent = change_percent;
-            if (market_cap != null) updatePayload.market_cap = Math.round(market_cap);
-            if (pe_ratio != null) updatePayload.pe_ratio = pe_ratio;
-            if (dividend_per_share != null) updatePayload.dividend_per_share = dividend_per_share;
-            if (dividend_yield != null) updatePayload.dividend_yield = dividend_yield;
-            if (ytd_performance != null) updatePayload.ytd_performance = ytd_performance;
-
-            if (Object.keys(updatePayload).length > 0) {
-              await mutateSupabaseJson(
-                `/rest/v1/securities?id=eq.${encodeURIComponent(sec.id)}`,
-                updatePayload,
-                null,
-                'PATCH'
-              );
-              updated++;
-            } else {
-              skipped++;
-            }
-          } catch (err) {
-            errors.push({ symbol: sec.symbol, error: err.message });
-          }
-
-          await new Promise(r => setTimeout(r, 150));
-        }
-
-        sendJson(res, 200, { ok: true, total: securities.length, updated, skipped, errors });
+        await syncAllSecuritiesFromYahoo();
+        sendJson(res, 200, { ok: true });
       } catch (error) {
         sendJson(res, 500, { error: 'Sync failed', details: error?.message || 'Unknown error' });
       }
@@ -921,4 +952,5 @@ server.listen(port, () => {
   if (orderbookEnableIntervalScheduler) {
     startDailyOrderbookScheduler();
   }
+  startMarketDataScheduler();
 });
