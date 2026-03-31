@@ -3953,8 +3953,8 @@
         const strategies = _ovAllStrategies;
         if (!strategies.length) { panel.innerHTML = ''; return; }
 
-        const withInv = strategies.filter(s => strategyInvestedIds.has(String(s.id)));
-        const noInv   = strategies.filter(s => !strategyInvestedIds.has(String(s.id)));
+        const liveStrats  = strategies.filter(s => s.is_public);
+        const otherStrats = strategies.filter(s => !s.is_public);
         const currentIdx = Number(document.getElementById('ovStratSel')?.value ?? -1);
 
         let itemCounter = 0;
@@ -4026,14 +4026,14 @@
           Add New Strategy
         </div>`;
         html += `<div class="strat-drop-sep"></div>`;
-        if (withInv.length) {
-          html += `<div class="strat-drop-header">Active <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;font-size:9px;">(${withInv.length})</span></div>`;
-          html += withInv.map(s => renderItem(s)).join('');
+        if (liveStrats.length) {
+          html += `<div class="strat-drop-header">Live <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;font-size:9px;">(${liveStrats.length})</span></div>`;
+          html += liveStrats.map(s => renderItem(s)).join('');
         }
-        if (noInv.length) {
-          if (withInv.length) html += `<div class="strat-drop-sep"></div>`;
-          html += `<div class="strat-drop-header">Draft <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;font-size:9px;">(${noInv.length})</span></div>`;
-          html += noInv.map(s => renderItem(s)).join('');
+        if (otherStrats.length) {
+          if (liveStrats.length) html += `<div class="strat-drop-sep"></div>`;
+          html += `<div class="strat-drop-header">Not Live <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;font-size:9px;">(${otherStrats.length})</span></div>`;
+          html += otherStrats.map(s => renderItem(s)).join('');
         }
 
         panel.innerHTML = html;
