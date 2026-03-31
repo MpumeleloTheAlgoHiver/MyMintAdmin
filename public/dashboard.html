@@ -4004,7 +4004,6 @@
         /* Add New Strategy */
         panel.querySelector('#ovDropAddNew')?.addEventListener('click', (e) => {
           e.stopPropagation();
-          _ovClosePanel();
           window.ovPromptNewStrategy();
         });
 
@@ -4173,8 +4172,12 @@
 
       window.ovPromptNewStrategy = () => {
         const panel = document.getElementById('ovStratPanel');
+        const btn   = document.getElementById('ovStratBtn');
         if (!panel) return;
+        /* Cancel any in-progress close animation and keep the panel open */
+        panel.classList.remove('strat-drop-close', 'strat-drop-open');
         panel.style.display = 'block';
+        if (btn) btn.classList.add('strat-open');
         panel.innerHTML = `
           <div style="padding:14px 14px 12px;">
             <p style="font-size:10.5px;font-weight:700;color:#64748b;letter-spacing:0.07em;text-transform:uppercase;margin:0 0 8px;">Strategy Name</p>
@@ -4183,24 +4186,28 @@
             <p id="_ovNewStratErr" style="display:none;font-size:11px;color:#dc2626;margin:4px 0 0;"></p>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <button id="_ovNewStratConfirm" onclick="window.ovConfirmNewStrategy()"
-                style="flex:1;padding:7px;background:#2563eb;color:#fff;border:none;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer;">
+                style="flex:1;padding:7px;background:#4f46e5;color:#fff;border:none;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer;">
                 Create
               </button>
-              <button onclick="document.getElementById('ovStratPanel').style.display='none'"
+              <button id="_ovNewStratCancel"
                 style="padding:7px 12px;background:#f1f5f9;color:#64748b;border:none;border-radius:7px;font-size:12.5px;cursor:pointer;">
                 Cancel
               </button>
             </div>
           </div>`;
+        document.getElementById('_ovNewStratCancel')?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          _ovClosePanel();
+        });
         const inp = document.getElementById('_ovNewStratNameInput');
         if (inp) {
           inp.focus();
-          inp.style.borderColor = '#2563eb';
-          inp.addEventListener('focus', () => inp.style.borderColor = '#2563eb');
+          inp.style.borderColor = '#4f46e5';
+          inp.addEventListener('focus', () => inp.style.borderColor = '#4f46e5');
           inp.addEventListener('blur',  () => inp.style.borderColor = '#e2e8f0');
           inp.addEventListener('keydown', e => {
             if (e.key === 'Enter') { e.preventDefault(); window.ovConfirmNewStrategy(); }
-            if (e.key === 'Escape') document.getElementById('ovStratPanel').style.display = 'none';
+            if (e.key === 'Escape') { e.stopPropagation(); _ovClosePanel(); }
           });
         }
       };
