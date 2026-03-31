@@ -7,6 +7,7 @@
     <style>html{opacity:0}</style>
     <link rel="prefetch" href="/index.html">
     <link rel="prefetch" href="/orderbook.html">
+    <link rel="prefetch" href="/eft.html">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       body {
@@ -535,7 +536,7 @@
 
         <span class="sidebar-section-label">Investments</span>
 
-        <a class="nav-icon" id="sidebarEft" href="#" aria-label="EFT Payments">
+        <a class="nav-icon" href="/eft.html" aria-label="EFT Payments">
           <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
           EFT Payments
         </a>
@@ -607,13 +608,6 @@
               class="text-sm pb-2 tab-inactive hover:text-slate-800"
             >
               Factsheets
-            </button>
-            <button
-              id="tabEft"
-              type="button"
-              class="text-sm pb-2 tab-inactive hover:text-slate-800"
-            >
-              EFT Confirmations
             </button>
           </div>
 
@@ -1210,151 +1204,6 @@
             </div>
           </div>
 
-          <!-- ═══════════════ EFT CONFIRMATIONS TAB ═══════════════ -->
-          <div id="tabEftPanel" class="hidden">
-            <!-- Stats Row -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-              <div
-                class="bg-white rounded-3xl p-5 shadow-sm border border-slate-100"
-              >
-                <p class="text-xs text-slate-500 mb-1">
-                  Pending EFT Transactions
-                </p>
-                <p class="text-2xl font-bold text-slate-800" id="eftPendingCount">
-                  0
-                </p>
-              </div>
-              <div
-                class="bg-white rounded-3xl p-5 shadow-sm border border-slate-100"
-              >
-                <p class="text-xs text-slate-500 mb-1">
-                  Total Amount Awaiting Release
-                </p>
-                <p
-                  class="text-2xl font-bold text-slate-800"
-                  id="eftPendingTotal"
-                >
-                  R 0.00
-                </p>
-              </div>
-            </div>
-
-            <!-- CSV Uploader Section -->
-            <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-4">
-              <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div>
-                  <h3 class="text-sm font-semibold text-slate-700 mb-1">Upload Bank Statement</h3>
-                  <p class="text-xs text-slate-500">Auto-match deposits to users using their Mint number from the CSV reference.</p>
-                </div>
-                <div class="flex items-center gap-3">
-                  <input type="file" id="eftCsvUpload" accept=".csv" class="hidden" />
-                  <label for="eftCsvUpload" class="cursor-pointer px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors">
-                    Select CSV File
-                  </label>
-                </div>
-              </div>
-
-              <div id="eftCsvResults" class="hidden mt-6 border-t border-slate-100 pt-5">
-                <div class="flex items-center justify-between mb-3">
-                  <h4 class="text-xs font-semibold text-slate-700">Matched Deposits</h4>
-                  <button id="eftCsvCommitBtn" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors">
-                    Create Pending EFTs
-                  </button>
-                </div>
-                <div class="overflow-x-auto rounded-xl border border-slate-100">
-                  <table class="w-full text-left border-collapse">
-                    <thead class="bg-slate-50 border-b border-slate-100 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                      <tr>
-                        <th class="px-4 py-2">Parsed Ref</th>
-                        <th class="px-4 py-2">Matched User</th>
-                        <th class="px-4 py-2 text-right">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody id="eftCsvResultsBody" class="divide-y divide-slate-50 bg-white">
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div
-              class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden"
-            >
-              <div
-                class="px-6 py-4 border-b border-slate-50 flex justify-between items-center bg-slate-50/50"
-              >
-                <h3 class="text-sm font-semibold text-slate-700">
-                  Awaiting Payment Confirmation
-                </h3>
-                <button
-                  id="eftRefreshBtn"
-                  class="p-2 hover:bg-slate-200 rounded-full transition-colors"
-                  title="Refresh list"
-                >
-                  <svg
-                    class="w-4 h-4 text-slate-500"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                  </svg>
-                </button>
-              </div>
-              <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                  <thead class="bg-slate-50 border-b border-slate-100">
-                    <tr>
-                      <th
-                        class="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider"
-                      >
-                        Date
-                      </th>
-                      <th
-                        class="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider"
-                      >
-                        User
-                      </th>
-                      <th
-                        class="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider"
-                      >
-                        Asset/Strategy
-                      </th>
-                      <th
-                        class="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider"
-                      >
-                        Amount
-                      </th>
-                      <th
-                        class="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider"
-                      >
-                        Reference
-                      </th>
-                      <th
-                        class="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider"
-                      >
-                        Status
-                      </th>
-                      <th
-                        class="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right"
-                      >
-                        Action
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody id="eftTableBody" class="divide-y divide-slate-50">
-                    <!-- Rows injected here -->
-                  </tbody>
-                </table>
-                <div id="eftEmptyState" class="hidden py-20 text-center">
-                  <p class="text-slate-400 text-sm">No pending EFT payments</p>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </main>
@@ -1471,7 +1320,6 @@
       const tabOverviewPanel = document.getElementById("tabOverviewPanel");
       const tabStrategiesPanel = document.getElementById("tabStrategiesPanel");
       const tabFactsheetsPanel = document.getElementById("tabFactsheetsPanel");
-      const tabEftPanel = document.getElementById("tabEftPanel");
 
       const strategyChart = document.getElementById("strategyChart");
       const featuredStrategies = document.getElementById("featuredStrategies");
@@ -1528,13 +1376,6 @@
         "factsheetStrategyList",
       );
       const factsheetBackBtn = document.getElementById("factsheetBackBtn");
-      const tabEft = document.getElementById("tabEft");
-      const sidebarEft = document.getElementById("sidebarEft");
-      const eftTableBody = document.getElementById("eftTableBody");
-      const eftRefreshBtn = document.getElementById("eftRefreshBtn");
-      const eftEmptyState = document.getElementById("eftEmptyState");
-      const eftPendingCount = document.getElementById("eftPendingCount");
-      const eftPendingTotal = document.getElementById("eftPendingTotal");
 
       let allStrategiesData = [];
       let _overviewSecMap = null;
@@ -1805,14 +1646,12 @@
           tabStrategies,
           tabRebalancing,
           tabFactsheets,
-          tabEft,
         ];
         const panels = [
           tabOverviewPanel,
           tabStrategiesPanel,
           tabRebalancingPanel,
           tabFactsheetsPanel,
-          tabEftPanel,
         ];
         tabs.forEach((tab, i) => {
           if (tab === activeTab) {
@@ -1826,18 +1665,10 @@
 
         /* Sync side-nav active state */
         const navIcons = document.querySelectorAll(".nav-icon");
-        if (activeTab === tabStrategies || activeTab === tabOverview || activeTab === tabRebalancing || activeTab === tabFactsheets) {
-          navIcons.forEach(icon => {
-            if (icon.getAttribute("aria-label") === "Dashboard") icon.classList.add("active");
-            else if (icon.id !== "sidebarEft") icon.classList.remove("active");
-          });
-          sidebarEft.classList.remove("active");
-        } else if (activeTab === tabEft) {
-          navIcons.forEach(icon => {
-            if (icon.id === "sidebarEft") icon.classList.add("active");
-            else icon.classList.remove("active");
-          });
-        }
+        navIcons.forEach(icon => {
+          if (icon.getAttribute("aria-label") === "Dashboard") icon.classList.add("active");
+          else icon.classList.remove("active");
+        });
       };
 
       tabOverview.addEventListener("click", () => switchTab(tabOverview));
@@ -1853,26 +1684,6 @@
         switchTab(tabRebalancing);
         rebInitStrategySelector();
       });
-      tabEft.addEventListener("click", () => {
-        switchTab(tabEft);
-        loadPendingEft();
-      });
-      sidebarEft.addEventListener("click", (e) => {
-        e.preventDefault();
-        switchTab(tabEft);
-        loadPendingEft();
-      });
-      if (eftRefreshBtn) {
-        eftRefreshBtn.addEventListener("click", loadPendingEft);
-      }
-
-      /* Auto-open tab from URL param e.g. ?tab=eft */
-      const urlTab = new URLSearchParams(window.location.search).get("tab");
-      if (urlTab === "eft") {
-        switchTab(tabEft);
-        loadPendingEft();
-        history.replaceState(null, "", window.location.pathname);
-      }
 
       /* ── Investor filter pills ── */
       document.querySelectorAll(".inv-filter-pill").forEach(btn => {
@@ -4896,318 +4707,6 @@
           tabsList.appendChild(wrap);
         });
       };
-
-      /* ─────────────────────── EFT CONFIRMATIONS LOGIC ─────────────────────── */
-      async function loadPendingEft() {
-        if (!eftTableBody) return;
-        eftTableBody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-400">Loading pending payments...</td></tr>`;
-        eftEmptyState.classList.add("hidden");
-
-        /* query transactions where status = 'pending' and type is related to EFT if possible, else just all pending */
-        const { data: txs, error } = await supabaseClient
-          .from("transactions")
-          .select("*")
-          .eq("status", "pending")
-          .ilike("store_reference", "EFT-%")
-          .order("created_at", { ascending: false });
-
-        if (error) {
-          console.error("EFT load error:", error);
-          eftTableBody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-rose-600">Failed to load: ${error.message}</td></tr>`;
-          return;
-        }
-
-        if (!txs || txs.length === 0) {
-          eftTableBody.innerHTML = "";
-          eftEmptyState.classList.remove("hidden");
-          eftPendingCount.textContent = "0";
-          eftPendingTotal.textContent = "R 0.00";
-          return;
-        }
-
-        const userIds = [...new Set(txs.map(t => t.user_id).filter(Boolean))];
-        let profilesMap = {};
-        if (userIds.length > 0) {
-          const { data: profilesData, error: profileErr } = await supabaseClient
-            .from("profiles")
-            .select("id, first_name, last_name, email, mint_number")
-            .in("id", userIds);
-            
-          if (profilesData && !profileErr) {
-            profilesData.forEach(p => {
-              profilesMap[p.id] = p;
-            });
-          }
-        }
-
-        let totalRand = 0;
-        eftTableBody.innerHTML = "";
-        txs.forEach((tx) => {
-          tx.profiles = profilesMap[tx.user_id] || null;
-          
-          // amount is stored in cents
-          const amtInRand = Number(tx.amount || 0) / 100;
-          totalRand += amtInRand;
-          
-          const row = document.createElement("tr");
-          row.className = "hover:bg-slate-50/50 transition-colors group";
-          row.dataset.ref = tx.store_reference;
-
-          const date = new Date(tx.created_at).toLocaleDateString("en-ZA", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          });
-          const amountStr = formatCurrencyDetailed(amtInRand);
-          const userName = [tx.profiles?.first_name, tx.profiles?.last_name]
-            .filter(Boolean)
-            .join(" ") || "Unknown User";
-          const assetName = tx.description || tx.metadata?.asset_name || "Investment";
-          const ref = tx.store_reference || "—";
-
-          row.innerHTML = `
-            <td class="px-6 py-4 text-xs text-slate-500">${date}</td>
-            <td class="px-6 py-4">
-              <div class="flex flex-col">
-                <span class="text-xs font-semibold text-slate-800">${userName}</span>
-                <span class="text-[10px] text-slate-400">${tx.profiles?.email || ""}</span>
-              </div>
-            </td>
-            <td class="px-6 py-4 text-xs text-slate-600">${assetName}</td>
-            <td class="px-6 py-4 text-xs font-bold text-slate-800">${amountStr}</td>
-            <td class="px-6 py-4">
-              <div class="flex flex-col gap-1 items-start">
-                <span class="px-2 py-1 bg-slate-100 rounded text-[10px] font-mono text-slate-500">${ref}</span>
-                ${tx.profiles?.mint_number ? `<span class="px-2 py-1 bg-violet-100 text-violet-700 rounded text-[10px] font-mono font-bold shadow-sm">${tx.profiles.mint_number}</span>` : ""}
-              </div>
-            </td>
-            <td class="px-6 py-4">
-              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">Awaiting confirmation</span>
-            </td>
-            <td class="px-6 py-4 text-right">
-              <button class="confirm-eft-btn opacity-0 group-hover:opacity-100 transition-opacity px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg shadow-sm">
-                Confirm
-              </button>
-            </td>
-          `;
-
-          const confirmBtn = row.querySelector(".confirm-eft-btn");
-          confirmBtn.addEventListener("click", () => handleEftConfirmRequest(tx));
-          eftTableBody.appendChild(row);
-        });
-
-        eftPendingCount.textContent = txs.length.toString();
-        eftPendingTotal.textContent = totalRand.toLocaleString("en-ZA", {
-          style: "currency",
-          currency: "ZAR",
-        });
-      }
-
-      const handleEftConfirmRequest = async (tx) => {
-        const amountStr = formatCurrencyDetailed(tx.amount);
-        const ref = tx.store_reference;
-
-        const confirmed = await confirmWithPassword(
-          "Confirm release",
-          `Confirm payment of ${amountStr} for reference ${ref}? This will release the investment and notify the user by email. This cannot be undone.`
-        );
-
-        if (!confirmed) return;
-
-        // Find the row to show loading state
-        const row = document.querySelector(`tr[data-ref="${ref}"]`);
-        const btn = row?.querySelector(".confirm-eft-btn");
-        if (btn) {
-          btn.disabled = true;
-          btn.innerHTML = `<span class="flex items-center gap-1.5"><div class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Releasing...</span>`;
-        }
-
-        try {
-          const { data: { session } } = await supabaseClient.auth.getSession();
-          const response = await fetch("/api/confirm-eft-deposit", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${session?.access_token}`,
-            },
-            body: JSON.stringify({ reference: ref }),
-          });
-
-          const result = await response.json();
-
-          if (!response.ok) {
-            throw new Error(result.error || result.message || "Failed to confirm payment");
-          }
-
-          // Show success toast or alert
-          alert("Payment confirmed — user notified by email");
-          
-          // Fade out and remove row
-          if (row) {
-            row.style.transition = "all 0.4s ease";
-            row.style.opacity = "0";
-            row.style.transform = "translateX(20px)";
-            setTimeout(() => {
-              loadPendingEft();
-            }, 400);
-          } else {
-            loadPendingEft();
-          }
-
-        } catch (err) {
-          alert(`Error: ${err.message}`);
-          if (btn) {
-            btn.disabled = false;
-            btn.textContent = "Confirm";
-          }
-        }
-      };
-
-      /* ───────────────────── EFT CSV UPLOADER ───────────────────── */
-      const eftCsvUpload = document.getElementById("eftCsvUpload");
-      const eftCsvResults = document.getElementById("eftCsvResults");
-      const eftCsvResultsBody = document.getElementById("eftCsvResultsBody");
-      const eftCsvCommitBtn = document.getElementById("eftCsvCommitBtn");
-
-      let parsedCsvDeposits = [];
-
-      if (eftCsvUpload) {
-        eftCsvUpload.addEventListener("change", async (e) => {
-          const file = e.target.files[0];
-          if (!file) return;
-
-          // Fetch all profiles to map mint_numbers
-          const { data: profiles } = await supabaseClient.from("profiles").select("id, first_name, last_name, mint_number");
-
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            const text = event.target.result;
-            const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-            parsedCsvDeposits = [];
-
-            lines.forEach((line) => {
-              const lowerLine = line.toLowerCase();
-              let matchedProfile = null;
-              let matchedMintNumber = null;
-
-              for (const p of (profiles || [])) {
-                const exactMint = (p.mint_number || "").toLowerCase().trim();
-                const numericMintMatch = exactMint.match(/\d{3,}/);
-                const numericMint = numericMintMatch ? numericMintMatch[0] : null;
-
-                const fName = (p.first_name || "").toLowerCase().trim();
-                const lName = (p.last_name || "").toLowerCase().trim();
-
-                // 1. Exact match
-                if (exactMint && lowerLine.includes(exactMint)) {
-                  matchedProfile = p;
-                  matchedMintNumber = p.mint_number.toUpperCase();
-                  break;
-                }
-                
-                // 2. Numeric mint match (e.g. statement says "BUY 6097" and mint_number is "MINT-6097")
-                if (numericMint && lowerLine.includes(numericMint)) {
-                  matchedProfile = p;
-                  matchedMintNumber = p.mint_number.toUpperCase();
-                  break;
-                }
-
-                // 3. Name match (e.g. statement says "Lonwabo")
-                if (fName.length > 2 && lowerLine.includes(fName)) {
-                  matchedProfile = p;
-                  matchedMintNumber = p.mint_number ? p.mint_number.toUpperCase() : "NAME-MATCH";
-                  break;
-                }
-                if (lName.length > 2 && lowerLine.includes(lName)) {
-                  matchedProfile = p;
-                  matchedMintNumber = p.mint_number ? p.mint_number.toUpperCase() : "NAME-MATCH";
-                  break;
-                }
-              }
-
-              if (matchedProfile) {
-                // Heuristic: Extract the largest decimal number on the line as the "amount"
-                // Avoid commas which split columns in CSV
-                const parts = line.split(',');
-                let maxAmount = 0;
-                
-                parts.forEach(part => {
-                  const numMatch = part.replace(/["\s]/g, '').match(/^\d+(\.\d{1,2})?$/);
-                  if (numMatch) {
-                     const num = Number(numMatch[0]);
-                     // Typically deposits are larger than days/months. Also ignore zero.
-                     if (num > maxAmount && num !== matchedMintNumber) {
-                       maxAmount = num;
-                     }
-                   }
-                });
-
-                if (maxAmount > 0) {
-                  parsedCsvDeposits.push({
-                    date: new Date().toISOString(),
-                    amount: maxAmount,
-                    userId: matchedProfile.id,
-                    mintNumber: matchedMintNumber,
-                    userName: `${matchedProfile.first_name} ${matchedProfile.last_name}`
-                  });
-                }
-              }
-            });
-
-            eftCsvResultsBody.innerHTML = "";
-            if (parsedCsvDeposits.length > 0) {
-              parsedCsvDeposits.forEach((dep) => {
-                const tr = document.createElement("tr");
-                tr.innerHTML = `
-                  <td class="px-4 py-3 text-xs font-mono font-bold text-violet-700">${dep.mintNumber}</td>
-                  <td class="px-4 py-3 text-xs font-semibold text-slate-700">${dep.userName}</td>
-                  <td class="px-4 py-3 text-xs font-bold text-emerald-600 text-right">${formatCurrencyDetailed(dep.amount)}</td>
-                `;
-                eftCsvResultsBody.appendChild(tr);
-              });
-            } else {
-              eftCsvResultsBody.innerHTML = `<tr><td colspan="3" class="px-4 py-6 text-center text-xs text-slate-500">No matching mint numbers found in this CSV.</td></tr>`;
-            }
-            eftCsvResults.classList.remove("hidden");
-          };
-          reader.readAsText(file);
-          e.target.value = ''; // reset input
-        });
-      }
-
-      if (eftCsvCommitBtn) {
-        eftCsvCommitBtn.addEventListener("click", async () => {
-          if (parsedCsvDeposits.length === 0) return;
-
-          const confirmed = await confirmWithPassword(
-            "Confirm Upload",
-            `Create ${parsedCsvDeposits.length} pending transaction(s)?`
-          );
-          if (!confirmed) return;
-
-          try {
-            const inserts = parsedCsvDeposits.map(dep => ({
-              user_id: dep.userId,
-              amount: Math.round(dep.amount * 100), // convert ZAR back to cents for DB
-              description: `Bank Deposit - ${dep.mintNumber}`,
-              store_reference: `EFT-${Date.now()}-${Math.floor(Math.random()*1000)}`,
-              status: "pending",
-              created_at: dep.date,
-              updated_at: dep.date
-            }));
-
-            const { error } = await supabaseClient.from("transactions").insert(inserts);
-            if (error) throw error;
-
-            alert("Successfully uploaded pending transactions!");
-            eftCsvResults.classList.add("hidden");
-            parsedCsvDeposits = [];
-            loadPendingEft();
-          } catch (err) {
-            alert(`Error inserting transactions: ${err.message}`);
-          }
-        });
-      }
 
       const renderTopAssetsRow = () => {
         const row = document.getElementById("topAssetsRow");

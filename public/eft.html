@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mint EFT Payments</title>
+  <style>html{opacity:0}</style>
+  <link rel="prefetch" href="/dashboard.html">
+  <link rel="prefetch" href="/index.html">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #f5f6fa;
+      min-height: 100vh;
+      color: #22163a;
+    }
+
+    .sidebar {
+      position: fixed; left: 0; top: 0; width: 220px; height: 100vh;
+      background: #ffffff; border-right: 1px solid #ede9fe;
+      display: flex; flex-direction: column; padding: 0; z-index: 1000; overflow: hidden;
+    }
+    .sidebar-header { display: flex; align-items: center; gap: 10px; padding: 20px 20px 16px; border-bottom: 1px solid #f3f0ff; }
+    .sidebar-logo { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
+    .sidebar-brand { display: flex; flex-direction: column; }
+    .sidebar-brand-name { font-size: 14px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em; line-height: 1.2; }
+    .sidebar-brand-sub { font-size: 10px; color: #94a3b8; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+    .sidebar-nav { flex: 1; display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 16px 12px; overflow-y: auto; }
+    .sidebar-section-label { font-size: 10px; font-weight: 600; color: #94a3b8; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 8px 4px; margin-top: 8px; }
+    .sidebar-section-label:first-child { margin-top: 0; }
+    .nav-icon { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: pointer; transition: all 0.15s ease; text-decoration: none; color: #64748b; font-size: 13px; font-weight: 500; white-space: nowrap; }
+    .nav-icon svg { width: 18px; height: 18px; fill: #94a3b8; transition: fill 0.15s ease; flex-shrink: 0; }
+    .nav-icon:hover { background: #f5f3ff; color: #5b21b6; }
+    .nav-icon:hover svg { fill: #7c3aed; }
+    .nav-icon.active { background: #ede9fe; color: #5b21b6; font-weight: 600; }
+    .nav-icon.active svg { fill: #7c3aed; }
+    .sidebar-footer { border-top: 1px solid #f1f5f9; padding: 12px; }
+    .sidebar-user { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; margin-bottom: 4px; }
+    .sidebar-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0; }
+    .sidebar-user-info { flex: 1; min-width: 0; }
+    .sidebar-user-name { font-size: 12px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sidebar-user-role { font-size: 10px; color: #94a3b8; font-weight: 500; }
+    .sidebar-signout { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: pointer; color: #ef4444; font-size: 13px; font-weight: 500; transition: all 0.15s ease; border: none; background: none; width: 100%; text-align: left; }
+    .sidebar-signout svg { width: 18px; height: 18px; fill: #ef4444; flex-shrink: 0; }
+    .sidebar-signout:hover { background: #fef2f2; }
+
+    .main-content { margin-left: 220px; min-height: 100vh; display: flex; flex-direction: column; }
+
+    .top-nav {
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #e8defa;
+      padding: 0 32px;
+      min-height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .top-nav-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .page-wrap {
+      padding: 28px 32px;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.45);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 2000; padding: 16px;
+    }
+    .modal-backdrop.hidden { display: none; }
+    .modal-content {
+      background: #fff; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+      width: 100%; max-width: 420px; padding: 24px;
+    }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <img src="/icon.png" alt="Mint logo" style="width:34px;height:34px;border-radius:8px;" />
+      </div>
+      <div class="sidebar-brand">
+        <span class="sidebar-brand-name">Mint</span>
+        <span class="sidebar-brand-sub">Admin Portal</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="sidebar-section-label">Main</span>
+
+      <a class="nav-icon" href="/dashboard.html" aria-label="Dashboard">
+        <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+        Dashboard
+      </a>
+
+      <a class="nav-icon" href="/index.html" aria-label="Clients">
+        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        Clients
+      </a>
+
+      <span class="sidebar-section-label">Investments</span>
+
+      <a class="nav-icon active" href="/eft.html" aria-label="EFT Payments">
+        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
+        EFT Payments
+      </a>
+
+      <a class="nav-icon" href="/orderbook.html" aria-label="Order Book">
+        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
+        Order Book
+      </a>
+
+      <span class="sidebar-section-label">System</span>
+
+      <a class="nav-icon" href="#" aria-label="Settings">
+        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        Settings
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar" id="sidebarAvatarInitials">A</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name" id="sidebarUserEmail">Admin</div>
+          <div class="sidebar-user-role">Administrator</div>
+        </div>
+      </div>
+      <button class="sidebar-signout" id="signOutBtn">
+        <svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+        Sign out
+      </button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div id="pageSkeleton" style="position:fixed;left:220px;top:0;right:0;bottom:0;background:#f8fafc;z-index:50;padding:28px 32px;display:flex;flex-direction:column;gap:20px;pointer-events:none;transition:opacity 0.3s ease">
+      <div style="display:flex;align-items:center;height:36px"><div style="width:220px;height:22px;border-radius:8px;background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);background-size:1600px 100%;animation:skShimmer 1.4s ease infinite"></div></div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px"><div style="height:88px;border-radius:12px;background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);background-size:1600px 100%;animation:skShimmer 1.4s ease infinite"></div><div style="height:88px;border-radius:12px;background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);background-size:1600px 100%;animation:skShimmer 1.4s ease infinite"></div></div>
+      <div style="height:260px;border-radius:12px;background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);background-size:1600px 100%;animation:skShimmer 1.4s ease infinite"></div>
+    </div>
+    <style>@keyframes skShimmer{from{background-position:-800px 0}to{background-position:800px 0}}</style>
+
+    <div class="top-nav">
+      <span class="top-nav-title">EFT Payments</span>
+    </div>
+
+    <div class="page-wrap">
+      <!-- Stats Row -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4" style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:16px;">
+        <div style="background:#fff;border-radius:24px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06);border:1px solid #f1f5f9;">
+          <p style="font-size:11px;color:#94a3b8;margin-bottom:4px;">Pending EFT Transactions</p>
+          <p style="font-size:24px;font-weight:700;color:#1e293b;" id="eftPendingCount">—</p>
+        </div>
+        <div style="background:#fff;border-radius:24px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06);border:1px solid #f1f5f9;">
+          <p style="font-size:11px;color:#94a3b8;margin-bottom:4px;">Total Amount Awaiting Release</p>
+          <p style="font-size:24px;font-weight:700;color:#1e293b;" id="eftPendingTotal">—</p>
+        </div>
+      </div>
+
+      <!-- CSV Uploader -->
+      <div style="background:#fff;border-radius:24px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06);border:1px solid #f1f5f9;margin-bottom:16px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+          <div>
+            <h3 style="font-size:13px;font-weight:600;color:#374151;margin-bottom:4px;">Upload Bank Statement</h3>
+            <p style="font-size:12px;color:#94a3b8;">Auto-match deposits to users using their Mint number from the CSV reference.</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <input type="file" id="eftCsvUpload" accept=".csv" style="display:none;" />
+            <label for="eftCsvUpload" style="cursor:pointer;padding:8px 16px;background:#f1f5f9;border-radius:12px;font-size:12px;font-weight:600;color:#374151;transition:background 0.15s;">Select CSV File</label>
+          </div>
+        </div>
+
+        <div id="eftCsvResults" style="display:none;margin-top:24px;border-top:1px solid #f1f5f9;padding-top:20px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <h4 style="font-size:12px;font-weight:600;color:#374151;">Matched Deposits</h4>
+            <button id="eftCsvCommitBtn" style="padding:6px 16px;background:#059669;color:#fff;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;">Create Pending EFTs</button>
+          </div>
+          <div style="overflow-x:auto;border-radius:12px;border:1px solid #f1f5f9;">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead style="background:#f8fafc;border-bottom:1px solid #f1f5f9;">
+                <tr>
+                  <th style="padding:8px 16px;text-align:left;font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Parsed Ref</th>
+                  <th style="padding:8px 16px;text-align:left;font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Matched User</th>
+                  <th style="padding:8px 16px;text-align:right;font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Amount</th>
+                </tr>
+              </thead>
+              <tbody id="eftCsvResultsBody" style="background:#fff;"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pending Payments Table -->
+      <div style="background:#fff;border-radius:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06);border:1px solid #f1f5f9;overflow:hidden;">
+        <div style="padding:16px 24px;border-bottom:1px solid #f8fafc;display:flex;justify-content:space-between;align-items:center;background:#fafafa;">
+          <h3 style="font-size:13px;font-weight:600;color:#374151;">Awaiting Payment Confirmation</h3>
+          <button id="eftRefreshBtn" style="padding:8px;border-radius:50%;border:none;background:none;cursor:pointer;" title="Refresh list">
+            <svg style="width:16px;height:16px;color:#94a3b8;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+          </button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;text-align:left;">
+            <thead style="background:#f8fafc;border-bottom:1px solid #f1f5f9;">
+              <tr>
+                <th style="padding:12px 24px;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;">Date</th>
+                <th style="padding:12px 24px;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;">User</th>
+                <th style="padding:12px 24px;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;">Asset/Strategy</th>
+                <th style="padding:12px 24px;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;">Amount</th>
+                <th style="padding:12px 24px;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;">Reference</th>
+                <th style="padding:12px 24px;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;">Status</th>
+                <th style="padding:12px 24px;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;text-align:right;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="eftTableBody"></tbody>
+          </table>
+          <div id="eftEmptyState" style="display:none;padding:80px 0;text-align:center;">
+            <p style="font-size:13px;color:#94a3b8;">No pending EFT payments</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Password Confirm Modal -->
+  <div id="pwConfirmModal" class="modal-backdrop hidden">
+    <div class="modal-content">
+      <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;">
+        <div id="pwConfirmIcon" style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#fef3c7;">
+          <svg style="width:20px;height:20px;color:#d97706;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+        <div style="min-width:0;">
+          <p style="font-weight:600;color:#0f172a;" id="pwConfirmTitle">Confirm action</p>
+          <p style="font-size:13px;color:#64748b;margin-top:2px;" id="pwConfirmDescription"></p>
+        </div>
+      </div>
+      <label style="display:block;font-size:12px;font-weight:500;color:#374151;margin-bottom:4px;">Enter your password to confirm</label>
+      <input id="pwConfirmInput" type="password" placeholder="Your password" autocomplete="current-password"
+        style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;margin-bottom:4px;" />
+      <p id="pwConfirmError" style="font-size:12px;color:#dc2626;margin-bottom:12px;display:none;"></p>
+      <div style="display:flex;gap:8px;margin-top:16px;">
+        <button id="pwConfirmCancel" style="flex:1;padding:8px 16px;border-radius:8px;border:1px solid #e2e8f0;font-size:13px;color:#64748b;cursor:pointer;background:#fff;">Cancel</button>
+        <button id="pwConfirmSubmit" style="flex:1;padding:8px 16px;border-radius:8px;border:none;font-size:13px;font-weight:600;color:#fff;cursor:pointer;background:#d97706;">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const requireSession = async () => {
+      const { data } = await supabaseClient.auth.getSession();
+      if (!data.session) { window.location.href = '/signin.html'; return false; }
+      return true;
+    };
+
+    const signOutBtn = document.getElementById('signOutBtn');
+    if (signOutBtn) {
+      signOutBtn.addEventListener('click', async () => {
+        await supabaseClient.auth.signOut();
+        window.location.href = '/signin.html';
+      });
+    }
+
+    (async () => {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      const email = session?.user?.email || '';
+      const nameEl = document.getElementById('sidebarUserEmail');
+      const avatarEl = document.getElementById('sidebarAvatarInitials');
+      if (nameEl && email) nameEl.textContent = email;
+      if (avatarEl && email) avatarEl.textContent = email.charAt(0).toUpperCase();
+    })();
+
+    const formatCurrencyDetailed = (value, currency = 'ZAR') => {
+      if (value === null || value === undefined) return null;
+      const numeric = Number(value);
+      if (Number.isNaN(numeric)) return null;
+      try {
+        return new Intl.NumberFormat('en-ZA', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(numeric);
+      } catch { return `R ${numeric.toFixed(2)}`; }
+    };
+
+    /* ── Password confirm modal ── */
+    const _pwModal = document.getElementById('pwConfirmModal');
+    const _pwInput = document.getElementById('pwConfirmInput');
+    const _pwError = document.getElementById('pwConfirmError');
+    const _pwTitle = document.getElementById('pwConfirmTitle');
+    const _pwDesc = document.getElementById('pwConfirmDescription');
+    const _pwSubmit = document.getElementById('pwConfirmSubmit');
+    const _pwCancel = document.getElementById('pwConfirmCancel');
+    const _pwIcon = document.getElementById('pwConfirmIcon');
+
+    const confirmWithPassword = (title, description, { danger = false } = {}) =>
+      new Promise((resolve) => {
+        _pwTitle.textContent = title;
+        _pwDesc.textContent = description;
+        _pwInput.value = '';
+        _pwError.textContent = '';
+        _pwError.style.display = 'none';
+        _pwSubmit.textContent = 'Confirm';
+        _pwSubmit.disabled = false;
+        if (danger) {
+          _pwSubmit.style.background = '#dc2626';
+          _pwIcon.style.background = '#fee2e2';
+        } else {
+          _pwSubmit.style.background = '#d97706';
+          _pwIcon.style.background = '#fef3c7';
+        }
+        _pwModal.classList.remove('hidden');
+        _pwInput.focus();
+
+        const cleanup = () => {
+          _pwModal.classList.add('hidden');
+          _pwSubmit.removeEventListener('click', onSubmit);
+          _pwCancel.removeEventListener('click', onCancel);
+        };
+        const onCancel = () => { cleanup(); resolve(false); };
+        const onSubmit = async () => {
+          const password = _pwInput.value.trim();
+          if (!password) {
+            _pwError.textContent = 'Please enter your password.';
+            _pwError.style.display = 'block';
+            return;
+          }
+          _pwSubmit.textContent = 'Verifying…';
+          _pwSubmit.disabled = true;
+          _pwError.style.display = 'none';
+          const { data: { user } } = await supabaseClient.auth.getUser();
+          if (!user) {
+            _pwError.textContent = 'Session expired. Please sign in again.';
+            _pwError.style.display = 'block';
+            _pwSubmit.textContent = 'Confirm';
+            _pwSubmit.disabled = false;
+            return;
+          }
+          const { error } = await supabaseClient.auth.signInWithPassword({ email: user.email, password });
+          if (error) {
+            _pwError.textContent = 'Incorrect password. Please try again.';
+            _pwError.style.display = 'block';
+            _pwSubmit.textContent = 'Confirm';
+            _pwSubmit.disabled = false;
+            _pwInput.value = '';
+            _pwInput.focus();
+            return;
+          }
+          cleanup();
+          resolve(true);
+        };
+        _pwSubmit.addEventListener('click', onSubmit);
+        _pwCancel.addEventListener('click', onCancel);
+        _pwInput.addEventListener('keydown', function onKey(e) {
+          if (e.key === 'Enter') onSubmit();
+          if (e.key === 'Escape') onCancel();
+          if (!_pwModal.classList.contains('hidden')) return;
+          _pwInput.removeEventListener('keydown', onKey);
+        });
+        _pwModal.addEventListener('click', (e) => { if (e.target === _pwModal) onCancel(); });
+      });
+
+    /* ── EFT DOM refs ── */
+    const eftTableBody = document.getElementById('eftTableBody');
+    const eftEmptyState = document.getElementById('eftEmptyState');
+    const eftPendingCount = document.getElementById('eftPendingCount');
+    const eftPendingTotal = document.getElementById('eftPendingTotal');
+    const eftRefreshBtn = document.getElementById('eftRefreshBtn');
+    const eftCsvUpload = document.getElementById('eftCsvUpload');
+    const eftCsvResults = document.getElementById('eftCsvResults');
+    const eftCsvResultsBody = document.getElementById('eftCsvResultsBody');
+    const eftCsvCommitBtn = document.getElementById('eftCsvCommitBtn');
+
+    let parsedCsvDeposits = [];
+
+    async function loadPendingEft() {
+      if (!eftTableBody) return;
+      eftTableBody.innerHTML = `<tr><td colspan="7" style="padding:48px;text-align:center;font-size:13px;color:#94a3b8;">Loading pending payments...</td></tr>`;
+      eftEmptyState.style.display = 'none';
+
+      const { data: txs, error } = await supabaseClient
+        .from('transactions')
+        .select('*')
+        .eq('status', 'pending')
+        .ilike('store_reference', 'EFT-%')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        eftTableBody.innerHTML = `<tr><td colspan="7" style="padding:48px;text-align:center;font-size:13px;color:#dc2626;">Failed to load: ${error.message}</td></tr>`;
+        return;
+      }
+
+      if (!txs || txs.length === 0) {
+        eftTableBody.innerHTML = '';
+        eftEmptyState.style.display = 'block';
+        eftPendingCount.textContent = '0';
+        eftPendingTotal.textContent = 'R 0.00';
+        return;
+      }
+
+      const userIds = [...new Set(txs.map(t => t.user_id).filter(Boolean))];
+      let profilesMap = {};
+      if (userIds.length > 0) {
+        const { data: profilesData, error: profileErr } = await supabaseClient
+          .from('profiles')
+          .select('id, first_name, last_name, email, mint_number')
+          .in('id', userIds);
+        if (profilesData && !profileErr) {
+          profilesData.forEach(p => { profilesMap[p.id] = p; });
+        }
+      }
+
+      let totalRand = 0;
+      eftTableBody.innerHTML = '';
+      txs.forEach((tx) => {
+        tx.profiles = profilesMap[tx.user_id] || null;
+        const amtInRand = Number(tx.amount || 0) / 100;
+        totalRand += amtInRand;
+
+        const row = document.createElement('tr');
+        row.style.cssText = 'transition:background 0.15s;';
+        row.onmouseenter = () => { row.style.background = '#f8fafc'; };
+        row.onmouseleave = () => { row.style.background = ''; };
+        row.dataset.ref = tx.store_reference;
+
+        const date = new Date(tx.created_at).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
+        const amountStr = formatCurrencyDetailed(amtInRand);
+        const userName = [tx.profiles?.first_name, tx.profiles?.last_name].filter(Boolean).join(' ') || 'Unknown User';
+        const assetName = tx.description || tx.metadata?.asset_name || 'Investment';
+        const ref = tx.store_reference || '—';
+
+        row.innerHTML = `
+          <td style="padding:16px 24px;font-size:12px;color:#94a3b8;">${date}</td>
+          <td style="padding:16px 24px;">
+            <div style="display:flex;flex-direction:column;">
+              <span style="font-size:12px;font-weight:600;color:#1e293b;">${userName}</span>
+              <span style="font-size:10px;color:#94a3b8;">${tx.profiles?.email || ''}</span>
+            </div>
+          </td>
+          <td style="padding:16px 24px;font-size:12px;color:#475569;">${assetName}</td>
+          <td style="padding:16px 24px;font-size:12px;font-weight:700;color:#1e293b;">${amountStr}</td>
+          <td style="padding:16px 24px;">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <span style="padding:4px 8px;background:#f1f5f9;border-radius:6px;font-size:10px;font-family:monospace;color:#64748b;">${ref}</span>
+              ${tx.profiles?.mint_number ? `<span style="padding:4px 8px;background:#ede9fe;border-radius:6px;font-size:10px;font-family:monospace;font-weight:700;color:#7c3aed;">${tx.profiles.mint_number}</span>` : ''}
+            </div>
+          </td>
+          <td style="padding:16px 24px;">
+            <span style="padding:4px 10px;border-radius:999px;font-size:10px;font-weight:700;background:#fef3c7;color:#d97706;">Awaiting confirmation</span>
+          </td>
+          <td style="padding:16px 24px;text-align:right;">
+            <button class="confirm-eft-btn" style="opacity:0;padding:6px 16px;background:#059669;color:#fff;font-size:11px;font-weight:700;border-radius:8px;border:none;cursor:pointer;transition:opacity 0.15s;">
+              Confirm
+            </button>
+          </td>
+        `;
+
+        row.onmouseenter = () => { row.style.background = '#f8fafc'; row.querySelector('.confirm-eft-btn').style.opacity = '1'; };
+        row.onmouseleave = () => { row.style.background = ''; row.querySelector('.confirm-eft-btn').style.opacity = '0'; };
+
+        const confirmBtn = row.querySelector('.confirm-eft-btn');
+        confirmBtn.addEventListener('click', () => handleEftConfirmRequest(tx));
+        eftTableBody.appendChild(row);
+      });
+
+      eftPendingCount.textContent = txs.length.toString();
+      eftPendingTotal.textContent = totalRand.toLocaleString('en-ZA', { style: 'currency', currency: 'ZAR' });
+    }
+
+    const handleEftConfirmRequest = async (tx) => {
+      const amountStr = formatCurrencyDetailed(tx.amount);
+      const ref = tx.store_reference;
+
+      const confirmed = await confirmWithPassword(
+        'Confirm release',
+        `Confirm payment of ${amountStr} for reference ${ref}? This will release the investment and notify the user by email. This cannot be undone.`
+      );
+      if (!confirmed) return;
+
+      const row = document.querySelector(`tr[data-ref="${ref}"]`);
+      const btn = row?.querySelector('.confirm-eft-btn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span style="display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;display:inline-block;"></span> Releasing...</span>`;
+      }
+
+      try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        const response = await fetch('/api/confirm-eft-deposit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ reference: ref }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || result.message || 'Failed to confirm payment');
+        alert('Payment confirmed — user notified by email');
+        if (row) {
+          row.style.transition = 'all 0.4s ease';
+          row.style.opacity = '0';
+          row.style.transform = 'translateX(20px)';
+          setTimeout(() => loadPendingEft(), 400);
+        } else {
+          loadPendingEft();
+        }
+      } catch (err) {
+        alert(`Error: ${err.message}`);
+        if (btn) { btn.disabled = false; btn.textContent = 'Confirm'; }
+      }
+    };
+
+    /* ── CSV Uploader ── */
+    if (eftCsvUpload) {
+      eftCsvUpload.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const { data: profiles } = await supabaseClient.from('profiles').select('id, first_name, last_name, mint_number');
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const text = event.target.result;
+          const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+          parsedCsvDeposits = [];
+
+          lines.forEach((line) => {
+            const lowerLine = line.toLowerCase();
+            let matchedProfile = null;
+            let matchedMintNumber = null;
+
+            for (const p of (profiles || [])) {
+              const exactMint = (p.mint_number || '').toLowerCase().trim();
+              const numericMintMatch = exactMint.match(/\d{3,}/);
+              const numericMint = numericMintMatch ? numericMintMatch[0] : null;
+              const fName = (p.first_name || '').toLowerCase().trim();
+              const lName = (p.last_name || '').toLowerCase().trim();
+
+              if (exactMint && lowerLine.includes(exactMint)) { matchedProfile = p; matchedMintNumber = p.mint_number.toUpperCase(); break; }
+              if (numericMint && lowerLine.includes(numericMint)) { matchedProfile = p; matchedMintNumber = p.mint_number.toUpperCase(); break; }
+              if (fName.length > 2 && lowerLine.includes(fName)) { matchedProfile = p; matchedMintNumber = p.mint_number ? p.mint_number.toUpperCase() : 'NAME-MATCH'; break; }
+              if (lName.length > 2 && lowerLine.includes(lName)) { matchedProfile = p; matchedMintNumber = p.mint_number ? p.mint_number.toUpperCase() : 'NAME-MATCH'; break; }
+            }
+
+            if (matchedProfile) {
+              const parts = line.split(',');
+              let maxAmount = 0;
+              parts.forEach(part => {
+                const numMatch = part.replace(/["\s]/g, '').match(/^\d+(\.\d{1,2})?$/);
+                if (numMatch) {
+                  const num = Number(numMatch[0]);
+                  if (num > maxAmount && num !== matchedMintNumber) maxAmount = num;
+                }
+              });
+              if (maxAmount > 0) {
+                parsedCsvDeposits.push({
+                  date: new Date().toISOString(),
+                  amount: maxAmount,
+                  userId: matchedProfile.id,
+                  mintNumber: matchedMintNumber,
+                  userName: `${matchedProfile.first_name} ${matchedProfile.last_name}`
+                });
+              }
+            }
+          });
+
+          eftCsvResultsBody.innerHTML = '';
+          if (parsedCsvDeposits.length > 0) {
+            parsedCsvDeposits.forEach((dep) => {
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                <td style="padding:12px 16px;font-size:12px;font-family:monospace;font-weight:700;color:#7c3aed;">${dep.mintNumber}</td>
+                <td style="padding:12px 16px;font-size:12px;font-weight:600;color:#374151;">${dep.userName}</td>
+                <td style="padding:12px 16px;font-size:12px;font-weight:700;color:#059669;text-align:right;">${formatCurrencyDetailed(dep.amount)}</td>
+              `;
+              eftCsvResultsBody.appendChild(tr);
+            });
+          } else {
+            eftCsvResultsBody.innerHTML = `<tr><td colspan="3" style="padding:24px;text-align:center;font-size:12px;color:#94a3b8;">No matching mint numbers found in this CSV.</td></tr>`;
+          }
+          eftCsvResults.style.display = 'block';
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+      });
+    }
+
+    if (eftCsvCommitBtn) {
+      eftCsvCommitBtn.addEventListener('click', async () => {
+        if (parsedCsvDeposits.length === 0) return;
+        const confirmed = await confirmWithPassword('Confirm Upload', `Create ${parsedCsvDeposits.length} pending transaction(s)?`);
+        if (!confirmed) return;
+        try {
+          const inserts = parsedCsvDeposits.map(dep => ({
+            user_id: dep.userId,
+            amount: Math.round(dep.amount * 100),
+            description: `Bank Deposit - ${dep.mintNumber}`,
+            store_reference: `EFT-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+            status: 'pending',
+            created_at: dep.date,
+            updated_at: dep.date
+          }));
+          const { error } = await supabaseClient.from('transactions').insert(inserts);
+          if (error) throw error;
+          alert('Successfully uploaded pending transactions!');
+          eftCsvResults.style.display = 'none';
+          parsedCsvDeposits = [];
+          loadPendingEft();
+        } catch (err) {
+          alert(`Error inserting transactions: ${err.message}`);
+        }
+      });
+    }
+
+    if (eftRefreshBtn) {
+      eftRefreshBtn.addEventListener('click', loadPendingEft);
+    }
+
+    requireSession().then(ok => {
+      if (!ok) return;
+      loadPendingEft();
+    });
+  </script>
+
+  <style>
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  </style>
+
+  <script>
+    (function() {
+      var h = document.documentElement;
+      var sk = document.getElementById('pageSkeleton');
+      h.style.transition = 'opacity 0.22s ease';
+      h.style.opacity = '1';
+      function hideSkeleton() {
+        if (!sk) return;
+        sk.style.opacity = '0';
+        setTimeout(function() { if (sk) sk.style.display = 'none'; }, 300);
+        sk = null;
+      }
+      window.__hideSkeleton = hideSkeleton;
+      window.addEventListener('load', function() { setTimeout(hideSkeleton, 300); });
+      window.addEventListener('pagehide', function() { h.style.transition = 'none'; h.style.opacity = '0'; });
+      window.addEventListener('pageshow', function(e) {
+        if (e.persisted) { h.style.transition = 'opacity 0.2s ease'; h.style.opacity = '1'; }
+      });
+      document.addEventListener('click', function(e) {
+        var link = e.target.closest('a.nav-icon');
+        if (!link) return;
+        var href = link.getAttribute('href');
+        if (!href || href === '#') return;
+        e.preventDefault();
+        h.style.transition = 'opacity 0.12s ease';
+        h.style.opacity = '0';
+        setTimeout(function() { window.location.href = href; }, 120);
+      });
+    })();
+  </script>
+</body>
+</html>
