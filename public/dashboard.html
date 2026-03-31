@@ -1737,6 +1737,19 @@
         switchTab(tabFactsheets);
         renderFactsheetStrategyList();
       });
+
+      /* Intercept sidebar nav links so unsaved changes are warned before page navigation */
+      document.querySelectorAll('.nav-icon[href]').forEach((link) => {
+        const href = link.getAttribute('href');
+        if (!href || href === '#' || href === window.location.pathname) return;
+        link.addEventListener('click', async (e) => {
+          if (!_stratDirty) return;
+          e.preventDefault();
+          const ok = await checkUnsavedChanges();
+          if (ok) window.location.href = href;
+        });
+      });
+
       window.openRebalancingModal = async () => {
         if (!(await checkUnsavedChanges())) return;
         const modal = document.getElementById('rebalancingModal');
@@ -2662,6 +2675,7 @@
             1,
             (Number(formHoldings[idx].shares) || 1) - 1,
           );
+          _stratDirty = true;
           const input = holdingsContainer.querySelector(
             `[data-shares="${idx}"]`,
           );
@@ -2671,6 +2685,7 @@
           const idx = Number(inc.dataset.inc);
           formHoldings[idx].shares =
             (Number(formHoldings[idx].shares) || 0) + 1;
+          _stratDirty = true;
           const input = holdingsContainer.querySelector(
             `[data-shares="${idx}"]`,
           );
@@ -2687,6 +2702,7 @@
           const val = Math.max(1, parseInt(e.target.value, 10) || 1);
           e.target.value = val;
           formHoldings[idx].shares = val;
+          _stratDirty = true;
           recalculate();
         }
       });
