@@ -536,6 +536,15 @@ const getSumsubAuthHeaders = (method, pathWithQuery) => {
 
 
 const server = http.createServer((req, res) => {
+  if (req.url === '/favicon.ico') {
+    fs.readFile(path.join(publicDir, 'icon.png'), (err, data) => {
+      if (err) { res.writeHead(204); res.end(); return; }
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+      res.end(data);
+    });
+    return;
+  }
+
   if (req.url.startsWith('/api/mandate-data') && req.method === 'GET') {
     const token = parseBearerToken(req.headers.authorization);
     if (!token) {
@@ -971,6 +980,20 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': cacheControl });
     res.end(data);
   });
+});
+
+process.on('SIGTERM', () => {
+  console.log('[Process] SIGTERM received — closing server gracefully...');
+  server.close(() => {
+    console.log('[Process] Server closed, exiting cleanly.');
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(0), 5000).unref();
+});
+
+process.on('SIGINT', () => {
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 3000).unref();
 });
 
 process.on('uncaughtException', (err) => {
