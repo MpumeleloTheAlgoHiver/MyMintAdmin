@@ -657,12 +657,13 @@
       <div class="top-nav">
         <!-- Tabs in nav -->
         <div class="top-nav-tabs">
-          <button id="tabOverview" type="button" class="tab-active">Overview</button>
-          <button id="tabFactsheets" type="button" class="tab-inactive">Factsheets</button>
+          <!-- Kept in DOM for JS compat, hidden visually -->
+          <button id="tabOverview" type="button" class="tab-active" style="display:none;"></button>
+          <button id="tabFactsheets" type="button" class="tab-inactive" style="display:none;"></button>
           <!-- Strategy Management tab kept hidden for JS compat -->
           <button id="tabStrategies" type="button" class="tab-inactive" style="display:none;"></button>
         </div>
-        <!-- Right: strategy selector + rebalance button -->
+        <!-- Right: Factsheets + strategy selector + rebalance button -->
         <div class="top-nav-right">
           <!-- Custom strategy dropdown -->
           <div id="ovStratDropWrapper" style="position:relative;flex-shrink:0;">
@@ -677,6 +678,11 @@
           </div>
           <!-- Hidden select kept for JS compat -->
           <select id="ovStratSel" style="display:none;" onchange="window.ovSelectStrategy(this.value)"></select>
+          <button id="factsheetsNavBtn" onclick="document.getElementById('tabFactsheets').click()"
+            style="display:flex;align-items:center;gap:5px;height:32px;padding:0 14px;border-radius:8px;background:#f8fafc;color:#475569;border:1.5px solid #e2e8f0;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background 0.15s,color 0.15s,border-color 0.15s;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Factsheets
+          </button>
           <button onclick="window.openRebalancingModal()" style="display:flex;align-items:center;gap:5px;height:32px;padding:0 14px;border-radius:8px;background:#2563eb;color:white;border:none;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;">
             Rebalance
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
@@ -1732,6 +1738,15 @@
             panels[i].classList.add("hidden");
           }
         });
+
+        /* Sync Factsheets nav button active state */
+        const fsBtn = document.getElementById('factsheetsNavBtn');
+        if (fsBtn) {
+          const fsActive = activeTab === tabFactsheets;
+          fsBtn.style.background    = fsActive ? '#1e293b' : '#f8fafc';
+          fsBtn.style.color         = fsActive ? '#fff'    : '#475569';
+          fsBtn.style.borderColor   = fsActive ? '#1e293b' : '#e2e8f0';
+        }
 
         /* Sync side-nav active state */
         const navIcons = document.querySelectorAll(".nav-icon");
