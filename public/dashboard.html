@@ -5812,7 +5812,11 @@
             "Update strategy";
         showFormMessage("");
 
-        document.getElementById("tabStrategies")?.click();
+        document.getElementById("tabOverview")?.click();
+        const _sp = document.getElementById('tabStrategiesPanel');
+        if (_sp) _sp.style.display = 'block';
+        const _sc = document.getElementById('ovStratContent');
+        if (_sc) _sc.style.display = 'none';
         setTimeout(
           () =>
             strategyForm?.scrollIntoView({
