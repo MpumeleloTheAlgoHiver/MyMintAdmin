@@ -2272,16 +2272,26 @@
     }
 
     .top-nav {
-      min-height: 70px;
       background: #ffffff;
       border-bottom: 1px solid var(--border);
-      padding: 0 24px;
+      padding: 12px 24px 10px;
       display: flex;
-      align-items: center;
-      gap: 14px;
+      flex-direction: column;
+      gap: 10px;
       position: sticky;
       top: 0;
       z-index: 50;
+    }
+    .top-nav-row1 {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .top-nav-row2 {
+      display: flex;
+      align-items: center;
+      gap: 2px;
     }
 
     .filter-bar .top-search {
@@ -2931,8 +2941,11 @@
     .simple-view { padding: 18px 24px 28px !important; }
 
     /* ── Title row ── */
-    .clients-top-row { margin-bottom: 14px; }
+    .clients-top-row { margin-bottom: 0; }
     .clients-title-inline { display: flex; align-items: center; gap: 10px; }
+    .top-nav .filter-bar { background: none; border: none; border-radius: 0; padding: 0; margin: 0; box-shadow: none; }
+    .top-search { position: relative; }
+    .top-nav-row1 .top-search { min-width: 200px; max-width: 240px; }
 
     /* Count badge — inline with title */
     .user-count-badge { background: #f0eeff !important; border: 1px solid #e0d9ff !important; border-radius: 999px !important; padding: 3px 11px !important; font-size: 12px !important; font-weight: 600 !important; color: #5b21b6 !important; box-shadow: none !important; cursor: default !important; display: inline-flex !important; align-items: center !important; gap: 5px !important; }
@@ -3399,10 +3412,9 @@
       <div class="sk-rows"><div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div><div class="sk-row" style="width:58%"></div></div>
     </div>
     <!-- Top Navigation -->
-    <div class="top-nav"></div>
-
-    <section class="simple-view" id="simpleView">
-      <div class="clients-top-row">
+    <div class="top-nav">
+      <!-- Row 1: Title + right controls -->
+      <div class="top-nav-row1">
         <div class="clients-title-block">
           <div class="clients-title-inline">
             <h1 class="clients-page-title">Clients</h1>
@@ -3414,8 +3426,18 @@
           </div>
           <p class="clients-page-sub">KYC verification &amp; profile management</p>
         </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+          <div class="top-search">
+            <svg class="search-icon-svg" viewBox="0 0 20 20" aria-hidden="true"><path d="M13 11a5 5 0 10-1.41 1.41l3.54 3.55 1.41-1.42L13 11zm-5 1a4 4 0 110-8 4 4 0 010 8z"/></svg>
+            <input type="search" placeholder="Search by name, email or UID…" aria-label="Search profiles">
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;padding-left:8px;border-left:1px solid #ebebf4;">
+            <button class="quick-filter-pill table-view-toggle-btn" id="completedTableViewBtn" type="button" aria-expanded="false" aria-controls="completedTablePanel">Table view ▾</button>
+            <button class="quick-filter-pill table-view-toggle-btn" id="notCompletedEmailViewBtn" type="button" aria-expanded="false" aria-controls="notCompletedEmailPanel">Email view ▾</button>
+          </div>
+        </div>
       </div>
-
+      <!-- Row 2: Filter pills -->
       <div class="filter-bar">
         <div class="filter-bar-left" aria-label="User filters">
           <button class="quick-filter-pill active" type="button" data-kyc-pill="all">All</button>
@@ -3441,16 +3463,11 @@
               <button class="bank-filter-option" type="button" data-bank-filter="unlinked" role="menuitem">Unlinked bank</button>
             </div>
           </div>
-          <div class="top-search" style="margin-left:6px;">
-            <svg class="search-icon-svg" viewBox="0 0 20 20" aria-hidden="true"><path d="M13 11a5 5 0 10-1.41 1.41l3.54 3.55 1.41-1.42L13 11zm-5 1a4 4 0 110-8 4 4 0 010 8z"/></svg>
-            <input type="search" placeholder="Search by name, email or UID…" aria-label="Search profiles">
-          </div>
-        </div>
-        <div class="filter-bar-right">
-          <button class="quick-filter-pill table-view-toggle-btn" id="completedTableViewBtn" type="button" aria-expanded="false" aria-controls="completedTablePanel">Table view ▾</button>
-          <button class="quick-filter-pill table-view-toggle-btn" id="notCompletedEmailViewBtn" type="button" aria-expanded="false" aria-controls="notCompletedEmailPanel">Email view ▾</button>
         </div>
       </div>
+    </div>
+
+    <section class="simple-view" id="simpleView">
       <div class="client-stats-strip">
         <div class="client-stat-card stat-total">
           <div class="csc-value" id="statsTotal">—</div>
