@@ -2770,8 +2770,13 @@
         _ctxMenu.style.left = left + "px";
         _ctxMenu.classList.remove("hidden");
 
-        const onEdit = () => {
+        const onEdit = async () => {
           hideStrategyContextMenu();
+          const ok = await confirmWithPassword(
+            `Edit "${strategy.name || 'Strategy'}"`,
+            "Enter your password to edit this strategy."
+          );
+          if (!ok) return;
           editStrategy(strategy, securitiesMap);
         };
         const onArchive = () => {
@@ -5366,6 +5371,11 @@
             if (btn.dataset.action === "edit") {
               (async () => {
                 if (!(await checkUnsavedChanges())) return;
+                const ok = await confirmWithPassword(
+                  `Edit "${strategyName || 'Strategy'}"`,
+                  "Enter your password to edit this strategy."
+                );
+                if (!ok) return;
                 const panel = document.getElementById('ovStratPanel');
                 if (panel) panel.style.display = 'none';
                 const sp = document.getElementById('tabStrategiesPanel');
@@ -5379,9 +5389,23 @@
                 setWorkspaceReadOnly(false);
               })();
             } else if (btn.dataset.action === "details") {
-              openStrategyDetailsModal(strategyObj || { id: strategyId, name: strategyName });
+              (async () => {
+                const ok = await confirmWithPassword(
+                  `Strategy Details — "${strategyName || 'Strategy'}"`,
+                  "Enter your password to view strategy details."
+                );
+                if (!ok) return;
+                openStrategyDetailsModal(strategyObj || { id: strategyId, name: strategyName });
+              })();
             } else if (btn.dataset.action === "rename") {
-              renameStrategyInline(strategyId, strategyName);
+              (async () => {
+                const ok = await confirmWithPassword(
+                  `Rename "${strategyName || 'Strategy'}"`,
+                  "Enter your password to rename this strategy."
+                );
+                if (!ok) return;
+                renameStrategyInline(strategyId, strategyName);
+              })();
             } else if (btn.dataset.action === "delete") {
               deleteStrategy(strategyId, strategyName);
             }
