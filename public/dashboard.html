@@ -4067,6 +4067,22 @@
         if (content) content.style.display = 'block';
         const holdings = Array.isArray(strat.holdings) ? strat.holdings : [];
 
+        /* ── No holdings → open management form so user can add assets first ── */
+        if (holdings.length === 0) {
+          /* Keep the label updated but show the management panel instead */
+          const stratMgmtPanel = document.getElementById('tabStrategiesPanel');
+          if (stratMgmtPanel) stratMgmtPanel.style.display = 'block';
+          const ovContent = document.getElementById('ovStratContent');
+          if (ovContent) ovContent.style.display = 'none';
+          activeStrategyTabId = strat.id;
+          const fullStrat = (allStrategiesFullData || []).find(s => String(s.id) === String(strat.id)) || strat;
+          setStrategyWorkspaceVisible(true);
+          renderStrategyTabs();
+          await editStrategy(fullStrat, globalSecuritiesMap);
+          setWorkspaceReadOnly(false);
+          return;
+        }
+
         window.__dbgBreadcrumb('ovSelect:fetch-analytics');
         const { data: analytics } = await supabaseClient
           .from('strategy_analytics')
