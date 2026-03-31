@@ -3716,7 +3716,7 @@
         applyStrategiesFiltersAndRender();
         updateStrategyBadges();
         loadSectors();
-        initOverviewDashboard(strategies, _overviewSecMap);
+        initOverviewDashboard(strategies, _overviewSecMap).catch(err => console.error('[Overview] init error:', err));
       };
 
       /* ═══════════════════════════════════════════════════════════════
@@ -3727,6 +3727,7 @@
       let _ovPerfChartInst = null;
       let _ovSectorChartInst = null;
       let _ovTickerInterval = null;
+      let _ovPerfResizeObs = null;
 
       const ovFmtPct = (v) => {
         if (v == null || isNaN(Number(v))) return '—';
@@ -3756,6 +3757,7 @@
       };
 
       window.ovSelectStrategy = async (val) => {
+        try {
         const idx = Number(val) || 0;
         const strat = _ovAllStrategies[idx];
         if (!strat) return;
@@ -3820,6 +3822,9 @@
         ovRenderSectorChart(holdings, secMap);
         ovRenderHoldings(holdings, secMap);
         ovRenderInvestors(investRows, profiles);
+        } catch (err) {
+          console.error('[Overview] strategy render error:', err);
+        }
       };
 
       const ovRenderTitleBar = (strat, analytics, aum, investorCount) => {
@@ -3971,7 +3976,7 @@
             textStyle: { color: '#f8fafc', fontSize: 11 },
             formatter: (params) => {
               let s = `<div style="font-size:10px;color:#94a3b8;margin-bottom:4px;">${params[0]?.axisValue}</div>`;
-              params.forEach(p => { s += `<div style="color:${p.color}">${p.seriesName}: <b>${Number(p.value >= 0 ? '+' : '')}${Number(p.value).toFixed(2)}%</b></div>`; });
+              params.forEach(p => { s += `<div style="color:${p.color}">${p.seriesName}: <b>${Number(p.value) >= 0 ? '+' : ''}${Number(p.value).toFixed(2)}%</b></div>`; });
               return s;
             }
           },
@@ -3998,7 +4003,9 @@
             } : null,
           ].filter(Boolean),
         });
-        new ResizeObserver(() => _ovPerfChartInst && _ovPerfChartInst.resize()).observe(el);
+        if (_ovPerfResizeObs) { try { _ovPerfResizeObs.disconnect(); } catch(e) {} }
+        _ovPerfResizeObs = new ResizeObserver(() => _ovPerfChartInst && _ovPerfChartInst.resize());
+        _ovPerfResizeObs.observe(el);
       };
 
       const ovRenderSectorChart = (holdings, secMap) => {
