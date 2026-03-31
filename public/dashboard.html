@@ -610,13 +610,6 @@
               Strategy Management
             </button>
             <button
-              id="tabRebalancing"
-              type="button"
-              class="text-sm pb-2 tab-inactive hover:text-slate-800"
-            >
-              Rebalancing
-            </button>
-            <button
               id="tabFactsheets"
               type="button"
               class="text-sm pb-2 tab-inactive hover:text-slate-800"
@@ -652,7 +645,7 @@
             <!-- ── Strategy Selector + Controls ── -->
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
               <select id="ovStratSel" onchange="window.ovSelectStrategy(this.value)" style="height:32px;font-size:12px;border:1px solid #e2e8f0;border-radius:8px;padding:0 28px 0 10px;background:#fff;color:#0f172a;cursor:pointer;outline:none;-webkit-appearance:none;appearance:none;min-width:220px;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%226%22 viewBox=%220 0 10 6%22><path d=%22M1 1l4 4 4-4%22 stroke=%22%2394a3b8%22 stroke-width=%221.5%22 fill=%22none%22 stroke-linecap=%22round%22/></svg>');background-repeat:no-repeat;background-position:right 10px center;"></select>
-              <button onclick="document.getElementById('tabRebalancing').click()" style="display:flex;align-items:center;gap:5px;padding:6px 14px;border-radius:8px;background:#2563eb;color:white;border:none;font-size:12px;font-weight:600;cursor:pointer;">
+              <button onclick="window.openRebalancingModal()" style="display:flex;align-items:center;gap:5px;padding:6px 14px;border-radius:8px;background:#2563eb;color:white;border:none;font-size:12px;font-weight:600;cursor:pointer;">
                 Rebalance
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
               </button>
@@ -990,7 +983,18 @@
 
           <!-- ═══════════════ FACTSHEETS TAB ═══════════════ -->
           <!-- ═══════════════ REBALANCING TAB ═══════════════ -->
-          <div id="tabRebalancingPanel" class="hidden">
+          <!-- REBALANCING MODAL -->
+          <div id="rebalancingModal" class="hidden fixed inset-0 z-[8000] flex items-start justify-center p-4" style="background:rgba(15,23,42,0.45);padding-top:48px;overflow-y:auto;">
+            <div style="width:100%;max-width:1100px;background:#f8fafc;border-radius:16px;overflow:hidden;box-shadow:0 24px 48px rgba(0,0,0,0.22);">
+              <!-- Modal header -->
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#fff;border-bottom:1px solid #e2e8f0;">
+                <div style="font-size:15px;font-weight:600;color:#0f172a;display:flex;align-items:center;gap:8px;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+                  Rebalancing
+                </div>
+                <button onclick="document.getElementById('rebalancingModal').classList.add('hidden')" style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;cursor:pointer;font-size:20px;line-height:1;font-weight:300;">&times;</button>
+              </div>
+              <div style="padding:16px;">
             <!-- Header bar: strategy selector + commit button -->
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-4 px-5 py-4 flex flex-wrap items-center gap-4">
               <div class="flex-1 min-w-[200px]">
@@ -1095,7 +1099,9 @@
               </div>
             </div>
 
-          </div>
+              </div><!-- /modal body padding -->
+            </div><!-- /modal box -->
+          </div><!-- /rebalancingModal -->
 
           <!-- SELL MODAL -->
           <div id="rebSellModal" class="hidden fixed inset-0 z-[9000] flex items-center justify-center p-4">
@@ -1648,20 +1654,15 @@
       ];
 
       /* ─────────────────────── TAB SWITCHING ─────────────────────── */
-      const tabRebalancing = document.getElementById("tabRebalancing");
-      const tabRebalancingPanel = document.getElementById("tabRebalancingPanel");
-
       const switchTab = (activeTab) => {
         const tabs = [
           tabOverview,
           tabStrategies,
-          tabRebalancing,
           tabFactsheets,
         ];
         const panels = [
           tabOverviewPanel,
           tabStrategiesPanel,
-          tabRebalancingPanel,
           tabFactsheetsPanel,
         ];
         tabs.forEach((tab, i) => {
@@ -1691,9 +1692,15 @@
         switchTab(tabFactsheets);
         renderFactsheetStrategyList();
       });
-      tabRebalancing.addEventListener("click", () => {
-        switchTab(tabRebalancing);
+      window.openRebalancingModal = () => {
+        const modal = document.getElementById('rebalancingModal');
+        modal.classList.remove('hidden');
         rebInitStrategySelector();
+        const onKey = (e) => { if (e.key === 'Escape') { modal.classList.add('hidden'); document.removeEventListener('keydown', onKey); } };
+        document.addEventListener('keydown', onKey);
+      };
+      document.getElementById('rebalancingModal').addEventListener('click', function(e) {
+        if (e.target === this) this.classList.add('hidden');
       });
 
       /* ── Investor filter pills ── */
