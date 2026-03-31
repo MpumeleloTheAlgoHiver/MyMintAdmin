@@ -770,55 +770,7 @@
 
           <!-- ═══════════════ STRATEGIES TAB ═══════════════ -->
           <div id="tabStrategiesPanel" class="hidden">
-            <!-- ── Investor filter bar ── -->
-            <div id="strategyInvestorFilterBar" style="display:flex;align-items:center;gap:10px;padding:10px 14px 0;">
-              <div style="display:inline-flex;align-items:center;background:#f1f3f9;border-radius:12px;padding:3px;gap:2px;box-shadow:inset 0 1px 3px rgba(0,0,0,0.07);">
-                <button type="button" data-inv-filter="all" class="inv-filter-pill" style="display:flex;align-items:center;gap:5px;padding:5px 13px;border-radius:9px;border:none;font-size:11.5px;font-weight:600;letter-spacing:0.01em;cursor:pointer;transition:all 0.18s;background:#fff;color:#1e293b;box-shadow:0 1px 4px rgba(0,0,0,0.10),0 0 0 0.5px rgba(0,0,0,0.04);">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
-                  All
-                </button>
-                <button type="button" data-inv-filter="invested" class="inv-filter-pill" style="display:flex;align-items:center;gap:5px;padding:5px 13px;border-radius:9px;border:none;font-size:11.5px;font-weight:600;letter-spacing:0.01em;cursor:pointer;transition:all 0.18s;background:transparent;color:#64748b;box-shadow:none;">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                  Has investors
-                </button>
-                <button type="button" data-inv-filter="not-invested" class="inv-filter-pill" style="display:flex;align-items:center;gap:5px;padding:5px 13px;border-radius:9px;border:none;font-size:11.5px;font-weight:600;letter-spacing:0.01em;cursor:pointer;transition:all 0.18s;background:transparent;color:#64748b;box-shadow:none;">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg>
-                  No investors
-                </button>
-              </div>
-              <span id="invFilterCount" style="font-size:10.5px;font-weight:500;color:#94a3b8;letter-spacing:0.02em;"></span>
-            </div>
-
-            <!-- ── STRATEGY SHEET TABS (spreadsheet-style) ── -->
-            <div
-              class="flex items-end gap-0 overflow-x-auto"
-              style="scrollbar-width: none; border-bottom: 2px solid #e2e8f0"
-            >
-              <!-- + New button (separate pill, not a tab) -->
-              <button
-                id="newStrategyTabBtn"
-                type="button"
-                class="flex-shrink-0 flex items-center justify-center w-9 h-9 mb-[2px] mr-2 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
-                title="New strategy"
-              >
-                <svg
-                  class="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-              </button>
-              <!-- Sheet tabs -->
-              <div id="strategyTabsList" class="flex items-end gap-0.5"></div>
-
-              <!-- hidden compat elements -->
+            <!-- hidden compat elements -->
               <div class="hidden">
                 <span id="strategiesTotalBadge"></span>
                 <span id="strategiesPublicBadge"></span>
@@ -843,7 +795,6 @@
                 </select>
                 <div id="strategiesList"></div>
               </div>
-            </div>
 
             <!-- ── MAIN WORKSPACE ── -->
             <div
@@ -1798,14 +1749,6 @@
         if (e.target === this) this.classList.add('hidden');
       });
 
-      /* ── Investor filter pills ── */
-      document.querySelectorAll(".inv-filter-pill").forEach(btn => {
-        btn.addEventListener("click", () => {
-          strategyInvestorFilter = btn.dataset.invFilter || "all";
-          applyInvFilterPillStyles();
-          renderStrategyTabs();
-        });
-      });
 
       /* ─────────────────────── OVERVIEW TAB LOGIC ─────────────────────── */
       const renderOverviewStrategyItem = (strategy) => {
@@ -3141,7 +3084,6 @@
         }
 
         globalSecuritiesMap = securitiesMap;
-        renderStrategyTabs();
         strategiesList.innerHTML = "";
         if (!items.length) {
           strategiesList.innerHTML =
@@ -3908,7 +3850,6 @@
           activeStrategyTabId = null;
           if (typeof setStrategyWorkspaceVisible === 'function') setStrategyWorkspaceVisible(false);
           if (typeof renderFormHoldings === 'function') renderFormHoldings();
-          if (typeof renderStrategyTabs === 'function') renderStrategyTabs();
           cleanup(true);
         };
         stayBtn.addEventListener('click',  onStay);
@@ -4077,7 +4018,6 @@
           activeStrategyTabId = strat.id;
           const fullStrat = (allStrategiesFullData || []).find(s => String(s.id) === String(strat.id)) || strat;
           setStrategyWorkspaceVisible(true);
-          renderStrategyTabs();
           await editStrategy(fullStrat, globalSecuritiesMap);
           setWorkspaceReadOnly(false);
           return;
@@ -4223,7 +4163,7 @@
         }
         const newId = insertData.id;
         const minimalStrat = { id: newId, name, slug: createStrategySlug(name), status: 'active', is_public: false, is_featured: false, holdings: [] };
-        /* Inject into local arrays so renderStrategyTabs / editStrategy can find it immediately */
+        /* Inject into local arrays so editStrategy can find it immediately */
         allStrategiesFullData = [minimalStrat, ...(allStrategiesFullData || [])];
         _ovAllStrategies = window._ovAllStrategies = [minimalStrat, ...(_ovAllStrategies || [])];
         activeStrategyTabId   = newId;
@@ -4234,7 +4174,6 @@
         const sc = document.getElementById('ovStratContent');
         if (sc) sc.style.display = 'none';
         setStrategyWorkspaceVisible(true);
-        renderStrategyTabs();
         await editStrategy(minimalStrat, globalSecuritiesMap);
         /* Update dropdown label */
         const btnLabel = document.getElementById('ovStratBtnLabel');
@@ -5355,211 +5294,7 @@
           console.warn("loadStrategyInvestorData failed:", e);
         }
 
-        /* Update pill count display */
-        const countEl = document.getElementById("invFilterCount");
-        if (countEl) {
-          const visible = strategyInvestorFilter === "invested"
-            ? strategyInvestedIds.size
-            : strategyInvestorFilter === "not-invested"
-              ? strategies.length - strategyInvestedIds.size
-              : strategies.length;
-          countEl.textContent = `${visible} shown`;
-        }
         ovBuildStratDrop();
-        renderStrategyTabs();
-      };
-
-      /* ── Helper: apply investor filter pill active styles ── */
-      const applyInvFilterPillStyles = () => {
-        document.querySelectorAll(".inv-filter-pill").forEach(btn => {
-          const v = btn.dataset.invFilter;
-          const isActive = v === strategyInvestorFilter;
-          const base = "display:flex;align-items:center;gap:5px;padding:5px 13px;border-radius:9px;border:none;font-size:11.5px;font-weight:600;letter-spacing:0.01em;cursor:pointer;transition:all 0.18s;";
-          if (isActive) {
-            if (v === "all") {
-              btn.style.cssText = base + "background:#fff;color:#1e293b;box-shadow:0 1px 4px rgba(0,0,0,0.10),0 0 0 0.5px rgba(0,0,0,0.04);";
-            } else if (v === "invested") {
-              btn.style.cssText = base + "background:linear-gradient(135deg,#059669,#10b981);color:#fff;box-shadow:0 1px 6px rgba(16,185,129,0.35),0 0 0 0.5px rgba(16,185,129,0.2);";
-            } else {
-              btn.style.cssText = base + "background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;box-shadow:0 1px 6px rgba(124,58,237,0.35),0 0 0 0.5px rgba(124,58,237,0.2);";
-            }
-          } else {
-            btn.style.cssText = base + "background:transparent;color:#64748b;box-shadow:none;";
-          }
-        });
-      };
-
-      const renderStrategyTabs = () => {
-        const tabsList = document.getElementById("strategyTabsList");
-        if (!tabsList) return;
-        /* Preserve any in-progress draft tab across re-renders */
-        const existingDraft = tabsList.querySelector(".draft-strategy-tab");
-        tabsList.innerHTML = "";
-        if (existingDraft && !activeStrategyTabId) {
-          tabsList.insertBefore(existingDraft, tabsList.firstChild);
-        }
-
-        /* Apply investor filter */
-        let filteredStrategies = (allStrategiesFullData || []);
-        if (strategyInvestorFilter === "invested") {
-          filteredStrategies = filteredStrategies.filter(s => strategyInvestedIds.has(String(s.id)));
-        } else if (strategyInvestorFilter === "not-invested") {
-          filteredStrategies = filteredStrategies.filter(s => !strategyInvestedIds.has(String(s.id)));
-        }
-
-        /* Update count chip */
-        const countEl = document.getElementById("invFilterCount");
-        if (countEl) countEl.textContent = `${filteredStrategies.length} shown`;
-
-        filteredStrategies.forEach((strategy) => {
-          const isActive = strategy.id === activeStrategyTabId;
-          const wrap = document.createElement("div");
-          wrap.style.cssText = `position:relative;display:flex;align-items:flex-end;`;
-
-          const tab = document.createElement("button");
-          tab.type = "button";
-          tab.dataset.strategyId = strategy.id;
-          tab.title = strategy.name || "Untitled";
-
-          /* ── active vs inactive style ── */
-          if (isActive) {
-            tab.style.cssText = `
-            display:flex;align-items:center;gap:6px;
-            padding:8px 6px 9px 11px;
-            font-size:12.5px;font-weight:600;
-            color:#6d28d9;
-            background:#ffffff;
-            border:1.5px solid #ddd6fe;
-            border-bottom:2px solid #ffffff;
-            border-radius:8px 8px 0 0;
-            position:relative;bottom:-2px;z-index:2;
-            cursor:pointer;white-space:nowrap;max-width:170px;
-            transition:color 0.1s;`;
-          } else {
-            tab.style.cssText = `
-            display:flex;align-items:center;gap:6px;
-            padding:7px 8px 8px 11px;
-            font-size:12.5px;font-weight:500;
-            color:#64748b;
-            background:#f1f5f9;
-            border:1.5px solid transparent;
-            border-bottom:none;
-            border-radius:8px 8px 0 0;
-            position:relative;bottom:0;
-            cursor:pointer;white-space:nowrap;max-width:170px;
-            transition:all 0.12s;`;
-            tab.onmouseenter = () => {
-              tab.style.background = "#e8edf5";
-              tab.style.color = "#334155";
-              tab.style.borderColor = "#cbd5e1";
-            };
-            tab.onmouseleave = () => {
-              tab.style.background = "#f1f5f9";
-              tab.style.color = "#64748b";
-              tab.style.borderColor = "transparent";
-            };
-          }
-
-          /* sheet icon */
-          const iconCol = isActive ? "#7c3aed" : "#94a3b8";
-          const nameSpan = `<span style="overflow:hidden;text-overflow:ellipsis;flex:1;max-width:110px;">${strategy.name || "Untitled"}</span>`;
-          const lockIcon = strategyInvestedIds.has(strategy.id)
-            ? `<span title="Protected — has active investors" style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:5px;background:linear-gradient(135deg,#f59e0b,#d97706);box-shadow:0 1px 3px rgba(245,158,11,0.45);flex-shrink:0;margin-left:1px;">
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2.5"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-               </span>`
-            : "";
-          tab.innerHTML = `
-          <svg style="width:13px;height:13px;flex-shrink:0;color:${iconCol}" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-            <rect x="3" y="3" width="18" height="18" rx="2.5"/>
-            <path d="M3 9h18M9 21V9"/>
-          </svg>
-          ${nameSpan}${lockIcon}`;
-
-          tab.addEventListener("click", async (e) => {
-            if (e.target.closest("[data-tabmenu]")) return;
-            /* Clicking the already-active tab deselects it */
-            if (activeStrategyTabId === strategy.id) {
-              if (!(await checkUnsavedChanges())) return;
-              activeStrategyTabId = null;
-              formHoldings = [];
-              _stratDirty = false;
-              setWorkspaceReadOnly(false);
-              setStrategyWorkspaceVisible(false);
-              renderStrategyTabs();
-              return;
-            }
-
-            /* Switching to a different tab — warn if there are unsaved changes */
-            if (!(await checkUnsavedChanges())) return;
-
-            const isInvested = strategyInvestedIds.has(strategy.id);
-
-            const doOpenTab = async () => {
-              activeStrategyTabId = strategy.id;
-              setStrategyWorkspaceVisible(true);
-              renderStrategyTabs();
-              await editStrategy(strategy, globalSecuritiesMap);
-              const body = document.getElementById("strategyDetailsBody");
-              if (body) body.style.display = "";
-              const icon = document.getElementById("toggleStrategyDetailsIcon");
-              if (icon) icon.style.transform = "";
-              /* apply read-only after holdings are rendered */
-              if (isInvested) setWorkspaceReadOnly(true);
-              else setWorkspaceReadOnly(false);
-            };
-
-            if (isInvested) {
-              openStrategyTabPwModal(doOpenTab);
-            } else {
-              await doOpenTab();
-            }
-          });
-
-          /* ⋮ menu button */
-          const menuBtn = document.createElement("button");
-          menuBtn.type = "button";
-          menuBtn.dataset.tabmenu = "1";
-          menuBtn.title = "More options";
-          menuBtn.style.cssText = `
-          display:flex;align-items:center;justify-content:center;
-          width:20px;height:20px;flex-shrink:0;
-          border-radius:5px;border:none;background:none;cursor:pointer;
-          color:${isActive ? "#7c3aed" : "#94a3b8"};
-          padding:0;margin-left:2px;
-          opacity:${isActive ? "0.7" : "0"};
-          transition:opacity 0.12s,background 0.1s;`;
-          menuBtn.innerHTML = `<svg style="width:14px;height:14px;pointer-events:none" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>`;
-          /* hide the ⋮ menu entirely for invested (protected) strategies */
-          if (strategyInvestedIds.has(strategy.id)) {
-            menuBtn.style.display = "none";
-          } else {
-            menuBtn.addEventListener("click", (e) => {
-              e.stopPropagation();
-              openTabMenu(menuBtn, strategy.id, strategy.name || "Untitled", strategy);
-            });
-          }
-
-          if (!isActive) {
-            wrap.onmouseenter = () => {
-              menuBtn.style.opacity = "0.6";
-            };
-            wrap.onmouseleave = () => {
-              if (_tabMenuOpen !== strategy.id) menuBtn.style.opacity = "0";
-            };
-          }
-          menuBtn.onmouseenter = () => {
-            menuBtn.style.background = isActive ? "#ede9fe" : "#e2e8f0";
-            menuBtn.style.opacity = "1";
-          };
-          menuBtn.onmouseleave = () => {
-            menuBtn.style.background = "none";
-            if (!isActive) menuBtn.style.opacity = "0.6";
-          };
-
-          tab.appendChild(menuBtn);
-          wrap.appendChild(tab);
-          tabsList.appendChild(wrap);
-        });
       };
 
       const renderTopAssetsRow = () => {
@@ -5751,94 +5486,6 @@
           });
         });
       };
-
-      const newStrategyTabBtn = document.getElementById("newStrategyTabBtn");
-      if (newStrategyTabBtn) {
-        newStrategyTabBtn.addEventListener("click", () => {
-          activeStrategyTabId = null;
-          cancelEdit();
-          renderStrategyTabs();
-          setStrategyWorkspaceVisible(true);
-
-          /* Build the draft tab with an inline editable input */
-          const tabsList = document.getElementById("strategyTabsList");
-          if (!tabsList) return;
-
-          const draftWrap = document.createElement("div");
-          draftWrap.className = "draft-strategy-tab";
-          draftWrap.style.cssText = "position:relative;display:flex;align-items:flex-end;";
-
-          const draftTab = document.createElement("div");
-          draftTab.style.cssText = `
-            display:flex;align-items:center;gap:6px;
-            padding:8px 11px 9px 11px;
-            background:#ffffff;
-            border:1.5px solid #ddd6fe;
-            border-bottom:2px solid #ffffff;
-            border-radius:8px 8px 0 0;
-            position:relative;bottom:-2px;z-index:2;`;
-
-          draftTab.innerHTML = `<svg style="width:13px;height:13px;flex-shrink:0;color:#7c3aed" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M3 9h18M9 21V9"/></svg>`;
-
-          const tabInput = document.createElement("input");
-          tabInput.type = "text";
-          tabInput.placeholder = "Strategy name…";
-          tabInput.style.cssText = `
-            border:none;outline:none;background:transparent;
-            font-size:12.5px;font-weight:600;color:#6d28d9;
-            width:140px;min-width:60px;padding:0;margin:0;`;
-
-          /* On confirm (Enter or blur): if name is non-empty, immediately
-             create a skeleton strategy record so the tab is permanently saved */
-          let _committing = false;
-          const commitDraft = async () => {
-            if (_committing) return;
-            const name = tabInput.value.trim();
-            if (!name) {
-              /* Empty name — discard the draft */
-              draftWrap.remove();
-              setStrategyWorkspaceVisible(false);
-              return;
-            }
-            _committing = true;
-            tabInput.disabled = true;
-            const { data: insertData, error } = await supabaseClient
-              .from("strategies")
-              .insert([{ name, slug: createStrategySlug(name), status: "active", is_public: false, is_featured: false }])
-              .select("id")
-              .single();
-            if (error || !insertData?.id) {
-              console.error("Could not create strategy:", error);
-              tabInput.disabled = false;
-              _committing = false;
-              return;
-            }
-            activeStrategyTabId = insertData.id;
-            const hiddenName = document.getElementById("strategyName");
-            if (hiddenName) hiddenName.value = name;
-            await loadStrategies();
-            const saved = (allStrategiesFullData || []).find(
-              (s) => s.id === activeStrategyTabId,
-            );
-            if (saved) {
-              setStrategyWorkspaceVisible(true);
-              await editStrategy(saved, globalSecuritiesMap);
-            }
-          };
-
-          tabInput.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") { e.preventDefault(); tabInput.blur(); }
-            if (e.key === "Escape") { draftWrap.remove(); setStrategyWorkspaceVisible(false); }
-          });
-
-          tabInput.addEventListener("blur", () => commitDraft());
-
-          draftTab.appendChild(tabInput);
-          draftWrap.appendChild(draftTab);
-          tabsList.insertBefore(draftWrap, tabsList.firstChild);
-          tabInput.focus();
-        });
-      }
 
       const toggleStrategyDetailsBtn = document.getElementById(
         "toggleStrategyDetails",
