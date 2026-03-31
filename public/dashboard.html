@@ -641,8 +641,9 @@
         <!-- Tabs in nav -->
         <div class="top-nav-tabs">
           <button id="tabOverview" type="button" class="tab-active">Overview</button>
-          <button id="tabStrategies" type="button" class="tab-inactive">Strategy Management</button>
           <button id="tabFactsheets" type="button" class="tab-inactive">Factsheets</button>
+          <!-- Strategy Management tab kept hidden for JS compat -->
+          <button id="tabStrategies" type="button" class="tab-inactive" style="display:none;"></button>
         </div>
         <!-- Right: strategy selector + rebalance button -->
         <div class="top-nav-right">
@@ -690,12 +691,9 @@
               <span id="usersBankValue"></span>
             </div>
 
-            <!-- ── Empty state: shown when no strategy selected ── -->
-            <div id="ovNoStratState" style="display:none;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;text-align:center;">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.5" stroke-linecap="round" style="margin-bottom:16px;"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
-              <div style="font-size:16px;font-weight:600;color:#94a3b8;margin-bottom:6px;">No strategy selected</div>
-              <div style="font-size:13px;color:#cbd5e1;">Choose a strategy from the dropdown above to view its overview</div>
-            </div>
+            <!-- ── Strategy Management inline panel (shown when no strategy selected) ── -->
+            <div id="tabStrategiesInline">
+            </div><!-- /tabStrategiesInline -->
 
             <!-- ── Strategy content: shown only when a strategy is selected ── -->
             <div id="ovStratContent" style="display:none;">
@@ -1711,15 +1709,24 @@
         tabFactsheets: 'Factsheets',
       };
 
+      /* On init, physically move tabStrategiesPanel into the overview inline holder */
+      (() => {
+        const inline = document.getElementById('tabStrategiesInline');
+        const sp = document.getElementById('tabStrategiesPanel');
+        if (inline && sp) {
+          inline.appendChild(sp);
+          sp.classList.remove('hidden');
+          sp.style.display = 'block';
+        }
+      })();
+
       const switchTab = (activeTab) => {
         const tabs = [
           tabOverview,
-          tabStrategies,
           tabFactsheets,
         ];
         const panels = [
           tabOverviewPanel,
-          tabStrategiesPanel,
           tabFactsheetsPanel,
         ];
         tabs.forEach((tab, i) => {
@@ -3872,7 +3879,7 @@
 
         let html = '';
         html += `<div style="${itemStyle}color:#2563eb;font-weight:600;" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background=''"
-          onclick="document.getElementById('ovStratPanel').style.display='none';document.getElementById('tabStrategies')?.click();setTimeout(()=>document.getElementById('newStrategyTabBtn')?.click(),120);">
+          onclick="document.getElementById('ovStratPanel').style.display='none';document.getElementById('tabOverview')?.click();const _sp=document.getElementById('tabStrategiesPanel');if(_sp)_sp.style.display='block';const _sc=document.getElementById('ovStratContent');if(_sc)_sc.style.display='none';setTimeout(()=>document.getElementById('newStrategyTabBtn')?.click(),120);">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 4v16m8-8H4"/></svg>
           Add New Strategy
         </div>`;
@@ -3908,8 +3915,12 @@
         }
         ovBuildStratDrop();
         ovRenderTicker().catch(e => console.warn('[Ticker] load failed:', e));
-        /* Default: show Strategy Management tab with no selection */
-        document.getElementById('tabStrategies')?.click();
+        /* Default: show Overview tab with strategy mgmt content, no strategy selected */
+        document.getElementById('tabOverview')?.click();
+        const sp = document.getElementById('tabStrategiesPanel');
+        if (sp) sp.style.display = 'block';
+        const sc = document.getElementById('ovStratContent');
+        if (sc) sc.style.display = 'none';
         window.__dbgBreadcrumb('initOverview:done');
       };
 
@@ -3923,11 +3934,11 @@
         if (sel) sel.value = String(idx);
         const btnLabel = document.getElementById('ovStratBtnLabel');
         if (btnLabel) btnLabel.textContent = strat.short_name || strat.name || 'Strategy ' + (idx+1);
-        /* Switch to Overview tab and reveal content */
+        /* Switch to Overview tab, hide strategy mgmt, reveal strategy content */
         document.getElementById('tabOverview')?.click();
-        const noState = document.getElementById('ovNoStratState');
+        const stratMgmt = document.getElementById('tabStrategiesPanel');
+        if (stratMgmt) stratMgmt.style.display = 'none';
         const content = document.getElementById('ovStratContent');
-        if (noState) noState.style.display = 'none';
         if (content) content.style.display = 'block';
         const holdings = Array.isArray(strat.holdings) ? strat.holdings : [];
 
