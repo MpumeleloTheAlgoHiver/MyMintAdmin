@@ -3966,10 +3966,12 @@
           const selClass = isSel ? ' selected' : '';
           const delay  = (itemCounter++ * 0.025).toFixed(3);
 
-          /* ── Status dot (users) ── */
-          const dot = hasInv
-            ? `<span title="Has investors" style="width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 0 2px rgba(16,185,129,0.2);flex-shrink:0;"></span>`
-            : `<span title="No investors" style="width:8px;height:8px;border-radius:50%;background:#e2e8f0;flex-shrink:0;"></span>`;
+          /* ── Status dot: green if live or has investors, grey otherwise ── */
+          const dotGreen = hasInv || s.is_public;
+          const dotTitle = hasInv ? 'Has investors' : s.is_public ? 'Live — no investors yet' : 'Not live, no investors';
+          const dot = dotGreen
+            ? `<span title="${dotTitle}" style="width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 0 2px rgba(16,185,129,0.2);flex-shrink:0;"></span>`
+            : `<span title="${dotTitle}" style="width:8px;height:8px;border-radius:50%;background:#e2e8f0;flex-shrink:0;"></span>`;
 
           /* ── Icon badges ── */
           /* Users badge */
@@ -4027,7 +4029,7 @@
         </div>`;
         html += `<div class="strat-drop-sep"></div>`;
         if (liveStrats.length) {
-          html += `<div class="strat-drop-header">Live <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;font-size:9px;">(${liveStrats.length})</span></div>`;
+          html += `<div class="strat-drop-header"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 0 2px rgba(16,185,129,0.25);margin-right:5px;vertical-align:middle;"></span>Live <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;font-size:9px;">(${liveStrats.length})</span></div>`;
           html += liveStrats.map(s => renderItem(s)).join('');
         }
         if (otherStrats.length) {
