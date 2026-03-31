@@ -1335,6 +1335,29 @@
       </div>
     </div>
 
+    <!-- Unsaved changes warning modal -->
+    <div id="unsavedChangesModal" class="modal-backdrop hidden">
+      <div class="modal-content max-w-sm w-full p-6">
+        <div class="flex items-start gap-3 mb-4">
+          <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-amber-100">
+            <svg class="w-5 h-5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <p class="font-semibold text-slate-900">Unsaved Changes</p>
+            <p class="text-sm text-slate-500 mt-0.5">You have unsaved asset changes. Press <strong>Update Strategy</strong> and enter your password to save before leaving.</p>
+          </div>
+        </div>
+        <div class="flex gap-2 mt-4">
+          <button type="button" id="unsavedStayBtn"
+            class="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors">Stay &amp; Save</button>
+          <button type="button" id="unsavedLeaveBtn"
+            class="flex-1 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 transition-colors">Leave Anyway</button>
+        </div>
+      </div>
+    </div>
+
     <div id="strategyModal" class="modal-backdrop hidden">
       <div class="modal-content" id="strategyModalContent"></div>
     </div>
@@ -1747,12 +1770,19 @@
         });
       };
 
-      tabOverview.addEventListener("click", () => { window.__dbgBreadcrumb('tab:overview:click'); switchTab(tabOverview); window.__dbgBreadcrumb('tab:overview:switchTab:done'); });
-      tabStrategies.addEventListener("click", () => {
+      tabOverview.addEventListener("click", async () => {
+        window.__dbgBreadcrumb('tab:overview:click');
+        if (!(await checkUnsavedChanges())) return;
+        switchTab(tabOverview);
+        window.__dbgBreadcrumb('tab:overview:switchTab:done');
+      });
+      tabStrategies.addEventListener("click", async () => {
+        if (!(await checkUnsavedChanges())) return;
         switchTab(tabStrategies);
         loadAllSecurities();
       });
-      tabFactsheets.addEventListener("click", () => {
+      tabFactsheets.addEventListener("click", async () => {
+        if (!(await checkUnsavedChanges())) return;
         switchTab(tabFactsheets);
         renderFactsheetStrategyList();
       });
@@ -2505,6 +2535,7 @@
 
       const addHolding = (holding) => {
         formHoldings.push(holding);
+        _stratDirty = true;
         setStrategyWorkspaceVisible(true);
         renderFormHoldings();
         recalculate();
@@ -3148,6 +3179,15 @@
         event.preventDefault();
         if (!strategyForm) return;
         if (strategyViewOnlyMode) return;  /* block saves in read-only mode */
+
+        /* Require password before saving */
+        const confirmed = await confirmWithPassword(
+          "Confirm Strategy Update",
+          "Enter your password to save changes to this strategy.",
+        );
+        if (!confirmed) return;
+
+        _stratDirty = false;
         recalculate();
         const formData = new FormData(strategyForm);
 
@@ -3837,6 +3877,27 @@
       let _ovSecMap = new Map();
       let _ovPerfChartInst = null;
       let _ovStratFromDropdownCreate = false; // true when strategy created via dropdown prompt
+      let _stratDirty = false; // true when holdings have been modified but not saved
+
+      /* Returns true if it's safe to navigate away (no unsaved changes, or user chose Leave) */
+      const checkUnsavedChanges = () => new Promise((resolve) => {
+        if (!_stratDirty || formHoldings.length === 0) { resolve(true); return; }
+        const modal = document.getElementById('unsavedChangesModal');
+        const stayBtn  = document.getElementById('unsavedStayBtn');
+        const leaveBtn = document.getElementById('unsavedLeaveBtn');
+        if (!modal) { resolve(true); return; }
+        modal.classList.remove('hidden');
+        const cleanup = (result) => {
+          modal.classList.add('hidden');
+          stayBtn.removeEventListener('click', onStay);
+          leaveBtn.removeEventListener('click', onLeave);
+          resolve(result);
+        };
+        const onStay  = () => cleanup(false);
+        const onLeave = () => { _stratDirty = false; cleanup(true); };
+        stayBtn.addEventListener('click',  onStay);
+        leaveBtn.addEventListener('click', onLeave);
+      });
       let _ovSectorChartInst = null;
       let _ovTickerInterval = null;
       let _ovPerfResizeObs = null;
@@ -4869,6 +4930,7 @@
 
       const cancelEdit = () => {
         editingStrategyId = null;
+        _stratDirty = false;
         if (strategyForm) strategyForm.reset();
         formHoldings = [];
         renderFormHoldings();
@@ -5349,13 +5411,18 @@
             if (e.target.closest("[data-tabmenu]")) return;
             /* Clicking the already-active tab deselects it */
             if (activeStrategyTabId === strategy.id) {
+              if (!(await checkUnsavedChanges())) return;
               activeStrategyTabId = null;
               formHoldings = [];
+              _stratDirty = false;
               setWorkspaceReadOnly(false);
               setStrategyWorkspaceVisible(false);
               renderStrategyTabs();
               return;
             }
+
+            /* Switching to a different tab — warn if there are unsaved changes */
+            if (!(await checkUnsavedChanges())) return;
 
             const isInvested = strategyInvestedIds.has(strategy.id);
 
@@ -5731,6 +5798,7 @@
 
       const editStrategy = async (strategy, securitiesMap) => {
         editingStrategyId = strategy.id;
+        _stratDirty = false;
 
         if (strategyForm) {
           const f = strategyForm;
