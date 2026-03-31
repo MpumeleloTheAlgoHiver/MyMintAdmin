@@ -208,10 +208,10 @@ const maybeRunDailyOrderbookScheduler = async () => {
 
 const startDailyOrderbookScheduler = () => {
   setInterval(() => {
-    maybeRunDailyOrderbookScheduler();
+    maybeRunDailyOrderbookScheduler().catch(err => console.error('[OrderbookScheduler] Interval error:', err?.message || err));
   }, 30000);
 
-  maybeRunDailyOrderbookScheduler();
+  maybeRunDailyOrderbookScheduler().catch(err => console.error('[OrderbookScheduler] Startup error:', err?.message || err));
 };
 
 const syncAllSecuritiesFromYahoo = async () => {
@@ -349,11 +349,11 @@ const maybeRunDailyMarketSync = async () => {
 
 const startMarketDataScheduler = () => {
   setTimeout(() => {
-    syncAllSecuritiesFromYahoo();
+    syncAllSecuritiesFromYahoo().catch(err => console.error('[MarketSync] Startup sync error:', err?.message || err));
   }, 10000);
 
   setInterval(() => {
-    maybeRunDailyMarketSync();
+    maybeRunDailyMarketSync().catch(err => console.error('[MarketSync] Scheduled sync error:', err?.message || err));
   }, 60000);
 };
 
@@ -971,6 +971,14 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': cacheControl });
     res.end(data);
   });
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[Process] Uncaught exception:', err?.message || err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[Process] Unhandled promise rejection:', reason?.message || reason);
 });
 
 server.listen(port, () => {
