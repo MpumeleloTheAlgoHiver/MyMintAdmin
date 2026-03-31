@@ -673,7 +673,7 @@
               </div>
               <svg class="strat-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
-            <div id="ovStratPanel" style="display:none;position:absolute;top:46px;right:0;z-index:3000;background:white;border:1.5px solid #e8eaf0;border-radius:14px;box-shadow:0 12px 40px rgba(15,23,42,0.14),0 2px 8px rgba(15,23,42,0.06);min-width:280px;max-height:400px;overflow-y:auto;padding:8px 0;"></div>
+            <div id="ovStratPanel" style="display:none;position:absolute;top:46px;right:0;z-index:3000;background:white;border:1.5px solid #e8eaf0;border-radius:14px;box-shadow:0 12px 40px rgba(15,23,42,0.14),0 2px 8px rgba(15,23,42,0.06);min-width:360px;max-height:420px;overflow-y:auto;padding:8px 0;"></div>
           </div>
           <!-- Hidden select kept for JS compat -->
           <select id="ovStratSel" style="display:none;" onchange="window.ovSelectStrategy(this.value)"></select>
@@ -3959,20 +3959,57 @@
 
         let itemCounter = 0;
         const renderItem = (s) => {
-          const idx = strategies.indexOf(s);
+          const idx    = strategies.indexOf(s);
           const hasInv = strategyInvestedIds.has(String(s.id));
           const isSel  = idx === currentIdx;
-          const dot = hasInv
-            ? `<span style="width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 0 2px rgba(16,185,129,0.2);flex-shrink:0;"></span>`
-            : `<span style="width:8px;height:8px;border-radius:50%;background:#e2e8f0;flex-shrink:0;"></span>`;
-          const label = s.short_name || s.name || 'Strategy ' + (idx + 1);
+          const label  = s.short_name || s.name || 'Strategy ' + (idx + 1);
           const selClass = isSel ? ' selected' : '';
-          const delay = (itemCounter++ * 0.025).toFixed(3);
+          const delay  = (itemCounter++ * 0.025).toFixed(3);
+
+          /* ── Status dot (users) ── */
+          const dot = hasInv
+            ? `<span title="Has investors" style="width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 0 2px rgba(16,185,129,0.2);flex-shrink:0;"></span>`
+            : `<span title="No investors" style="width:8px;height:8px;border-radius:50%;background:#e2e8f0;flex-shrink:0;"></span>`;
+
+          /* ── Icon badges ── */
+          /* Users badge */
+          const usersBadge = hasInv
+            ? `<span title="Has investors" style="display:inline-flex;align-items:center;gap:3px;padding:2px 5px;border-radius:5px;background:#dcfce7;color:#16a34a;font-size:9.5px;font-weight:600;flex-shrink:0;">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                Users
+              </span>`
+            : `<span title="No investors" style="display:inline-flex;align-items:center;gap:3px;padding:2px 5px;border-radius:5px;background:#f1f5f9;color:#94a3b8;font-size:9.5px;font-weight:600;flex-shrink:0;">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                None
+              </span>`;
+
+          /* Public / Live badge */
+          const publicBadge = s.is_public
+            ? `<span title="Live on website" style="display:inline-flex;align-items:center;gap:3px;padding:2px 5px;border-radius:5px;background:#dbeafe;color:#2563eb;font-size:9.5px;font-weight:600;flex-shrink:0;">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                Live
+              </span>`
+            : `<span title="Not public" style="display:inline-flex;align-items:center;gap:3px;padding:2px 5px;border-radius:5px;background:#f1f5f9;color:#94a3b8;font-size:9.5px;font-weight:600;flex-shrink:0;">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                Private
+              </span>`;
+
+          /* Featured badge — only shown when true */
+          const featuredBadge = s.is_featured
+            ? `<span title="Featured on website" style="display:inline-flex;align-items:center;gap:3px;padding:2px 5px;border-radius:5px;background:#fef3c7;color:#d97706;font-size:9.5px;font-weight:600;flex-shrink:0;">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                Featured
+              </span>`
+            : '';
+
           return `<div data-ov-idx="${idx}" class="strat-drop-item${selClass}"
-            style="animation:strat-item-in 0.18s ease both;animation-delay:${delay}s;">
+            style="animation:strat-item-in 0.18s ease both;animation-delay:${delay}s;flex-wrap:nowrap;">
             ${dot}
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${label}</span>
-            ${isSel ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;">${label}</span>
+            <div style="display:flex;align-items:center;gap:3px;flex-shrink:0;">
+              ${usersBadge}${publicBadge}${featuredBadge}
+              ${isSel ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2.5" stroke-linecap="round" style="margin-left:2px;"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
+            </div>
             <button type="button" class="strat-drop-dots ov-drop-dots" data-ov-idx="${idx}">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="#64748b"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
             </button>
