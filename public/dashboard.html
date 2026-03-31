@@ -1294,15 +1294,20 @@
         window.__dbgLog.push(entry);
         console.log('[DBG]', label);
       };
+      window.onerror = function(msg, src, line, col, err) {
+        if (msg && msg.toString().includes('ResizeObserver loop')) return true;
+        const out = `UNCAUGHT ERROR\n  message: ${msg}\n  source:  ${src}\n  line:    ${line}:${col}\n  error:   ${err?.stack || err || '(null)'}`;
+        console.error('[DBG] ' + out);
+        console.error('[DBG] breadcrumbs:', JSON.stringify(window.__dbgLog.slice(-10)));
+        return false;
+      };
       window.addEventListener('error', function(e) {
         if (e.message && e.message.includes('ResizeObserver loop')) {
           e.preventDefault();
-          return;
+          e.stopImmediatePropagation();
+          return true;
         }
-        const msg = `UNCAUGHT ERROR\n  message: ${e.message}\n  source:  ${e.filename}\n  line:    ${e.lineno}:${e.colno}\n  error:   ${e.error?.stack || e.error || '(null)'}`;
-        console.error('[DBG] ' + msg);
-        console.error('[DBG] breadcrumbs:', JSON.stringify(window.__dbgLog.slice(-10)));
-      });
+      }, true);
       window.addEventListener('unhandledrejection', function(e) {
         const reason = e.reason;
         const msg = `UNHANDLED REJECTION\n  reason: ${reason?.stack || reason?.message || JSON.stringify(reason) || '(null/undefined)'}`;
@@ -2253,7 +2258,7 @@
 
         try { chart.setOption(option); } catch(e) { console.error('[Chart] setOption failed:', e); }
 
-        const resizeObserver = new ResizeObserver(() => { try { chart.resize(); } catch(e) {} });
+        const resizeObserver = new ResizeObserver(() => { requestAnimationFrame(() => { try { chart.resize(); } catch(e) {} }); });
         resizeObserver.observe(strategyChart);
         strategyChart.__strategyChartResizeObserver = resizeObserver;
       };
@@ -4046,7 +4051,7 @@
           });
         } catch(e) { console.error('[Overview] Perf chart setOption failed:', e); }
         if (_ovPerfResizeObs) { try { _ovPerfResizeObs.disconnect(); } catch(e) {} }
-        _ovPerfResizeObs = new ResizeObserver(() => { try { if (_ovPerfChartInst) _ovPerfChartInst.resize(); } catch(e) {} });
+        _ovPerfResizeObs = new ResizeObserver(() => { requestAnimationFrame(() => { try { if (_ovPerfChartInst) _ovPerfChartInst.resize(); } catch(e) {} }); });
         _ovPerfResizeObs.observe(el);
       };
 
@@ -4100,7 +4105,7 @@
           ).join('');
         }
         if (el.__sectorResizeObs) { try { el.__sectorResizeObs.disconnect(); } catch(e) {} }
-        el.__sectorResizeObs = new ResizeObserver(() => { try { if (_ovSectorChartInst) _ovSectorChartInst.resize(); } catch(e) {} });
+        el.__sectorResizeObs = new ResizeObserver(() => { requestAnimationFrame(() => { try { if (_ovSectorChartInst) _ovSectorChartInst.resize(); } catch(e) {} }); });
         el.__sectorResizeObs.observe(el);
       };
 
