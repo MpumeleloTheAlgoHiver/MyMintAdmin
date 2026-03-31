@@ -654,6 +654,13 @@
         </div>
       </div>
 
+      <!-- ── Market Ticker Sub-bar ── -->
+      <div style="overflow:hidden;background:#0c1929;border-bottom:1px solid rgba(255,255,255,0.06);height:34px;display:flex;align-items:center;width:100%;flex-shrink:0;">
+        <div id="ovTickerTrack" class="ov-ticker-anim" style="display:flex;align-items:center;white-space:nowrap;">
+          <span style="font-size:11px;color:#4a6a8a;padding:0 20px;font-family:ui-monospace,monospace;letter-spacing:0.02em;">Loading market data…</span>
+        </div>
+      </div>
+
       <div class="dashboard-shell">
         <div class="max-w-7xl mx-auto px-5 py-5 space-y-4">
 
@@ -673,14 +680,6 @@
               <span id="usersKycValue"></span>
               <span id="usersBankValue"></span>
             </div>
-
-            <!-- ── Live Market Ticker ── -->
-            <div style="overflow:hidden;border-radius:8px;background:rgba(15,23,42,0.025);border:1px solid #e2e8f0;margin-bottom:14px;height:34px;display:flex;align-items:center;">
-              <div id="ovTickerTrack" class="ov-ticker-anim" style="display:flex;align-items:center;white-space:nowrap;">
-                <span style="font-size:11px;color:#94a3b8;padding:0 16px;font-family:ui-monospace,monospace;">Loading market data…</span>
-              </div>
-            </div>
-
 
             <!-- ── Strategy Title Bar ── -->
             <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;">
@@ -3977,18 +3976,18 @@
         }).filter(Boolean);
 
         if (!items.length) {
-          track.innerHTML = '<span style="font-size:11px;color:#94a3b8;padding:0 16px;font-family:ui-monospace,monospace;">No market data available for this strategy</span>';
+          track.innerHTML = '<span style="font-size:11px;color:#4a6a8a;padding:0 20px;font-family:ui-monospace,monospace;letter-spacing:0.02em;">No market data available for this strategy</span>';
           return;
         }
 
         const renderTickerItem = (item) => {
           const priceStr = item.price != null ? item.price.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
           const changeStr = item.change != null ? `${item.change >= 0 ? '+' : ''}${item.change.toFixed(2)}%` : '';
-          const cc = item.change == null ? '#94a3b8' : item.change >= 0 ? '#059669' : '#dc2626';
-          return `<div style="display:flex;align-items:center;gap:6px;padding:0 14px;border-right:1px solid #e2e8f0;flex-shrink:0;height:34px;">
-            <span style="font-size:11px;font-weight:600;color:#0f172a;font-family:ui-monospace,monospace;">${item.sym}</span>
-            <span style="font-size:11px;color:#475569;font-family:ui-monospace,monospace;">${priceStr}</span>
-            ${changeStr ? `<span style="font-size:11px;font-family:ui-monospace,monospace;color:${cc};">${changeStr}</span>` : ''}
+          const cc = item.change == null ? '#4a6a8a' : item.change >= 0 ? '#10b981' : '#f87171';
+          return `<div style="display:flex;align-items:center;gap:7px;padding:0 16px;border-right:1px solid rgba(255,255,255,0.07);flex-shrink:0;height:34px;">
+            <span style="font-size:11px;font-weight:700;color:#e2e8f0;font-family:ui-monospace,monospace;letter-spacing:0.04em;">${item.sym}</span>
+            <span style="font-size:11px;color:#7a9ab8;font-family:ui-monospace,monospace;">${priceStr}</span>
+            ${changeStr ? `<span style="font-size:11px;font-family:ui-monospace,monospace;font-weight:600;color:${cc};">${changeStr}</span>` : ''}
           </div>`;
         };
 
