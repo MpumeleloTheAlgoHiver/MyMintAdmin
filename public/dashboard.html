@@ -3879,7 +3879,7 @@
       /* ═══════════════════════════════════════════════════════════════
          OVERVIEW DASHBOARD v2 — Lovable-style layout
       ═══════════════════════════════════════════════════════════════ */
-      let _ovAllStrategies = [];
+      let _ovAllStrategies = window._ovAllStrategies = [];
       let _ovSecMap = new Map();
       let _ovPerfChartInst = null;
       let _ovStratFromDropdownCreate = false; // true when strategy created via dropdown prompt
@@ -3964,8 +3964,14 @@
           const dot = hasInv
             ? `<span style="width:7px;height:7px;border-radius:50%;background:#059669;flex-shrink:0;"></span>`
             : `<span style="width:7px;height:7px;border-radius:50%;background:#e2e8f0;flex-shrink:0;"></span>`;
-          return `<div style="${itemStyle}" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''" onclick="window.ovSelectStrategy(${idx});document.getElementById('ovStratPanel').style.display='none'">
-            ${dot}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.short_name || s.name || 'Strategy ' + (idx+1)}</span>
+          const stratId   = JSON.stringify(String(s.id));
+          const stratName = JSON.stringify(s.short_name || s.name || 'Strategy ' + (idx+1));
+          return `<div style="${itemStyle}padding-right:6px;" onmouseover="this.style.background='#f8fafc';this.querySelector('.ov-drop-dots').style.opacity='1'" onmouseout="this.style.background='';this.querySelector('.ov-drop-dots').style.opacity='0'" onclick="if(!event.target.closest('.ov-drop-dots')){window.ovSelectStrategy(${idx});document.getElementById('ovStratPanel').style.display='none';}">
+            ${dot}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${s.short_name || s.name || 'Strategy ' + (idx+1)}</span>
+            <button type="button" class="ov-drop-dots" onclick="event.stopPropagation();window.openTabMenu(this,${stratId},${stratName},window._ovAllStrategies&&window._ovAllStrategies.find(function(x){return String(x.id)===${stratId}}))"
+              style="flex-shrink:0;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:none;background:none;border-radius:5px;cursor:pointer;padding:0;opacity:0;transition:opacity 0.12s;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="#64748b"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+            </button>
           </div>`;
         };
 
@@ -3997,7 +4003,7 @@
 
       const initOverviewDashboard = async (strategies, secMap) => {
         window.__dbgBreadcrumb('initOverview:start');
-        _ovAllStrategies = strategies || [];
+        _ovAllStrategies = window._ovAllStrategies = strategies || [];
         _ovSecMap = secMap || new Map();
         const sel = document.getElementById('ovStratSel');
         if (sel) {
@@ -4175,7 +4181,7 @@
         const minimalStrat = { id: newId, name, slug: createStrategySlug(name), status: 'active', is_public: false, is_featured: false, holdings: [] };
         /* Inject into local arrays so renderStrategyTabs / editStrategy can find it immediately */
         allStrategiesFullData = [minimalStrat, ...(allStrategiesFullData || [])];
-        _ovAllStrategies      = [minimalStrat, ...(_ovAllStrategies      || [])];
+        _ovAllStrategies = window._ovAllStrategies = [minimalStrat, ...(_ovAllStrategies || [])];
         activeStrategyTabId   = newId;
         _ovStratFromDropdownCreate = true;
         /* Show strategy management form — user adds assets then saves */
@@ -5215,7 +5221,7 @@
         });
       };
 
-      const openTabMenu = (anchorEl, strategyId, strategyName, strategyObj) => {
+      const openTabMenu = window.openTabMenu = (anchorEl, strategyId, strategyName, strategyObj) => {
         if (_tabMenuOpen === strategyId) {
           closeTabMenu();
           return;
