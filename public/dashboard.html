@@ -263,19 +263,44 @@
       }
 
       .top-nav {
-        background: rgba(255, 255, 255, 0.92);
+        background: rgba(255, 255, 255, 0.96);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
         border-bottom: 1px solid #e2e8f0;
-        padding: 0 32px;
-        min-height: 64px;
+        padding: 0 28px;
+        height: 56px;
         display: flex;
-        align-items: center;
+        align-items: stretch;
         justify-content: space-between;
-        gap: 16px;
         position: sticky;
         top: 0;
         z-index: 100;
+      }
+
+      .top-nav-brand {
+        display: flex;
+        align-items: center;
+        padding-right: 24px;
+        border-right: 1px solid #e2e8f0;
+        margin-right: 4px;
+        gap: 7px;
+        flex-shrink: 0;
+      }
+
+      .top-nav-tabs {
+        display: flex;
+        align-items: stretch;
+        flex: 1;
+      }
+
+      .top-nav-right {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding-left: 20px;
+        border-left: 1px solid #e2e8f0;
+        margin-left: 4px;
+        flex-shrink: 0;
       }
 
       .top-nav-actions {
@@ -453,12 +478,34 @@
         font-weight: 600;
         border-bottom: 2px solid #2563eb;
         letter-spacing: -0.01em;
+        font-size: 13px;
+        padding: 0 18px;
+        display: flex;
+        align-items: center;
+        background: none;
+        border-top: none;
+        border-left: none;
+        border-right: none;
+        cursor: pointer;
+        white-space: nowrap;
+        flex-shrink: 0;
       }
 
       .tab-inactive {
         color: #94a3b8;
         font-weight: 500;
         border-bottom: 2px solid transparent;
+        font-size: 13px;
+        padding: 0 18px;
+        display: flex;
+        align-items: center;
+        background: none;
+        border-top: none;
+        border-left: none;
+        border-right: none;
+        cursor: pointer;
+        white-space: nowrap;
+        flex-shrink: 0;
         transition: color 0.15s ease;
       }
 
@@ -601,21 +648,30 @@
         <div class="sk-rows"><div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div><div class="sk-row" style="width:58%"></div></div>
       </div>
       <div class="top-nav">
-        <div style="display:flex;flex-direction:column;gap:2px;">
-          <span style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#94a3b8;font-family:ui-monospace,monospace;">Mint CRM &rsaquo; Dashboard</span>
-          <span id="topNavTitle" style="font-size:20px;font-weight:700;color:#0f172a;letter-spacing:-0.03em;line-height:1.15;">Overview</span>
+        <!-- Brand -->
+        <div class="top-nav-brand">
+          <div style="display:flex;flex-direction:column;gap:1px;">
+            <span style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#94a3b8;font-family:ui-monospace,monospace;line-height:1;">Mint CRM</span>
+            <span style="font-size:11px;font-weight:600;color:#475569;letter-spacing:0.01em;line-height:1;">Dashboard</span>
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:20px;">
+        <!-- Tabs in nav -->
+        <div class="top-nav-tabs">
+          <button id="tabOverview" type="button" class="tab-active">Overview</button>
+          <button id="tabStrategies" type="button" class="tab-inactive">Strategy Management</button>
+          <button id="tabFactsheets" type="button" class="tab-inactive">Factsheets</button>
+        </div>
+        <!-- Right: date / time / user -->
+        <div class="top-nav-right">
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
-            <span id="topNavDate" style="font-size:11px;color:#64748b;font-weight:500;"></span>
+            <span id="topNavDate" style="font-size:11px;color:#64748b;font-weight:500;white-space:nowrap;"></span>
             <span id="topNavTime" style="font-size:11px;color:#94a3b8;font-family:ui-monospace,monospace;font-weight:400;"></span>
           </div>
-          <div style="width:1px;height:28px;background:#e2e8f0;"></div>
           <div style="display:flex;align-items:center;gap:8px;">
-            <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#1e40af 0%,#3b82f6 100%);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;" id="topNavAvatar">A</div>
+            <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#1e40af 0%,#3b82f6 100%);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;" id="topNavAvatar">A</div>
             <div style="display:flex;flex-direction:column;gap:1px;">
-              <span style="font-size:11px;font-weight:600;color:#0f172a;" id="topNavUser">Admin</span>
-              <span style="font-size:10px;color:#94a3b8;font-weight:500;">Administrator</span>
+              <span style="font-size:12px;font-weight:600;color:#0f172a;line-height:1.2;" id="topNavUser">Admin</span>
+              <span style="font-size:10px;color:#94a3b8;font-weight:500;line-height:1.2;">Administrator</span>
             </div>
           </div>
         </div>
@@ -623,29 +679,6 @@
 
       <div class="dashboard-shell">
         <div class="max-w-7xl mx-auto px-5 py-5 space-y-4">
-          <div class="flex items-center gap-6 border-b border-slate-200 pb-0">
-            <button
-              id="tabOverview"
-              type="button"
-              class="text-sm pb-2 tab-active"
-            >
-              Overview
-            </button>
-            <button
-              id="tabStrategies"
-              type="button"
-              class="text-sm pb-2 tab-inactive hover:text-slate-800"
-            >
-              Strategy Management
-            </button>
-            <button
-              id="tabFactsheets"
-              type="button"
-              class="text-sm pb-2 tab-inactive hover:text-slate-800"
-            >
-              Factsheets
-            </button>
-          </div>
 
           <!-- ═══════════════ OVERVIEW TAB ═══════════════ -->
           <div id="tabOverviewPanel">
@@ -1690,8 +1723,6 @@
       };
 
       const switchTab = (activeTab) => {
-        const titleEl = document.getElementById('topNavTitle');
-        if (titleEl && activeTab?.id) titleEl.textContent = _tabTitleMap[activeTab.id] || activeTab.textContent.trim();
         const tabs = [
           tabOverview,
           tabStrategies,
@@ -1704,10 +1735,10 @@
         ];
         tabs.forEach((tab, i) => {
           if (tab === activeTab) {
-            tab.className = "text-sm pb-2 tab-active";
+            tab.className = "tab-active";
             panels[i].classList.remove("hidden");
           } else {
-            tab.className = "text-sm pb-2 tab-inactive hover:text-slate-800";
+            tab.className = "tab-inactive";
             panels[i].classList.add("hidden");
           }
         });
