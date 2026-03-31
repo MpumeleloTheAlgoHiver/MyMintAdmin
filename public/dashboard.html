@@ -4084,22 +4084,17 @@
           if (btn) { btn.textContent = 'Create'; btn.disabled = false; }
           return;
         }
-        activeStrategyTabId = insertData.id;
-        const hiddenName = document.getElementById('strategyName');
-        if (hiddenName) hiddenName.value = name;
-        const sp = document.getElementById('tabStrategiesPanel');
-        if (sp) sp.style.display = 'block';
-        const sc = document.getElementById('ovStratContent');
-        if (sc) sc.style.display = 'none';
-        setStrategyWorkspaceVisible(true);
+        const newId = insertData.id;
+        /* Refresh strategy list — initOverviewDashboard will run but we override it right after */
         await loadStrategies();
-        const saved = (allStrategiesFullData || []).find(s => s.id === activeStrategyTabId);
+        /* Find the newly created strategy and show its overview metrics view */
+        const saved = (allStrategiesFullData || []).find(s => s.id === newId);
         if (saved) {
-          setStrategyWorkspaceVisible(true);
-          await editStrategy(saved, globalSecuritiesMap);
+          const idx = _ovAllStrategies.findIndex(s => s.id === newId);
+          if (idx !== -1) {
+            await _doOvSelectStrategy(idx, saved);
+          }
         }
-        const btnLabel = document.getElementById('ovStratBtnLabel');
-        if (btnLabel) btnLabel.textContent = name;
       };
 
       const ovRenderTitleBar = (strat, analytics, aum, investorCount) => {
