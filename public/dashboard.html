@@ -2359,11 +2359,13 @@
       let securitiesLoading = false;
       let holdingsQuantityMap = {};
 
-      const loadAllSecurities = async () => {
+      const loadAllSecurities = async (opts = {}) => {
         if (allSecuritiesCache !== null || securitiesLoading) return;
         securitiesLoading = true;
-        securityDropdown.innerHTML = `<div class="px-3 py-3 text-sm text-slate-400 text-center">Loading assets...</div>`;
-        securityDropdown.classList.remove("hidden");
+        if (!opts.silent) {
+          securityDropdown.innerHTML = `<div class="px-3 py-3 text-sm text-slate-400 text-center">Loading assets...</div>`;
+          securityDropdown.classList.remove("hidden");
+        }
 
         const [strategiesResult] = await Promise.all([
           supabaseClient
@@ -3913,6 +3915,8 @@
             `<option value="${i}">${s.short_name || s.name || 'Strategy ' + (i+1)}</option>`
           ).join('');
         }
+        /* Pre-load securities silently so asset cards appear without waiting for search focus */
+        loadAllSecurities({ silent: true }).catch(e => console.warn('[Securities] silent load failed:', e));
         ovBuildStratDrop();
         ovRenderTicker().catch(e => console.warn('[Ticker] load failed:', e));
         /* Default: show Overview tab with strategy mgmt content, no strategy selected */
@@ -5756,6 +5760,9 @@
       securitySearchInput.addEventListener("focus", () => {
         if (allSecuritiesCache !== null) {
           renderSecuritiesDropdown(securitySearchInput.value.trim());
+        } else if (securitiesLoading) {
+          securityDropdown.innerHTML = `<div class="px-3 py-3 text-sm text-slate-400 text-center">Loading assets...</div>`;
+          securityDropdown.classList.remove("hidden");
         }
         loadAllSecurities();
       });
