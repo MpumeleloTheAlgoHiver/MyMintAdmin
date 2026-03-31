@@ -1284,8 +1284,29 @@
       <div class="modal-content" id="strategyModalContent"></div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js" crossorigin="anonymous"></script>
+    <script>
+      /* ── DEBUG: capture all uncaught errors with full details ── */
+      window.__dbgLog = [];
+      window.__dbgBreadcrumb = (label) => {
+        const entry = { t: Date.now(), label };
+        window.__dbgLog.push(entry);
+        console.log('[DBG]', label);
+      };
+      window.addEventListener('error', function(e) {
+        const msg = `UNCAUGHT ERROR\n  message: ${e.message}\n  source:  ${e.filename}\n  line:    ${e.lineno}:${e.colno}\n  error:   ${e.error?.stack || e.error || '(null)'}`;
+        console.error('[DBG] ' + msg);
+        console.error('[DBG] breadcrumbs:', JSON.stringify(window.__dbgLog.slice(-10)));
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        const reason = e.reason;
+        const msg = `UNHANDLED REJECTION\n  reason: ${reason?.stack || reason?.message || JSON.stringify(reason) || '(null/undefined)'}`;
+        console.error('[DBG] ' + msg);
+        console.error('[DBG] breadcrumbs:', JSON.stringify(window.__dbgLog.slice(-10)));
+        e.preventDefault();
+      });
+    </script>
     <script>
       const SUPABASE_URL = "https://mfxnghmuccevsxwcetej.supabase.co";
       const SUPABASE_ANON_KEY =
@@ -1652,7 +1673,7 @@
         });
       };
 
-      tabOverview.addEventListener("click", () => switchTab(tabOverview));
+      tabOverview.addEventListener("click", () => { window.__dbgBreadcrumb('tab:overview:click'); switchTab(tabOverview); window.__dbgBreadcrumb('tab:overview:switchTab:done'); });
       tabStrategies.addEventListener("click", () => {
         switchTab(tabStrategies);
         loadAllSecurities();
@@ -3630,6 +3651,7 @@
 
       /* ─────────────────────── DATA LOADING ─────────────────────── */
       const loadStrategies = async () => {
+        window.__dbgBreadcrumb('loadStrategies:start');
         const { data, error } = await supabaseClient
           .from("strategies")
           .select(
@@ -3744,35 +3766,39 @@
       };
 
       const initOverviewDashboard = async (strategies, secMap) => {
+        window.__dbgBreadcrumb('initOverview:start');
         _ovAllStrategies = strategies || [];
         _ovSecMap = secMap || new Map();
         const sel = document.getElementById('ovStratSel');
-        if (!sel) return;
+        if (!sel) { window.__dbgBreadcrumb('initOverview:no-sel'); return; }
         sel.innerHTML = _ovAllStrategies.map((s, i) =>
           `<option value="${i}">${s.short_name || s.name || 'Strategy ' + (i+1)}</option>`
         ).join('');
         if (_ovAllStrategies.length > 0) {
+          window.__dbgBreadcrumb('initOverview:calling-ovSelectStrategy');
           await window.ovSelectStrategy(0);
+          window.__dbgBreadcrumb('initOverview:done');
         }
       };
 
       window.ovSelectStrategy = async (val) => {
         try {
+        window.__dbgBreadcrumb('ovSelect:start val=' + val);
         const idx = Number(val) || 0;
         const strat = _ovAllStrategies[idx];
-        if (!strat) return;
+        if (!strat) { window.__dbgBreadcrumb('ovSelect:no-strat'); return; }
         const sel = document.getElementById('ovStratSel');
         if (sel) sel.value = String(idx);
         const holdings = Array.isArray(strat.holdings) ? strat.holdings : [];
 
-        // Fetch analytics
+        window.__dbgBreadcrumb('ovSelect:fetch-analytics');
         const { data: analytics } = await supabaseClient
           .from('strategy_analytics')
           .select('strategy_id, as_of_date, latest_value, ytd_return, summary, curves, computed_at')
           .eq('strategy_id', strat.id)
           .maybeSingle();
 
-        // Fetch security prices for holdings
+        window.__dbgBreadcrumb('ovSelect:fetch-securities');
         const symbols = [...new Set(holdings.map(h => h.ticker || h.symbol || h).filter(s => typeof s === 'string' && s))];
         const secMap = new Map(_ovSecMap);
         if (symbols.length > 0) {
@@ -3786,7 +3812,7 @@
           });
         }
 
-        // Fetch investor holdings for this strategy
+        window.__dbgBreadcrumb('ovSelect:fetch-holdings');
         const { data: investorRows } = await supabaseClient
           .from('stock_holdings')
           .select('user_id, quantity, purchase_price, current_price, is_active, trade_side')
@@ -3794,7 +3820,7 @@
           .eq('is_active', true);
         const investRows = (investorRows || []).filter(r => !r.trade_side || r.trade_side === 'BUY');
 
-        // Fetch profiles
+        window.__dbgBreadcrumb('ovSelect:fetch-profiles');
         let profiles = {};
         if (investRows.length) {
           const uids = [...new Set(investRows.map(r => r.user_id).filter(Boolean))];
@@ -3807,7 +3833,6 @@
           }
         }
 
-        // Compute AUM
         let totalAum = 0;
         investRows.forEach(r => {
           const price = Number(r.current_price) || 0;
@@ -3815,14 +3840,23 @@
           totalAum += price * qty;
         });
 
+        window.__dbgBreadcrumb('ovSelect:render-titlebar');
         ovRenderTitleBar(strat, analytics, totalAum, investRows.length);
+        window.__dbgBreadcrumb('ovSelect:render-kpi');
         ovRenderKpiStrip(analytics);
+        window.__dbgBreadcrumb('ovSelect:render-ticker');
         ovRenderTicker(holdings, secMap);
+        window.__dbgBreadcrumb('ovSelect:render-perfchart');
         ovRenderPerfChart(analytics, strat.name || 'Strategy');
+        window.__dbgBreadcrumb('ovSelect:render-sectorchart');
         ovRenderSectorChart(holdings, secMap);
+        window.__dbgBreadcrumb('ovSelect:render-holdings');
         ovRenderHoldings(holdings, secMap);
+        window.__dbgBreadcrumb('ovSelect:render-investors');
         ovRenderInvestors(investRows, profiles);
+        window.__dbgBreadcrumb('ovSelect:done');
         } catch (err) {
+          window.__dbgBreadcrumb('ovSelect:CAUGHT-ERROR:' + (err?.message || String(err)));
           console.error('[Overview] strategy render error:', err);
         }
       };
@@ -5629,8 +5663,10 @@
       renderFormHoldings();
 
       window.addEventListener("DOMContentLoaded", async function () {
+        window.__dbgBreadcrumb('DOMContentLoaded:start');
         const ok = await requireSession();
-        if (!ok) return;
+        if (!ok) { window.__dbgBreadcrumb('DOMContentLoaded:no-session'); return; }
+        window.__dbgBreadcrumb('DOMContentLoaded:session-ok');
         loadStrategies().catch(err => console.error('[Init] loadStrategies failed:', err));
         loadTopHoldings().catch(err => console.error('[Init] loadTopHoldings failed:', err));
         loadUserStats().catch(err => console.error('[Init] loadUserStats failed:', err));
