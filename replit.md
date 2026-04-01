@@ -12,7 +12,7 @@ Internal admin dashboard for the Mint investment platform. Provides client manag
 
 ## Key Pages
 - `/signin.html` - Admin login (Supabase Auth)
-- `/index.html` - Client profiles / CRM
+- `/index.html` - Client profiles / CRM..
 - `/dashboard.html` - Main dashboard with four tabs: Overview, Strategy Management, Rebalancing, Factsheets
 - `/eft.html` - EFT Payments standalone page (upload bank CSV, confirm pending deposits)
 - `/orderbook.html` - Order book email runs
