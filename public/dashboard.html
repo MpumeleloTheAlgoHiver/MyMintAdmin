@@ -7779,17 +7779,23 @@
           const adminNotes    = document.getElementById('approvalNotes').value;
 
           // Bank details for payout record (sourced from the profile shown in modal)
-          const app     = _approvalsCache.find(a => String(a.id) === String(id));
-          const profile = app?.profile || {};
+          const app        = _approvalsCache.find(a => String(a.id) === String(id));
+          const profile    = app?.profile    || {};
+          const onboarding = app?.onboarding || {};
 
           const payload = {
             interestRate,
             tenureMonths,
             adminNotes,
+            // payout bank (from user_onboarding)
             payoutBankName:      onboarding.bank_name           || null,
             payoutAccountNumber: onboarding.bank_account_number || null,
             payoutBranchCode:    onboarding.bank_branch_code    || null,
-            payoutAccountType:   null
+            payoutAccountType:   null,
+            // for Resend email
+            toEmail:    profile.email      || null,
+            firstName:  profile.first_name || null,
+            amount:     app?.amount        || null
           };
 
           try {
@@ -7824,13 +7830,19 @@
 
         try {
           const { data: { session } } = await supabaseClient.auth.getSession();
+          const app     = _approvalsCache.find(a => String(a.id) === String(id));
+          const profile = app?.profile || {};
           const res = await fetch(`/api/admin/approvals/${id}/reject`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${session.access_token}`
             },
-            body: JSON.stringify({ reason })
+            body: JSON.stringify({
+              reason,
+              toEmail:   profile.email      || null,
+              firstName: profile.first_name || null
+            })
           });
 
           if (res.ok) {

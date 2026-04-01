@@ -25,6 +25,7 @@ const mimeTypes = {
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const resendApiKey = process.env.RESEND_API_KEY;
+const resendFrom = process.env.RESEND_FROM || 'Mint Loans <loans@mymint.co.za>';
 const orderbookEmailFrom = process.env.ORDERBOOK_EMAIL_FROM;
 const orderbookEmailTo = process.env.ORDERBOOK_EMAIL_TO;
 const orderbookDailyAmHour = Number(process.env.ORDERBOOK_DAILY_AM_HOUR || 15);
@@ -106,6 +107,175 @@ const sendOrderbookCsvEmail = async ({ subject, csvContent, fileName }) => {
   }
 
   return payload;
+};
+
+/* ─── Loan Approval / Rejection emails (Resend) ─────────────────────── */
+const sendApprovalEmail = async ({ toEmail, firstName, amount, interestRate, tenureMonths, bankName, accountNumber }) => {
+  if (!resendApiKey) {
+    console.warn('[Email] RESEND_API_KEY not set — skipping approval email');
+    return;
+  }
+
+  const rateDisplay   = interestRate  != null ? `${(Number(interestRate) * 100).toFixed(0)}%`  : 'as agreed';
+  const tenureDisplay = tenureMonths  != null ? `${tenureMonths} month${tenureMonths !== 1 ? 's' : ''}` : 'as agreed';
+  const amountDisplay = amount        != null ? `R ${Number(amount).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'as per your application';
+  const bankDisplay   = (bankName && accountNumber) ? `${bankName} (****${String(accountNumber).slice(-4)})` : 'your linked account';
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Loan Approved – Mint</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f6fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f6fa;padding:40px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#6d28d9 0%,#7c3aed 100%);padding:36px 40px;text-align:center;">
+            <p style="margin:0 0 8px;font-size:28px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">✓ Loan Approved</p>
+            <p style="margin:0;font-size:15px;color:#ede9fe;">Your application has been reviewed and approved.</p>
+          </td>
+        </tr>
+
+        <!-- Greeting -->
+        <tr>
+          <td style="padding:32px 40px 0;">
+            <p style="margin:0;font-size:16px;color:#1e293b;">Hi <strong>${firstName || 'there'}</strong>,</p>
+            <p style="margin:12px 0 0;font-size:15px;color:#475569;line-height:1.6;">Great news! Your Mint loan application has been <strong style="color:#6d28d9;">approved</strong>. Here's a summary of your loan terms and where your funds will be sent.</p>
+          </td>
+        </tr>
+
+        <!-- Loan term cards -->
+        <tr>
+          <td style="padding:24px 40px 0;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td width="33%" style="padding-right:8px;">
+                  <div style="background:#f5f3ff;border-radius:12px;padding:16px;text-align:center;">
+                    <p style="margin:0 0 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#7c3aed;">Loan Amount</p>
+                    <p style="margin:0;font-size:20px;font-weight:800;color:#4c1d95;">${amountDisplay}</p>
+                  </div>
+                </td>
+                <td width="33%" style="padding:0 4px;">
+                  <div style="background:#f8fafc;border-radius:12px;padding:16px;text-align:center;">
+                    <p style="margin:0 0 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#64748b;">Interest Rate</p>
+                    <p style="margin:0;font-size:20px;font-weight:800;color:#0f172a;">${rateDisplay}</p>
+                  </div>
+                </td>
+                <td width="33%" style="padding-left:8px;">
+                  <div style="background:#f8fafc;border-radius:12px;padding:16px;text-align:center;">
+                    <p style="margin:0 0 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#64748b;">Tenure</p>
+                    <p style="margin:0;font-size:20px;font-weight:800;color:#0f172a;">${tenureDisplay}</p>
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Payout destination -->
+        <tr>
+          <td style="padding:20px 40px 0;">
+            <div style="border:1.5px solid #e2e8f0;border-radius:12px;padding:20px;">
+              <p style="margin:0 0 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;">💳 Payout Destination</p>
+              <p style="margin:0;font-size:15px;color:#1e293b;">Funds will be sent to <strong>${bankDisplay}</strong> within 1–2 business days.</p>
+            </div>
+          </td>
+        </tr>
+
+        <!-- CTA -->
+        <tr>
+          <td style="padding:28px 40px;text-align:center;">
+            <p style="margin:0 0 20px;font-size:14px;color:#64748b;line-height:1.6;">You will receive your funds shortly. If you have any questions, reply to this email or contact support.</p>
+            <a href="https://mymint.co.za" style="display:inline-block;background:#6d28d9;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:14px 32px;border-radius:12px;">Open Mint App</a>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f8fafc;padding:20px 40px;text-align:center;border-radius:0 0 20px 20px;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">Mint Financial Services &bull; This is an automated message, please do not reply directly.</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: resendFrom,
+      to: [toEmail],
+      subject: `✓ Your Mint loan of ${amountDisplay} has been approved`,
+      html
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Resend error ${res.status}`);
+  }
+  return res.json();
+};
+
+const sendRejectionEmail = async ({ toEmail, firstName, reason }) => {
+  if (!resendApiKey) {
+    console.warn('[Email] RESEND_API_KEY not set — skipping rejection email');
+    return;
+  }
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><title>Loan Application Update – Mint</title></head>
+<body style="margin:0;padding:0;background:#f5f6fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f6fa;padding:40px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+        <tr><td style="background:#0f172a;padding:36px 40px;text-align:center;">
+          <p style="margin:0 0 8px;font-size:24px;font-weight:800;color:#ffffff;">Loan Application Update</p>
+          <p style="margin:0;font-size:14px;color:#94a3b8;">We have reviewed your application.</p>
+        </td></tr>
+        <tr><td style="padding:32px 40px;">
+          <p style="margin:0 0 12px;font-size:16px;color:#1e293b;">Hi <strong>${firstName || 'there'}</strong>,</p>
+          <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">Thank you for applying with Mint. After reviewing your application, we were unfortunately unable to approve it at this time.</p>
+          ${reason ? `<div style="background:#fef2f2;border-left:3px solid #ef4444;border-radius:8px;padding:16px;margin-bottom:16px;"><p style="margin:0;font-size:14px;color:#991b1b;"><strong>Reason:</strong> ${reason}</p></div>` : ''}
+          <p style="margin:0;font-size:15px;color:#475569;line-height:1.6;">You are welcome to apply again in the future. If you believe this decision was made in error, please contact our support team.</p>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 40px;text-align:center;border-radius:0 0 20px 20px;">
+          <p style="margin:0;font-size:12px;color:#94a3b8;">Mint Financial Services &bull; Automated notification.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: resendFrom,
+      to: [toEmail],
+      subject: 'Update on your Mint loan application',
+      html
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Resend error ${res.status}`);
+  }
+  return res.json();
 };
 
 const toOrderbookCsvContent = (rows) => {
@@ -860,6 +1030,20 @@ const server = http.createServer((req, res) => {
             }
           }, token, 'POST');
 
+          // Send approval email — fire & forget (don't block the response)
+          if (body.toEmail) {
+            sendApprovalEmail({
+              toEmail:      body.toEmail,
+              firstName:    body.firstName,
+              amount:       body.amount,
+              interestRate: body.interestRate,
+              tenureMonths: body.tenureMonths,
+              bankName:     body.payoutBankName,
+              accountNumber: body.payoutAccountNumber
+            }).then(() => console.log(`[Email] Approval email sent to ${body.toEmail}`))
+              .catch(err => console.error('[Email] Approval email failed:', err.message));
+          }
+
           sendJson(res, 200, { ok: true, data: updateResult });
           return;
         }
@@ -887,6 +1071,16 @@ const server = http.createServer((req, res) => {
             action: 'reject',
             details: { reason: body.reason }
           }, token, 'POST');
+
+          // Send rejection email — fire & forget
+          if (body.toEmail) {
+            sendRejectionEmail({
+              toEmail:   body.toEmail,
+              firstName: body.firstName,
+              reason:    body.reason
+            }).then(() => console.log(`[Email] Rejection email sent to ${body.toEmail}`))
+              .catch(err => console.error('[Email] Rejection email failed:', err.message));
+          }
 
           sendJson(res, 200, { ok: true, data: updateResult });
           return;
