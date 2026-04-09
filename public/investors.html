@@ -541,10 +541,13 @@
           ? +(((Math.pow(1 + returnPct / 100, 365 / days) - 1) * 100)).toFixed(2)
           : returnPct;
 
+        /* Skip users with no strategy — they hold individual assets, not a managed strategy */
+        if (!u.strategyId) return null;
+
         return {
           userId: u.userId,
           name,
-          strategy: strat?.short_name || strat?.name || 'No Strategy',
+          strategy: strat?.short_name || strat?.name || '—',
           strategyId: u.strategyId,
           value: fmtR(currentVal),
           valueFull: currentVal,
@@ -556,7 +559,7 @@
           annualised,
           inceptionDate
         };
-      }).sort((a, b) => b.valueFull - a.valueFull);
+      }).filter(Boolean).sort((a, b) => b.valueFull - a.valueFull);
     }
 
     /* ─────────────────────────────────────────────────────── */
@@ -1196,7 +1199,8 @@
     /* ─────────────────────────────────────────────────────── */
     function populateStrategyFilter() {
       const sel = document.getElementById('strategyFilter');
-      const strats = [...new Set(allStrategies.map(s => s.short_name || s.name))].filter(Boolean).sort();
+      /* Only list strategies that are actually used by loaded investors */
+      const strats = [...new Set(allInvestors.map(i => i.strategy))].filter(s => s && s !== '—').sort();
       sel.innerHTML = '<option value="">All Strategies</option>';
       strats.forEach(name => {
         const opt = document.createElement('option');
