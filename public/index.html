@@ -6215,9 +6215,9 @@
 
       // User vs Market holdings comparison
       const holdingsCompareClass = totalUserHoldings > totalMarketHoldings
-        ? 'holdings-green'
+        ? 'holdings-red'
         : totalMarketHoldings > totalUserHoldings
-          ? 'holdings-red'
+          ? 'holdings-green'
           : '';
       const fmtUserH = 'R ' + totalUserHoldings.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const fmtMarketH = 'R ' + totalMarketHoldings.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
