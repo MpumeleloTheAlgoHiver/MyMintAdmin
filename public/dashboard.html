@@ -1851,21 +1851,19 @@
       });
 
       window.sidebarOpenFactsheets = function() {
-        /* First try the active edit/workspace strategy */
-        let activeId = window._activeStrategyTabId;
-        /* If no active workspace strategy, try the currently selected overview dropdown strategy */
-        if (!activeId) {
-          const sel = document.getElementById('ovStratSel');
-          const idx = sel ? Number(sel.value) : NaN;
-          const strats = window._ovAllStrategies;
-          if (!Number.isNaN(idx) && strats && strats[idx]) {
-            activeId = strats[idx].id;
-          }
-        }
+        /* Try the currently selected overview dropdown strategy first */
+        const sel = document.getElementById('ovStratSel');
+        const idx = sel ? Number(sel.value) : NaN;
+        const strats = window._ovAllStrategies;
+        const selectedStrat = (!Number.isNaN(idx) && strats && strats[idx]) ? strats[idx] : null;
+        /* Fall back to the active workspace strategy */
+        const activeId = (selectedStrat && selectedStrat.id) || window._activeStrategyTabId;
         if (activeId) {
-          window.location.href = '/factsheets.html?id=' + encodeURIComponent(activeId);
+          /* Stay on dashboard, open that strategy's factsheet inline */
+          window.openFactsheetInline(activeId);
         } else {
-          window.location.href = '/factsheets.html';
+          /* No strategy selected — show the factsheets selection grid */
+          document.getElementById('tabFactsheets').click();
         }
       };
 
