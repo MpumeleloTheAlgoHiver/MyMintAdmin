@@ -360,7 +360,7 @@
       const stratMap = {};
       allStrategies.forEach(s => { stratMap[s.id] = s; });
 
-      /* Group holdings by user — track current market value and earliest holding date */
+      /* Group holdings by user — track cost basis, market value, and earliest holding date */
       const byUser = {};
       holdings.forEach(row => {
         const uid = row.user_id;
@@ -368,7 +368,7 @@
         if (!byUser[uid]) {
           byUser[uid] = {
             userId: uid,
-            costBasis: 0,      /* fallback if no transactions */
+            costBasis: 0,
             current: 0,
             strategyId: row.strategy_id,
             inceptionDate: row.created_at
@@ -389,29 +389,78 @@
         if (!byUser[uid].strategyId && row.strategy_id) byUser[uid].strategyId = row.strategy_id;
       });
 
+      /* ── Fetch strategy analytics for NAV-based returns (matches Mint platform) ── */
+      const uniqueStratIds = [...new Set(Object.values(byUser).map(u => u.strategyId).filter(Boolean))];
+      const navCurves = {};  /* strategyId → [{d, v}] sorted ascending */
+      if (uniqueStratIds.length > 0) {
+        const { data: analyticsRows } = await supabaseClient
+          .from('strategy_analytics')
+          .select('strategy_id, curves, as_of_date')
+          .in('strategy_id', uniqueStratIds)
+          .order('as_of_date', { ascending: false });
+
+        const seenStrats = new Set();
+        (analyticsRows || []).forEach(row => {
+          if (seenStrats.has(row.strategy_id)) return;
+          seenStrats.add(row.strategy_id);
+          /* Merge all timeframe curves; iterate long→short so shorter frames can fill gaps */
+          const allPoints = {};
+          ['YTD', '6M', '3M', '1M', '1W'].forEach(key => {
+            (row.curves?.[key] || []).forEach(p => {
+              if (!(p.d in allPoints)) allPoints[p.d] = p.v;
+            });
+          });
+          navCurves[row.strategy_id] = Object.entries(allPoints)
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([d, v]) => ({ d, v }));
+        });
+      }
+
       return Object.values(byUser).map(u => {
-        const prof  = profMap[u.userId]  || {};
+        const prof  = profMap[u.userId] || {};
         const strat = u.strategyId ? stratMap[u.strategyId] : null;
         const name  = [prof.first_name, prof.last_name].filter(Boolean).join(' ') || prof.email || u.userId;
-        /* Use transaction total as invested; fall back to holdings cost basis if none */
-        const invested = txnInvested[u.userId] > 0 ? txnInvested[u.userId] : u.costBasis;
-        const pnl      = u.current - invested;
-        const returnPct = invested > 0 ? +((pnl / invested) * 100).toFixed(2) : 0;
+
         const inceptionDate = u.inceptionDate ? u.inceptionDate.split('T')[0] : null;
         const days = inceptionDate ? Math.floor((Date.now() - new Date(inceptionDate)) / 86400000) : 0;
+
+        /* ── NAV-based return: same methodology as Mint platform ── */
+        let pnl, returnPct, currentVal;
+        const navCurve = navCurves[u.strategyId] || [];
+        if (navCurve.length > 0 && inceptionDate) {
+          /* Find entry NAV: first available curve point on or after the inception date */
+          const entryPt  = navCurve.find(p => p.d >= inceptionDate) || navCurve[0];
+          const latestPt = navCurve[navCurve.length - 1];
+          if (entryPt && latestPt && entryPt.v > 0) {
+            returnPct = +((latestPt.v - entryPt.v) / entryPt.v * 100).toFixed(2);
+            pnl       = +(u.costBasis * returnPct / 100).toFixed(2);
+            currentVal = +(u.costBasis + pnl).toFixed(2);
+          }
+        }
+        /* Fallback: direct P&L (no NAV curve available) */
+        if (returnPct == null) {
+          currentVal  = u.current;
+          const invBase = txnInvested[u.userId] > 0 ? txnInvested[u.userId] : u.costBasis;
+          pnl         = +(currentVal - invBase).toFixed(2);
+          returnPct   = invBase > 0 ? +((pnl / invBase) * 100).toFixed(2) : 0;
+        }
+
+        const invested = u.costBasis;   /* cost basis = investor's principal in NAV model */
+
         /* Geometric annualisation: ((1 + r)^(365/days) − 1) × 100 */
         const annualised = days > 30
           ? +(((Math.pow(1 + returnPct / 100, 365 / days) - 1) * 100)).toFixed(2)
           : returnPct;
+
         return {
           userId: u.userId,
           name,
           strategy: strat?.short_name || strat?.name || 'No Strategy',
           strategyId: u.strategyId,
-          value: fmtR(u.current),
-          valueFull: u.current,
+          value: fmtR(currentVal),
+          valueFull: currentVal,
           invested,
-          current: u.current,
+          current: currentVal,
           pnl,
           returnPct,
           days,
