@@ -1918,6 +1918,31 @@
       color: #6b7280;
     }
 
+    .strategy-holdings-compare {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 2px;
+      font-size: 0.72rem;
+      font-weight: 500;
+      text-align: right;
+    }
+    .strategy-holdings-compare .compare-label {
+      color: #9ca3af;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .strategy-holdings-compare .compare-value {
+      font-weight: 600;
+    }
+    .strategy-holdings-compare.holdings-green .compare-value {
+      color: #16a34a;
+    }
+    .strategy-holdings-compare.holdings-red .compare-value {
+      color: #dc2626;
+    }
+
     .strategy-group-card {
       cursor: pointer;
       transition: box-shadow 0.2s ease, border-color 0.2s ease;
@@ -3372,6 +3397,9 @@
     .holding-price.negative { color: #dc2626 !important; }
     .holding-price.neutral { color: #6b7280 !important; }
     .holding-change { font-size: 0.74rem !important; }
+    .strategy-holdings-compare { font-size: 0.65rem !important; }
+    .strategy-holdings-compare.holdings-green .compare-value { color: #16a34a !important; }
+    .strategy-holdings-compare.holdings-red .compare-value { color: #dc2626 !important; }
     .holding-desc { font-size: 0.75rem !important; color: #6b7280 !important; margin-bottom: 9px !important; }
     .holding-tag { font-size: 0.69rem !important; font-weight: 600 !important; }
     .holding-card-muted { background: #fafbfc !important; border-color: #eef0f3 !important; }
@@ -6071,11 +6099,15 @@
     const renderStrategyGroupCard = (strategyName, holdings, groupId) => {
       let totalValue = 0;
       let totalBottomValue = 0;
+      let totalUserHoldings = 0;   // sum of (avg_fill / 100) * quantity
+      let totalMarketHoldings = 0; // sum of (last_price / 100) * quantity
       holdings.forEach(row => {
         const security = securitiesByIdMap[row.security_id] || {};
         const currentPrice = security.last_price ? Number(security.last_price) / 100 : 0;
         const qty = Number(row.quantity) || 0;
         const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
+        totalUserHoldings += (avgFill / 100) * qty;
+        totalMarketHoldings += currentPrice * qty;
         const mv = currentPrice ? qty * currentPrice : (Number(row.market_value) || 0);
         // Bottom = unrealized_pnl / 100, fall back to cost basis, then market value
         let rowBottom;
@@ -6111,6 +6143,15 @@
       const holdingCount = holdings.length;
       const safeGroupId = escapeHtml(groupId);
 
+      // User vs Market holdings comparison
+      const holdingsCompareClass = totalUserHoldings > totalMarketHoldings
+        ? 'holdings-green'
+        : totalMarketHoldings > totalUserHoldings
+          ? 'holdings-red'
+          : '';
+      const fmtUserH = 'R ' + totalUserHoldings.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const fmtMarketH = 'R ' + totalMarketHoldings.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
       const assetsHtml = holdings.map(row => renderStockHoldingCard(row)).join('');
 
       return `
@@ -6122,6 +6163,10 @@
             <div>
               <div class="holding-price ${escapeHtml(pnlPriceClass)}">${escapeHtml(pnlStr)}</div>
               <div class="holding-change neutral">all time</div>
+              <div class="strategy-holdings-compare ${holdingsCompareClass}">
+                <span><span class="compare-label">User</span> <span class="compare-value">${escapeHtml(fmtUserH)}</span></span>
+                <span><span class="compare-label">Market</span> <span class="compare-value">${escapeHtml(fmtMarketH)}</span></span>
+              </div>
             </div>
           </div>
           <div class="holding-desc">${holdingCount} holding${holdingCount === 1 ? '' : 's'} in this strategy</div>
