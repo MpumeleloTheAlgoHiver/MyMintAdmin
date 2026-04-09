@@ -1813,10 +1813,11 @@
           fsBtn.style.borderColor   = fsActive ? '#c7d2fe' : '#e2e8f0';
         }
 
-        /* Sync side-nav active state */
+        /* Sync side-nav active state based on which tab is active */
+        const activeLabel = (activeTab === tabFactsheets) ? "Factsheets" : "Dashboard";
         const navIcons = document.querySelectorAll(".nav-icon");
         navIcons.forEach(icon => {
-          if (icon.getAttribute("aria-label") === "Dashboard") icon.classList.add("active");
+          if (icon.getAttribute("aria-label") === activeLabel) icon.classList.add("active");
           else icon.classList.remove("active");
         });
       };
@@ -1871,6 +1872,14 @@
       };
 
       window.openFactsheetsGrid = function() {
+        /* Explicitly hide the strategy workspace and overview content first */
+        const sp = document.getElementById('tabStrategiesPanel');
+        if (sp) sp.style.display = 'none';
+        const oc = document.getElementById('ovStratContent');
+        if (oc) oc.style.display = 'none';
+        const ws = document.getElementById('strategyWorkspace');
+        if (ws) ws.style.display = 'none';
+        /* Switch to Factsheets tab and always show the selection grid */
         switchTab(tabFactsheets);
         factsheetDetailView.classList.add("hidden");
         factsheetSelectView.classList.remove("hidden");
