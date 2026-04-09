@@ -1851,7 +1851,17 @@
       });
 
       window.sidebarOpenFactsheets = function() {
-        const activeId = window._activeStrategyTabId;
+        /* First try the active edit/workspace strategy */
+        let activeId = window._activeStrategyTabId;
+        /* If no active workspace strategy, try the currently selected overview dropdown strategy */
+        if (!activeId) {
+          const sel = document.getElementById('ovStratSel');
+          const idx = sel ? Number(sel.value) : NaN;
+          const strats = window._ovAllStrategies;
+          if (!Number.isNaN(idx) && strats && strats[idx]) {
+            activeId = strats[idx].id;
+          }
+        }
         if (activeId) {
           window.location.href = '/factsheets.html?id=' + encodeURIComponent(activeId);
         } else {
