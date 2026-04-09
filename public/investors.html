@@ -328,25 +328,39 @@
       /* Fetch active buy holdings with created_at for inception date */
       const { data: holdings } = await supabaseClient
         .from('stock_holdings')
-        .select('user_id, strategy_id, quantity, avg_fill, market_value, unrealized_pnl, created_at, as_of_date')
+        .select('user_id, strategy_id, quantity, avg_fill, market_value, created_at, as_of_date')
         .eq('is_active', true)
         .eq('trade_side', 'BUY');
 
       if (!holdings || holdings.length === 0) return [];
 
       const userIds = [...new Set(holdings.map(r => r.user_id).filter(Boolean))];
-      const { data: profiles } = await supabaseClient
-        .from('profiles')
-        .select('id, first_name, last_name, email')
-        .in('id', userIds);
+
+      /* Fetch profiles and transactions in parallel */
+      const [{ data: profiles }, { data: txnRows }] = await Promise.all([
+        supabaseClient.from('profiles').select('id, first_name, last_name, email').in('id', userIds),
+        supabaseClient
+          .from('transactions')
+          .select('user_id, amount, direction, status')
+          .in('user_id', userIds)
+          .eq('direction', 'debit')
+          .eq('status',    'posted')
+          .gte('amount', 10000)   /* exclude tiny per-share test transactions */
+      ]);
 
       const profMap = {};
       (profiles || []).forEach(p => { profMap[p.id] = p; });
 
+      /* Sum investment transaction amounts per user */
+      const txnInvested = {};
+      (txnRows || []).forEach(t => {
+        txnInvested[t.user_id] = (txnInvested[t.user_id] || 0) + Number(t.amount);
+      });
+
       const stratMap = {};
       allStrategies.forEach(s => { stratMap[s.id] = s; });
 
-      /* Group holdings by user */
+      /* Group holdings by user — track current market value and earliest holding date */
       const byUser = {};
       holdings.forEach(row => {
         const uid = row.user_id;
@@ -354,22 +368,19 @@
         if (!byUser[uid]) {
           byUser[uid] = {
             userId: uid,
-            invested: 0,
+            costBasis: 0,      /* fallback if no transactions */
             current: 0,
-            pnl: 0,
             strategyId: row.strategy_id,
             inceptionDate: row.created_at
           };
         }
-        const mv   = Number(row.market_value) || 0;
-        const qty  = Number(row.quantity)    || 0;
-        let fill   = Number(row.avg_fill)    || 0;
-        /* Sanity-check: if avg_fill×qty is >10× market_value, avg_fill is in cents */
+        const mv  = Number(row.market_value) || 0;
+        const qty = Number(row.quantity)     || 0;
+        let fill  = Number(row.avg_fill)     || 0;
+        /* Sanity-check: if avg_fill×qty is >10× market_value, avg_fill is likely in cents */
         if (fill * qty > 10 * mv && mv > 0) fill /= 100;
-        const cost = fill * qty;
-        byUser[uid].invested += cost;
-        byUser[uid].current  += mv;
-        byUser[uid].pnl      += mv - cost;   /* market_value − cost_basis (not unrealized_pnl) */
+        byUser[uid].costBasis += fill * qty;
+        byUser[uid].current   += mv;
         /* Use the earliest created_at as inception date */
         if (row.created_at && row.created_at < byUser[uid].inceptionDate) {
           byUser[uid].inceptionDate = row.created_at;
@@ -378,10 +389,13 @@
       });
 
       return Object.values(byUser).map(u => {
-        const prof = profMap[u.userId] || {};
+        const prof  = profMap[u.userId]  || {};
         const strat = u.strategyId ? stratMap[u.strategyId] : null;
-        const name = [prof.first_name, prof.last_name].filter(Boolean).join(' ') || prof.email || u.userId;
-        const returnPct = u.invested > 0 ? +((u.pnl / u.invested) * 100).toFixed(2) : 0;
+        const name  = [prof.first_name, prof.last_name].filter(Boolean).join(' ') || prof.email || u.userId;
+        /* Use transaction total as invested; fall back to holdings cost basis if none */
+        const invested = txnInvested[u.userId] > 0 ? txnInvested[u.userId] : u.costBasis;
+        const pnl      = u.current - invested;
+        const returnPct = invested > 0 ? +((pnl / invested) * 100).toFixed(2) : 0;
         const inceptionDate = u.inceptionDate ? u.inceptionDate.split('T')[0] : null;
         const days = inceptionDate ? Math.floor((Date.now() - new Date(inceptionDate)) / 86400000) : 0;
         /* Geometric annualisation: ((1 + r)^(365/days) − 1) × 100 */
@@ -395,9 +409,9 @@
           strategyId: u.strategyId,
           value: fmtR(u.current),
           valueFull: u.current,
-          invested: u.invested,
+          invested,
           current: u.current,
-          pnl: u.pnl,
+          pnl,
           returnPct,
           days,
           annualised,
