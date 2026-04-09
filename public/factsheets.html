@@ -247,20 +247,44 @@
     };
 
     const loadStrategyList = async () => {
-      const { data: strategies, error } = await supabaseClient
-        .from('strategies')
-        .select('id, name, short_name, description, risk_level, sector, status, is_public, holdings')
-        .order('name');
-
       const grid = document.getElementById('strategyGrid');
+
+      /* Fetch strategies + active investor counts in parallel */
+      const [{ data: strategies, error }, { data: holdingRows }] = await Promise.all([
+        supabaseClient
+          .from('strategies')
+          .select('id, name, short_name, description, risk_level, sector, status, is_public, holdings')
+          .order('name'),
+        supabaseClient
+          .from('stock_holdings')
+          .select('strategy_id, user_id')
+          .eq('is_active', true)
+          .eq('trade_side', 'BUY')
+      ]);
+
       if (error || !strategies || strategies.length === 0) {
         grid.innerHTML = '<div class="col-span-3 text-sm text-slate-500 text-center py-12">No strategies available.</div>';
         return;
       }
 
-      grid.innerHTML = '';
-      strategies.forEach(s => {
+      /* Count distinct investors per strategy */
+      const investorCounts = {};
+      (holdingRows || []).forEach(r => {
+        if (!r.strategy_id) return;
+        if (!investorCounts[r.strategy_id]) investorCounts[r.strategy_id] = new Set();
+        investorCounts[r.strategy_id].add(r.user_id);
+      });
+      const investorCount = id => investorCounts[id] ? investorCounts[id].size : 0;
+
+      /* Group strategies into three buckets */
+      const isLive = s => s.status === 'active';
+      const groupA = strategies.filter(s => isLive(s) && investorCount(s.id) > 0);  /* live + investors */
+      const groupB = strategies.filter(s => isLive(s) && investorCount(s.id) === 0); /* live, no investors */
+      const groupC = strategies.filter(s => !isLive(s));                              /* everything else */
+
+      const buildCard = (s) => {
         const holdings = Array.isArray(s.holdings) ? s.holdings : [];
+        const count    = investorCount(s.id);
         const card = document.createElement('div');
         card.className = 'bg-white rounded-2xl p-5 shadow-sm border border-slate-100 cursor-pointer hover:border-violet-300 hover:shadow-md transition-all';
         card.innerHTML = `
@@ -274,12 +298,41 @@
           ${s.description ? `<p class="text-xs text-slate-500 mb-3 line-clamp-2">${s.description}</p>` : ''}
           <div class="flex items-center gap-3 text-[11px] text-slate-400">
             <span>${holdings.length} holding${holdings.length !== 1 ? 's' : ''}</span>
-            <span>${s.status || 'draft'}</span>
+            ${count > 0
+              ? `<span style="color:#059669;font-weight:600;">${count} investor${count !== 1 ? 's' : ''}</span>`
+              : ''}
             ${s.is_public ? '<span class="text-emerald-600">Public</span>' : ''}
           </div>`;
         card.addEventListener('click', () => openFactsheet(s.id, s.name));
-        grid.appendChild(card);
-      });
+        return card;
+      };
+
+      const sectionLabel = (text, count, accent) => {
+        const el = document.createElement('div');
+        el.className = 'col-span-3';
+        el.innerHTML = `
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+            <span style="font-size:12px;font-weight:700;color:${accent};text-transform:uppercase;letter-spacing:0.06em;">${text}</span>
+            <span style="font-size:11px;color:#94a3b8;">(${count})</span>
+            <div style="flex:1;height:1px;background:#f1f5f9;"></div>
+          </div>`;
+        return el;
+      };
+
+      grid.innerHTML = '';
+
+      if (groupA.length > 0) {
+        grid.appendChild(sectionLabel('Live · With Investors', groupA.length, '#059669'));
+        groupA.forEach(s => grid.appendChild(buildCard(s)));
+      }
+      if (groupB.length > 0) {
+        grid.appendChild(sectionLabel('Live · No Investors Yet', groupB.length, '#7c3aed'));
+        groupB.forEach(s => grid.appendChild(buildCard(s)));
+      }
+      if (groupC.length > 0) {
+        grid.appendChild(sectionLabel('Inactive / Draft', groupC.length, '#94a3b8'));
+        groupC.forEach(s => grid.appendChild(buildCard(s)));
+      }
     };
 
     const openFactsheet = async (strategyId, strategyName) => {
