@@ -1851,6 +1851,11 @@
           const hasUsers = strategyInvestedIds.has(String(strat.id));
 
           if (isLive && hasUsers) {
+            const confirmed = await confirmWithPassword(
+              `Rebalance — "${strat.short_name || strat.name || 'Strategy'}"`,
+              'Enter your password to access the rebalancing tool for this live strategy.'
+            );
+            if (!confirmed) return;
             const modal = document.getElementById('rebalancingModal');
             modal.classList.remove('hidden');
             rebInitStrategySelector();
@@ -4311,11 +4316,7 @@
         const idx = Number(val) || 0;
         const strat = _ovAllStrategies[idx];
         if (!strat) { window.__dbgBreadcrumb('ovSelect:no-strat'); return; }
-        if (strategyInvestedIds.has(String(strat.id))) {
-          openStrategyTabPwModal(() => _doOvSelectStrategy(idx, strat));
-        } else {
-          await _doOvSelectStrategy(idx, strat);
-        }
+        await _doOvSelectStrategy(idx, strat);
       };
 
       window.ovPromptNewStrategy = () => {
