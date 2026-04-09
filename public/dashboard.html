@@ -8014,41 +8014,67 @@
           throw new Error("No active position found for selected sell instrument.");
         }
 
+        // Compute per-row sell quantity using the divisibility step ratio.
+        // reductionUnits / unitsPerLot gives the fraction of each client's position to sell.
+        const reductionUnits = Number(rebSelectedStep.reductionUnits || 0);
+        const unitsPerLot = Math.max(1, Number(rebSelectedIsin.unitsPerLot || 1));
+        const sellFraction = reductionUnits / unitsPerLot;
+        const isFullExit = sellFraction >= 1 || Number(rebSelectedStep.reductionPercent || 0) >= 100;
+
         // Persist SELL order history rows first for broker/audit visibility.
-        const sellEventRows = activeSellRows.map((row) => ({
-          user_id: row.user_id,
-          security_id: sellSecurityId,
-          quantity: Math.abs(Number(row.quantity || 0)),
-          strategy_id: strategyId,
-          updated_at: nowIso,
-          trade_side: "SELL",
-          is_active: false,
-          closed_reason: "REBALANCE_EVENT_SELL",
-          closed_at: nowIso,
-          rebalance_batch_id: rebalanceBatchId,
-          strategy_name_snapshot: strategyNameSnapshot,
-        }));
+        const sellEventRows = activeSellRows.map((row) => {
+          const totalQty = Math.abs(Number(row.quantity || 0));
+          const soldQty = isFullExit ? totalQty : Math.max(0, Math.round(totalQty * sellFraction));
+          return {
+            user_id: row.user_id,
+            security_id: sellSecurityId,
+            quantity: soldQty,
+            strategy_id: strategyId,
+            updated_at: nowIso,
+            trade_side: "SELL",
+            is_active: false,
+            closed_reason: "REBALANCE_EVENT_SELL",
+            closed_at: nowIso,
+            rebalance_batch_id: rebalanceBatchId,
+            strategy_name_snapshot: strategyNameSnapshot,
+            _rowId: row.id,
+            _remaining: totalQty - soldQty,
+          };
+        });
         if (sellEventRows.length) {
+          const insertRows = sellEventRows.map(({ _rowId, _remaining, ...rest }) => rest);
           const { error: sellEventErr } = await supabaseClient
             .from("stock_holdings")
-            .insert(sellEventRows);
+            .insert(insertRows);
           if (sellEventErr) throw new Error(sellEventErr.message || "Failed to insert sell order events.");
         }
 
-        // Close old held position rows so holdings bucket can fully replace instrument.
-        const soldPositionIds = activeSellRows.map((row) => row.id).filter(Boolean);
-        if (soldPositionIds.length) {
-          const { error: closeErr } = await supabaseClient
-            .from("stock_holdings")
-            .update({
-              is_active: false,
-              closed_reason: "POSITION_REPLACED",
-              closed_at: nowIso,
-              updated_at: nowIso,
-              rebalance_batch_id: rebalanceBatchId,
-            })
-            .in("id", soldPositionIds);
-          if (closeErr) throw new Error(closeErr.message || "Failed to close replaced positions.");
+        // For full exits: close the entire active position.
+        // For partial sells: update the active row to reflect remaining quantity.
+        for (const evt of sellEventRows) {
+          if (!evt._rowId) continue;
+          if (isFullExit || evt._remaining <= 0) {
+            const { error: closeErr } = await supabaseClient
+              .from("stock_holdings")
+              .update({
+                is_active: false,
+                closed_reason: "POSITION_REPLACED",
+                closed_at: nowIso,
+                updated_at: nowIso,
+                rebalance_batch_id: rebalanceBatchId,
+              })
+              .eq("id", evt._rowId);
+            if (closeErr) throw new Error(closeErr.message || "Failed to close replaced position.");
+          } else {
+            const { error: partialErr } = await supabaseClient
+              .from("stock_holdings")
+              .update({
+                quantity: evt._remaining,
+                updated_at: nowIso,
+              })
+              .eq("id", evt._rowId);
+            if (partialErr) throw new Error(partialErr.message || "Failed to update remaining position.");
+          }
         }
 
         // Persist BUY order history rows for orderbook audit trail.
