@@ -4379,7 +4379,7 @@
         window.__dbgBreadcrumb('ovSelect:fetch-investors');
         const { data: investorRows } = await supabaseClient
           .from('stock_holdings')
-          .select('user_id, quantity, avg_fill, market_value, strategy_id, trade_side, is_active, created_at')
+          .select('user_id, quantity, avg_fill, market_value, strategy_id, trade_side, is_active, created_at, security_id')
           .eq('is_active', true)
           .eq('trade_side', 'BUY')
           .eq('strategy_id', strat.id);
@@ -4388,34 +4388,44 @@
         window.__dbgBreadcrumb('ovSelect:fetch-profiles');
         let profiles = {};
         let txnInceptionMap = {};  /* userId → earliest transaction_date */
+        let secPriceMap = {};      /* security_id → last_price (ZAR cents) */
         if (investRows.length) {
           const uids = [...new Set(investRows.map(r => r.user_id).filter(Boolean))];
-          if (uids.length) {
-            const [{ data: profs }, { data: txnRows }] = await Promise.all([
-              supabaseClient.from('profiles').select('id, first_name, last_name, email').in('id', uids),
-              supabaseClient.from('transactions')
-                .select('user_id, transaction_date')
-                .in('user_id', uids)
-                .eq('direction', 'debit')
-                .eq('status', 'posted')
-                .gte('amount', 10000)
-            ]);
-            if (profs) profs.forEach(p => { profiles[p.id] = p; });
-            (txnRows || []).forEach(t => {
-              const d = t.transaction_date ? t.transaction_date.split('T')[0] : null;
-              if (d && (!txnInceptionMap[t.user_id] || d < txnInceptionMap[t.user_id]))
-                txnInceptionMap[t.user_id] = d;
-            });
-          }
+          const sids = [...new Set(investRows.map(r => r.security_id).filter(Boolean))];
+          const fetches = [
+            supabaseClient.from('profiles').select('id, first_name, last_name, email').in('id', uids.length ? uids : ['_']),
+            supabaseClient.from('transactions')
+              .select('user_id, transaction_date')
+              .in('user_id', uids.length ? uids : ['_'])
+              .eq('direction', 'debit')
+              .eq('status', 'posted')
+              .gte('amount', 10000),
+            sids.length
+              ? supabaseClient.from('securities').select('id, last_price').in('id', sids)
+              : Promise.resolve({ data: [] })
+          ];
+          const [{ data: profs }, { data: txnRows }, { data: secRows }] = await Promise.all(fetches);
+          if (profs) profs.forEach(p => { profiles[p.id] = p; });
+          (txnRows || []).forEach(t => {
+            const d = t.transaction_date ? t.transaction_date.split('T')[0] : null;
+            if (d && (!txnInceptionMap[t.user_id] || d < txnInceptionMap[t.user_id]))
+              txnInceptionMap[t.user_id] = d;
+          });
+          (secRows || []).forEach(s => { secPriceMap[s.id] = Number(s.last_price) || 0; });
         }
 
-        /* Compute AUM from cost basis (avg_fill × qty in cents → rands) */
+        /* Compute AUM from live prices (qty × last_price / 100) or fall back to cost basis */
         let totalAum = 0;
         investRows.forEach(r => {
           const qty = Number(r.quantity) || 0;
-          let fill = Number(r.avg_fill) || 0;
-          if (fill * qty > 10 * (Number(r.market_value) || 0) && Number(r.market_value) > 0) fill /= 100;
-          totalAum += (fill * qty) / 100;
+          const lp  = secPriceMap[r.security_id] || 0;
+          if (lp > 0) {
+            totalAum += (qty * lp) / 100;
+          } else {
+            let fill = Number(r.avg_fill) || 0;
+            if (fill * qty > 10 * (Number(r.market_value) || 0) && Number(r.market_value) > 0) fill /= 100;
+            totalAum += (fill * qty) / 100;
+          }
         });
 
         window.__dbgBreadcrumb('ovSelect:render-titlebar');
@@ -4429,7 +4439,7 @@
         window.__dbgBreadcrumb('ovSelect:render-holdings');
         ovRenderHoldings(holdings, secMap);
         window.__dbgBreadcrumb('ovSelect:render-investors');
-        ovRenderInvestors(investRows, profiles, strat, analytics, txnInceptionMap);
+        ovRenderInvestors(investRows, profiles, strat, analytics, txnInceptionMap, secPriceMap);
         fetchNewsInsights();
         window.__dbgBreadcrumb('ovSelect:done');
         } catch (err) {
@@ -4895,7 +4905,7 @@
         }</tbody></table>`;
       };
 
-      const ovRenderInvestors = (investRows, profiles, strat, analytics, txnInceptionMap = {}) => {
+      const ovRenderInvestors = (investRows, profiles, strat, analytics, txnInceptionMap = {}, secPriceMap = {}) => {
         const el = document.getElementById('ovInvestorsTable');
         const badge = document.getElementById('ovInvestorCountBadge');
         const aumLabel = document.getElementById('ovInvestorsTotalAUM');
@@ -4907,55 +4917,41 @@
           return;
         }
 
-        /* ── Build merged daily NAV curve from analytics ── */
-        const navCurve = (() => {
-          const pts = {};
-          ['YTD','6M','3M','1M','1W'].forEach(k => {
-            (analytics?.curves?.[k] || []).forEach(p => { if (!(p.d in pts)) pts[p.d] = p.v; });
-          });
-          return Object.entries(pts).sort((a,b) => a[0].localeCompare(b[0])).map(([d,v]) => ({d,v}));
-        })();
-        const latestNav = navCurve.length > 0 ? navCurve[navCurve.length - 1].v : null;
-
-        /* ── Aggregate holdings per user ── */
+        /* ── Aggregate holdings per user using live prices ── */
         const byUser = {};
         investRows.forEach(r => {
           const uid = r.user_id;
-          if (!byUser[uid]) byUser[uid] = { costBasis: 0, inception: r.created_at };
+          if (!byUser[uid]) byUser[uid] = { costBasis: 0, currentVal: 0, inception: r.created_at };
           const qty = Number(r.quantity) || 0;
+          /* Cost basis: avg_fill × qty (cents → rands) */
           let fill = Number(r.avg_fill) || 0;
-          /* avg_fill × qty sanity check: if it's >>market_value, avg_fill is in cents already */
           const mv = Number(r.market_value) || 0;
           if (fill * qty > 10 * mv && mv > 0) fill /= 100;
-          byUser[uid].costBasis += (fill * qty) / 100;   /* ZAR cents → rands */
+          byUser[uid].costBasis += (fill * qty) / 100;
+          /* Live current value: qty × last_price (cents → rands) */
+          const lp = secPriceMap[r.security_id] || 0;
+          if (lp > 0) byUser[uid].currentVal += (qty * lp) / 100;
           if (r.created_at && new Date(r.created_at) < new Date(byUser[uid].inception))
             byUser[uid].inception = r.created_at;
         });
 
-        /* ── Compute NAV-based return per investor ── */
+        /* ── Full-amount formatter (no K/m abbreviation) ── */
         const fmtR = (v) => {
-          const abs = Math.abs(v);
-          if (abs >= 1e6) return `R${(v/1e6).toFixed(2)}m`;
-          if (abs >= 1e3) return `R${(v/1e3).toFixed(1)}k`;
-          return `R${v.toFixed(0)}`;
+          const neg = v < 0;
+          const [int, dec] = Math.abs(v).toFixed(2).split('.');
+          return (neg ? '-' : '') + 'R' + int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + dec;
         };
 
         const rows = Object.entries(byUser).map(([uid, data]) => {
           const prof = profiles[uid];
           const name = prof ? ([prof.first_name, prof.last_name].filter(Boolean).join(' ').trim() || prof.email || uid) : uid;
-          /* Use transaction-based inception date if available, fall back to created_at */
           const inceptionDate = txnInceptionMap[uid] || (data.inception ? data.inception.split('T')[0] : null);
           const days = inceptionDate ? Math.floor((Date.now() - new Date(inceptionDate)) / 86400000) : 0;
 
-          let returnPct = 0, currentVal = data.costBasis;
-          if (navCurve.length > 0 && inceptionDate && latestNav) {
-            const entryPt = navCurve.find(p => p.d >= inceptionDate) || navCurve[0];
-            if (entryPt && entryPt.v > 0) {
-              returnPct = (latestNav - entryPt.v) / entryPt.v * 100;
-              currentVal = data.costBasis * (1 + returnPct / 100);
-            }
-          }
-          const pnl = currentVal - data.costBasis;
+          /* Use live current value; fall back to cost basis if no prices available */
+          const currentVal = data.currentVal > 0 ? data.currentVal : data.costBasis;
+          const returnPct  = data.costBasis > 0 ? (currentVal - data.costBasis) / data.costBasis * 100 : 0;
+          const pnl        = currentVal - data.costBasis;
 
           return { uid, name, invested: data.costBasis, currentVal, pnl, returnPct, days, inceptionDate };
         }).sort((a, b) => b.currentVal - a.currentVal);
