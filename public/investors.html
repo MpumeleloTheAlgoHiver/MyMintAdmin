@@ -1093,6 +1093,35 @@
         await supabaseClient.auth.signOut();
         window.location.href = '/signin.html';
       };
+
+      /* ── Live data refresh ────────────────────────────────── */
+      let _refreshTimer = null;
+      async function refreshAllData() {
+        const prevId = currentInvestor?.userId;
+        allInvestors = await loadInvestors();
+        renderKpiBar(allInvestors);
+        renderInvestorList(allInvestors);
+        /* If a detail panel was open, re-load it with fresh data */
+        if (prevId) await selectInvestor(prevId);
+      }
+
+      /* Debounce rapid bursts (e.g. batch inserts) into one refresh */
+      function scheduleRefresh() {
+        clearTimeout(_refreshTimer);
+        _refreshTimer = setTimeout(refreshAllData, 800);
+      }
+
+      /* Subscribe to the three tables that drive all investor data */
+      supabaseClient
+        .channel('investors-live')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_holdings' },      scheduleRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' },         scheduleRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_analytics' },  scheduleRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' },             scheduleRefresh)
+        .subscribe();
+
+      /* Fallback: silent background poll every 60 s (catches anything Realtime misses) */
+      setInterval(refreshAllData, 60000);
     });
   </script>
 </body>
