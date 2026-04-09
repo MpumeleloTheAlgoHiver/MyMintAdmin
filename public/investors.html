@@ -484,8 +484,8 @@
         const livePx = priceMap[row.security_id];
         const liveVal = livePx && livePx.price > 0 ? livePx.price * qty / 100 : mv / 100;
         byUser[uid].current += liveVal;
-        /* Track the most recent price timestamp across all holdings */
-        if (livePx?.asOf && (!byUser[uid].liveAsOf || livePx.asOf > byUser[uid].liveAsOf)) {
+        /* Track the most recent price timestamp across all holdings (date-safe comparison) */
+        if (livePx?.asOf && (!byUser[uid].liveAsOf || new Date(livePx.asOf) > new Date(byUser[uid].liveAsOf))) {
           byUser[uid].liveAsOf = livePx.asOf;
         }
         /* Use the earliest created_at as inception date */
