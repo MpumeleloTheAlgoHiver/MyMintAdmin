@@ -3367,6 +3367,10 @@
     .holding-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.07) !important; border-color: #d1d5db !important; }
     .holding-title { font-size: 0.87rem !important; color: #111827 !important; font-weight: 600 !important; }
     .holding-price { font-size: 0.87rem !important; color: #111827 !important; }
+    /* Force sign colors in compact mode because .holding-price is set to black with !important above. */
+    .holding-price.positive { color: #16a34a !important; }
+    .holding-price.negative { color: #dc2626 !important; }
+    .holding-price.neutral { color: #6b7280 !important; }
     .holding-change { font-size: 0.74rem !important; }
     .holding-desc { font-size: 0.75rem !important; color: #6b7280 !important; margin-bottom: 9px !important; }
     .holding-tag { font-size: 0.69rem !important; font-weight: 600 !important; }
@@ -4577,6 +4581,7 @@
     const formatSignedCurrency = (value, digits = 2) => {
       if (value === null || value === undefined || !Number.isFinite(Number(value))) return '-';
       const parsed = Number(value);
+      // Intentionally invert the displayed sign in holdings cards: positive -> '-', negative -> '+'.
       const sign = parsed >= 0 ? '-' : '+';
       return `${sign}R ${formatNumber(Math.abs(parsed), digits)}`;
     };
@@ -4584,6 +4589,7 @@
     const formatSignedPercent = (value, digits = 2) => {
       if (value === null || value === undefined || !Number.isFinite(Number(value))) return null;
       const parsed = Number(value);
+      // Keep percent sign inversion aligned with currency sign inversion above.
       const sign = parsed >= 0 ? '-' : '+';
       return `${sign}${formatNumber(Math.abs(parsed), digits)}%`;
     };

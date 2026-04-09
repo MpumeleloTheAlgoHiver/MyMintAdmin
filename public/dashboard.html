@@ -6261,6 +6261,92 @@
         }, {});
       }
 
+      function rebNormalizeCsv(value) {
+        const base = String(value ?? "");
+        return `"${base.replace(/"/g, '""')}"`;
+      }
+
+      function rebFormatNominal(value) {
+        const n = Number(value || 0);
+        if (!Number.isFinite(n)) return "0";
+        const rounded = Math.round(n * 1_000_000) / 1_000_000;
+        return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+      }
+
+      function rebTradeRowsToCsv(rows) {
+        const header = ["Buy/sell", "Equity code", "Nominal"];
+        const lines = [header.map(rebNormalizeCsv).join(",")];
+        (rows || []).forEach((row) => {
+          lines.push([
+            row.side || "",
+            row.code || "",
+            rebFormatNominal(row.nominal),
+          ].map(rebNormalizeCsv).join(","));
+        });
+        return lines.join("\n");
+      }
+
+      function rebDownloadTradeCsv(rows, batchId) {
+        const csv = rebTradeRowsToCsv(rows);
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `rebalance-trade-${String(batchId || new Date().toISOString().slice(0, 10))}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function rebShowCommitSuccessToast(payload) {
+        const rows = payload?.rows || [];
+        const batchId = payload?.batchId || "";
+        const existing = document.getElementById("rebCommitSuccessToast");
+        if (existing) existing.remove();
+
+        const toast = document.createElement("div");
+        toast.id = "rebCommitSuccessToast";
+        toast.style.cssText = "position:fixed;right:22px;bottom:22px;z-index:99999;min-width:320px;max-width:420px;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);color:#f8fafc;border:1px solid rgba(148,163,184,0.25);border-radius:16px;box-shadow:0 14px 34px rgba(2,6,23,0.35);padding:14px 14px 12px;animation:toast-in 0.22s ease forwards";
+        const rowCountText = rows.length ? `${rows.length} row${rows.length === 1 ? "" : "s"} ready` : "No CSV rows generated";
+        toast.innerHTML = `
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+            <div style="display:flex;align-items:flex-start;gap:10px;min-width:0;">
+              <div style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:999px;background:rgba(34,197,94,0.18);flex-shrink:0;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div style="min-width:0;">
+                <p style="margin:0;font-size:13px;font-weight:700;line-height:1.3;">Trade sequence committed</p>
+                <p style="margin:3px 0 0;font-size:11px;color:#cbd5e1;line-height:1.35;">${rowCountText}</p>
+              </div>
+            </div>
+            <button id="rebCommitToastClose" type="button" style="border:none;background:transparent;color:#cbd5e1;font-size:15px;line-height:1;cursor:pointer;padding:0 2px;">×</button>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">
+            <button id="rebCommitToastDismiss" type="button" style="border:1px solid rgba(148,163,184,0.35);background:rgba(15,23,42,0.38);color:#e2e8f0;font-size:11px;font-weight:600;padding:6px 10px;border-radius:10px;cursor:pointer;">Dismiss</button>
+            <button id="rebCommitToastDownload" type="button" ${rows.length ? "" : "disabled"} style="border:1px solid rgba(134,239,172,0.45);background:${rows.length ? "#16a34a" : "#334155"};color:${rows.length ? "#ecfdf5" : "#94a3b8"};font-size:11px;font-weight:700;padding:6px 10px;border-radius:10px;cursor:${rows.length ? "pointer" : "not-allowed"};">Download CSV</button>
+          </div>
+        `;
+        document.body.appendChild(toast);
+
+        const removeToast = () => {
+          if (!toast.isConnected) return;
+          toast.style.animation = "toast-out 0.22s ease forwards";
+          setTimeout(() => {
+            if (toast.isConnected) toast.remove();
+          }, 230);
+        };
+
+        toast.querySelector("#rebCommitToastClose")?.addEventListener("click", removeToast);
+        toast.querySelector("#rebCommitToastDismiss")?.addEventListener("click", removeToast);
+        toast.querySelector("#rebCommitToastDownload")?.addEventListener("click", () => {
+          if (!rows.length) return;
+          rebDownloadTradeCsv(rows, batchId);
+        });
+
+        setTimeout(removeToast, 12000);
+      }
+
       function rebComputeWalletFundedBuyExecution({ instrument, clients, capitalByClient, applyBuffer }) {
         const pricePerShare = Number(instrument?.currentPrice || 0);
         if (!instrument || pricePerShare <= 0 || !Array.isArray(clients) || !clients.length) {
@@ -7747,8 +7833,9 @@
           if (buyEventErr) throw new Error(buyEventErr.message || "Failed to insert buy order events.");
         }
 
+        let extraBuyEventRows = [];
         if (extraBuyExec) {
-          const extraBuyEventRows = (extraBuyExec.clientAllocations || [])
+          extraBuyEventRows = (extraBuyExec.clientAllocations || [])
             .map((alloc) => ({
               user_id: String(alloc.clientId),
               security_id: extraBuySecurityId,
@@ -7855,6 +7942,25 @@
 
         rebSelectedStrategyId = String(strategyId);
         await rebLoadStrategy(strategyId);
+
+        const tradeCsvRows = [];
+        const sellNominal = sellEventRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
+        const buyNominal = buyEventRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
+        const extraBuyNominal = extraBuyEventRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
+        if (sellNominal > 0) {
+          tradeCsvRows.push({ side: "SELL", code: String(rebSelectedIsin.code || "").replace(/\.[A-Z]+$/i, ""), nominal: sellNominal });
+        }
+        if (buyNominal > 0) {
+          tradeCsvRows.push({ side: "BUY", code: String(buySelection.instrument.code || "").replace(/\.[A-Z]+$/i, ""), nominal: buyNominal });
+        }
+        if (extraBuyNominal > 0) {
+          tradeCsvRows.push({ side: "BUY", code: String(extraBuySelection?.instrument?.code || "").replace(/\.[A-Z]+$/i, ""), nominal: extraBuyNominal });
+        }
+
+        return {
+          batchId: rebalanceBatchId,
+          rows: tradeCsvRows,
+        };
       }
 
       /* ── Wire up rebalancing event listeners (deferred) ── */
@@ -7936,13 +8042,9 @@
           buyCommit.disabled = true;
           buyCommit.textContent = "Processing...";
           try {
-            await rebPersistCommittedTradeSequence();
+            const commitResult = await rebPersistCommittedTradeSequence();
             closeBuy();
-            const t = document.createElement("div");
-            t.style.cssText = "position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:99999;display:flex;align-items:center;gap:10px;background:#1e293b;color:#f8fafc;font-size:13px;font-weight:600;padding:12px 20px;border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.22);pointer-events:none;white-space:nowrap;animation:toast-in 0.22s ease forwards";
-            t.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Trade sequence committed`;
-            document.body.appendChild(t);
-            setTimeout(() => { t.style.animation = "toast-out 0.22s ease forwards"; setTimeout(() => t.remove(), 230); }, 2800);
+            rebShowCommitSuccessToast(commitResult);
             rebSelectedIsin = null;
             rebSelectedStep = null;
             rebRenderAll();
