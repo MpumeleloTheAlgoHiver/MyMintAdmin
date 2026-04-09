@@ -282,6 +282,26 @@
       });
     }
 
+    /* ── Compute max drawdown from a raw daily NAV curve [{d, v}] ── */
+    function computeNavMaxDrawdown(navCurve) {
+      let peak = -Infinity, maxDD = 0;
+      navCurve.forEach(({ v }) => {
+        if (v > peak) peak = v;
+        const dd = peak > 0 ? (v - peak) / peak * 100 : 0;
+        if (dd < maxDD) maxDD = dd;
+      });
+      return maxDD; // negative, in %
+    }
+
+    /* ── Build daily drawdown % series from a raw NAV curve [{d, v}] ── */
+    function buildNavDrawdownSeries(navCurve) {
+      let peak = -Infinity;
+      return navCurve.map(({ v }) => {
+        if (v > peak) peak = v;
+        return peak > 0 ? +((v - peak) / peak * 100).toFixed(2) : 0;
+      });
+    }
+
     /* ── YYYY-MM key helpers ── */
     function monthKey(y, m) { return `${y}-${String(m).padStart(2,'0')}`; }
 
@@ -601,11 +621,34 @@
 
       investor.periodReturns = { ret1M, ret3M, ret6M, retYTD, ret1Y, retITD };
 
-      /* Cumulative series and max drawdown from calendar data */
+      /* Cumulative series from calendar data (for monthly return chart) */
       const { months: cumMonths, cumulative } = buildCumulativeSeries(calMap, investor.inceptionDate);
       investor.cumMonths = cumMonths;
       investor.cumulative = cumulative;
-      investor.maxDD = cumulative.length > 1 ? computeMaxDrawdown(cumulative) : null;
+
+      /* Build investor's daily NAV curve from inception (for drawdown chart + max DD) */
+      const mergedNavPts = {};
+      const rawCurves = analytics?.curves || {};
+      ['YTD', '6M', '3M', '1M', '1W'].forEach(key => {
+        (rawCurves[key] || []).forEach(p => {
+          if (!(p.d in mergedNavPts)) mergedNavPts[p.d] = p.v;
+        });
+      });
+      const fullNavCurve = Object.entries(mergedNavPts)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([d, v]) => ({ d, v }));
+      investor.navCurve = investor.inceptionDate
+        ? fullNavCurve.filter(p => p.d >= investor.inceptionDate)
+        : fullNavCurve;
+
+      /* Max drawdown: daily NAV is more accurate — falls back to monthly cumulative */
+      if (investor.navCurve.length > 1) {
+        investor.maxDD = computeNavMaxDrawdown(investor.navCurve);
+      } else if (cumulative.length > 1) {
+        investor.maxDD = computeMaxDrawdown(cumulative);
+      } else {
+        investor.maxDD = null;
+      }
 
       /* 3. Transactions */
       const { data: txRows } = await supabaseClient
@@ -824,7 +867,10 @@
         const bestDay  = summ.best_day      != null ? fmtPct(Number(summ.best_day)*100)       : null;
         const worstDay = summ.worst_day     != null ? fmtPct(Number(summ.worst_day)*100)      : null;
 
-        const ddSeries = buildDrawdownSeries(cumulative);
+        /* Drawdown chart: use daily NAV data when available (more granular than monthly) */
+        const useNavDD = inv.navCurve && inv.navCurve.length > 1;
+        const ddLabels = useNavDD ? inv.navCurve.map(p => p.d) : cumMonths;
+        const ddSeries = useNavDD ? buildNavDrawdownSeries(inv.navCurve) : buildDrawdownSeries(cumulative);
 
         tc.innerHTML = `
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">
@@ -845,7 +891,7 @@
           </div>
           <div id="drawdownChartEl" style="height:180px;"></div>
         `;
-        initRiskChart(cumMonths, ddSeries);
+        initRiskChart(ddLabels, ddSeries);
 
       } else if (currentTab === 'allocation') {
         const sh = inv.strategyHoldings || [];
