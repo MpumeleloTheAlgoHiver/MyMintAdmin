@@ -3497,7 +3497,11 @@
         });
       };
 
+      let _factsheetPrevTab = null;
+
       window.openFactsheetInline = async (strategyId) => {
+        /* Remember which tab was active so the back button can restore it */
+        _factsheetPrevTab = [tabOverview, tabStrategies].find(t => t && t.classList.contains('tab-active')) || null;
         switchTab(tabFactsheets);
         factsheetSelectView.classList.add("hidden");
         factsheetDetailView.classList.remove("hidden");
@@ -3909,8 +3913,15 @@
       };
 
       factsheetBackBtn.addEventListener("click", () => {
-        factsheetDetailView.classList.add("hidden");
-        factsheetSelectView.classList.remove("hidden");
+        if (_factsheetPrevTab) {
+          /* Restore the tab that was active before the factsheet was opened */
+          _factsheetPrevTab.click();
+          _factsheetPrevTab = null;
+        } else {
+          /* Fallback: show the strategy selection grid */
+          factsheetDetailView.classList.add("hidden");
+          factsheetSelectView.classList.remove("hidden");
+        }
       });
 
       /* ─────────────────────── DATA LOADING ─────────────────────── */
