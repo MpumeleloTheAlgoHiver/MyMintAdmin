@@ -206,6 +206,25 @@
       return map;
     }
 
+    /* ── Build investor-specific monthly returns from daily NAV curve ──────────
+       navCurve must already be filtered to the investor's inception date.
+       First month return = (end-of-month NAV) / (entry-day NAV) − 1
+       Subsequent months  = (end-of-month NAV) / (prev month end NAV) − 1      */
+    function buildNavCalMap(navCurve) {
+      if (!navCurve || navCurve.length === 0) return {};
+      /* Last NAV point per calendar month */
+      const byMonth = {};
+      navCurve.forEach(p => { byMonth[p.d.slice(0, 7)] = p.v; });
+      const months = Object.keys(byMonth).sort();
+      const result = {};
+      months.forEach((m, i) => {
+        const endNav   = byMonth[m];
+        const startNav = i === 0 ? navCurve[0].v : byMonth[months[i - 1]];
+        if (startNav > 0) result[m] = (endNav - startNav) / startNav;
+      });
+      return result;
+    }
+
     /* ── Get months from inception to now as [{ month, label, ret }] ── */
     function getMonthsSinceInception(calMap, inceptionDate) {
       const result = [];
@@ -606,27 +625,7 @@
       }
       investor.analytics = analytics;
 
-      /* Build calendar map for period return calculations */
-      const calMap = buildCalendarMap(analytics?.calendar_returns);
-      investor.calMap = calMap;
-
-      /* Compute period returns — gated by actual days invested (day-based, not month-key) */
-      const ret1M  = periodReturn(calMap, 1,  investor.days);
-      const ret3M  = periodReturn(calMap, 3,  investor.days);
-      const ret6M  = periodReturn(calMap, 6,  investor.days);
-      const retYTD = ytdReturn(calMap, investor.inceptionDate);
-      const ret1Y  = periodReturn(calMap, 12, investor.days);
-      /* ITD/MTD = investor's actual personal return from holdings */
-      const retITD = investor.returnPct;
-
-      investor.periodReturns = { ret1M, ret3M, ret6M, retYTD, ret1Y, retITD };
-
-      /* Cumulative series from calendar data (for monthly return chart) */
-      const { months: cumMonths, cumulative } = buildCumulativeSeries(calMap, investor.inceptionDate);
-      investor.cumMonths = cumMonths;
-      investor.cumulative = cumulative;
-
-      /* Build investor's daily NAV curve from inception (for drawdown chart + max DD) */
+      /* ── Build full merged daily NAV curve from all timeframe buckets ── */
       const mergedNavPts = {};
       const rawCurves = analytics?.curves || {};
       ['YTD', '6M', '3M', '1M', '1W'].forEach(key => {
@@ -637,11 +636,36 @@
       const fullNavCurve = Object.entries(mergedNavPts)
         .sort((a, b) => a[0].localeCompare(b[0]))
         .map(([d, v]) => ({ d, v }));
+
+      /* Filter to investor's inception date for investor-specific computations */
       investor.navCurve = investor.inceptionDate
         ? fullNavCurve.filter(p => p.d >= investor.inceptionDate)
         : fullNavCurve;
 
-      /* Max drawdown: daily NAV is more accurate — falls back to monthly cumulative */
+      /* ── navCalMap: investor-specific monthly returns from daily NAV (primary source)
+              Falls back to stored calendar_returns if no curve data available         ── */
+      const navCalMap = buildNavCalMap(investor.navCurve);
+      const calMap    = buildCalendarMap(analytics?.calendar_returns); // fallback
+      const activeMap = Object.keys(navCalMap).length > 0 ? navCalMap : calMap;
+      investor.calMap = activeMap;
+
+      /* Compute period returns — gated by actual days invested */
+      const ret1M  = periodReturn(activeMap, 1,  investor.days);
+      const ret3M  = periodReturn(activeMap, 3,  investor.days);
+      const ret6M  = periodReturn(activeMap, 6,  investor.days);
+      const retYTD = ytdReturn(activeMap, investor.inceptionDate);
+      const ret1Y  = periodReturn(activeMap, 12, investor.days);
+      /* ITD = investor's actual personal return from holdings */
+      const retITD = investor.returnPct;
+
+      investor.periodReturns = { ret1M, ret3M, ret6M, retYTD, ret1Y, retITD };
+
+      /* Cumulative monthly series (for bar chart) */
+      const { months: cumMonths, cumulative } = buildCumulativeSeries(activeMap, investor.inceptionDate);
+      investor.cumMonths = cumMonths;
+      investor.cumulative = cumulative;
+
+      /* Max drawdown: daily NAV is most accurate */
       if (investor.navCurve.length > 1) {
         investor.maxDD = computeNavMaxDrawdown(investor.navCurve);
       } else if (cumulative.length > 1) {
