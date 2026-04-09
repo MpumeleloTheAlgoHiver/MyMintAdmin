@@ -1852,14 +1852,10 @@
 
       window.sidebarOpenFactsheets = function() {
         const activeId = window._activeStrategyTabId;
-        if (activeId && window.openFactsheetInline) {
-          window.openFactsheetInline(activeId);
+        if (activeId) {
+          window.location.href = '/factsheets.html?id=' + encodeURIComponent(activeId);
         } else {
-          document.getElementById('tabFactsheets').click();
-          const selectView = document.getElementById('factsheetSelectView');
-          const detailView = document.getElementById('factsheetDetailView');
-          if (selectView) selectView.classList.remove('hidden');
-          if (detailView) detailView.classList.add('hidden');
+          window.location.href = '/factsheets.html';
         }
       };
 
