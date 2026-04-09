@@ -1902,8 +1902,12 @@
       font-size: 0.8rem;
       font-weight: 600;
       text-align: right;
-      color: #10b981;
+      color: #64748b;
       margin-top: 2px;
+    }
+
+    .holding-change.positive {
+      color: #16a34a;
     }
 
     .holding-change.negative {
@@ -4573,14 +4577,14 @@
     const formatSignedCurrency = (value, digits = 2) => {
       if (value === null || value === undefined || !Number.isFinite(Number(value))) return '-';
       const parsed = Number(value);
-      const sign = parsed >= 0 ? '+' : '-';
+      const sign = parsed >= 0 ? '-' : '+';
       return `${sign}R ${formatNumber(Math.abs(parsed), digits)}`;
     };
 
     const formatSignedPercent = (value, digits = 2) => {
       if (value === null || value === undefined || !Number.isFinite(Number(value))) return null;
       const parsed = Number(value);
-      const sign = parsed >= 0 ? '+' : '-';
+      const sign = parsed >= 0 ? '-' : '+';
       return `${sign}${formatNumber(Math.abs(parsed), digits)}%`;
     };
 
@@ -5956,9 +5960,13 @@
       const asOf = row.as_of_date || '-';
       const weight = Number.isFinite(Number(row.weight)) ? `${formatNumber(row.weight, 2)}%` : '-';
       const value = row.value === null || row.value === undefined ? 'R -' : `R ${formatNumber(row.value, 2)}`;
-      const return1d = row.return_1d === null || row.return_1d === undefined
+      const return1dRaw = Number(row.return_1d);
+      const return1d = row.return_1d === null || row.return_1d === undefined || !Number.isFinite(return1dRaw)
         ? '-'
-        : `${Number(row.return_1d) >= 0 ? '+' : ''}${formatNumber(row.return_1d, 3)}%`;
+        : `${return1dRaw >= 0 ? '-' : '+'}${formatNumber(Math.abs(return1dRaw), 3)}%`;
+      const return1dClass = Number.isFinite(return1dRaw)
+        ? (return1dRaw < 0 ? 'positive' : 'negative')
+        : '';
 
       return `
         <div class="holding-card">
@@ -5968,7 +5976,7 @@
             </div>
             <div>
               <div class="holding-price">${escapeHtml(value)}</div>
-              <div class="holding-change">${escapeHtml(return1d)}</div>
+              <div class="holding-change ${return1dClass}">${escapeHtml(return1d)}</div>
             </div>
           </div>
           <div class="holding-desc">Weight ${escapeHtml(weight)} • As of ${escapeHtml(asOf)}</div>
@@ -5987,7 +5995,7 @@
       const title = security.name || security.symbol || row.security_id || 'Stock holding';
       const logoUrl = security.logo_url || '';
       const titleInitial = String(title || 'S').trim().charAt(0) || 'S';
-      const asOf = row.as_of_date || '-';
+      const asOf = String(security.AsOfTime || row.as_of_date || '-');
       const qty = row.quantity === null || row.quantity === undefined ? 0 : Number(row.quantity);
       const quantityStr = qty ? formatNumber(qty, 2) : '-';
 
@@ -6013,11 +6021,13 @@
       // Color: compare bottom vs black top (market value)
       const isPositive = liveMarketValue > 0 && bottomValue > liveMarketValue;
       const isNegative = liveMarketValue > 0 && bottomValue < liveMarketValue;
-      const pnlPriceClass = isNegative ? 'negative' : (isPositive ? 'positive' : 'neutral');
       const allTimeChangeAmount = liveMarketValue ? (bottomValue - liveMarketValue) : null;
       const allTimeChangePct = liveMarketValue
         ? ((allTimeChangeAmount / liveMarketValue) * 100)
         : null;
+      const pnlPriceClass = allTimeChangeAmount == null
+        ? 'neutral'
+        : (allTimeChangeAmount < 0 ? 'positive' : allTimeChangeAmount > 0 ? 'negative' : 'neutral');
       const amountLabel = formatSignedCurrency(allTimeChangeAmount, 2);
       const pctLabel = formatSignedPercent(allTimeChangePct, 2);
       const pnl = amountLabel !== '-' && pctLabel
@@ -6080,11 +6090,13 @@
       // Color: compare total bottom vs total black top (market value)
       const isPositive = totalValue > 0 && totalBottomValue > totalValue;
       const isNegative = totalValue > 0 && totalBottomValue < totalValue;
-      const pnlPriceClass = isNegative ? 'negative' : (isPositive ? 'positive' : 'neutral');
       const allTimeChangeAmount = totalValue ? (totalBottomValue - totalValue) : null;
       const allTimeChangePct = totalValue
         ? ((allTimeChangeAmount / totalValue) * 100)
         : null;
+      const pnlPriceClass = allTimeChangeAmount == null
+        ? 'neutral'
+        : (allTimeChangeAmount < 0 ? 'positive' : allTimeChangeAmount > 0 ? 'negative' : 'neutral');
       const amountLabel = formatSignedCurrency(allTimeChangeAmount, 2);
       const pctLabel = formatSignedPercent(allTimeChangePct, 2);
       const pnlStr = amountLabel !== '-' && pctLabel
@@ -6284,7 +6296,7 @@
           if (securityIds.length) {
             const { data: securityRows, error: securitiesError } = await supabaseClient
               .from('securities')
-              .select('id, symbol, name, logo_url, last_price')
+              .select('id, symbol, name, logo_url, last_price, "AsOfTime"')
               .in('id', securityIds);
 
             if (!securitiesError && securityRows) {
