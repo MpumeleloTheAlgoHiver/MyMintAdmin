@@ -1852,11 +1852,16 @@
       window.sidebarOpenFactsheets = function() {
         const sel = document.getElementById('ovStratSel');
         const idx = sel ? Number(sel.value) : NaN;
-        const strat = (!Number.isNaN(idx) && _ovAllStrategies[idx]) ? _ovAllStrategies[idx] : null;
+        const strategies = window._ovAllStrategies || [];
+        const strat = (!Number.isNaN(idx) && idx >= 0 && strategies[idx]) ? strategies[idx] : null;
         if (strat && window.openFactsheetInline) {
           window.openFactsheetInline(strat.id);
         } else {
           document.getElementById('tabFactsheets').click();
+          const selectView = document.getElementById('factsheetSelectView');
+          const detailView = document.getElementById('factsheetDetailView');
+          if (selectView) selectView.classList.remove('hidden');
+          if (detailView) detailView.classList.add('hidden');
         }
       };
 
