@@ -843,11 +843,11 @@
                   <div id="ovInvestorCountBadge" style="font-size:11px;font-weight:600;color:#64748b;background:#f1f5f9;padding:2px 8px;border-radius:12px;">0</div>
                 </div>
                 
-                <!-- Updated Headers Mapping -->
+                <!-- Column headers -->
                 <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:0 8px 8px;border-bottom:1px solid #f1f5f9;margin-bottom:8px;">
                   <span style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.02em;">Client</span>
-                  <span style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.02em;text-align:right;">Lots</span>
-                  <span style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.02em;text-align:right;">P&L</span>
+                  <span style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.02em;text-align:right;">Invested</span>
+                  <span style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.02em;text-align:right;">Value</span>
                   <span style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.02em;text-align:right;">Return</span>
                 </div>
 
@@ -4319,34 +4319,45 @@
         }
 
         window.__dbgBreadcrumb('ovSelect:fetch-investors');
-        let ivQuery = supabaseClient
+        const { data: investorRows } = await supabaseClient
           .from('stock_holdings')
-          .select('user_id, quantity, avg_fill, market_value, unrealized_pnl, strategy_id, trade_side, is_active, created_at')
+          .select('user_id, quantity, avg_fill, market_value, strategy_id, trade_side, is_active, created_at')
           .eq('is_active', true)
           .eq('trade_side', 'BUY')
           .eq('strategy_id', strat.id);
-
-        const { data: investorRows } = await ivQuery;
         const investRows = investorRows || [];
 
         window.__dbgBreadcrumb('ovSelect:fetch-profiles');
         let profiles = {};
+        let txnInceptionMap = {};  /* userId → earliest transaction_date */
         if (investRows.length) {
           const uids = [...new Set(investRows.map(r => r.user_id).filter(Boolean))];
           if (uids.length) {
-            const { data: profs } = await supabaseClient
-              .from('profiles')
-              .select('id, first_name, last_name, email')
-              .in('id', uids);
+            const [{ data: profs }, { data: txnRows }] = await Promise.all([
+              supabaseClient.from('profiles').select('id, first_name, last_name, email').in('id', uids),
+              supabaseClient.from('transactions')
+                .select('user_id, transaction_date')
+                .in('user_id', uids)
+                .eq('direction', 'debit')
+                .eq('status', 'posted')
+                .gte('amount', 10000)
+            ]);
             if (profs) profs.forEach(p => { profiles[p.id] = p; });
+            (txnRows || []).forEach(t => {
+              const d = t.transaction_date ? t.transaction_date.split('T')[0] : null;
+              if (d && (!txnInceptionMap[t.user_id] || d < txnInceptionMap[t.user_id]))
+                txnInceptionMap[t.user_id] = d;
+            });
           }
         }
 
+        /* Compute AUM from cost basis (avg_fill × qty in cents → rands) */
         let totalAum = 0;
         investRows.forEach(r => {
           const qty = Number(r.quantity) || 0;
-          const avgFill = Number(r.avg_fill) || 0;
-          totalAum += (qty * avgFill);
+          let fill = Number(r.avg_fill) || 0;
+          if (fill * qty > 10 * (Number(r.market_value) || 0) && Number(r.market_value) > 0) fill /= 100;
+          totalAum += (fill * qty) / 100;
         });
 
         window.__dbgBreadcrumb('ovSelect:render-titlebar');
@@ -4360,7 +4371,7 @@
         window.__dbgBreadcrumb('ovSelect:render-holdings');
         ovRenderHoldings(holdings, secMap);
         window.__dbgBreadcrumb('ovSelect:render-investors');
-        ovRenderInvestors(investRows, profiles, strat);
+        ovRenderInvestors(investRows, profiles, strat, analytics, txnInceptionMap);
         fetchNewsInsights();
         window.__dbgBreadcrumb('ovSelect:done');
         } catch (err) {
@@ -4826,7 +4837,7 @@
         }</tbody></table>`;
       };
 
-      const ovRenderInvestors = (investRows, profiles, strat) => {
+      const ovRenderInvestors = (investRows, profiles, strat, analytics, txnInceptionMap = {}) => {
         const el = document.getElementById('ovInvestorsTable');
         const badge = document.getElementById('ovInvestorCountBadge');
         const aumLabel = document.getElementById('ovInvestorsTotalAUM');
@@ -4838,66 +4849,150 @@
           return;
         }
 
+        /* ── Build merged daily NAV curve from analytics ── */
+        const navCurve = (() => {
+          const pts = {};
+          ['YTD','6M','3M','1M','1W'].forEach(k => {
+            (analytics?.curves?.[k] || []).forEach(p => { if (!(p.d in pts)) pts[p.d] = p.v; });
+          });
+          return Object.entries(pts).sort((a,b) => a[0].localeCompare(b[0])).map(([d,v]) => ({d,v}));
+        })();
+        const latestNav = navCurve.length > 0 ? navCurve[navCurve.length - 1].v : null;
+
+        /* ── Aggregate holdings per user ── */
         const byUser = {};
         investRows.forEach(r => {
           const uid = r.user_id;
-          if (!byUser[uid]) {
-            byUser[uid] = { 
-              qty: 0, 
-              invested: 0, 
-              totalPnl: 0,
-              inception: r.created_at || new Date().toISOString() 
-            };
-          }
+          if (!byUser[uid]) byUser[uid] = { costBasis: 0, inception: r.created_at };
           const qty = Number(r.quantity) || 0;
-          const avgFill = Number(r.avg_fill) || 0;
-          const pnl = Number(r.unrealized_pnl) || 0;
-          
-          byUser[uid].qty += qty;
-          byUser[uid].invested += (qty * avgFill);
-          byUser[uid].totalPnl += pnl;
-          
-          if (r.created_at && new Date(r.created_at) < new Date(byUser[uid].inception)) {
+          let fill = Number(r.avg_fill) || 0;
+          /* avg_fill × qty sanity check: if it's >>market_value, avg_fill is in cents already */
+          const mv = Number(r.market_value) || 0;
+          if (fill * qty > 10 * mv && mv > 0) fill /= 100;
+          byUser[uid].costBasis += (fill * qty) / 100;   /* ZAR cents → rands */
+          if (r.created_at && new Date(r.created_at) < new Date(byUser[uid].inception))
             byUser[uid].inception = r.created_at;
-          }
         });
+
+        /* ── Compute NAV-based return per investor ── */
+        const fmtR = (v) => {
+          const abs = Math.abs(v);
+          if (abs >= 1e6) return `R${(v/1e6).toFixed(2)}m`;
+          if (abs >= 1e3) return `R${(v/1e3).toFixed(1)}k`;
+          return `R${v.toFixed(0)}`;
+        };
 
         const rows = Object.entries(byUser).map(([uid, data]) => {
           const prof = profiles[uid];
           const name = prof ? ([prof.first_name, prof.last_name].filter(Boolean).join(' ').trim() || prof.email || uid) : uid;
-          const pnl = data.totalPnl / 100;
-          const ret = data.invested > 0 ? (data.totalPnl / data.invested * 100) : 0;
-          return { name, lots: data.qty, pnl, ret, inception: data.inception, invested: data.invested };
-        }).sort((a, b) => b.lots - a.lots);
+          /* Use transaction-based inception date if available, fall back to created_at */
+          const inceptionDate = txnInceptionMap[uid] || (data.inception ? data.inception.split('T')[0] : null);
+          const days = inceptionDate ? Math.floor((Date.now() - new Date(inceptionDate)) / 86400000) : 0;
+
+          let returnPct = 0, currentVal = data.costBasis;
+          if (navCurve.length > 0 && inceptionDate && latestNav) {
+            const entryPt = navCurve.find(p => p.d >= inceptionDate) || navCurve[0];
+            if (entryPt && entryPt.v > 0) {
+              returnPct = (latestNav - entryPt.v) / entryPt.v * 100;
+              currentVal = data.costBasis * (1 + returnPct / 100);
+            }
+          }
+          const pnl = currentVal - data.costBasis;
+
+          return { uid, name, invested: data.costBasis, currentVal, pnl, returnPct, days, inceptionDate };
+        }).sort((a, b) => b.currentVal - a.currentVal);
 
         if (badge) badge.textContent = rows.length;
-        if (aumLabel && strat) {
-          const totalInvested = rows.reduce((s, r) => s + (r.invested || 0), 0);
-          aumLabel.textContent = `Total Invested: ${ovFmtMoney(totalInvested, strat.base_currency || 'ZAR')}`;
+        if (aumLabel) {
+          const totalAum = rows.reduce((s, r) => s + r.currentVal, 0);
+          aumLabel.textContent = `AUM: ${fmtR(totalAum)}`;
         }
 
-        el.innerHTML = rows.map(r => {
-          const pc = r.pnl >= 0 ? 'ov-pos' : 'ov-neg';
-          const rc = r.ret >= 0 ? 'ov-pos' : 'ov-neg';
-          const pnlStr = Math.abs(r.pnl) >= 1000 ? 
-            `${r.pnl >= 0 ? '+' : '-'}R${(Math.abs(r.pnl)/1000).toFixed(1)}k` : 
-            `${r.pnl >= 0 ? '+' : ''}R${r.pnl.toFixed(0)}`;
-          
-          const inceDate = new Date(r.inception);
-          const inceStr = `Since ${inceDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}`;
-
+        el.innerHTML = rows.map((r, idx) => {
+          const rc = r.returnPct >= 0 ? '#059669' : '#dc2626';
+          const inceStr = r.inceptionDate
+            ? new Date(r.inceptionDate).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'2-digit' })
+            : '—';
           return `
-            <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:10px 8px;border-bottom:1px solid #f8fafc;align-items:center;" class="investor-row-hover">
+            <div data-inv-idx="${idx}" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:10px 8px;border-bottom:1px solid #f8fafc;align-items:center;cursor:pointer;" class="investor-row-hover"
+              onclick="ovShowInvestorPreview(${idx})">
               <div style="min-width:0;">
                 <div style="font-size:12px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.name}</div>
-                <div style="font-size:10px;color:#94a3b8;font-weight:500;">${inceStr}</div>
+                <div style="font-size:10px;color:#94a3b8;font-weight:500;">Since ${inceStr} · ${r.days}d</div>
               </div>
-              <div style="text-align:right;font-size:11px;font-weight:600;color:#64748b;font-family:ui-monospace,monospace;">${r.lots.toLocaleString()}</div>
-              <div style="text-align:right;font-size:11px;font-weight:700;" class="${pc}">${pnlStr}</div>
-              <div style="text-align:right;font-size:11px;font-weight:700;" class="${rc}">${r.ret >= 0 ? '+' : ''}${r.ret.toFixed(1)}%</div>
+              <div style="text-align:right;font-size:11px;font-weight:600;color:#475569;font-family:ui-monospace,monospace;">${fmtR(r.invested)}</div>
+              <div style="text-align:right;font-size:11px;font-weight:700;font-family:ui-monospace,monospace;color:#0f172a;">${fmtR(r.currentVal)}</div>
+              <div style="text-align:right;font-size:11px;font-weight:700;color:${rc};">${r.returnPct >= 0 ? '+' : ''}${r.returnPct.toFixed(1)}%</div>
             </div>
           `;
         }).join('');
+
+        /* Store rows for modal access */
+        window._ovInvestorRows = rows;
+        window._ovInvestorStrat = strat;
+      };
+
+      /* ── Investor preview modal ── */
+      window.ovShowInvestorPreview = (idx) => {
+        const r = (window._ovInvestorRows || [])[idx];
+        const strat = window._ovInvestorStrat;
+        if (!r) return;
+
+        const pnlColor = r.pnl >= 0 ? '#059669' : '#dc2626';
+        const retColor = r.returnPct >= 0 ? '#059669' : '#dc2626';
+        const fmtR = (v) => {
+          const abs = Math.abs(v);
+          if (abs >= 1e6) return `R${(v/1e6).toFixed(2)}m`;
+          if (abs >= 1e3) return `R${(v/1e3).toFixed(1)}k`;
+          return `R${Math.abs(v).toFixed(0)}`;
+        };
+
+        let modal = document.getElementById('ovInvestorModal');
+        if (!modal) {
+          modal = document.createElement('div');
+          modal.id = 'ovInvestorModal';
+          modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.45);backdrop-filter:blur(2px);';
+          modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+          document.body.appendChild(modal);
+        }
+
+        modal.innerHTML = `
+          <div style="background:white;border-radius:16px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.2);overflow:hidden;">
+            <!-- Header -->
+            <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:20px 20px 16px;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div>
+                  <div style="font-size:18px;font-weight:700;color:white;">${r.name}</div>
+                  <div style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:2px;">${strat?.name || strat?.short_name || 'Strategy'}</div>
+                </div>
+                <button onclick="document.getElementById('ovInvestorModal').remove()"
+                  style="width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,0.15);border:none;color:white;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+              </div>
+            </div>
+            <!-- Stats grid -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:#f1f5f9;">
+              ${[
+                { l:'Invested',  v: fmtR(r.invested),          c:'#0f172a' },
+                { l:'Value',     v: fmtR(r.currentVal),         c:'#0f172a' },
+                { l:'P&L',       v: (r.pnl >= 0?'+':'-') + fmtR(r.pnl), c: pnlColor },
+                { l:'Return',    v: (r.returnPct>=0?'+':'') + r.returnPct.toFixed(2)+'%', c: retColor },
+                { l:'Days',      v: r.days,                     c:'#0f172a' },
+                { l:'Since',     v: r.inceptionDate ? new Date(r.inceptionDate).toLocaleDateString('en-ZA',{day:'numeric',month:'short',year:'numeric'}) : '—', c:'#0f172a' }
+              ].map(k=>`
+                <div style="background:white;padding:12px 14px;">
+                  <div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;">${k.l}</div>
+                  <div style="font-size:13px;font-weight:700;color:${k.c};font-family:ui-monospace,monospace;">${k.v}</div>
+                </div>`).join('')}
+            </div>
+            <!-- Footer -->
+            <div style="padding:14px 20px;display:flex;justify-content:flex-end;">
+              <a href="/investors.html" style="font-size:12px;font-weight:600;color:#4f46e5;text-decoration:none;display:flex;align-items:center;gap:5px;">
+                View full profile
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </a>
+            </div>
+          </div>
+        `;
       };
 
       const loadUserStats = async () => {
