@@ -206,15 +206,20 @@
       return map;
     }
 
-    /* ── Get trailing N months of calendar returns as [{ month, label, ret }] ── */
-    function getTrailingMonths(calMap, n) {
+    /* ── Get months from inception to now as [{ month, label, ret }] ── */
+    function getMonthsSinceInception(calMap, inceptionDate) {
       const result = [];
-      const now = new Date();
-      for (let i = n - 1; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-        const label = d.toLocaleDateString('en-US', { month: 'short' });
+      if (!inceptionDate) return result;
+      const start = new Date(inceptionDate);
+      const now   = new Date();
+      let sy = start.getFullYear(), sm = start.getMonth() + 1;
+      const ey = now.getFullYear(),  em = now.getMonth() + 1;
+      while (sy * 12 + sm <= ey * 12 + em) {
+        const key   = `${sy}-${String(sm).padStart(2,'0')}`;
+        const label = new Date(sy, sm - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
         result.push({ month: key, label, ret: calMap[key] ?? null });
+        sm++;
+        if (sm > 12) { sm = 1; sy++; }
       }
       return result;
     }
@@ -277,27 +282,43 @@
       });
     }
 
-    /* ── Compute period return from calendar_returns ── */
-    function periodReturn(calMap, nMonths) {
+    /* ── YYYY-MM key helpers ── */
+    function monthKey(y, m) { return `${y}-${String(m).padStart(2,'0')}`; }
+    function keyFromDate(d) { return monthKey(d.getFullYear(), d.getMonth() + 1); }
+
+    /* ── Compute period return — only from months the investor was actually invested ── */
+    function periodReturn(calMap, nMonths, inceptionKey) {
       const now = new Date();
-      let cum = 1;
-      let hasAny = false;
-      for (let i = nMonths - 1; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      /* The calendar start of the window is nMonths ago (1-indexed from current month) */
+      const windowStart = new Date(now.getFullYear(), now.getMonth() - (nMonths - 1), 1);
+      const windowStartKey = keyFromDate(windowStart);
+      /* If the investor joined AFTER the window start, this period predates their entry — hide it */
+      if (inceptionKey && inceptionKey > windowStartKey) return null;
+      /* Accumulate from whichever is later: window start or investor inception */
+      const effectiveStartKey = (inceptionKey && inceptionKey > windowStartKey) ? inceptionKey : windowStartKey;
+      let [sy, sm] = effectiveStartKey.split('-').map(Number);
+      const [ey, em] = [now.getFullYear(), now.getMonth() + 1];
+      let cum = 1, hasAny = false;
+      while (sy * 12 + sm <= ey * 12 + em) {
+        const key = monthKey(sy, sm);
         if (calMap[key] != null) { cum *= (1 + calMap[key]); hasAny = true; }
+        sm++; if (sm > 12) { sm = 1; sy++; }
       }
       return hasAny ? (cum - 1) * 100 : null;
     }
 
-    /* ── Compute YTD from calendar_returns ── */
-    function ytdReturn(calMap) {
+    /* ── Compute YTD — only from Jan of current year, but investor must have joined by then ── */
+    function ytdReturn(calMap, inceptionKey) {
       const now = new Date();
       const year = now.getFullYear();
-      let cum = 1;
-      let hasAny = false;
-      for (let m = 1; m <= now.getMonth() + 1; m++) {
-        const key = `${year}-${String(m).padStart(2,'0')}`;
+      const ytdStartKey = monthKey(year, 1);
+      /* If investor joined after January of this year, YTD is misleading — hide it */
+      if (inceptionKey && inceptionKey > ytdStartKey) return null;
+      let cum = 1, hasAny = false;
+      const startM = (inceptionKey && inceptionKey.startsWith(String(year)))
+        ? Number(inceptionKey.split('-')[1]) : 1;
+      for (let m = startM; m <= now.getMonth() + 1; m++) {
+        const key = monthKey(year, m);
         if (calMap[key] != null) { cum *= (1 + calMap[key]); hasAny = true; }
       }
       return hasAny ? (cum - 1) * 100 : null;
@@ -346,9 +367,15 @@
             inceptionDate: row.created_at
           };
         }
-        byUser[uid].invested += (Number(row.avg_fill) || 0) * (Number(row.quantity) || 0);
-        byUser[uid].current  += (Number(row.market_value) || 0);
-        byUser[uid].pnl      += (Number(row.unrealized_pnl) || 0);
+        const mv   = Number(row.market_value) || 0;
+        const qty  = Number(row.quantity)    || 0;
+        let fill   = Number(row.avg_fill)    || 0;
+        /* Sanity-check: if avg_fill×qty is >10× market_value, avg_fill is in cents */
+        if (fill * qty > 10 * mv && mv > 0) fill /= 100;
+        const cost = fill * qty;
+        byUser[uid].invested += cost;
+        byUser[uid].current  += mv;
+        byUser[uid].pnl      += mv - cost;   /* market_value − cost_basis (not unrealized_pnl) */
         /* Use the earliest created_at as inception date */
         if (row.created_at && row.created_at < byUser[uid].inceptionDate) {
           byUser[uid].inceptionDate = row.created_at;
@@ -363,7 +390,10 @@
         const returnPct = u.invested > 0 ? +((u.pnl / u.invested) * 100).toFixed(2) : 0;
         const inceptionDate = u.inceptionDate ? u.inceptionDate.split('T')[0] : null;
         const days = inceptionDate ? Math.floor((Date.now() - new Date(inceptionDate)) / 86400000) : 0;
-        const annualised = days > 30 ? +((returnPct / days) * 365).toFixed(2) : returnPct;
+        /* Geometric annualisation: ((1 + r)^(365/days) − 1) × 100 */
+        const annualised = days > 30
+          ? +(((Math.pow(1 + returnPct / 100, 365 / days) - 1) * 100)).toFixed(2)
+          : returnPct;
         return {
           userId: u.userId,
           name,
@@ -494,13 +524,20 @@
       const calMap = buildCalendarMap(analytics?.calendar_returns);
       investor.calMap = calMap;
 
-      /* Compute period returns from real monthly data */
-      const ret1M  = periodReturn(calMap, 1);
-      const ret3M  = periodReturn(calMap, 3);
-      const ret6M  = periodReturn(calMap, 6);
-      const retYTD = ytdReturn(calMap) ?? (analytics?.ytd_return != null ? Number(analytics.ytd_return) * 100 : null);
-      const ret1Y  = periodReturn(calMap, 12);
-      const retITD = investor.returnPct; // from actual holdings data
+      /* Investor's inception month key — gate all period returns on this */
+      const inceptionKey = investor.inceptionDate
+        ? monthKey(new Date(investor.inceptionDate).getFullYear(), new Date(investor.inceptionDate).getMonth() + 1)
+        : null;
+      investor.inceptionKey = inceptionKey;
+
+      /* Compute period returns — each one respects the inception date gate */
+      const ret1M  = periodReturn(calMap, 1,  inceptionKey);
+      const ret3M  = periodReturn(calMap, 3,  inceptionKey);
+      const ret6M  = periodReturn(calMap, 6,  inceptionKey);
+      const retYTD = ytdReturn(calMap, inceptionKey);
+      const ret1Y  = periodReturn(calMap, 12, inceptionKey);
+      /* ITD/MTD = investor's actual personal return from holdings */
+      const retITD = investor.returnPct;
 
       investor.periodReturns = { ret1M, ret3M, ret6M, retYTD, ret1Y, retITD };
 
@@ -575,13 +612,16 @@
       const maxDDStr = inv.maxDD != null ? inv.maxDD.toFixed(1) + '%' : '—';
       const itdColor = pctColor(pr.retITD);
 
+      /* Context-aware last-column label: MTD if < ~35 days invested, else ITD */
+      const itdLabel = (inv.days != null && inv.days < 35) ? 'MTD' : 'ITD';
+
       const periodCols = [
-        { l: '1M',  v: pr.ret1M,  bLabel: null },
-        { l: '3M',  v: pr.ret3M,  bLabel: null },
-        { l: '6M',  v: pr.ret6M,  bLabel: null },
-        { l: 'YTD', v: pr.retYTD, bLabel: null },
-        { l: '1Y',  v: pr.ret1Y,  bLabel: null },
-        { l: 'ITD', v: pr.retITD, bLabel: null }
+        { l: '1M',     v: pr.ret1M  },
+        { l: '3M',     v: pr.ret3M  },
+        { l: '6M',     v: pr.ret6M  },
+        { l: 'YTD',    v: pr.retYTD },
+        { l: '1Y',     v: pr.ret1Y  },
+        { l: itdLabel, v: pr.retITD }
       ];
 
       const periodHtml = `
@@ -613,7 +653,7 @@
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
               Factsheet
             </a>
-            <span style="font-size:11px;font-weight:700;color:${itdColor};background:${pr.retITD >= 0 ? '#f0fdf4' : '#fff1f2'};border:1px solid ${pr.retITD >= 0 ? '#bbf7d0' : '#fecdd3'};padding:3px 10px;border-radius:20px;font-family:ui-monospace,monospace;">${fmtPct(pr.retITD)} ITD</span>
+            <span style="font-size:11px;font-weight:700;color:${itdColor};background:${pr.retITD >= 0 ? '#f0fdf4' : '#fff1f2'};border:1px solid ${pr.retITD >= 0 ? '#bbf7d0' : '#fecdd3'};padding:3px 10px;border-radius:20px;font-family:ui-monospace,monospace;">${fmtPct(pr.retITD)} ${itdLabel}</span>
           </div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:12px 20px;background:#f8fafc;border-bottom:1px solid #f1f5f9;">
@@ -665,18 +705,20 @@
       const hasCalData = Object.keys(calMap).length > 0;
 
       if (currentTab === 'performance') {
-        /* Monthly trailing 12M */
-        const trailing12 = getTrailingMonths(calMap, 12);
+        /* Monthly returns since investor's inception date */
+        const monthsSinceInception = getMonthsSinceInception(calMap, inv.inceptionDate);
+        const hasEnoughFor3M = cumulative.length >= 4; /* need 3+ intervals for rolling 3M */
+        const colCount = Math.max(1, monthsSinceInception.length);
 
         tc.innerHTML = `
           <div style="margin-bottom:30px;">
             <div id="perfChartEl" style="height:300px;"></div>
           </div>
           <div style="margin-bottom:30px;">
-            <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:16px;">Monthly Returns (Trailing 12M)</div>
-            ${hasCalData ? `
-              <div style="display:grid;grid-template-columns:repeat(12,1fr);gap:8px;">
-                ${trailing12.map(m => `
+            <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:16px;">Monthly Returns Since Investment</div>
+            ${hasCalData && monthsSinceInception.length > 0 ? `
+              <div style="display:grid;grid-template-columns:repeat(${Math.min(colCount, 12)},1fr);gap:8px;">
+                ${monthsSinceInception.map(m => `
                   <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
                     <div style="width:100%;text-align:center;padding:12px 2px;border-radius:12px;font-size:11px;font-weight:700;font-family:ui-monospace,monospace;
                       background:${m.ret == null ? '#f8fafc' : m.ret >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'};
@@ -689,6 +731,7 @@
               </div>
             ` : `<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;">No monthly return data available yet for this strategy.</div>`}
           </div>
+          ${hasEnoughFor3M ? `
           <div style="margin-bottom:10px;">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -696,9 +739,10 @@
             </div>
             <div id="rollingChartEl" style="height:220px;"></div>
           </div>
+          ` : ''}
         `;
         initPerfChart(cumMonths, cumulative);
-        initRollingChart(cumMonths, buildRolling3M(cumulative));
+        if (hasEnoughFor3M) initRollingChart(cumMonths, buildRolling3M(cumulative));
 
       } else if (currentTab === 'risk') {
         const summ = inv.analytics?.summary || {};
