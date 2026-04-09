@@ -1174,11 +1174,36 @@
       document.getElementById('sidebarUserEmail').textContent = email;
       document.getElementById('sidebarAvatarInitials').textContent = email.charAt(0).toUpperCase();
 
+      const urlParams = new URLSearchParams(window.location.search);
+      const embedMode = urlParams.get('embed') === '1';
+      const embedUserId = urlParams.get('userId') || null;
+
+      /* ── Embed mode: hide chrome, show only the detail panel ── */
+      if (embedMode) {
+        document.querySelector('aside')?.style.setProperty('display', 'none', 'important');
+        document.querySelector('.top-nav')?.style.setProperty('display', 'none', 'important');
+        document.getElementById('kpiBar')?.style.setProperty('display', 'none', 'important');
+        /* Hide left panel (investor list) and expand detail panel to full width */
+        const grid = document.querySelector('[style*="grid-template-columns:300px"]');
+        if (grid) {
+          grid.style.gridTemplateColumns = '1fr';
+          grid.querySelectorAll(':scope > div:first-child').forEach(el => el.style.display = 'none');
+        }
+        document.querySelector('.main-content')?.style.setProperty('padding', '0', 'important');
+        document.querySelector('.main-content')?.style.setProperty('margin-left', '0', 'important');
+        document.querySelector('body')?.style.setProperty('background', 'white', 'important');
+      }
+
       allInvestors = await loadInvestors();
       renderKpiBar(allInvestors);
       populateStrategyFilter();
       renderInvestorList(allInvestors);
       renderDetail();
+
+      /* ── Auto-select investor if userId is in URL ── */
+      if (embedUserId) {
+        await selectInvestor(embedUserId);
+      }
 
       document.getElementById('investorSearch').oninput  = () => renderInvestorList(allInvestors);
       document.getElementById('strategyFilter').onchange = () => renderInvestorList(allInvestors);
