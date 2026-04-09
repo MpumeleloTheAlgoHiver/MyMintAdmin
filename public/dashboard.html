@@ -8176,6 +8176,13 @@
         await rebUpsertWalletBalances(strategyId, finalWalletByClient);
         rebWalletByClient = { ...rebWalletByClient, ...finalWalletByClient };
 
+        // Capture instrument codes BEFORE rebLoadStrategy resets rebSelectedIsin to null
+        const sellCode = String(rebSelectedIsin.code || "").replace(/\.[A-Z]+$/i, "");
+        const buyCode = String(buySelection.instrument.code || "").replace(/\.[A-Z]+$/i, "");
+        const extraBuyCode = extraBuySelection
+          ? String(extraBuySelection.instrument.code || "").replace(/\.[A-Z]+$/i, "")
+          : "";
+
         rebSelectedStrategyId = String(strategyId);
         await rebLoadStrategy(strategyId);
 
@@ -8184,13 +8191,13 @@
         const buyNominal = buyEventRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
         const extraBuyNominal = extraBuyEventRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
         if (sellNominal > 0) {
-          tradeCsvRows.push({ side: "SELL", code: String(rebSelectedIsin.code || "").replace(/\.[A-Z]+$/i, ""), nominal: sellNominal });
+          tradeCsvRows.push({ side: "SELL", code: sellCode, nominal: sellNominal });
         }
         if (buyNominal > 0) {
-          tradeCsvRows.push({ side: "BUY", code: String(buySelection.instrument.code || "").replace(/\.[A-Z]+$/i, ""), nominal: buyNominal });
+          tradeCsvRows.push({ side: "BUY", code: buyCode, nominal: buyNominal });
         }
         if (extraBuyNominal > 0) {
-          tradeCsvRows.push({ side: "BUY", code: String(extraBuySelection?.instrument?.code || "").replace(/\.[A-Z]+$/i, ""), nominal: extraBuyNominal });
+          tradeCsvRows.push({ side: "BUY", code: extraBuyCode, nominal: extraBuyNominal });
         }
 
         return {
