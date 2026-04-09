@@ -1841,6 +1841,44 @@
 
       window.openRebalancingModal = async () => {
         if (!(await checkUnsavedChanges())) return;
+
+        const sel = document.getElementById('ovStratSel');
+        const idx = sel ? Number(sel.value) : NaN;
+        const strat = (!Number.isNaN(idx) && _ovAllStrategies[idx]) ? _ovAllStrategies[idx] : null;
+
+        if (strat) {
+          const isLive = !!strat.is_public;
+          const hasUsers = strategyInvestedIds.has(String(strat.id));
+
+          if (isLive && hasUsers) {
+            const modal = document.getElementById('rebalancingModal');
+            modal.classList.remove('hidden');
+            rebInitStrategySelector();
+            const rebSel = document.getElementById('rebStrategySelect');
+            if (rebSel) {
+              rebSel.value = String(strat.id);
+              rebLoadStrategy(String(strat.id));
+            }
+            const onKey = (e) => { if (e.key === 'Escape') { modal.classList.add('hidden'); document.removeEventListener('keydown', onKey); } };
+            document.addEventListener('keydown', onKey);
+            return;
+          }
+
+          const panel = document.getElementById('ovStratPanel');
+          if (panel) panel.style.display = 'none';
+          const sp = document.getElementById('tabStrategiesPanel');
+          if (sp) sp.style.display = 'block';
+          const sc = document.getElementById('ovStratContent');
+          if (sc) sc.style.display = 'none';
+          activeStrategyTabId = strat.id;
+          setStrategyWorkspaceVisible(true);
+          if (!globalSecuritiesMap.size) await loadAllSecurities();
+          const fullStrat = (allStrategiesFullData || []).find(s => String(s.id) === String(strat.id)) || strat;
+          await editStrategy(fullStrat, globalSecuritiesMap);
+          setWorkspaceReadOnly(false);
+          return;
+        }
+
         const modal = document.getElementById('rebalancingModal');
         modal.classList.remove('hidden');
         rebInitStrategySelector();
