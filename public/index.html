@@ -3409,15 +3409,57 @@
 <body>
   <!-- Sidebar -->
   <aside class="sidebar">
-    <div class="sidebar-header">
+    <div class="sidebar-header" style="cursor:pointer;position:relative;user-select:none;" onclick="mintHubDropdownToggle(event)">
       <div class="sidebar-logo">
         <img src="/icon.png" alt="Mint logo" style="width:34px;height:34px;border-radius:8px;" />
       </div>
-      <div class="sidebar-brand">
+      <div class="sidebar-brand" style="flex:1;min-width:0;">
         <span class="sidebar-brand-name">Mint</span>
         <span class="sidebar-brand-sub">Mint Hub</span>
       </div>
+      <svg id="mintHubChevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0;transition:transform 0.2s;margin-right:-2px;"><polyline points="6 9 12 15 18 9"/></svg>
+      <div id="mintHubDropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:8px;right:8px;background:white;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.14),0 0 0 1px rgba(139,92,246,0.12);z-index:9999;overflow:hidden;" onclick="event.stopPropagation()">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f5f3ff;border-bottom:1px solid #ede9fe;">
+          <img src="/icon.png" style="width:26px;height:26px;border-radius:7px;flex-shrink:0;" />
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:700;color:#0f172a;line-height:1.3;">Mint Hub</div>
+            <div style="font-size:10px;color:#7c3aed;font-weight:500;">Admin Portal · Active</div>
+          </div>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;opacity:0.45;cursor:not-allowed;">
+          <div style="width:26px;height:26px;border-radius:7px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:11px;font-weight:600;color:#64748b;line-height:1.3;">More access roles</div>
+            <div style="font-size:10px;color:#94a3b8;">New dashboards coming soon</div>
+          </div>
+        </div>
+      </div>
     </div>
+    <script>
+    function mintHubDropdownToggle(e) {
+      e.stopPropagation();
+      const dd = document.getElementById('mintHubDropdown');
+      const ch = document.getElementById('mintHubChevron');
+      const open = dd.style.display !== 'block';
+      dd.style.display = open ? 'block' : 'none';
+      if (ch) ch.style.transform = open ? 'rotate(180deg)' : '';
+      if (open) {
+        setTimeout(() => {
+          const close = (ev) => {
+            if (!ev.target.closest('.sidebar-header')) {
+              dd.style.display = 'none';
+              if (ch) ch.style.transform = '';
+              document.removeEventListener('click', close);
+            }
+          };
+          document.addEventListener('click', close);
+        }, 0);
+      }
+    }
+    </script>
 
     <nav class="sidebar-nav">
       <span class="sidebar-section-label">Main</span>
