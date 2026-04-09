@@ -284,20 +284,16 @@
 
     /* ── YYYY-MM key helpers ── */
     function monthKey(y, m) { return `${y}-${String(m).padStart(2,'0')}`; }
-    function keyFromDate(d) { return monthKey(d.getFullYear(), d.getMonth() + 1); }
 
-    /* ── Compute period return — only from months the investor was actually invested ── */
-    function periodReturn(calMap, nMonths, inceptionKey) {
+    /* ── Compute period return — investor must have at least nMonths×28 days invested ── */
+    function periodReturn(calMap, nMonths, investorDays) {
+      /* Day-based gate: require roughly a full period of history */
+      if (investorDays == null || investorDays < nMonths * 28) return null;
       const now = new Date();
-      /* The calendar start of the window is nMonths ago (1-indexed from current month) */
-      const windowStart = new Date(now.getFullYear(), now.getMonth() - (nMonths - 1), 1);
-      const windowStartKey = keyFromDate(windowStart);
-      /* If the investor joined AFTER the window start, this period predates their entry — hide it */
-      if (inceptionKey && inceptionKey > windowStartKey) return null;
-      /* Accumulate from whichever is later: window start or investor inception */
-      const effectiveStartKey = (inceptionKey && inceptionKey > windowStartKey) ? inceptionKey : windowStartKey;
-      let [sy, sm] = effectiveStartKey.split('-').map(Number);
-      const [ey, em] = [now.getFullYear(), now.getMonth() + 1];
+      /* Accumulate from nMonths ago to this month */
+      let sy = now.getFullYear(), sm = now.getMonth() + 1 - (nMonths - 1);
+      while (sm <= 0) { sm += 12; sy--; }
+      const ey = now.getFullYear(), em = now.getMonth() + 1;
       let cum = 1, hasAny = false;
       while (sy * 12 + sm <= ey * 12 + em) {
         const key = monthKey(sy, sm);
@@ -307,18 +303,16 @@
       return hasAny ? (cum - 1) * 100 : null;
     }
 
-    /* ── Compute YTD — only from Jan of current year, but investor must have joined by then ── */
-    function ytdReturn(calMap, inceptionKey) {
+    /* ── Compute YTD — investor must have joined on/before Jan 1 of current year ── */
+    function ytdReturn(calMap, inceptionDate) {
+      if (!inceptionDate) return null;
       const now = new Date();
-      const year = now.getFullYear();
-      const ytdStartKey = monthKey(year, 1);
-      /* If investor joined after January of this year, YTD is misleading — hide it */
-      if (inceptionKey && inceptionKey > ytdStartKey) return null;
+      const jan1 = new Date(now.getFullYear(), 0, 1);
+      /* If investor joined after Jan 1 of this year, YTD predates their entry */
+      if (new Date(inceptionDate) > jan1) return null;
       let cum = 1, hasAny = false;
-      const startM = (inceptionKey && inceptionKey.startsWith(String(year)))
-        ? Number(inceptionKey.split('-')[1]) : 1;
-      for (let m = startM; m <= now.getMonth() + 1; m++) {
-        const key = monthKey(year, m);
+      for (let m = 1; m <= now.getMonth() + 1; m++) {
+        const key = monthKey(now.getFullYear(), m);
         if (calMap[key] != null) { cum *= (1 + calMap[key]); hasAny = true; }
       }
       return hasAny ? (cum - 1) * 100 : null;
@@ -524,18 +518,12 @@
       const calMap = buildCalendarMap(analytics?.calendar_returns);
       investor.calMap = calMap;
 
-      /* Investor's inception month key — gate all period returns on this */
-      const inceptionKey = investor.inceptionDate
-        ? monthKey(new Date(investor.inceptionDate).getFullYear(), new Date(investor.inceptionDate).getMonth() + 1)
-        : null;
-      investor.inceptionKey = inceptionKey;
-
-      /* Compute period returns — each one respects the inception date gate */
-      const ret1M  = periodReturn(calMap, 1,  inceptionKey);
-      const ret3M  = periodReturn(calMap, 3,  inceptionKey);
-      const ret6M  = periodReturn(calMap, 6,  inceptionKey);
-      const retYTD = ytdReturn(calMap, inceptionKey);
-      const ret1Y  = periodReturn(calMap, 12, inceptionKey);
+      /* Compute period returns — gated by actual days invested (day-based, not month-key) */
+      const ret1M  = periodReturn(calMap, 1,  investor.days);
+      const ret3M  = periodReturn(calMap, 3,  investor.days);
+      const ret6M  = periodReturn(calMap, 6,  investor.days);
+      const retYTD = ytdReturn(calMap, investor.inceptionDate);
+      const ret1Y  = periodReturn(calMap, 12, investor.days);
       /* ITD/MTD = investor's actual personal return from holdings */
       const retITD = investor.returnPct;
 
@@ -731,15 +719,18 @@
               </div>
             ` : `<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;">No monthly return data available yet for this strategy.</div>`}
           </div>
-          ${hasEnoughFor3M ? `
           <div style="margin-bottom:10px;">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
               <span style="font-size:13px;font-weight:700;color:#0f172a;">Rolling 3-Month Return</span>
             </div>
-            <div id="rollingChartEl" style="height:220px;"></div>
+            ${hasEnoughFor3M
+              ? `<div id="rollingChartEl" style="height:220px;"></div>`
+              : `<div style="height:80px;display:flex;align-items:center;justify-content:center;background:#f8fafc;border-radius:12px;border:1px dashed #e2e8f0;">
+                   <span style="font-size:12px;color:#94a3b8;">Not enough history to display rolling 3-month return — available after 3+ months of investment data.</span>
+                 </div>`
+            }
           </div>
-          ` : ''}
         `;
         initPerfChart(cumMonths, cumulative);
         if (hasEnoughFor3M) initRollingChart(cumMonths, buildRolling3M(cumulative));
