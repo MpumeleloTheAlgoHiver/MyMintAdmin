@@ -1513,6 +1513,7 @@
       let formHoldings = [];
       let editingStrategyId = null;
       let activeStrategyTabId = null;
+      Object.defineProperty(window, '_activeStrategyTabId', { get() { return activeStrategyTabId; }, configurable: true });
       let globalSecuritiesMap = new Map();
       let strategyWorkspaceVisible = false;
       let strategyInvestorFilter = "all";   // "all" | "invested" | "not-invested"
@@ -1850,12 +1851,9 @@
       });
 
       window.sidebarOpenFactsheets = function() {
-        const sel = document.getElementById('ovStratSel');
-        const idx = sel ? Number(sel.value) : NaN;
-        const strategies = window._ovAllStrategies || [];
-        const strat = (!Number.isNaN(idx) && idx >= 0 && strategies[idx]) ? strategies[idx] : null;
-        if (strat && window.openFactsheetInline) {
-          window.openFactsheetInline(strat.id);
+        const activeId = window._activeStrategyTabId;
+        if (activeId && window.openFactsheetInline) {
+          window.openFactsheetInline(activeId);
         } else {
           document.getElementById('tabFactsheets').click();
           const selectView = document.getElementById('factsheetSelectView');
