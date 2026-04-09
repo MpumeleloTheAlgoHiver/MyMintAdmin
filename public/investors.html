@@ -341,7 +341,7 @@
         supabaseClient.from('profiles').select('id, first_name, last_name, email').in('id', userIds),
         supabaseClient
           .from('transactions')
-          .select('user_id, amount, direction, status')
+          .select('user_id, amount, direction, status, transaction_date')
           .in('user_id', userIds)
           .eq('direction', 'debit')
           .eq('status',    'posted')
@@ -351,10 +351,16 @@
       const profMap = {};
       (profiles || []).forEach(p => { profMap[p.id] = p; });
 
-      /* Sum investment transaction amounts per user — DB stores amounts in ZAR cents */
-      const txnInvested = {};
+      /* Sum investment transaction amounts per user — DB stores amounts in ZAR cents.
+         Also track the EARLIEST transaction_date as the true "first invested" date. */
+      const txnInvested     = {};
+      const txnInceptionMap = {};  /* userId → earliest transaction_date (YYYY-MM-DD) */
       (txnRows || []).forEach(t => {
         txnInvested[t.user_id] = (txnInvested[t.user_id] || 0) + Number(t.amount) / 100;
+        const d = t.transaction_date ? t.transaction_date.split('T')[0] : null;
+        if (d && (!txnInceptionMap[t.user_id] || d < txnInceptionMap[t.user_id])) {
+          txnInceptionMap[t.user_id] = d;
+        }
       });
 
       const stratMap = {};
@@ -421,7 +427,9 @@
         const strat = u.strategyId ? stratMap[u.strategyId] : null;
         const name  = [prof.first_name, prof.last_name].filter(Boolean).join(' ') || prof.email || u.userId;
 
-        const inceptionDate = u.inceptionDate ? u.inceptionDate.split('T')[0] : null;
+        /* Transaction date is the authoritative "first invested" date; fall back to holdings created_at */
+        const inceptionDate = txnInceptionMap[u.userId]
+          || (u.inceptionDate ? u.inceptionDate.split('T')[0] : null);
         const days = inceptionDate ? Math.floor((Date.now() - new Date(inceptionDate)) / 86400000) : 0;
 
         /* ── NAV-based return: same methodology as Mint platform ── */
