@@ -704,7 +704,7 @@
           </div>
           <div style="margin-bottom:30px;">
             <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:16px;">Monthly Returns Since Investment</div>
-            ${hasCalData && monthsSinceInception.length > 0 ? `
+            ${monthsSinceInception.length > 0 ? `
               <div style="display:grid;grid-template-columns:repeat(${Math.min(colCount, 12)},1fr);gap:8px;">
                 ${monthsSinceInception.map(m => `
                   <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
@@ -717,7 +717,7 @@
                   </div>
                 `).join('')}
               </div>
-            ` : `<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;">No monthly return data available yet for this strategy.</div>`}
+            ` : `<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;">No investment history found for this investor.</div>`}
           </div>
           <div style="margin-bottom:10px;">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;">
