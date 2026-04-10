@@ -4717,10 +4717,15 @@
           const priceStr = item.price != null ? item.price.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
           const changeStr = item.change != null ? `${item.change >= 0 ? '+' : ''}${item.change.toFixed(2)}%` : '';
           const cc = item.change == null ? '#94a3b8' : item.change >= 0 ? '#059669' : '#dc2626';
-          return `<div style="display:flex;align-items:center;gap:9px;padding:0 22px;border-right:1px solid #e2e8f0;flex-shrink:0;height:50px;">
-            <span style="font-size:13px;font-weight:700;color:#0f172a;font-family:ui-monospace,monospace;letter-spacing:0.04em;">${item.sym}</span>
-            <span style="font-size:13px;color:#475569;font-family:ui-monospace,monospace;">${priceStr}</span>
-            ${changeStr ? `<span style="font-size:13px;font-family:ui-monospace,monospace;font-weight:600;color:${cc};">${changeStr}</span>` : ''}
+          const init = (item.sym || '').slice(0, 2).toUpperCase();
+          const logoEl = item.logo
+            ? `<img src="${item.logo}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;border:1px solid #e2e8f0;flex-shrink:0;background:#f8fafc;" onerror="this.outerHTML='<div style=\\'width:26px;height:26px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#7c3aed;flex-shrink:0;\\'>${init}</div>'">`
+            : `<div style="width:26px;height:26px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#7c3aed;flex-shrink:0;">${init}</div>`;
+          return `<div style="display:flex;align-items:center;gap:8px;padding:0 20px;border-right:1px solid #e2e8f0;flex-shrink:0;height:50px;">
+            ${logoEl}
+            <span style="font-size:12px;font-weight:700;color:#0f172a;font-family:ui-monospace,monospace;letter-spacing:0.04em;">${item.sym}</span>
+            <span style="font-size:12px;color:#475569;font-family:ui-monospace,monospace;">R ${priceStr}</span>
+            ${changeStr ? `<span style="font-size:12px;font-family:ui-monospace,monospace;font-weight:600;color:${cc};">${changeStr}</span>` : ''}
           </div>`;
         };
         track.innerHTML = [...items, ...items].map(renderTickerItem).join('');
@@ -4754,15 +4759,33 @@
         const track = document.getElementById('ovTickerTrack');
         if (!track) return;
         try {
-          const { data: secs, error } = await supabaseClient
+          /* Collect unique symbols from all strategy holdings */
+          const stratSymbols = new Set();
+          (allStrategiesFullData || []).forEach(strategy => {
+            (Array.isArray(strategy.holdings) ? strategy.holdings : []).forEach(h => {
+              const sym = h.ticker || h.symbol || (typeof h === 'string' ? h : '');
+              if (sym) stratSymbols.add(sym);
+            });
+          });
+
+          let query = supabaseClient
             .from('securities')
-            .select('symbol, last_price, change_percent')
-            .eq('is_active', true)
-            .order('symbol', { ascending: true })
-            .limit(200);
+            .select('symbol, name, logo_url, last_price, change_percent')
+            .order('symbol', { ascending: true });
+
+          if (stratSymbols.size > 0) {
+            /* Only show assets that exist in strategies */
+            query = query.in('symbol', [...stratSymbols]);
+          } else {
+            /* Fallback: all active securities */
+            query = query.eq('is_active', true).limit(60);
+          }
+
+          const { data: secs, error } = await query;
           if (error) throw error;
           const items = (secs || []).map(s => ({
             sym: (s.symbol || '').replace('.JO', ''),
+            logo: s.logo_url || null,
             price: s.last_price != null ? Number(s.last_price) / 100 : null,
             change: s.change_percent != null ? Number(s.change_percent) : null
           })).filter(item => item.sym);
