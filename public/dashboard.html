@@ -1624,6 +1624,7 @@
       let strategyWorkspaceVisible = false;
       let strategyInvestorFilter = "all";   // "all" | "invested" | "not-invested"
       let strategyInvestedIds = new Set();  // strategy IDs that have ≥1 real investor
+      let strategyYtdMap = new Map();       // strategy_id → YTD return (decimal, e.g. 0.1419)
 
       /* ── View-only mode for invested strategies ──────────────────────── */
       let strategyViewOnlyMode = false;
@@ -4082,6 +4083,7 @@
         allStrategiesFullData = strategies;
         renderTopAssetsRow(); // re-rank cards now that strategy usage counts are known
         loadStrategyInvestorData().catch(err => console.error('[Init] loadStrategyInvestorData failed:', err));
+        loadStrategyYtd().catch(err => console.warn('[Init] loadStrategyYtd failed:', err));
 
         // Build live securities price map for overview min investment display
         const _allSyms = [
@@ -5879,6 +5881,29 @@
       };
 
       /* ── Load which strategies have real investors ── */
+      /* Fetch YTD returns from strategy_analytics — same approach as Mint MarketsPage */
+      const loadStrategyYtd = async () => {
+        const strategies = allStrategiesFullData || [];
+        if (!strategies.length) return;
+        try {
+          const ids = strategies.map(s => s.id).filter(Boolean);
+          const { data, error } = await supabaseClient
+            .from("strategy_analytics")
+            .select("strategy_id, ytd_return, summary")
+            .in("strategy_id", ids);
+          if (error) throw error;
+          strategyYtdMap = new Map();
+          (data || []).forEach(row => {
+            /* Prefer summary.ytd_return, then ytd_return column — matches Mint source */
+            const val = row?.summary?.ytd_return ?? row?.ytd_return ?? null;
+            if (row.strategy_id != null) strategyYtdMap.set(String(row.strategy_id), val);
+          });
+          renderTopAssetsRow(); /* re-render with real YTD values */
+        } catch (e) {
+          console.warn("loadStrategyYtd failed:", e);
+        }
+      };
+
       const loadStrategyInvestorData = async () => {
         strategyInvestedIds = new Set();
         const strategies = allStrategiesFullData || [];
@@ -6019,8 +6044,8 @@
                </div>`
             : "";
 
-          /* YTD */
-          const ytd = strategy.r_ytd ?? null;
+          /* YTD — from strategy_analytics via strategyYtdMap */
+          const ytd = strategyYtdMap.get(String(strategy.id)) ?? null;
           const ytdDisplay = fmtYtd(ytd);
           const ytdClr = ytdColor(ytd);
 
