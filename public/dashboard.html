@@ -5970,11 +5970,8 @@
                    (typeof a.change_percent === "number" ? a.change_percent : -Infinity);
           };
 
-          /* Only show securities that appear in at least one strategy, with logos */
-          const inStrategies = (s) => (usageCount[s.symbol] || usageCount[normalizeSymbol(s.symbol)] || 0) > 0;
-          const top7 = [...allSecuritiesCache].filter((s) => inStrategies(s) && s.logo_url && s.last_price).sort(byUsage).slice(0, 7);
-          /* Fallback: strategy assets without logos if not enough */
-          const display = top7.length >= 3 ? top7 : [...allSecuritiesCache].filter((s) => inStrategies(s) && s.last_price).sort(byUsage).slice(0, 7);
+          const top7 = [...allSecuritiesCache].filter((s) => s.logo_url && s.last_price).sort(byUsage).slice(0, 7);
+          const display = top7.length >= 3 ? top7 : [...allSecuritiesCache].filter((s) => s.last_price).sort(byUsage).slice(0, 7);
 
           if (!display.length) {
             row.innerHTML = '<span style="color:#64748b;font-size:12px;padding:8px 0;">No live data available</span>';
