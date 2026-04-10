@@ -1033,6 +1033,65 @@
                 </div>
               </div>
 
+              <!-- Browse-mode panel: visible only when no strategy workspace is open -->
+              <div id="strategyBrowsePanel" style="display:none;padding:20px;border-top:1px solid #f1f5f9;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;">
+
+                  <!-- Left: Quick platform stats -->
+                  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:20px;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+                      <div style="width:30px;height:30px;border-radius:8px;background:#ede9fe;display:flex;align-items:center;justify-content:center;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="6" height="18" rx="1"/><rect x="9" y="8" width="6" height="13" rx="1"/><rect x="16" y="12" width="6" height="9" rx="1"/></svg>
+                      </div>
+                      <span style="font-size:14px;font-weight:700;color:#0f172a;">Platform Overview</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                      <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
+                        <div id="browseTotalStrategies" style="font-size:22px;font-weight:800;color:#0f172a;line-height:1;">—</div>
+                        <div style="font-size:11px;color:#94a3b8;margin-top:4px;font-weight:500;">Total Strategies</div>
+                      </div>
+                      <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
+                        <div id="browseLiveStrategies" style="font-size:22px;font-weight:800;color:#059669;line-height:1;">—</div>
+                        <div style="font-size:11px;color:#94a3b8;margin-top:4px;font-weight:500;">Live (Public)</div>
+                      </div>
+                      <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
+                        <div id="browseTotalInvestors" style="font-size:22px;font-weight:800;color:#2563eb;line-height:1;">—</div>
+                        <div style="font-size:11px;color:#94a3b8;margin-top:4px;font-weight:500;">Total Investors</div>
+                      </div>
+                      <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
+                        <div id="browseTotalAUM" style="font-size:16px;font-weight:800;color:#0f172a;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
+                        <div style="font-size:11px;color:#94a3b8;margin-top:4px;font-weight:500;">Total AUM</div>
+                      </div>
+                    </div>
+                    <button onclick="document.getElementById('newStrategyBtn')?.click()" style="margin-top:16px;width:100%;padding:11px;background:#7c3aed;color:white;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.15s;" onmouseenter="this.style.background='#6d28d9'" onmouseleave="this.style.background='#7c3aed'">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                      Create New Strategy
+                    </button>
+                  </div>
+
+                  <!-- Right: News & Insights from Mint platform -->
+                  <div style="background:white;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid #f1f5f9;">
+                      <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="width:30px;height:30px;border-radius:8px;background:#fef3c7;display:flex;align-items:center;justify-content:center;">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v18l-7-3-7 3z"/></svg>
+                        </div>
+                        <span style="font-size:14px;font-weight:700;color:#0f172a;">News &amp; Insights</span>
+                      </div>
+                      <span style="font-size:11px;color:#94a3b8;font-weight:500;">Mint Platform</span>
+                    </div>
+                    <div id="stratBrowseNewsList" style="max-height:300px;overflow-y:auto;padding:12px 14px;">
+                      <div class="animate-pulse flex flex-col gap-3">
+                        <div class="h-14 bg-slate-100 rounded-lg"></div>
+                        <div class="h-14 bg-slate-100 rounded-lg"></div>
+                        <div class="h-14 bg-slate-100 rounded-lg"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
               <!-- Heading + search (shown only when strategy workspace is open) -->
               <div id="strategySearchSection" class="px-5 py-8 border-b border-slate-100 text-center" style="display:none;">
                 <div style="display:flex;align-items:flex-start;justify-content:flex-end;margin-bottom:4px;">
@@ -1717,7 +1776,78 @@
         if (ws) ws.style.display = visible ? "" : "none";
         const searchSection = document.getElementById("strategySearchSection");
         if (searchSection) searchSection.style.display = visible ? "" : "none";
+        const browsePanel = document.getElementById("strategyBrowsePanel");
+        if (browsePanel) {
+          browsePanel.style.display = visible ? "none" : "";
+          if (!visible) loadStrategyBrowsePanel();
+        }
         renderTopAssetsRow(); /* swap between stock cards (editing) and strategy cards (browse) */
+      };
+
+      let _browsePanelLoaded = false;
+      const loadStrategyBrowsePanel = async () => {
+        if (_browsePanelLoaded) return;
+        _browsePanelLoaded = true;
+
+        /* ── Stats from already-loaded strategy data ── */
+        const strategies = allStrategiesFullData || [];
+        const total = strategies.length;
+        const live = strategies.filter(s => s.is_public).length;
+
+        const elTotal = document.getElementById('browseTotalStrategies');
+        const elLive = document.getElementById('browseLiveStrategies');
+        if (elTotal) elTotal.textContent = total;
+        if (elLive) elLive.textContent = live;
+
+        /* Fetch investor count & AUM from stock_holdings */
+        try {
+          const { data: hData } = await supabaseClient
+            .from('stock_holdings')
+            .select('investor_id, market_value')
+            .eq('is_active', true);
+          if (hData) {
+            const uniqueInvestors = new Set(hData.map(h => h.investor_id)).size;
+            const totalAUM = hData.reduce((sum, h) => sum + (Number(h.market_value) || 0), 0) / 100;
+            const elInv = document.getElementById('browseTotalInvestors');
+            const elAUM = document.getElementById('browseTotalAUM');
+            if (elInv) elInv.textContent = uniqueInvestors;
+            if (elAUM) elAUM.textContent = totalAUM >= 1e6
+              ? `R ${(totalAUM / 1e6).toFixed(1)}M`
+              : totalAUM >= 1e3 ? `R ${(totalAUM / 1e3).toFixed(0)}K` : `R ${totalAUM.toFixed(0)}`;
+          }
+        } catch(e) { /* silently ignore */ }
+
+        /* ── News from News_articles ── */
+        const listEl = document.getElementById('stratBrowseNewsList');
+        if (!listEl) return;
+        try {
+          const { data: newsData, error } = await supabaseClient
+            .from('News_articles')
+            .select('id, title, source, channel, published_at, body_text')
+            .order('published_at', { ascending: false })
+            .limit(8);
+          if (error || !newsData || !newsData.length) {
+            listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No news available</div>';
+            return;
+          }
+          listEl.innerHTML = newsData.map(article => {
+            const src = article.source || article.channel || 'Mint';
+            const dateStr = article.published_at
+              ? new Date(article.published_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })
+              : '';
+            const preview = (article.body_text || '').slice(0, 120) + (article.body_text?.length > 120 ? '…' : '');
+            return `<div class="news-item-hover" style="border:1px solid #f1f5f9;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s;background:white;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+                <span style="font-size:10px;font-weight:700;color:#7c3aed;background:#ede9fe;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:0.04em;">${src}</span>
+                <span style="font-size:10px;color:#94a3b8;">${dateStr}</span>
+              </div>
+              <div style="font-size:12px;font-weight:600;color:#0f172a;line-height:1.4;margin-bottom:3px;">${article.title}</div>
+              ${preview ? `<div style="font-size:11px;color:#64748b;line-height:1.5;">${preview}</div>` : ''}
+            </div>`;
+          }).join('');
+        } catch(e) {
+          if (listEl) listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">News unavailable</div>';
+        }
       };
 
       const normalizeSymbol = (symbol) => {
@@ -1942,6 +2072,8 @@
         if (!(await checkUnsavedChanges())) return;
         switchTab(tabStrategies);
         loadAllSecurities();
+        /* Ensure browse mode is active (no workspace open) when tab is first clicked */
+        if (!strategyWorkspaceVisible) setStrategyWorkspaceVisible(false);
       });
       tabFactsheets.addEventListener("click", async () => {
         if (!(await checkUnsavedChanges())) return;
