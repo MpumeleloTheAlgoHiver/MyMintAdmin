@@ -1780,12 +1780,16 @@
           browsePanel.style.display = visible ? "none" : "";
           if (!visible) loadStrategyBrowsePanel();
         }
-        /* Show Factsheets + Edit Strategy only when a strategy is selected */
+        if (visible) _setStratBtnsVisible(true); /* show when entering edit mode */
+        renderTopAssetsRow(); /* swap between stock cards (editing) and strategy cards (browse) */
+      };
+
+      /* Show/hide Factsheets + Edit Strategy nav buttons independently of workspace mode */
+      const _setStratBtnsVisible = (show) => {
         const factsheetsBtn = document.getElementById("factsheetsNavBtn");
         const editBtn = document.getElementById("editStrategyNavBtn");
-        if (factsheetsBtn) factsheetsBtn.style.display = visible ? "flex" : "none";
-        if (editBtn) editBtn.style.display = visible ? "flex" : "none";
-        renderTopAssetsRow(); /* swap between stock cards (editing) and strategy cards (browse) */
+        if (factsheetsBtn) factsheetsBtn.style.display = show ? "flex" : "none";
+        if (editBtn) editBtn.style.display = show ? "flex" : "none";
       };
 
       let _browsePanelLoaded = false;
@@ -3135,6 +3139,7 @@
         formHoldings.splice(index, 1);
         _stratDirty = true;
         if (formHoldings.length === 0 && !activeStrategyTabId) {
+          _setStratBtnsVisible(false);
           setStrategyWorkspaceVisible(false);
         }
         renderFormHoldings();
@@ -4522,6 +4527,7 @@
           formHoldings = [];
           editingStrategyId = null;
           activeStrategyTabId = null;
+          _setStratBtnsVisible(false);
           if (typeof setStrategyWorkspaceVisible === 'function') setStrategyWorkspaceVisible(false);
           if (typeof renderFormHoldings === 'function') renderFormHoldings();
           cleanup(true);
@@ -4723,6 +4729,7 @@
 
       const _doOvSelectStrategy = async (idx, strat) => {
         try {
+        _setStratBtnsVisible(true); /* strategy selected — show Factsheets + Edit Strategy */
         window.__dbgBreadcrumb('ovSelect:start val=' + idx);
         const sel = document.getElementById('ovStratSel');
         if (sel) sel.value = String(idx);
