@@ -7604,6 +7604,11 @@
             });
           }
 
+          // [FOCUS FIX] Capture focused element state
+          const focusedId = document.activeElement ? document.activeElement.id : null;
+          const selectionStart = (document.activeElement && typeof document.activeElement.selectionStart === "number") ? document.activeElement.selectionStart : null;
+          const selectionEnd = (document.activeElement && typeof document.activeElement.selectionEnd === "number") ? document.activeElement.selectionEnd : null;
+
           body.innerHTML = `
             <div class="space-y-4">
               <div>
@@ -7787,6 +7792,17 @@
             selectedExtraSecurityId = extraSelect.value || null;
             render();
           });
+ 
+          // [FOCUS FIX] Restore focused element state
+          if (focusedId) {
+            const el = body.querySelector(`#${focusedId}`);
+            if (el && el.tagName === "INPUT") {
+              el.focus();
+              if (selectionStart !== null && selectionEnd !== null) {
+                el.setSelectionRange(selectionStart, selectionEnd);
+              }
+            }
+          }
         };
 
         render();
@@ -8130,6 +8146,8 @@
             strategy_name_snapshot: strategyNameSnapshot,
             _rowId: row.id,
             _remaining: totalQty - soldQty,
+            avg_fill: Math.round(Number(rebSelectedIsin.currentPrice || 0) * 100),
+            Status: "inactive",
           };
         });
         if (sellEventRows.length) {
@@ -8153,6 +8171,9 @@
                 closed_at: nowIso,
                 updated_at: nowIso,
                 rebalance_batch_id: rebalanceBatchId,
+                avg_exit: Math.round(Number(rebSelectedIsin.currentPrice || 0) * 100),
+                exit_date: nowIso.split("T")[0],
+                Status: "inactive",
               })
               .eq("id", evt._rowId);
             if (closeErr) throw new Error(closeErr.message || "Failed to close replaced position.");
@@ -8182,6 +8203,7 @@
             closed_at: nowIso,
             rebalance_batch_id: rebalanceBatchId,
             strategy_name_snapshot: strategyNameSnapshot,
+            Status: "inactive",
           }))
           .filter((row) => row.quantity > 0);
         if (buyEventRows.length) {
@@ -8206,6 +8228,7 @@
               closed_at: nowIso,
               rebalance_batch_id: rebalanceBatchId,
               strategy_name_snapshot: strategyNameSnapshot,
+              Status: "inactive",
             }))
             .filter((row) => row.quantity > 0);
           if (extraBuyEventRows.length) {
@@ -8244,6 +8267,7 @@
                   trade_side: "BUY",
                   is_active: true,
                   strategy_name_snapshot: strategyNameSnapshot,
+                  Status: "active",
                 })
                 .eq("id", existingBuy.id);
               if (updateErr) throw new Error(updateErr.message || "Failed to update active buy bucket.");
@@ -8260,6 +8284,7 @@
                   is_active: true,
                   rebalance_batch_id: rebalanceBatchId,
                   strategy_name_snapshot: strategyNameSnapshot,
+                  Status: "active",
                 });
               if (insertErr) throw new Error(insertErr.message || "Failed to insert active buy bucket row.");
             }

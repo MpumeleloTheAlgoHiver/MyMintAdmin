@@ -822,6 +822,173 @@
         padding: 16px;
       }
     }
+
+    /* Price Edit Improvements */
+    .edit-price-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: #94a3b8;
+      cursor: pointer;
+      margin-left: 4px;
+      transition: all 0.15s ease;
+      vertical-align: middle;
+    }
+    .edit-price-btn:hover {
+      background: #f1f5f9;
+      color: #7c3aed;
+      border-color: #e2e8f0;
+    }
+    .edit-price-btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
+    /* Modal Styles */
+    .price-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(4px);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.22s ease;
+    }
+    .price-modal-backdrop.is-active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .price-modal-content {
+      background: white;
+      width: 100%;
+      max-width: 400px;
+      border-radius: 16px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      overflow: hidden;
+      transform: translateY(20px);
+      transition: transform 0.22s ease;
+    }
+    .price-modal-backdrop.is-active .price-modal-content {
+      transform: translateY(0);
+    }
+    .price-modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .price-modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .price-modal-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .price-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .price-input-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .price-input {
+      width: 100%;
+      height: 44px;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      padding: 0 12px;
+      font-size: 14px;
+      font-family: inherit;
+      color: #0f172a;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .price-input:focus {
+      border-color: #7c3aed;
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+    }
+    .batch-toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #f8fafc;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid #f1f5f9;
+      cursor: pointer;
+    }
+    .batch-toggle-input {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: #7c3aed;
+    }
+    .batch-toggle-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #475569;
+      cursor: pointer;
+    }
+    .price-modal-footer {
+      padding: 16px 24px;
+      background: #f8fafc;
+      border-top: 1px solid #f1f5f9;
+      display: flex;
+      gap: 12px;
+    }
+    .price-modal-btn {
+      flex: 1;
+      height: 40px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .price-btn-cancel {
+      background: white;
+      border: 1px solid #e2e8f0;
+      color: #64748b;
+    }
+    .price-btn-cancel:hover {
+      background: #f1f5f9;
+      color: #475569;
+    }
+    .price-btn-confirm {
+      background: #0f172a;
+      border: 1px solid #0f172a;
+      color: white;
+    }
+    .price-btn-confirm:hover {
+      background: #334155;
+    }
+    .price-btn-confirm:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -3698,7 +3865,13 @@
             <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
             <td><span class="side-badge ${sideClass}">${escapeHtml(sideValue || '-')}</span></td>
             <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
-            <td>${escapeHtml(asRandValue(row.avgFill))}</td>
+            <td>
+              ${escapeHtml(asRandValue(row.avgFill))}
+              ${sideValue === 'SELL' ? `
+              <button class="edit-price-btn" title="Update Actual Exit Price" data-edit-price data-line="${lineKey}">
+                <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+              </button>` : ''}
+            </td>
             <td>${escapeHtml(asRandValue(row.marketValue))}</td>
             <td>${escapeHtml(row.orderType || '-')}</td>
             <td>
@@ -4230,6 +4403,123 @@
       });
     }
 
+    /* ── Price Update Logic ── */
+    const priceModal = document.getElementById('orderbookPriceModal');
+    const priceInput = document.getElementById('priceInput');
+    const priceModalInstrument = document.getElementById('priceModalInstrument');
+    const priceModalConfirm = document.getElementById('priceModalConfirm');
+    const priceModalCancel = document.getElementById('priceModalCancel');
+    const priceModalClose = document.getElementById('priceModalClose');
+    const batchToggle = document.getElementById('batchToggle');
+    const batchToggleWrap = document.getElementById('batchToggleWrap');
+    let currentEditRow = null;
+
+    const openPriceModal = (row) => {
+      currentEditRow = row;
+      const side = String(row.tradeSide || row.side || '').toUpperCase();
+      const isBuy = side === 'BUY';
+      
+      priceModalInstrument.textContent = `${row.ticker || ''} · ${row.instrumentName || ''}`;
+      
+      // Show side with badge style
+      const sideEl = document.getElementById('priceModalSide');
+      if (sideEl) {
+        const sideClass = isBuy ? 'side-badge-buy' : (side === 'SELL' ? 'side-badge-sell' : 'side-badge-neutral');
+        sideEl.innerHTML = `<span class="side-badge ${sideClass}" style="font-size:10px;padding:2px 8px;">${side}</span>`;
+      }
+      
+      // Update label based on side
+      const labelEl = document.getElementById('priceInputLabel');
+      if (labelEl) {
+        labelEl.textContent = isBuy ? 'Broker Fill Price (R)' : 'Broker Exit Price (R)';
+      }
+
+      priceInput.value = (Number(row.avgFill) || 0).toFixed(2);
+      
+      // Only show batch toggle if we have a rebalance batch ID
+      if (row.rebalanceBatchId) {
+        batchToggleWrap.style.display = 'flex';
+        batchToggle.checked = true;
+      } else {
+        batchToggleWrap.style.display = 'none';
+        batchToggle.checked = false;
+      }
+      
+      priceModal.classList.add('is-active');
+      setTimeout(() => priceInput.focus(), 50);
+    };
+
+    const closePriceModal = () => {
+      priceModal.classList.remove('is-active');
+      currentEditRow = null;
+    };
+
+    if (orderbookTableBody) {
+      orderbookTableBody.addEventListener('click', async (event) => {
+        const editBtn = event.target.closest('[data-edit-price]');
+        if (editBtn) {
+          const lineKey = editBtn.dataset.line;
+          const row = (allOrderbookRows || []).find(r => String(r.line) === String(lineKey));
+          if (row) openPriceModal(row);
+          return;
+        }
+        // ... existing detail row toggling handled below
+      });
+    }
+
+    if (priceModalClose) priceModalClose.addEventListener('click', closePriceModal);
+    if (priceModalCancel) priceModalCancel.addEventListener('click', closePriceModal);
+    
+    if (priceModalConfirm) {
+      priceModalConfirm.addEventListener('click', async () => {
+        if (!currentEditRow) return;
+        const newPriceRand = parseFloat(priceInput.value);
+        if (isNaN(newPriceRand)) return;
+        
+        const newPriceCents = Math.round(newPriceRand * 100);
+        priceModalConfirm.disabled = true;
+        priceModalConfirm.textContent = 'Updating...';
+        
+        try {
+          // Identify IDs to update
+          let idsToUpdate = [];
+          if (batchToggle.checked && currentEditRow.rebalanceBatchId) {
+            // Find all matching rows in our current data
+            idsToUpdate = (allOrderbookRawRows || [])
+              .filter(r => r.rebalanceBatchId === currentEditRow.rebalanceBatchId)
+              .map(r => r.id);
+          } else {
+            idsToUpdate = [currentEditRow.id];
+          }
+
+          if (!idsToUpdate.length) throw new Error('No records to update.');
+
+          // Perform Supabase update
+          // Note: We update both avg_fill and avg_exit to be safe, 
+          // though usually one applies per row type.
+          const { error } = await supabaseClient
+            .from('stock_holdings')
+            .update({ 
+              avg_fill: newPriceCents,
+              avg_exit: newPriceCents
+            })
+            .in('id', idsToUpdate);
+
+          if (error) throw error;
+
+          // Success - refresh orderbook
+          closePriceModal();
+          await loadOrderbook();
+        } catch (err) {
+          console.error('Price update failed:', err);
+          alert('Failed to update price: ' + (err.message || 'Unknown error'));
+        } finally {
+          priceModalConfirm.disabled = false;
+          priceModalConfirm.textContent = 'Update Price';
+        }
+      });
+    }
+
     filledOrderbooksArchive = readFilledArchive();
     setActiveTab('active');
     updateOrderbookHeaderSequence();
@@ -4311,6 +4601,32 @@
     <button onclick="mintAppClose()" style="background:#1e293b;color:#94a3b8;border:none;border-radius:8px;padding:5px 14px;cursor:pointer;font-size:12px;font-weight:500;">&#8592; Back to Admin</button>
   </div>
   <iframe id="mintAppFrame" src="" style="position:absolute;top:44px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 44px);border:none;background:white;" allowfullscreen></iframe>
+</div>
+
+<!-- Price Update Modal -->
+<div id="orderbookPriceModal" class="price-modal-backdrop">
+  <div class="price-modal-content">
+    <div class="price-modal-header">
+      <h3 class="price-modal-title">Update Actual Price</h3>
+      <button id="priceModalClose" style="background:none;border:none;color:#94a3b8;cursor:pointer;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="price-modal-body">
+      <div id="priceModalInstrument" style="font-size:13px;color:#64748b;margin-bottom:-10px;"></div>
+      <div id="priceModalSide" style="margin-bottom:-5px;"></div>
+      <div class="price-input-group">
+        <label id="priceInputLabel" class="price-input-label" for="priceInput">Broker Fill Price (R)</label>
+        <input type="number" id="priceInput" class="price-input" placeholder="0.00" step="0.01">
+      </div>
+      <label id="batchToggleWrap" class="batch-toggle-wrap">
+        <input type="checkbox" id="batchToggle" class="batch-toggle-input">
+        <span class="batch-toggle-label">Apply to entire rebalance batch</span>
+      </label>
+    </div>
+    <div class="price-modal-footer">
+      <button id="priceModalCancel" class="price-modal-btn price-btn-cancel">Cancel</button>
+      <button id="priceModalConfirm" class="price-modal-btn price-btn-confirm">Update Price</button>
+    </div>
+  </div>
 </div>
 </body>
 </html>
