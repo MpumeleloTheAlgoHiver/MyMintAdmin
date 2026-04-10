@@ -1790,17 +1790,7 @@
         const listEl = document.getElementById('returnInsightsList');
         if (!listEl) return;
 
-        /* WTD / MTD not stored in DB — show a clear message */
-        if (tab === 'wtd' || tab === 'mtd') {
-          listEl.innerHTML = `<div style="text-align:center;padding:28px 16px;">
-            <div style="font-size:24px;margin-bottom:8px;">📊</div>
-            <div style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:4px;">${tab.toUpperCase()} data not tracked</div>
-            <div style="font-size:11px;color:#94a3b8;">This period isn't stored in the database yet.</div>
-          </div>`;
-          return;
-        }
-
-        const fieldMap = { daily: 'change_percent', ytd: 'ytd_performance' };
+        const fieldMap = { daily: 'change_percent', wtd: 'wtd_performance', mtd: 'mtd_performance', ytd: 'ytd_performance' };
         const field = fieldMap[tab] || 'change_percent';
         const all = (_returnInsightsData || [])
           .map(a => ({ ...a, _val: a[field] != null ? Number(a[field]) : null }))
@@ -1865,10 +1855,12 @@
         listEl.innerHTML = html;
       };
 
-      window.switchReturnTab = (tab) => {
+      const _fetchedPeriods = new Set(['daily', 'ytd']); /* already loaded via Supabase */
+
+      window.switchReturnTab = async (tab) => {
         _activeReturnTab = tab;
-        const tabs = { daily: 'riTabDaily', wtd: 'riTabWtd', mtd: 'riTabMtd', ytd: 'riTabYtd' };
-        Object.entries(tabs).forEach(([key, id]) => {
+        const tabBtns = { daily: 'riTabDaily', wtd: 'riTabWtd', mtd: 'riTabMtd', ytd: 'riTabYtd' };
+        Object.entries(tabBtns).forEach(([key, id]) => {
           const btn = document.getElementById(id);
           if (!btn) return;
           const active = key === tab;
@@ -1876,6 +1868,30 @@
           btn.style.borderBottomColor = active ? '#7c3aed' : 'transparent';
           btn.style.fontWeight = active ? '700' : '600';
         });
+
+        /* WTD / MTD — fetch from server if not yet loaded */
+        if ((tab === 'wtd' || tab === 'mtd') && !_fetchedPeriods.has(tab)) {
+          const listEl = document.getElementById('returnInsightsList');
+          if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">Loading ${tab.toUpperCase()} data…</div>`;
+
+          try {
+            const symbols = (_returnInsightsData || []).map(a => a.symbol).filter(Boolean);
+            if (symbols.length) {
+              const resp = await fetch(`/api/security-performance?symbols=${encodeURIComponent(symbols.join(','))}`);
+              if (resp.ok) {
+                const { results } = await resp.json();
+                /* Merge wtd/mtd into existing data */
+                _returnInsightsData = (_returnInsightsData || []).map(a => {
+                  const r = results[a.symbol];
+                  return r ? { ...a, wtd_performance: r.wtd_performance, mtd_performance: r.mtd_performance } : a;
+                });
+                _fetchedPeriods.add('wtd');
+                _fetchedPeriods.add('mtd');
+              }
+            }
+          } catch(e) { console.warn('[ReturnInsights] WTD/MTD fetch failed:', e); }
+        }
+
         _renderReturnInsights(tab);
       };
 

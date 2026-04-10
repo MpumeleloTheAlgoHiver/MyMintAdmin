@@ -907,6 +907,84 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  /* ── WTD / MTD performance calculated from Yahoo Finance chart API ── */
+  if (req.url.startsWith('/api/security-performance') && req.method === 'GET') {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const symbolsParam = url.searchParams.get('symbols') || '';
+    const symbols = symbolsParam.split(',').map(s => s.trim()).filter(Boolean);
+    if (!symbols.length) { sendJson(res, 400, { error: 'symbols param required' }); return; }
+
+    (async () => {
+      try {
+        const results = {};
+        for (const sym of symbols) {
+          const encodedSym = encodeURIComponent(sym);
+          const perf = { symbol: sym, wtd_performance: null, mtd_performance: null };
+
+          /* WTD — last 5 trading days */
+          try {
+            const r = await fetch(
+              `https://query1.finance.yahoo.com/v8/finance/chart/${encodedSym}?interval=1d&range=5d`,
+              { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } }
+            );
+            if (r.ok) {
+              const d = await r.json();
+              const cr = d?.chart?.result?.[0];
+              if (cr) {
+                const timestamps = cr.timestamp || [];
+                const closes = cr.indicators?.quote?.[0]?.close || [];
+                const cur = cr.meta?.regularMarketPrice;
+                const now = new Date();
+                const dow = now.getDay();
+                const monday = new Date(now);
+                monday.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
+                monday.setHours(0, 0, 0, 0);
+                let startPrice = null;
+                for (let i = 0; i < timestamps.length; i++) {
+                  if (new Date(timestamps[i] * 1000) >= monday && closes[i] != null) { startPrice = closes[i]; break; }
+                }
+                if (startPrice == null) startPrice = closes.find(c => c != null);
+                if (startPrice && cur) perf.wtd_performance = ((cur - startPrice) / startPrice) * 100;
+              }
+            }
+          } catch { /* ignore */ }
+
+          /* MTD — last 1 month */
+          try {
+            const r = await fetch(
+              `https://query1.finance.yahoo.com/v8/finance/chart/${encodedSym}?interval=1d&range=1mo`,
+              { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } }
+            );
+            if (r.ok) {
+              const d = await r.json();
+              const cr = d?.chart?.result?.[0];
+              if (cr) {
+                const timestamps = cr.timestamp || [];
+                const closes = cr.indicators?.quote?.[0]?.close || [];
+                const cur = cr.meta?.regularMarketPrice;
+                const now = new Date();
+                const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                let startPrice = null;
+                for (let i = 0; i < timestamps.length; i++) {
+                  if (new Date(timestamps[i] * 1000) >= firstOfMonth && closes[i] != null) { startPrice = closes[i]; break; }
+                }
+                if (startPrice == null) startPrice = closes.find(c => c != null);
+                if (startPrice && cur) perf.mtd_performance = ((cur - startPrice) / startPrice) * 100;
+              }
+            }
+          } catch { /* ignore */ }
+
+          results[sym] = perf;
+          await new Promise(r => setTimeout(r, 120)); /* rate limit */
+        }
+        sendJson(res, 200, { results });
+      } catch (err) {
+        sendJson(res, 500, { error: err?.message || 'Failed' });
+      }
+    })();
+    return;
+  }
+
   if (req.url.startsWith('/api/confirm-eft-deposit') && req.method === 'POST') {
     const token = parseBearerToken(req.headers.authorization);
     if (!token) {
