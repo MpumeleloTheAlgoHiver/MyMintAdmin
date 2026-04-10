@@ -5900,6 +5900,7 @@
         }
 
         ovBuildStratDrop();
+        renderTopAssetsRow(); /* re-render now that investor data is ready, so sort is correct */
       };
 
       const renderTopAssetsRow = () => {
@@ -5911,7 +5912,19 @@
         /* If strategies haven't loaded yet, keep skeleton; will be called again on load */
         if (!strategies.length) return;
 
-        const display = strategies.slice(0, 7);
+        /* Sort: 1) live + has investors  2) live but no investors  3) rest */
+        const sortedStrategies = [...strategies].sort((a, b) => {
+          const rank = (s) => {
+            const hasUsers = strategyInvestedIds.has(String(s.id));
+            const isLive   = !!s.is_public;
+            if (isLive && hasUsers) return 0;
+            if (isLive && !hasUsers) return 1;
+            return 2;
+          };
+          return rank(a) - rank(b);
+        });
+
+        const display = sortedStrategies.slice(0, 7);
 
         /* Mini sparkline — matches Mint StrategyMiniChart: purple line + end dot on slate-50 bg */
         const sparkline = (i) => {
