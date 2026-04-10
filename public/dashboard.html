@@ -846,6 +846,7 @@
 
             <!-- ── Strategy Management inline panel (shown when no strategy selected) ── -->
             <div id="tabStrategiesInline">
+              <div id="ovStratCards" style="display:none;padding-bottom:24px;"></div>
             </div><!-- /tabStrategiesInline -->
 
             <!-- ── Strategy content: shown only when a strategy is selected ── -->
@@ -1887,7 +1888,7 @@
         if (inline && sp) {
           inline.appendChild(sp);
           sp.classList.remove('hidden');
-          sp.style.display = 'block';
+          sp.style.display = 'none'; /* cards view shown instead by default */
         }
       })();
 
@@ -4229,6 +4230,100 @@
         }
       };
 
+      const ovRenderStratCards = () => {
+        const container = document.getElementById('ovStratCards');
+        if (!container) return;
+        const strategies = _ovAllStrategies || [];
+        if (!strategies.length) {
+          container.innerHTML = `<div style="text-align:center;padding:48px 24px;color:#94a3b8;font-size:13px;">No strategies found. Use the dropdown above to create one.</div>`;
+          return;
+        }
+        const riskColor = {
+          low:    { bg: '#f0fdf4', text: '#16a34a', border: '#bbf7d0' },
+          medium: { bg: '#fefce8', text: '#ca8a04', border: '#fde68a' },
+          high:   { bg: '#fef2f2', text: '#dc2626', border: '#fecaca' },
+        };
+        const cards = strategies.map((s, idx) => {
+          const hasInv = strategyInvestedIds.has(String(s.id));
+          const isLive = s.is_public;
+          const holdings = Array.isArray(s.holdings) ? s.holdings : [];
+          const top5 = [...holdings]
+            .sort((a, b) => (Number(b.weight) || 0) - (Number(a.weight) || 0))
+            .slice(0, 5);
+          const risk = ((s.risk_level || 'medium') + '').toLowerCase();
+          const rc = riskColor[risk] || riskColor.medium;
+          const holdingsHtml = top5.length > 0 ? top5.map(h => {
+            const pct = Math.min(Number(h.weight) || 0, 100);
+            return `
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+                <span style="font-size:11px;font-weight:600;color:#475569;min-width:54px;font-family:ui-monospace,monospace;white-space:nowrap;">${h.ticker || '—'}</span>
+                <div style="flex:1;background:#f1f5f9;border-radius:3px;height:4px;overflow:hidden;">
+                  <div style="height:4px;border-radius:3px;background:#4f46e5;width:${pct}%;transition:width 0.4s;"></div>
+                </div>
+                <span style="font-size:10px;color:#94a3b8;font-family:ui-monospace,monospace;min-width:36px;text-align:right;">${pct.toFixed(1)}%</span>
+              </div>`;
+          }).join('') : '<span style="font-size:11px;color:#94a3b8;font-style:italic;">No holdings yet</span>';
+          return `
+            <div onclick="window.ovSelectStrategy(${idx})"
+              style="background:white;border-radius:14px;border:1.5px solid #e2e8f0;padding:18px 20px;cursor:pointer;transition:box-shadow 0.15s,border-color 0.15s;display:flex;flex-direction:column;gap:0;"
+              onmouseover="this.style.boxShadow='0 4px 24px rgba(79,70,229,0.1)';this.style.borderColor='#c7d2fe';"
+              onmouseout="this.style.boxShadow='';this.style.borderColor='#e2e8f0';">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:12px;">
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.short_name || s.name || 'Strategy'}</div>
+                  <div style="font-size:11px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.description || s.sector || '—'}</div>
+                </div>
+                <div style="display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;">
+                  ${isLive
+                    ? `<span style="font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:6px;background:#dcfce7;color:#16a34a;">Live</span>`
+                    : `<span style="font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:6px;background:#f1f5f9;color:#94a3b8;">Draft</span>`}
+                  <span style="font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:6px;background:${rc.bg};color:${rc.text};border:1px solid ${rc.border};">${risk.charAt(0).toUpperCase()+risk.slice(1)} risk</span>
+                </div>
+              </div>
+              <div style="margin-bottom:14px;">
+                <div style="font-size:9.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Top ${top5.length} holdings</div>
+                ${holdingsHtml}
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid #f1f5f9;margin-top:auto;">
+                <span style="font-size:10px;color:#94a3b8;font-weight:500;">${holdings.length} asset${holdings.length !== 1 ? 's' : ''}</span>
+                ${hasInv
+                  ? `<span style="font-size:10px;font-weight:600;color:#059669;display:flex;align-items:center;gap:3px;"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>Investors</span>`
+                  : `<span style="font-size:10px;color:#cbd5e1;">No investors</span>`}
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#c7d2fe" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+              </div>
+            </div>`;
+        }).join('');
+        container.innerHTML = `
+          <div style="margin-bottom:20px;">
+            <h2 style="font-size:17px;font-weight:700;color:#0f172a;margin:0 0 3px;">Strategies</h2>
+            <p style="font-size:12px;color:#94a3b8;margin:0;">Select a strategy to view its full dashboard</p>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px;">
+            ${cards}
+          </div>`;
+      };
+      window.ovRenderStratCards = ovRenderStratCards;
+
+      window.ovDeselectStrategy = () => {
+        /* Reset button label */
+        const btnLabel = document.getElementById('ovStratBtnLabel');
+        const btnDot   = document.getElementById('ovStratBtnDot');
+        if (btnLabel) { btnLabel.textContent = 'Select strategy'; btnLabel.style.color = '#64748b'; }
+        if (btnDot)   { btnDot.style.display = 'none'; }
+        /* Reset select */
+        const sel = document.getElementById('ovStratSel');
+        if (sel) sel.value = '';
+        /* Hide strategy content and workspace, show cards */
+        const sc = document.getElementById('ovStratContent');
+        if (sc) sc.style.display = 'none';
+        const sp = document.getElementById('tabStrategiesPanel');
+        if (sp) sp.style.display = 'none';
+        const cardsEl = document.getElementById('ovStratCards');
+        if (cardsEl) { cardsEl.style.display = 'block'; ovRenderStratCards(); }
+        /* Rebuild dropdown (removes ← All Strategies row) */
+        ovBuildStratDrop();
+      };
+
       window.ovBuildStratDrop = () => {
         const panel = document.getElementById('ovStratPanel');
         if (!panel) return;
@@ -4294,6 +4389,16 @@
         };
 
         let html = '';
+        /* ← All Strategies row (only shown when a strategy is active) */
+        if (currentIdx >= 0 && currentIdx < strategies.length) {
+          html += `<div class="strat-drop-item" id="ovDropAllStrats"
+            style="color:#64748b;font-weight:600;animation:strat-item-in 0.18s ease both;gap:8px;"
+            onclick="window.ovDeselectStrategy();_ovClosePanel();">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+            All Strategies
+          </div>`;
+          html += `<div class="strat-drop-sep"></div>`;
+        }
         /* Add New Strategy row */
         html += `<div class="strat-drop-item" id="ovDropAddNew"
           style="color:#4f46e5;font-weight:600;animation:strat-item-in 0.18s ease both;">
@@ -4362,12 +4467,14 @@
         loadAllSecurities({ silent: true }).catch(e => console.warn('[Securities] silent load failed:', e));
         ovBuildStratDrop();
         ovRenderTicker().catch(e => console.warn('[Ticker] load failed:', e));
-        /* Default: show Overview tab with strategy mgmt content, no strategy selected */
+        /* Default: show strategy cards, hide workspace and strategy content */
         document.getElementById('tabOverview')?.click();
         const sp = document.getElementById('tabStrategiesPanel');
-        if (sp) sp.style.display = 'block';
+        if (sp) sp.style.display = 'none';
         const sc = document.getElementById('ovStratContent');
         if (sc) sc.style.display = 'none';
+        const cardsEl = document.getElementById('ovStratCards');
+        if (cardsEl) { cardsEl.style.display = 'block'; ovRenderStratCards(); }
         window.__dbgBreadcrumb('initOverview:done');
       };
 
@@ -4381,7 +4488,9 @@
         const hasInv   = strategyInvestedIds.has(String(strat.id));
         if (btnLabel) { btnLabel.textContent = strat.short_name || strat.name || 'Strategy ' + (idx+1); btnLabel.style.color = '#0f172a'; }
         if (btnDot)   { btnDot.style.display = 'block'; btnDot.style.background = hasInv ? '#10b981' : '#e2e8f0'; }
-        /* Switch to Overview tab, hide strategy mgmt, reveal strategy content */
+        /* Hide strategy cards, switch to Overview tab, reveal strategy content */
+        const cardsEl = document.getElementById('ovStratCards');
+        if (cardsEl) cardsEl.style.display = 'none';
         document.getElementById('tabOverview')?.click();
         const stratMgmt = document.getElementById('tabStrategiesPanel');
         if (stratMgmt) stratMgmt.style.display = 'none';
