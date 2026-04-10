@@ -1033,8 +1033,8 @@
                 </div>
               </div>
 
-              <!-- Heading + search (always visible) -->
-              <div id="strategySearchSection" class="px-5 py-8 border-b border-slate-100 text-center">
+              <!-- Heading + search (shown only when strategy workspace is open) -->
+              <div id="strategySearchSection" class="px-5 py-8 border-b border-slate-100 text-center" style="display:none;">
                 <div style="display:flex;align-items:flex-start;justify-content:flex-end;margin-bottom:4px;">
                   <button id="syncFundamentalsBtn" type="button"
                     style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;transition:all 0.15s;"
@@ -1715,6 +1715,8 @@
         strategyWorkspaceVisible = visible;
         const ws = document.getElementById("strategyWorkspace");
         if (ws) ws.style.display = visible ? "" : "none";
+        const searchSection = document.getElementById("strategySearchSection");
+        if (searchSection) searchSection.style.display = visible ? "" : "none";
         renderTopAssetsRow(); /* swap between stock cards (editing) and strategy cards (browse) */
       };
 
