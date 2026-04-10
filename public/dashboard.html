@@ -1791,41 +1791,66 @@
         if (!listEl) return;
         const fieldMap = { daily: 'change_percent', wtd: 'wtd_performance', mtd: 'mtd_performance', ytd: 'ytd_performance' };
         const field = fieldMap[tab] || 'change_percent';
-        const assets = (_returnInsightsData || [])
+        const all = (_returnInsightsData || [])
           .map(a => ({ ...a, _val: a[field] != null ? Number(a[field]) : null }))
           .filter(a => a._val != null)
           .sort((a, b) => b._val - a._val);
 
-        if (!assets.length) {
+        if (!all.length) {
           listEl.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No ${tab.toUpperCase()} data available</div>`;
           return;
         }
 
-        const maxAbs = Math.max(...assets.map(a => Math.abs(a._val)), 0.01);
-        listEl.innerHTML = assets.map((a, i) => {
+        const gainers = all.filter(a => a._val > 0).slice(0, 4);
+        const losers  = all.filter(a => a._val < 0).slice(-4).reverse();
+        const maxGain = Math.max(...gainers.map(a => a._val), 0.001);
+        const maxLoss = Math.max(...losers.map(a => Math.abs(a._val)), 0.001);
+
+        const buildRow = (a, rank, isGainer) => {
           const val = a._val;
-          const pos = val >= 0;
-          const valStr = (pos ? '+' : '') + val.toFixed(2) + '%';
-          const barColor = pos ? '#dcfce7' : '#fee2e2';
-          const textColor = pos ? '#16a34a' : '#dc2626';
-          const barW = Math.round((Math.abs(val) / maxAbs) * 100);
+          const valStr = (val >= 0 ? '+' : '') + val.toFixed(2) + '%';
+          const barPct = Math.round((Math.abs(val) / (isGainer ? maxGain : maxLoss)) * 100);
           const init = (a.symbol || '').replace('.JO','').slice(0,2).toUpperCase();
           const logoEl = a.logo_url
-            ? `<img src="${a.logo_url}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid #e2e8f0;flex-shrink:0;" onerror="this.outerHTML='<div style=\\'width:28px;height:28px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#7c3aed;\\'>${init}</div>'">`
-            : `<div style="width:28px;height:28px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#7c3aed;flex-shrink:0;">${init}</div>`;
+            ? `<img src="${a.logo_url}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;border:1px solid #e2e8f0;flex-shrink:0;" onerror="this.outerHTML='<div style=\\'width:26px;height:26px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#7c3aed;\\'>${init}</div>'">`
+            : `<div style="width:26px;height:26px;border-radius:50%;background:${isGainer ? '#dcfce7' : '#fee2e2'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:${isGainer ? '#16a34a' : '#dc2626'};flex-shrink:0;">${init}</div>`;
           const sym = (a.symbol || '').replace('.JO','');
-          return `<div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:10px;margin-bottom:2px;background:${i % 2 === 0 ? '#fafafa' : 'white'};">
-            <span style="font-size:10px;color:#cbd5e1;font-weight:600;width:16px;text-align:right;flex-shrink:0;">${i+1}</span>
+          return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;margin-bottom:2px;">
+            <span style="font-size:10px;color:#cbd5e1;font-weight:700;width:14px;text-align:center;flex-shrink:0;">${rank}</span>
             ${logoEl}
             <div style="flex:1;min-width:0;">
-              <div style="font-size:12px;font-weight:700;color:#0f172a;line-height:1.2;">${sym}</div>
-              <div style="height:4px;background:#f1f5f9;border-radius:4px;margin-top:4px;overflow:hidden;">
-                <div style="height:100%;width:${barW}%;background:${barColor};border-radius:4px;"></div>
+              <div style="font-size:11px;font-weight:700;color:#0f172a;">${sym}</div>
+              <div style="height:3px;background:#f1f5f9;border-radius:4px;margin-top:3px;overflow:hidden;">
+                <div style="height:100%;width:${barPct}%;background:${isGainer ? '#86efac' : '#fca5a5'};border-radius:4px;transition:width 0.4s ease;"></div>
               </div>
             </div>
-            <span style="font-size:12px;font-weight:700;color:${textColor};flex-shrink:0;min-width:52px;text-align:right;">${valStr}</span>
+            <span style="font-size:12px;font-weight:800;color:${isGainer ? '#16a34a' : '#dc2626'};flex-shrink:0;">${valStr}</span>
           </div>`;
-        }).join('');
+        };
+
+        let html = '';
+
+        if (gainers.length) {
+          html += `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px 4px;margin-top:2px;">
+            <div style="width:6px;height:6px;border-radius:50%;background:#16a34a;flex-shrink:0;"></div>
+            <span style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:0.06em;">Top Gainers</span>
+          </div>`;
+          html += gainers.map((a, i) => buildRow(a, i + 1, true)).join('');
+        }
+
+        if (losers.length) {
+          html += `<div style="display:flex;align-items:center;gap:6px;padding:8px 8px 4px;margin-top:4px;border-top:1px solid #f1f5f9;">
+            <div style="width:6px;height:6px;border-radius:50%;background:#dc2626;flex-shrink:0;"></div>
+            <span style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:0.06em;">Top Losers</span>
+          </div>`;
+          html += losers.map((a, i) => buildRow(a, i + 1, false)).join('');
+        }
+
+        if (!gainers.length && !losers.length) {
+          html = `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No ${tab.toUpperCase()} data available</div>`;
+        }
+
+        listEl.innerHTML = html;
       };
 
       window.switchReturnTab = (tab) => {
