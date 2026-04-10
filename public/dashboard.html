@@ -7813,11 +7813,13 @@
               ticker: rawSymbol,
               name: String(holding?.name || rawSymbol),
               shares: 0,
+              pending: !!holding?.pending,
             });
           }
           const entry = mergedBySymbol.get(key);
           entry.shares += Math.max(0, Number(holding?.shares || holding?.quantity || 0));
           if (!entry.name && holding?.name) entry.name = String(holding.name);
+          if (holding?.pending) entry.pending = true;
         });
 
         const merged = [...mergedBySymbol.values()].filter((h) => h.shares > 0);
@@ -7861,6 +7863,7 @@
             quantity: shares,
             marketValue,
             basis: marketValue > 0 ? marketValue : fallbackBasis,
+            pending: !!holding.pending,
           };
         });
 
@@ -7874,6 +7877,7 @@
           shares: holding.shares,
           quantity: holding.quantity,
           weight: totalBasis > 0 ? Number(((holding.basis / totalBasis) * 100).toFixed(2)) : 0,
+          ...(holding.pending ? { pending: true } : {}),
         }));
 
         return {
@@ -7952,6 +7956,7 @@
             name: existingBuy.name || buySelection.instrument.description || buySelection.instrument.code || buyFullSymbol,
             shares: updatedBuyShares,
             quantity: updatedBuyShares,
+            pending: true,
           };
         } else {
           nextHoldings.push({
@@ -7960,6 +7965,7 @@
             name: buySelection.instrument.description || buySelection.instrument.code || buyFullSymbol,
             shares: buyShares,
             quantity: buyShares,
+            pending: true,
           });
         }
 
