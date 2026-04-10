@@ -5940,72 +5940,135 @@
 
         /* ── SECURITY CARD MODE (shown while creating / editing a strategy) ── */
         if (strategyWorkspaceVisible) {
-          const securities = (allSecuritiesCache || [])
-            .filter(s => s.last_price)
-            .sort((a, b) => (b.market_cap || 0) - (a.market_cap || 0))
-            .slice(0, 20);
+          if (!allSecuritiesCache) return; /* wait for securities to load */
 
-          if (!securities.length) {
-            row.innerHTML = `<span style="color:#94a3b8;font-size:12px;padding:8px 0;">Start typing in the search box above to find assets to add</span>`;
+          const alreadyAdded = new Set(
+            formHoldings.map((h) => h.symbol || h.ticker).filter(Boolean),
+          );
+
+          /* Sort by how many strategies already use this symbol, then by price change */
+          const usageCount = {};
+          (allStrategiesFullData || []).forEach((strategy) => {
+            const holdings = Array.isArray(strategy.holdings) ? strategy.holdings : [];
+            const seen = new Set();
+            holdings.forEach((h) => {
+              const sym = h.ticker || h.symbol || (typeof h === "string" ? h : "");
+              if (sym && !seen.has(sym)) {
+                seen.add(sym);
+                usageCount[sym] = (usageCount[sym] || 0) + 1;
+                const norm = normalizeSymbol(sym);
+                if (norm !== sym) usageCount[norm] = (usageCount[norm] || 0) + 1;
+              }
+            });
+          });
+
+          const byUsage = (a, b) => {
+            const ua = usageCount[a.symbol] || usageCount[normalizeSymbol(a.symbol)] || 0;
+            const ub = usageCount[b.symbol] || usageCount[normalizeSymbol(b.symbol)] || 0;
+            if (ub !== ua) return ub - ua;
+            return (typeof b.change_percent === "number" ? b.change_percent : -Infinity) -
+                   (typeof a.change_percent === "number" ? a.change_percent : -Infinity);
+          };
+
+          const top7 = [...allSecuritiesCache].filter((s) => s.logo_url && s.last_price).sort(byUsage).slice(0, 7);
+          const display = top7.length >= 3 ? top7 : [...allSecuritiesCache].filter((s) => s.last_price).sort(byUsage).slice(0, 7);
+
+          if (!display.length) {
+            row.innerHTML = '<span style="color:#64748b;font-size:12px;padding:8px 0;">No live data available</span>';
             return;
           }
 
-          row.innerHTML = securities.map(s => {
-            const price = s.last_price ? "R\u00a0" + (Number(s.last_price) / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
-            const chg = s.change_percent != null ? Number(s.change_percent) : null;
-            const chgTxt = chg != null ? (chg >= 0 ? "+" : "") + chg.toFixed(2) + "%" : null;
-            const chgClr = chg == null ? "#94a3b8" : chg >= 0 ? "#16a34a" : "#dc2626";
-            const chgBg  = chg == null ? "#f8fafc"  : chg >= 0 ? "#f0fdf4" : "#fef2f2";
-            const sym = s._sym || s.symbol || "";
-            const init = sym.slice(0, 2).toUpperCase();
-            const logo = s.logo_url
-              ? `<img src="${s.logo_url}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" onerror="this.parentElement.innerHTML='<span style=\\'font-size:10px;font-weight:700;color:#64748b;\\'>${init}</span>'">`
-              : `<span style="font-size:10px;font-weight:700;color:#64748b;">${init}</span>`;
+          row.innerHTML = display.map((s) => {
+            const ticker = (s.symbol || "").replace(".JO", "");
+            const rawPrice = s.last_price ? s.last_price / 100 : null;
+            const price = rawPrice !== null ? rawPrice.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
+            const chgVal = typeof s.change_percent === "number" ? s.change_percent : null;
+            const absChange = rawPrice !== null && chgVal !== null ? (rawPrice * chgVal) / 100 : null;
+            const absStr = absChange !== null ? `${absChange >= 0 ? "+" : ""}${Math.abs(absChange).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "";
+            const pctStr = chgVal !== null ? `(${chgVal >= 0 ? "+" : ""}${chgVal.toFixed(2)}%)` : "—";
+            const chgStr = absStr ? `${absStr} ${pctStr}` : pctStr;
+            const isPos = chgVal !== null && chgVal >= 0;
+            const added = alreadyAdded.has(s.symbol);
 
-            return `<button type="button" data-sym="${sym}"
-              style="flex-shrink:0;width:160px;display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:14px;cursor:pointer;text-align:left;background:#ffffff;border:1px solid #f1f5f9;box-shadow:0 1px 3px rgba(0,0,0,0.06);transition:all 0.15s;outline:none;-webkit-appearance:none;appearance:none;">
+            const pillBg   = isPos ? "#16a34a" : "#dc2626";
+            const barColor = isPos ? "#22c55e" : "#ef4444";
+            const cardBorder = added ? "1.5px solid #22c55e" : "1.5px solid #e8edf3";
+            const cardShadow = added ? "0 2px 12px rgba(22,163,74,0.12)" : "0 2px 12px rgba(0,0,0,0.06)";
+
+            const initials = ticker.slice(0, 2);
+            const logoHtml = s.logo_url
+              ? `<img src="${s.logo_url}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1.5px solid #f1f5f9;flex-shrink:0;background:#f8fafc;" onerror="this.outerHTML='<div style=\\'width:34px;height:34px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#7c3aed;flex-shrink:0;\\'>${initials}</div>'">`
+              : `<div style="width:34px;height:34px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#7c3aed;flex-shrink:0;">${initials}</div>`;
+
+            const dots = `<div onclick="event.stopPropagation()" style="flex-shrink:0;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:default;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="#94a3b8"><circle cx="9" cy="6" r="1.8"/><circle cx="15" cy="6" r="1.8"/><circle cx="9" cy="12" r="1.8"/><circle cx="15" cy="12" r="1.8"/><circle cx="9" cy="18" r="1.8"/><circle cx="15" cy="18" r="1.8"/></svg>
+            </div>`;
+
+            const addedBadge = added
+              ? `<div style="position:absolute;top:8px;right:8px;width:18px;height:18px;background:#16a34a;border-radius:50%;display:flex;align-items:center;justify-content:center;">
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>`
+              : "";
+
+            return `<button type="button" data-sym="${s.symbol}"
+              style="flex-shrink:0;width:192px;display:flex;flex-direction:column;padding:14px;border-radius:16px;cursor:pointer;text-align:left;background:#ffffff;border:${cardBorder};box-shadow:${cardShadow};transition:all 0.18s;gap:10px;position:relative;overflow:hidden;outline:none;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none;">
+              <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${barColor};opacity:${isPos ? "0.6" : "0.5"};border-radius:16px 16px 0 0;"></div>
+              ${addedBadge}
               <div style="display:flex;align-items:center;gap:8px;">
-                <div style="width:34px;height:34px;border-radius:10px;border:1px solid #e2e8f0;background:#f8fafc;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">${logo}</div>
-                <div style="min-width:0;flex:1;">
-                  <div style="font-size:11.5px;font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name || sym}</div>
-                  <div style="font-size:10px;color:#94a3b8;margin-top:1px;">${sym}</div>
+                ${logoHtml}
+                <div style="overflow:hidden;flex:1;min-width:0;">
+                  <div style="font-size:11.5px;font-weight:700;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name || ticker}</div>
+                  <div style="font-size:10px;font-weight:500;color:#94a3b8;margin-top:1px;">${ticker}</div>
                 </div>
+                ${dots}
               </div>
-              <div style="display:flex;align-items:center;justify-content:space-between;">
-                <span style="font-size:12px;font-weight:600;color:#1e293b;">${price}</span>
-                ${chgTxt ? `<span style="font-size:10px;font-weight:700;color:${chgClr};background:${chgBg};padding:2px 6px;border-radius:20px;">${chgTxt}</span>` : ""}
+              <div style="font-size:19px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;line-height:1;"><span style="font-size:12px;font-weight:600;color:#64748b;margin-right:1px;">R</span>${price}</div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;background:${pillBg};color:#fff;letter-spacing:0.1px;">${chgStr}</span>
               </div>
             </button>`;
           }).join("");
 
-          row.querySelectorAll("button[data-sym]").forEach(btn => {
+          row.querySelectorAll("button[data-sym]").forEach((btn) => {
             const sym = btn.dataset.sym;
-            const sec = (allSecuritiesCache || []).find(s => (s._sym || s.symbol) === sym) || {};
-            btn.addEventListener("mouseenter", () => {
-              btn.style.boxShadow = "0 4px 14px rgba(0,0,0,0.10)";
-              btn.style.borderColor = "#e2e8f0";
-              btn.style.transform = "translateY(-2px)";
-            });
-            btn.addEventListener("mouseleave", () => {
-              btn.style.boxShadow = "0 1px 3px rgba(0,0,0,0.06)";
-              btn.style.borderColor = "#f1f5f9";
-              btn.style.transform = "";
-            });
-            btn.addEventListener("click", () => {
-              addHolding({
-                symbol: sym,
-                name: sec.name || sec._sym || sym,
-                last_price: sec.last_price || 0,
-                logo_url: sec.logo_url || null,
-                shares: 1,
-                weight: 0,
-                market_cap: sec.market_cap ?? null,
-                pe_ratio: sec.pe_ratio ?? null,
-                dividend_per_share: sec.dividend_per_share ?? null,
-                dividend_yield: sec.dividend_yield ?? null,
-                ytd_performance: sec.ytd_performance ?? null,
-                change_percent: sec.change_percent ?? null,
+            const isAdded = alreadyAdded.has(sym);
+            if (!isAdded) {
+              btn.addEventListener("mouseenter", () => {
+                btn.style.transform = "translateY(-2px)";
+                btn.style.boxShadow = "0 6px 20px rgba(0,0,0,0.10)";
+                btn.style.borderColor = "#c7d2df";
               });
+              btn.addEventListener("mouseleave", () => {
+                btn.style.transform = "";
+                btn.style.boxShadow = "0 2px 12px rgba(0,0,0,0.06)";
+                btn.style.borderColor = "#e8edf3";
+              });
+            }
+            btn.addEventListener("click", () => {
+              const existingIdx = formHoldings.findIndex((h) => (h.symbol || h.ticker) === sym);
+              if (existingIdx !== -1) {
+                removeHolding(existingIdx);
+                renderTopAssetsRow();
+              } else {
+                const sec = allSecuritiesCache.find((s) => s.symbol === sym);
+                if (sec) {
+                  addHolding({
+                    symbol: sec.symbol,
+                    name: sec.name,
+                    last_price: sec.last_price || 0,
+                    logo_url: sec.logo_url || null,
+                    shares: 1,
+                    weight: 0,
+                    market_cap: sec.market_cap ?? null,
+                    pe_ratio: sec.pe_ratio ?? null,
+                    dividend_per_share: sec.dividend_per_share ?? null,
+                    dividend_yield: sec.dividend_yield ?? null,
+                    ytd_performance: sec.ytd_performance ?? null,
+                    change_percent: sec.change_percent ?? null,
+                  });
+                  renderTopAssetsRow();
+                }
+              }
             });
           });
           return; /* do not fall through to strategy card rendering */
