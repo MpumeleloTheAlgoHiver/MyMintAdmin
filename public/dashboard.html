@@ -5904,105 +5904,24 @@
 
       const renderTopAssetsRow = () => {
         const row = document.getElementById("topAssetsRow");
-        if (!row || !allSecuritiesCache) return;
-        const alreadyAdded = new Set(
-          formHoldings.map((h) => h.symbol || h.ticker).filter(Boolean),
-        );
+        if (!row) return;
 
-        /* Build usage count: how many strategies contain each symbol */
-        const usageCount = {};
-        (allStrategiesFullData || []).forEach((strategy) => {
-          const holdings = Array.isArray(strategy.holdings) ? strategy.holdings : [];
-          const seen = new Set();
-          holdings.forEach((h) => {
-            const sym = h.ticker || h.symbol || (typeof h === "string" ? h : "");
-            if (sym && !seen.has(sym)) {
-              seen.add(sym);
-              usageCount[sym] = (usageCount[sym] || 0) + 1;
-              const norm = normalizeSymbol(sym);
-              if (norm !== sym) usageCount[norm] = (usageCount[norm] || 0) + 1;
-            }
-          });
-        });
+        const strategies = allStrategiesFullData || [];
 
-        const byUsage = (a, b) => {
-          const ua = usageCount[a.symbol] || usageCount[normalizeSymbol(a.symbol)] || 0;
-          const ub = usageCount[b.symbol] || usageCount[normalizeSymbol(b.symbol)] || 0;
-          if (ub !== ua) return ub - ua;
-          /* tiebreak by price change */
-          return (typeof b.change_percent === "number" ? b.change_percent : -Infinity) -
-                 (typeof a.change_percent === "number" ? a.change_percent : -Infinity);
+        /* If strategies haven't loaded yet, keep skeleton; will be called again on load */
+        if (!strategies.length) return;
+
+        const display = strategies.slice(0, 7);
+
+        const riskAccentColor = (risk) => {
+          const r = (risk || "").toLowerCase();
+          if (r === "low") return { bar: "#22c55e", pill: "#16a34a" };
+          if (r === "medium") return { bar: "#f59e0b", pill: "#d97706" };
+          if (r === "high") return { bar: "#ef4444", pill: "#dc2626" };
+          return { bar: "#6366f1", pill: "#4f46e5" };
         };
 
-        /* Prefer assets with logo + price; sort by strategy usage */
-        const top7 = [...allSecuritiesCache]
-          .filter((s) => s.logo_url && s.last_price)
-          .sort(byUsage)
-          .slice(0, 7);
-
-        /* Fallback: any with a price if not enough logos */
-        const display =
-          top7.length >= 3
-            ? top7
-            : [...allSecuritiesCache]
-                .filter((s) => s.last_price)
-                .sort(byUsage)
-                .slice(0, 7);
-
-        if (!display.length) {
-          row.innerHTML =
-            '<span style="color:#64748b;font-size:12px;padding:8px 0;">No live data available</span>';
-          return;
-        }
-
-        row.innerHTML = display
-          .map((s) => {
-            const ticker = (s.symbol || "").replace(".JO", "");
-            const rawPrice = s.last_price ? s.last_price / 100 : null;
-            const price =
-              rawPrice !== null
-                ? rawPrice.toLocaleString("en-ZA", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })
-                : "—";
-            const chgVal =
-              typeof s.change_percent === "number" ? s.change_percent : null;
-            const absChange =
-              rawPrice !== null && chgVal !== null
-                ? (rawPrice * chgVal) / 100
-                : null;
-            const absStr =
-              absChange !== null
-                ? `${absChange >= 0 ? "+" : ""}${Math.abs(absChange).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                : "";
-            const pctStr =
-              chgVal !== null
-                ? `(${chgVal >= 0 ? "+" : ""}${chgVal.toFixed(2)}%)`
-                : "—";
-            const chgStr = absStr ? `${absStr} ${pctStr}` : pctStr;
-            const isPos = chgVal !== null && chgVal >= 0;
-            const added = alreadyAdded.has(s.symbol);
-
-            /* colours — no purple anywhere */
-            const pillBg = isPos ? "#16a34a" : "#dc2626";
-            const barColor2 = isPos ? "#22c55e" : "#ef4444";
-            const cardBg = "#ffffff";
-            const cardBorder = added
-              ? "1.5px solid #22c55e"
-              : "1.5px solid #e8edf3";
-            const cardShadow = added
-              ? "0 2px 12px rgba(22,163,74,0.12)"
-              : "0 2px 12px rgba(0,0,0,0.06)";
-
-            /* logo */
-            const initials = ticker.slice(0, 2);
-            const logoHtml = s.logo_url
-              ? `<img src="${s.logo_url}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1.5px solid #f1f5f9;flex-shrink:0;background:#f8fafc;" onerror="this.outerHTML='<div style=\\'width:34px;height:34px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#7c3aed;flex-shrink:0;\\'>${initials}</div>'">`
-              : `<div style="width:34px;height:34px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#7c3aed;flex-shrink:0;">${initials}</div>`;
-
-            const dots = `<div onclick="event.stopPropagation()"
-          style="flex-shrink:0;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:default;">
+        const dots = `<div onclick="event.stopPropagation()" style="flex-shrink:0;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:default;">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="#94a3b8">
             <circle cx="9" cy="6" r="1.8"/><circle cx="15" cy="6" r="1.8"/>
             <circle cx="9" cy="12" r="1.8"/><circle cx="15" cy="12" r="1.8"/>
@@ -6010,84 +5929,57 @@
           </svg>
         </div>`;
 
-            /* green tick shown when stock is already added */
-            const addedBadge = added
-              ? `<div style="position:absolute;top:8px;right:8px;width:18px;height:18px;background:#16a34a;border-radius:50%;display:flex;align-items:center;justify-content:center;">
-          <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </div>`
-              : "";
+        row.innerHTML = display.map((strategy, idx) => {
+          const name = strategy.short_name || strategy.name || "Untitled";
+          const riskLabel = strategy.risk_level
+            ? strategy.risk_level.charAt(0).toUpperCase() + strategy.risk_level.slice(1).toLowerCase()
+            : "—";
+          const holdings = Array.isArray(strategy.holdings) ? strategy.holdings : [];
+          const holdingsCount = holdings.length;
+          const colors = riskAccentColor(strategy.risk_level);
+          const initials = name.slice(0, 2).toUpperCase();
 
-            return `<button type="button" data-sym="${s.symbol}"
-          style="flex-shrink:0;width:192px;display:flex;flex-direction:column;padding:14px;border-radius:16px;cursor:pointer;text-align:left;background:${cardBg};border:${cardBorder};box-shadow:${cardShadow};transition:all 0.18s;gap:10px;position:relative;overflow:hidden;outline:none;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none;">
-          <!-- subtle top accent bar -->
-          <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${barColor2};opacity:${isPos ? "0.6" : "0.5"};border-radius:16px 16px 0 0;"></div>
-          ${addedBadge}
-          <!-- header: logo + name/ticker + dots -->
-          <div style="display:flex;align-items:center;gap:8px;">
-            ${logoHtml}
-            <div style="overflow:hidden;flex:1;min-width:0;">
-              <div style="font-size:11.5px;font-weight:700;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name || ticker}</div>
-              <div style="font-size:10px;font-weight:500;color:#94a3b8;margin-top:1px;">${ticker}</div>
+          const logoHtml = strategy.icon_url
+            ? `<img src="${strategy.icon_url}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1.5px solid #f1f5f9;flex-shrink:0;background:#f8fafc;" onerror="this.outerHTML='<div style=\\'width:34px;height:34px;border-radius:50%;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#4f46e5;flex-shrink:0;\\'>${initials}</div>'">`
+            : `<div style="width:34px;height:34px;border-radius:50%;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#4f46e5;flex-shrink:0;">${initials}</div>`;
+
+          return `<button type="button" data-strat-idx="${idx}"
+          style="flex-shrink:0;width:192px;display:flex;flex-direction:column;padding:14px;border-radius:16px;cursor:pointer;text-align:left;background:#ffffff;border:1.5px solid #e8edf3;box-shadow:0 2px 12px rgba(0,0,0,0.06);transition:all 0.18s;gap:10px;position:relative;overflow:hidden;outline:none;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none;">
+            <!-- subtle top accent bar -->
+            <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${colors.bar};opacity:0.6;border-radius:16px 16px 0 0;"></div>
+            <!-- header: icon + name/risk + dots -->
+            <div style="display:flex;align-items:center;gap:8px;">
+              ${logoHtml}
+              <div style="overflow:hidden;flex:1;min-width:0;">
+                <div style="font-size:11.5px;font-weight:700;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</div>
+                <div style="font-size:10px;font-weight:500;color:#94a3b8;margin-top:1px;">${riskLabel} Risk</div>
+              </div>
+              ${dots}
             </div>
-            ${dots}
-          </div>
-          <!-- price -->
-          <div style="font-size:19px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;line-height:1;"><span style="font-size:12px;font-weight:600;color:#64748b;margin-right:1px;">R</span>${price}</div>
-          <!-- change pill -->
-          <div style="display:flex;align-items:center;gap:6px;">
-            <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;background:${pillBg};color:#fff;letter-spacing:0.1px;">${chgStr}</span>
-          </div>
-        </button>`;
-          })
-          .join("");
+            <!-- holdings count -->
+            <div style="font-size:19px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;line-height:1;">${holdingsCount}<span style="font-size:12px;font-weight:600;color:#64748b;margin-left:4px;">stocks</span></div>
+            <!-- risk pill -->
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;background:${colors.pill};color:#fff;letter-spacing:0.1px;">${riskLabel} Risk</span>
+            </div>
+          </button>`;
+        }).join("");
 
-        row.querySelectorAll("button[data-sym]").forEach((btn) => {
-          const sym = btn.dataset.sym;
-          const isAdded = alreadyAdded.has(sym);
-          if (!isAdded) {
-            btn.addEventListener("mouseenter", () => {
-              btn.style.transform = "translateY(-2px)";
-              btn.style.boxShadow = "0 6px 20px rgba(0,0,0,0.10)";
-              btn.style.borderColor = "#c7d2df";
-            });
-            btn.addEventListener("mouseleave", () => {
-              btn.style.transform = "";
-              btn.style.boxShadow = "0 2px 12px rgba(0,0,0,0.06)";
-              btn.style.borderColor = "#e8edf3";
-            });
-          }
+        row.querySelectorAll("button[data-strat-idx]").forEach((btn) => {
+          const idx = parseInt(btn.dataset.stratIdx, 10);
+          btn.addEventListener("mouseenter", () => {
+            btn.style.transform = "translateY(-2px)";
+            btn.style.boxShadow = "0 6px 20px rgba(0,0,0,0.10)";
+            btn.style.borderColor = "#c7d2df";
+          });
+          btn.addEventListener("mouseleave", () => {
+            btn.style.transform = "";
+            btn.style.boxShadow = "0 2px 12px rgba(0,0,0,0.06)";
+            btn.style.borderColor = "#e8edf3";
+          });
           btn.addEventListener("click", () => {
-            if (!strategyWorkspaceVisible) {
-              showStrategyRequiredToast();
-              return;
-            }
-            const existingIdx = formHoldings.findIndex(
-              (h) => (h.symbol || h.ticker) === sym,
-            );
-            if (existingIdx !== -1) {
-              /* Already added — toggle off */
-              removeHolding(existingIdx);
-              renderTopAssetsRow();
-            } else {
-              const sec = allSecuritiesCache.find((s) => s.symbol === sym);
-              if (sec) {
-                addHolding({
-                  symbol: sec.symbol,
-                  name: sec.name,
-                  last_price: sec.last_price || 0,
-                  logo_url: sec.logo_url || null,
-                  shares: 1,
-                  weight: 0,
-                  market_cap: sec.market_cap ?? null,
-                  pe_ratio: sec.pe_ratio ?? null,
-                  dividend_per_share: sec.dividend_per_share ?? null,
-                  dividend_yield: sec.dividend_yield ?? null,
-                  ytd_performance: sec.ytd_performance ?? null,
-                  change_percent: sec.change_percent ?? null,
-                });
-                renderTopAssetsRow();
-              }
-            }
+            const strategy = (allStrategiesFullData || [])[idx];
+            if (strategy) editStrategy(strategy, globalSecuritiesMap);
           });
         });
       };
