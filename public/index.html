@@ -6224,7 +6224,9 @@
         const qty = Number(row.quantity) || 0;
         const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
         if (isPending) {
-          pendingUserHoldings += (avgFill / 100) * qty;
+          // No fill price yet — use current market price as theoretical fill
+          const pendingFillPrice = (avgFill > 0) ? (avgFill / 100) : currentPrice;
+          pendingUserHoldings += pendingFillPrice * qty;
           pendingMarketHoldings += currentPrice * qty;
         } else {
           totalUserHoldings += (avgFill / 100) * qty;
