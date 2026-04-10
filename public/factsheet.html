@@ -315,9 +315,12 @@
         }
       }
 
-      const totalWeight = holdings.reduce((sum, h) => sum + (Number(h.weight) || 0), 0);
-      const minInvestment = calculateMinInvestment(holdings, securitiesMap) || Number(strategy.min_investment) || null;
+      const filledHoldings = holdings.filter(h => !h.pending);
+      const pendingHoldings = holdings.filter(h => !!h.pending);
+      const totalWeight = filledHoldings.reduce((sum, h) => sum + (Number(h.weight) || 0), 0);
+      const minInvestment = calculateMinInvestment(filledHoldings, securitiesMap) || Number(strategy.min_investment) || null;
       const cashAmount = minInvestment ? minInvestment * 0.08 : null;
+      const pendingCount = pendingHoldings.length;
 
       const analyticsTimestamp = analytics?.computed_at || analytics?.as_of_date || null;
       const analyticsUnavailable = !analytics || analytics?.error;
@@ -426,7 +429,8 @@
           <div class="mt-4 grid grid-cols-3 gap-3">
             <div class="bg-slate-50 rounded-xl p-3 text-center">
               <p class="text-[11px] text-slate-500">Holdings</p>
-              <p class="text-xl font-semibold text-slate-900">${holdings.length}</p>
+              <p class="text-xl font-semibold text-slate-900">${filledHoldings.length}</p>
+              ${pendingCount > 0 ? `<p class="text-[10px] font-medium text-amber-600"><i class="fas fa-clock" style="font-size:0.5rem;"></i> ${pendingCount} pending</p>` : ''}
             </div>
             <div class="bg-violet-50 rounded-xl p-3 text-center">
               <p class="text-[11px] text-violet-600">Min. Investment</p>
@@ -508,7 +512,7 @@
       html += `
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
           <h2 class="text-base font-semibold text-slate-900">Portfolio Holdings</h2>
-          <p class="mt-1 text-xs text-slate-500">${nonCashHoldings.length} asset${nonCashHoldings.length !== 1 ? 's' : ''} including cash</p>
+          <p class="mt-1 text-xs text-slate-500">${nonCashHoldings.filter(h => !h.pending).length} asset${nonCashHoldings.filter(h => !h.pending).length !== 1 ? 's' : ''} including cash${pendingCount > 0 ? ` · <span class="text-amber-600 font-medium">${pendingCount} pending</span>` : ''}</p>
           <div class="mt-4 space-y-3">
             ${nonCashHoldings.length > 0 ? nonCashHoldings.map((h, i) => `
               <div class="flex items-center gap-3 ${h.pending ? 'rounded-xl border border-dashed border-amber-300 bg-amber-50 px-3 py-2' : ''}">
