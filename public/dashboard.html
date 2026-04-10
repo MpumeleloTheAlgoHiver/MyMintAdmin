@@ -1715,6 +1715,7 @@
         strategyWorkspaceVisible = visible;
         const ws = document.getElementById("strategyWorkspace");
         if (ws) ws.style.display = visible ? "" : "none";
+        renderTopAssetsRow(); /* swap between stock cards (editing) and strategy cards (browse) */
       };
 
       const normalizeSymbol = (symbol) => {
@@ -5936,6 +5937,79 @@
 
         /* If strategies haven't loaded yet, keep skeleton; will be called again on load */
         if (!strategies.length) return;
+
+        /* ── SECURITY CARD MODE (shown while creating / editing a strategy) ── */
+        if (strategyWorkspaceVisible) {
+          const securities = (allSecuritiesCache || [])
+            .filter(s => s.last_price)
+            .sort((a, b) => (b.market_cap || 0) - (a.market_cap || 0))
+            .slice(0, 20);
+
+          if (!securities.length) {
+            row.innerHTML = `<span style="color:#94a3b8;font-size:12px;padding:8px 0;">Start typing in the search box above to find assets to add</span>`;
+            return;
+          }
+
+          row.innerHTML = securities.map(s => {
+            const price = s.last_price ? "R\u00a0" + (Number(s.last_price) / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
+            const chg = s.change_percent != null ? Number(s.change_percent) : null;
+            const chgTxt = chg != null ? (chg >= 0 ? "+" : "") + chg.toFixed(2) + "%" : null;
+            const chgClr = chg == null ? "#94a3b8" : chg >= 0 ? "#16a34a" : "#dc2626";
+            const chgBg  = chg == null ? "#f8fafc"  : chg >= 0 ? "#f0fdf4" : "#fef2f2";
+            const sym = s._sym || s.symbol || "";
+            const init = sym.slice(0, 2).toUpperCase();
+            const logo = s.logo_url
+              ? `<img src="${s.logo_url}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" onerror="this.parentElement.innerHTML='<span style=\\'font-size:10px;font-weight:700;color:#64748b;\\'>${init}</span>'">`
+              : `<span style="font-size:10px;font-weight:700;color:#64748b;">${init}</span>`;
+
+            return `<button type="button" data-sym="${sym}"
+              style="flex-shrink:0;width:160px;display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:14px;cursor:pointer;text-align:left;background:#ffffff;border:1px solid #f1f5f9;box-shadow:0 1px 3px rgba(0,0,0,0.06);transition:all 0.15s;outline:none;-webkit-appearance:none;appearance:none;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div style="width:34px;height:34px;border-radius:10px;border:1px solid #e2e8f0;background:#f8fafc;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">${logo}</div>
+                <div style="min-width:0;flex:1;">
+                  <div style="font-size:11.5px;font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name || sym}</div>
+                  <div style="font-size:10px;color:#94a3b8;margin-top:1px;">${sym}</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-size:12px;font-weight:600;color:#1e293b;">${price}</span>
+                ${chgTxt ? `<span style="font-size:10px;font-weight:700;color:${chgClr};background:${chgBg};padding:2px 6px;border-radius:20px;">${chgTxt}</span>` : ""}
+              </div>
+            </button>`;
+          }).join("");
+
+          row.querySelectorAll("button[data-sym]").forEach(btn => {
+            const sym = btn.dataset.sym;
+            const sec = (allSecuritiesCache || []).find(s => (s._sym || s.symbol) === sym) || {};
+            btn.addEventListener("mouseenter", () => {
+              btn.style.boxShadow = "0 4px 14px rgba(0,0,0,0.10)";
+              btn.style.borderColor = "#e2e8f0";
+              btn.style.transform = "translateY(-2px)";
+            });
+            btn.addEventListener("mouseleave", () => {
+              btn.style.boxShadow = "0 1px 3px rgba(0,0,0,0.06)";
+              btn.style.borderColor = "#f1f5f9";
+              btn.style.transform = "";
+            });
+            btn.addEventListener("click", () => {
+              addHolding({
+                symbol: sym,
+                name: sec.name || sec._sym || sym,
+                last_price: sec.last_price || 0,
+                logo_url: sec.logo_url || null,
+                shares: 1,
+                weight: 0,
+                market_cap: sec.market_cap ?? null,
+                pe_ratio: sec.pe_ratio ?? null,
+                dividend_per_share: sec.dividend_per_share ?? null,
+                dividend_yield: sec.dividend_yield ?? null,
+                ytd_performance: sec.ytd_performance ?? null,
+                change_percent: sec.change_percent ?? null,
+              });
+            });
+          });
+          return; /* do not fall through to strategy card rendering */
+        }
 
         /* Sort: 1) live + has investors  2) live but no investors  3) rest */
         const sortedStrategies = [...strategies].sort((a, b) => {
