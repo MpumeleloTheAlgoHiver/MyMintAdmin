@@ -6556,6 +6556,22 @@
           const ytdDisplay = fmtYtd(ytd);
           const ytdClr = ytdColor(ytd);
 
+          /* Daily return — weighted average of holdings change_percent */
+          let dailyReturn = null;
+          if (holdings.length && globalSecuritiesMap) {
+            let wSum = 0, wTotal = 0;
+            holdings.forEach(h => {
+              const sym = h.ticker || h.symbol || (typeof h === "string" ? h : "");
+              const sec = globalSecuritiesMap.get(sym) || globalSecuritiesMap.get(sym + ".JO");
+              const pct = sec?.change_percent != null ? Number(sec.change_percent) : null;
+              const w   = h.weight != null ? Number(h.weight) : null;
+              if (pct != null && w != null && w > 0) { wSum += pct * w; wTotal += w; }
+            });
+            if (wTotal > 0) dailyReturn = wSum / wTotal;
+          }
+          const dailyDisplay = fmtYtd(dailyReturn);
+          const dailyClr = ytdColor(dailyReturn);
+
           /* Provider */
           const provider = strategy.provider_name || "Mint";
 
@@ -6574,8 +6590,13 @@
             </div>
             <!-- Tags -->
             <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;">${tagHtml}${featuredHtml}</div>
-            <!-- YTD return row — bg-slate-50 rounded-xl -->
+            <!-- Daily return row -->
             <div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;background:#f8fafc;border-radius:12px;padding:8px 12px;">
+              <span style="font-size:12px;font-weight:600;color:#475569;">Daily return</span>
+              <span style="font-size:12px;font-weight:600;color:${dailyClr};">${dailyDisplay}</span>
+            </div>
+            <!-- YTD return row -->
+            <div style="margin-top:6px;display:flex;align-items:center;justify-content:space-between;background:#f8fafc;border-radius:12px;padding:8px 12px;">
               <span style="font-size:12px;font-weight:600;color:#475569;">YTD return</span>
               <span style="font-size:12px;font-weight:600;color:${ytdClr};">${ytdDisplay}</span>
             </div>
