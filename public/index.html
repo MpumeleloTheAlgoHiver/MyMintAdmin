@@ -1968,6 +1968,38 @@
     .strategy-holdings-compare.holdings-pending-row .compare-value {
       color: #d97706;
     }
+    .pending-info-btn {
+      background: none;
+      border: none;
+      color: #d97706;
+      cursor: pointer;
+      font-size: 0.65rem;
+      padding: 0 2px;
+      line-height: 1;
+      position: relative;
+    }
+    .pending-info-popup {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 100%;
+      margin-top: 6px;
+      width: 260px;
+      background: #1e293b;
+      color: #f8fafc;
+      font-size: 0.7rem;
+      font-weight: 500;
+      line-height: 1.45;
+      padding: 10px 12px;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      z-index: 9999;
+      white-space: normal;
+      text-align: left;
+    }
+    .pending-info-popup.active {
+      display: block;
+    }
 
     .strategy-group-card {
       cursor: pointer;
@@ -6301,6 +6333,7 @@
                 <span><span class="compare-label">Market</span> <span class="compare-value">${escapeHtml(fmtMarketH)}</span></span>
               </div>${pendingCount ? `
               <div class="strategy-holdings-compare holdings-pending-row">
+                <span class="pending-info-btn" onclick="event.stopPropagation();this.querySelector('.pending-info-popup').classList.toggle('active')" onblur="this.querySelector('.pending-info-popup').classList.remove('active')" tabindex="0"><i class="fas fa-info-circle"></i><div class="pending-info-popup">These are projected values. Pending holdings use the current market price as a theoretical fill until the actual fill date and price are confirmed. Once filled, these values merge into the main totals above and this row disappears.</div></span>
                 <span><span class="compare-label"><i class="fas fa-clock" style="font-size:0.55rem;"></i> User</span> <span class="compare-value">${escapeHtml(fmtProjUserH)}</span></span>
                 <span><span class="compare-label"><i class="fas fa-clock" style="font-size:0.55rem;"></i> Market</span> <span class="compare-value">${escapeHtml(fmtProjMarketH)}</span></span>
               </div>` : ''}
