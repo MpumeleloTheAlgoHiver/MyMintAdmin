@@ -715,22 +715,32 @@
         investor.maxDD = null;
       }
 
-      /* 3. Transactions */
-      const { data: txRows } = await supabaseClient
-        .from('transactions')
-        .select('*')
-        .eq('user_id', investor.userId)
-        .order('created_at', { ascending: false });
+      /* 3. Transactions & Trades */
+      const [{ data: txRows }, { data: tradeRows }] = await Promise.all([
+        supabaseClient
+          .from('transactions')
+          .select('*')
+          .eq('user_id', investor.userId)
+          .order('created_at', { ascending: false }),
+        supabaseClient
+          .from('stock_holdings')
+          .select('*, securities(code, description)')
+          .eq('user_id', investor.userId)
+          .eq('Status', 'inactive')
+          .eq('is_active', false)
+          .not('closed_reason', 'is', null) // Only actual trades
+      ]);
 
-      investor.transactions = (txRows || []).map(row => {
+      const allTxRecords = [];
+
+      // Add records from transactions table
+      (txRows || []).forEach(row => {
         let typeLabel = row.name || row.type || 'Transaction';
         if (row.type === 'DEPOSIT' || typeLabel.toLowerCase().includes('deposit')) typeLabel = 'Subscription';
         if (row.type === 'WITHDRAWAL' || typeLabel.toLowerCase().includes('withdraw')) typeLabel = 'Withdrawal';
         if (typeLabel.toLowerCase().includes('investment')) typeLabel = 'Investment';
 
-        /* All transaction amounts are stored in ZAR cents — always convert to rands */
         const amt = Number(row.amount || 0) / 100;
-
         let units = '—', nav = '—';
         if (row.description && typeof row.description === 'string' && row.description.startsWith('{')) {
           try {
@@ -740,14 +750,37 @@
           } catch(e) {}
         }
 
-        return {
-          date: new Date(row.created_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
+        allTxRecords.push({
+          rawDate: new Date(row.created_at || row.transaction_date),
+          date: new Date(row.created_at || row.transaction_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
           type: typeLabel,
           amount: 'R' + Math.abs(amt).toLocaleString('en-ZA', { maximumFractionDigits: 0 }),
           units,
           nav
-        };
+        });
       });
+
+      // Add records from stock_holdings (Rebalance Trades)
+      (tradeRows || []).forEach(row => {
+        const isBuy = String(row.trade_side).toUpperCase() === 'BUY';
+        const qty = Number(row.quantity || 0);
+        // Use avg_fill for buys, avg_exit for sells
+        const priceCents = isBuy ? Number(row.avg_fill || 0) : Number(row.avg_exit || row.avg_fill || 0);
+        const totalRands = (qty * priceCents) / 100;
+        const ticker = (row.securities?.code || 'Share').replace(/\.[A-Z]+$/i, "");
+
+        allTxRecords.push({
+          rawDate: new Date(row.updated_at || row.created_at),
+          date: new Date(row.updated_at || row.created_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
+          type: isBuy ? `Buy ${ticker}` : `Sell ${ticker}`,
+          amount: 'R' + Math.abs(totalRands).toLocaleString('en-ZA', { maximumFractionDigits: 0 }),
+          units: qty.toLocaleString(),
+          nav: (priceCents / 100).toFixed(2)
+        });
+      });
+
+      // Sort newest first
+      investor.transactions = allTxRecords.sort((a, b) => b.rawDate - a.rawDate);
 
       currentInvestor = investor;
       renderInvestorList(allInvestors);
