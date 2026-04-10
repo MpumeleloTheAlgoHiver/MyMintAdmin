@@ -1834,6 +1834,25 @@
       box-shadow: none;
     }
 
+    .holding-card.holding-pending {
+      border-style: dashed;
+      border-color: #fbbf24;
+      background: #fffbeb;
+    }
+    .holding-pending-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #d97706;
+      background: #fef3c7;
+      padding: 2px 8px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
     .holding-header {
       display: flex;
       justify-content: space-between;
@@ -3403,6 +3422,8 @@
     .holding-desc { font-size: 0.75rem !important; color: #6b7280 !important; margin-bottom: 9px !important; }
     .holding-tag { font-size: 0.69rem !important; font-weight: 600 !important; }
     .holding-card-muted { background: #fafbfc !important; border-color: #eef0f3 !important; }
+    .holding-card.holding-pending { border-color: #fbbf24 !important; background: #fffbeb !important; }
+    .holding-pending-badge { font-size: 0.62rem !important; }
     .holdings-empty-state { padding: 32px 20px !important; }
   </style>
 </head>
@@ -4789,6 +4810,7 @@
             unrealized_pnl: 0,
             status: row.status || row.Status || null,
             avg_fill: row.avg_fill,
+            fill_date: row.fill_date || row.Fill_date || null,
             as_of_date: row.as_of_date || row.Fill_date || row.fill_date || null,
             updated_at: row.updated_at || row.created_at || row.as_of_date || null,
             strategy_id: row.strategy_id || null,
@@ -4811,6 +4833,11 @@
 
         if (!grouped[key].status && (row.status || row.Status)) {
           grouped[key].status = row.status || row.Status;
+        }
+
+        // Preserve fill_date: if any contributing row has a fill_date, the aggregate is filled
+        if (!grouped[key].fill_date && (row.fill_date || row.Fill_date)) {
+          grouped[key].fill_date = row.fill_date || row.Fill_date;
         }
 
         const candidateAsOf = row.as_of_date || row.Fill_date || row.fill_date;
@@ -6102,6 +6129,7 @@
       const asOf = String(security.AsOfTime || row.as_of_date || '-');
       const qty = row.quantity === null || row.quantity === undefined ? 0 : Number(row.quantity);
       const quantityStr = qty ? formatNumber(qty, 2) : '-';
+      const isPending = !row.fill_date && !row.Fill_date;
 
       const currentPrice = security.last_price ? Number(security.last_price) / 100 : 0;
       const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
@@ -6141,8 +6169,14 @@
       const status = row.status || row.Status || 'Stock';
       const strategyLabel = row.strategy_name_snapshot || strategiesByIdMap[row.strategy_id] || '';
 
+      // Pending holdings: show badge instead of PnL
+      const priceBlock = isPending
+        ? `<span class="holding-pending-badge">⏳ Pending Fill</span>`
+        : `<div class="holding-price ${escapeHtml(pnlPriceClass)}">${escapeHtml(pnl)}</div>
+              <div class="holding-change neutral">all time</div>`;
+
       return `
-        <div class="holding-card">
+        <div class="holding-card${isPending ? ' holding-pending' : ''}">
           <div class="holding-header">
             <div class="holding-title-wrap">
               ${logoUrl
@@ -6151,15 +6185,14 @@
               <div class="holding-title">${escapeHtml(title)}</div>
             </div>
             <div>
-              <div class="holding-price ${escapeHtml(pnlPriceClass)}">${escapeHtml(pnl)}</div>
-              <div class="holding-change neutral">all time</div>
+              ${priceBlock}
             </div>
           </div>
           <div class="holding-desc">Qty ${escapeHtml(quantityStr)}${priceStr ? ` • ${escapeHtml(priceStr)}` : ''} • As of ${escapeHtml(asOf)}</div>
           <div class="holding-footer">
             <div class="holding-tag">${escapeHtml(strategyLabel || status)}</div>
             <div class="holdings-container">
-              <span class="holding-label">Holding</span>
+              <span class="holding-label">${isPending ? 'Pending' : 'Holding'}</span>
             </div>
           </div>
         </div>
@@ -6171,13 +6204,19 @@
       let totalBottomValue = 0;
       let totalUserHoldings = 0;   // sum of (avg_fill / 100) * quantity
       let totalMarketHoldings = 0; // sum of (last_price / 100) * quantity
+      let pendingCount = 0;
       holdings.forEach(row => {
+        const isPending = !row.fill_date && !row.Fill_date;
+        if (isPending) { pendingCount++; }
         const security = securitiesByIdMap[row.security_id] || {};
         const currentPrice = security.last_price ? Number(security.last_price) / 100 : 0;
         const qty = Number(row.quantity) || 0;
         const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
-        totalUserHoldings += (avgFill / 100) * qty;
-        totalMarketHoldings += currentPrice * qty;
+        // Only include filled holdings in PnL totals
+        if (!isPending) {
+          totalUserHoldings += (avgFill / 100) * qty;
+          totalMarketHoldings += currentPrice * qty;
+        }
         const mv = currentPrice ? qty * currentPrice : (Number(row.market_value) || 0);
         // Bottom = unrealized_pnl / 100, fall back to cost basis, then market value
         let rowBottom;
@@ -6239,7 +6278,7 @@
               </div>
             </div>
           </div>
-          <div class="holding-desc">${holdingCount} holding${holdingCount === 1 ? '' : 's'} in this strategy</div>
+          <div class="holding-desc">${holdingCount} holding${holdingCount === 1 ? '' : 's'} in this strategy${pendingCount ? ` · <span style="color:#d97706;font-weight:600;">${pendingCount} pending</span>` : ''}</div>
           <div class="holding-footer">
             <div class="holding-tag">${escapeHtml(strategyName)}</div>
             <div class="holdings-container">
