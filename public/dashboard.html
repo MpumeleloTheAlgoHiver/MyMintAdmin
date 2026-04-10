@@ -5913,9 +5913,8 @@
 
         const display = strategies.slice(0, 7);
 
-        /* Mini sparkline — gentle upward curve with purple dot, on light violet bg */
+        /* Mini sparkline — matches Mint StrategyMiniChart: purple line + end dot on slate-50 bg */
         const sparkline = (i) => {
-          /* Each card gets a slightly different curve so they don't all look identical */
           const curves = [
             "M2 30 C8 26 15 22 24 18 C32 14 40 11 58 4",
             "M2 28 C10 25 18 20 26 17 C36 13 46 9 58 5",
@@ -5926,110 +5925,134 @@
             "M2 30 C9 25 17 21 26 17 C37 12 47 8 58 5",
           ];
           const d = curves[i % curves.length];
-          return `<div style="background:#f5f3ff;border-radius:8px;padding:5px 6px;flex-shrink:0;">
-            <svg width="60" height="34" viewBox="0 0 60 36" fill="none">
-              <defs><linearGradient id="sg${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7c3aed" stop-opacity="0.18"/><stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/></linearGradient></defs>
-              <path d="${d}" stroke="#7c3aed" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-              <circle cx="58" cy="4" r="2.6" fill="#7c3aed"/>
+          /* bg-slate-50 = #f8fafc, rounded-xl = 12px, px-2 = 8px horizontal */
+          return `<div style="background:#f8fafc;border-radius:12px;padding:4px 8px;flex-shrink:0;display:flex;align-items:center;">
+            <svg width="96" height="48" viewBox="0 0 60 36" fill="none" style="display:block;">
+              <defs><linearGradient id="sg${i}" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#5b21b6" stop-opacity="0.22"/>
+                <stop offset="70%" stop-color="#3b1b7a" stop-opacity="0.08"/>
+                <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+              </linearGradient></defs>
+              <path d="${d}" stroke="#5b21b6" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="58" cy="4" r="5" fill="#ffffff" opacity="0.95"/>
+              <circle cx="58" cy="4" r="2.5" fill="#5b21b6"/>
             </svg>
           </div>`;
         };
 
-        /* Risk label mapping */
-        const riskDescriptor = (r) => {
-          const v = (r || "").toLowerCase();
-          if (v === "low") return "Conservative";
-          if (v === "medium") return "Balanced";
-          if (v === "high") return "Aggressive";
-          return r ? (r.charAt(0).toUpperCase() + r.slice(1).toLowerCase()) : "—";
+        /* Format YTD like Mint's formatChangePct */
+        const fmtYtd = (v) => {
+          if (v == null || isNaN(v)) return "—";
+          return (v >= 0 ? "+" : "") + Number(v).toFixed(2) + "%";
+        };
+        const ytdColor = (v) => {
+          if (v == null || isNaN(v)) return "#475569";
+          return v >= 0 ? "#16a34a" : "#dc2626";
         };
 
         row.innerHTML = display.map((strategy, idx) => {
+          /* Name: prefer short_name */
           const name = strategy.short_name || strategy.name || "Untitled";
-          const riskDesc = riskDescriptor(strategy.risk_level);
-          const sector = strategy.sector || null;
-          const subtitle = [riskDesc, sector].filter(Boolean).join(" • ");
 
+          /* Subtitle: risk_level • objective (fallback to sector) — matches Mint source */
+          const riskPart = strategy.risk_level
+            ? strategy.risk_level.charAt(0).toUpperCase() + strategy.risk_level.slice(1).toLowerCase()
+            : "Balanced";
+          const secondPart = strategy.objective || strategy.sector || null;
+          const subtitle = secondPart ? `${riskPart} • ${secondPart}` : riskPart;
+
+          /* Min investment */
           const minInv = strategy.min_investment ? Number(strategy.min_investment) : null;
           const minStr = minInv
-            ? "R " + minInv.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-            : "—";
+            ? "Min. R " + minInv.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : null;
 
+          /* Tags: strategy.tags array (first 2) exactly like Mint — fallback to risk_level */
+          const tags = Array.isArray(strategy.tags) && strategy.tags.length > 0
+            ? strategy.tags.slice(0, 2)
+            : [riskPart];
+          const tagHtml = tags.map(t =>
+            `<span style="border-radius:9999px;border:1px solid #e2e8f0;background:#ffffff;padding:4px 12px;font-size:12px;font-weight:600;color:#475569;white-space:nowrap;">${t}</span>`
+          ).join("");
+          const featuredHtml = strategy.is_featured
+            ? `<span style="border-radius:9999px;border:1px solid #ddd6fe;background:#f5f3ff;padding:4px 12px;font-size:12px;font-weight:600;color:#7c3aed;white-space:nowrap;">Featured</span>`
+            : "";
+
+          /* Holdings snapshot — 28px circles, -8px overlap (Mint -space-x-2) */
           const holdings = Array.isArray(strategy.holdings) ? strategy.holdings : [];
           const holdingsCount = holdings.length;
-
-          /* Stacked holding logo circles */
           const visible = holdings.slice(0, 3);
-          const extra = holdingsCount > 3 ? holdingsCount - 3 : 0;
-          const iconHtml = visible.map((h, i) => {
+          const extra = holdingsCount > 3 ? Math.max(0, holdingsCount - 3) : 0;
+
+          const holdingCircles = visible.map((h, i) => {
             const sym = h.ticker || h.symbol || (typeof h === "string" ? h : "");
             const sec = globalSecuritiesMap
               ? globalSecuritiesMap.get(sym) || globalSecuritiesMap.get(sym + ".JO")
               : null;
             const logo = sec?.logo_url || null;
             const init = (sym || "?").slice(0, 2).toUpperCase();
-            const z = 10 - i;
-            const l = i * 16;
+            const ml = i === 0 ? "0" : "-8px";
             return logo
-              ? `<img src="${logo}" style="width:24px;height:24px;border-radius:50%;border:2px solid #fff;position:absolute;left:${l}px;z-index:${z};object-fit:cover;background:#f8fafc;" onerror="this.outerHTML='<div style=\\'position:absolute;left:${l}px;z-index:${z};width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:#4f46e5;\\'>${init}</div>'">`
-              : `<div style="position:absolute;left:${l}px;z-index:${z};width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:#4f46e5;">${init}</div>`;
+              ? `<div style="width:28px;height:28px;border-radius:50%;border:2px solid #ffffff;background:#ffffff;overflow:hidden;margin-left:${ml};box-shadow:0 1px 2px rgba(0,0,0,0.08);flex-shrink:0;"><img src="${logo}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<div style=\\'width:100%;height:100%;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#475569;\\'>${init}</div>'"></div>`
+              : `<div style="width:28px;height:28px;border-radius:50%;border:2px solid #ffffff;background:#f1f5f9;margin-left:${ml};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#475569;box-shadow:0 1px 2px rgba(0,0,0,0.08);flex-shrink:0;">${init}</div>`;
           }).join("");
-          const extraHtml = extra > 0
-            ? `<div style="position:absolute;left:${visible.length * 16}px;z-index:0;width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#64748b;">+${extra}</div>`
+          const extraCircle = extra > 0
+            ? `<div style="width:28px;height:28px;border-radius:50%;border:1px solid #e2e8f0;background:#f8fafc;margin-left:-8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#64748b;flex-shrink:0;">+${extra}</div>`
             : "";
-          const iconsW = holdingsCount > 3 ? (visible.length * 16 + 24) : (visible.length > 0 ? (visible.length - 1) * 16 + 24 : 0);
-          const iconsBlock = holdingsCount > 0
-            ? `<div style="position:relative;height:24px;width:${iconsW}px;flex-shrink:0;">${iconHtml}${extraHtml}</div>`
+          const holdingsBlock = holdingsCount > 0
+            ? `<div style="margin-top:12px;display:flex;align-items:center;gap:12px;">
+                <div style="display:flex;align-items:center;">${holdingCircles}${extraCircle}</div>
+                <span style="font-size:12px;font-weight:600;color:#64748b;">Holdings snapshot</span>
+               </div>`
             : "";
 
-          /* Tags */
-          const sectorTag = sector
-            ? `<span style="font-size:10px;font-weight:500;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;padding:3px 9px;border-radius:20px;white-space:nowrap;">${sector}</span>`
-            : "";
-          const featuredTag = strategy.is_featured
-            ? `<span style="font-size:10px;font-weight:600;color:#7c3aed;background:#f5f3ff;border:1px solid #ddd6fe;padding:3px 9px;border-radius:20px;white-space:nowrap;">Featured</span>`
-            : "";
+          /* YTD */
+          const ytd = strategy.r_ytd ?? null;
+          const ytdDisplay = fmtYtd(ytd);
+          const ytdClr = ytdColor(ytd);
+
+          /* Provider */
+          const provider = strategy.provider_name || "Mint";
 
           return `<button type="button" data-strat-idx="${idx}"
-          style="flex-shrink:0;width:224px;display:flex;flex-direction:column;padding:16px;border-radius:16px;cursor:pointer;text-align:left;background:#ffffff;border:1px solid #e8edf3;box-shadow:0 2px 12px rgba(0,0,0,0.06);transition:all 0.18s;position:relative;overflow:hidden;outline:none;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none;">
-            <!-- Name + sparkline -->
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:3px;">
-              <div style="min-width:0;flex:1;">
-                <div style="font-size:13.5px;font-weight:700;color:#0f172a;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</div>
-                <div style="font-size:10.5px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${subtitle}</div>
+          style="flex-shrink:0;width:320px;display:flex;flex-direction:column;padding:16px;border-radius:16px;cursor:pointer;text-align:left;background:#ffffff;border:1px solid #f1f5f9;box-shadow:0 1px 2px rgba(0,0,0,0.05);transition:box-shadow 0.18s,border-color 0.18s;outline:none;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none;">
+            <!-- Top: name + sparkline -->
+            <div style="display:flex;align-items:flex-start;gap:16px;">
+              <div style="flex:1;min-width:0;text-align:left;">
+                <p style="font-size:14px;font-weight:600;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0 0 4px;">${name}</p>
+                <div>
+                  <p style="font-size:12px;color:#475569;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${subtitle}</p>
+                  ${minStr ? `<p style="font-size:11px;color:#94a3b8;margin:2px 0 0;">${minStr}</p>` : ""}
+                </div>
               </div>
               ${sparkline(idx)}
             </div>
-            <!-- Min investment -->
-            <div style="font-size:10.5px;color:#94a3b8;margin-bottom:10px;">Min. ${minStr}</div>
             <!-- Tags -->
-            ${(sectorTag || featuredTag) ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;">${sectorTag}${featuredTag}</div>` : ""}
-            <!-- YTD return -->
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid #f1f5f9;border-bottom:1px solid #f1f5f9;margin-bottom:10px;">
-              <span style="font-size:10.5px;color:#64748b;">YTD return</span>
-              <span style="font-size:10.5px;font-weight:700;color:#16a34a;">—</span>
+            <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;">${tagHtml}${featuredHtml}</div>
+            <!-- YTD return row — bg-slate-50 rounded-xl -->
+            <div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;background:#f8fafc;border-radius:12px;padding:8px 12px;">
+              <span style="font-size:12px;font-weight:600;color:#475569;">YTD return</span>
+              <span style="font-size:12px;font-weight:600;color:${ytdClr};">${ytdDisplay}</span>
             </div>
             <!-- Holdings snapshot -->
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-              ${iconsBlock}
-              <span style="font-size:10.5px;color:#64748b;">Holdings snapshot</span>
-            </div>
+            ${holdingsBlock}
             <!-- Provider -->
-            <div style="font-size:10.5px;color:#94a3b8;">Provider: <span style="color:#64748b;font-weight:500;">Mint</span></div>
+            <div style="margin-top:12px;display:flex;align-items:center;gap:8px;">
+              <span style="font-size:12px;color:#64748b;">Provider:</span>
+              <span style="font-size:12px;font-weight:600;color:#334155;">${provider}</span>
+            </div>
           </button>`;
         }).join("");
 
         row.querySelectorAll("button[data-strat-idx]").forEach((btn) => {
           const idx = parseInt(btn.dataset.stratIdx, 10);
           btn.addEventListener("mouseenter", () => {
-            btn.style.transform = "translateY(-2px)";
-            btn.style.boxShadow = "0 6px 24px rgba(124,58,237,0.12)";
-            btn.style.borderColor = "#c4b5fd";
+            btn.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
+            btn.style.borderColor = "#e2e8f0";
           });
           btn.addEventListener("mouseleave", () => {
-            btn.style.transform = "";
-            btn.style.boxShadow = "0 2px 12px rgba(0,0,0,0.06)";
-            btn.style.borderColor = "#e8edf3";
+            btn.style.boxShadow = "0 1px 2px rgba(0,0,0,0.05)";
+            btn.style.borderColor = "#f1f5f9";
           });
           btn.addEventListener("click", () => {
             const strategy = (allStrategiesFullData || [])[idx];
