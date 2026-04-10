@@ -2023,6 +2023,9 @@
           sp.classList.remove('hidden');
           sp.style.display = 'block';
         }
+        /* Show browse panel immediately — workspace starts hidden */
+        const browsePanel = document.getElementById('strategyBrowsePanel');
+        if (browsePanel) browsePanel.style.display = '';
       })();
 
       const switchTab = (activeTab) => {
@@ -4219,6 +4222,7 @@
         renderTopAssetsRow(); // re-rank cards now that strategy usage counts are known
         loadStrategyInvestorData().catch(err => console.error('[Init] loadStrategyInvestorData failed:', err));
         loadStrategyYtd().catch(err => console.warn('[Init] loadStrategyYtd failed:', err));
+        loadStrategyBrowsePanel().catch(err => console.warn('[Init] loadStrategyBrowsePanel failed:', err));
 
         // Build live securities price map for overview min investment display
         const _allSyms = [
