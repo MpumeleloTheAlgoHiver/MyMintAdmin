@@ -1037,36 +1037,34 @@
               <div id="strategyBrowsePanel" style="display:none;padding:20px;border-top:1px solid #f1f5f9;">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;">
 
-                  <!-- Left: Quick platform stats -->
-                  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:20px;">
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
-                      <div style="width:30px;height:30px;border-radius:8px;background:#ede9fe;display:flex;align-items:center;justify-content:center;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="6" height="18" rx="1"/><rect x="9" y="8" width="6" height="13" rx="1"/><rect x="16" y="12" width="6" height="9" rx="1"/></svg>
+                  <!-- Left: Asset Return Insights -->
+                  <div style="background:white;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;">
+                    <!-- Header -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #f1f5f9;">
+                      <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="width:30px;height:30px;border-radius:8px;background:#ecfdf5;display:flex;align-items:center;justify-content:center;">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                        </div>
+                        <span style="font-size:14px;font-weight:700;color:#0f172a;">Return Insights</span>
                       </div>
-                      <span style="font-size:14px;font-weight:700;color:#0f172a;">Platform Overview</span>
+                      <span style="font-size:11px;color:#94a3b8;font-weight:500;">Strategy Assets</span>
                     </div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                      <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
-                        <div id="browseTotalStrategies" style="font-size:22px;font-weight:800;color:#0f172a;line-height:1;">—</div>
-                        <div style="font-size:11px;color:#94a3b8;margin-top:4px;font-weight:500;">Total Strategies</div>
-                      </div>
-                      <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
-                        <div id="browseLiveStrategies" style="font-size:22px;font-weight:800;color:#059669;line-height:1;">—</div>
-                        <div style="font-size:11px;color:#94a3b8;margin-top:4px;font-weight:500;">Live (Public)</div>
-                      </div>
-                      <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
-                        <div id="browseTotalInvestors" style="font-size:22px;font-weight:800;color:#2563eb;line-height:1;">—</div>
-                        <div style="font-size:11px;color:#94a3b8;margin-top:4px;font-weight:500;">Total Investors</div>
-                      </div>
-                      <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
-                        <div id="browseTotalAUM" style="font-size:16px;font-weight:800;color:#0f172a;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
-                        <div style="font-size:11px;color:#94a3b8;margin-top:4px;font-weight:500;">Total AUM</div>
+                    <!-- Period Tabs -->
+                    <div style="display:flex;border-bottom:1px solid #f1f5f9;padding:0 14px;gap:2px;">
+                      <button id="riTabDaily" onclick="window.switchReturnTab('daily')" style="padding:9px 12px;font-size:11px;font-weight:700;color:#7c3aed;border-bottom:2px solid #7c3aed;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;">Daily</button>
+                      <button id="riTabWtd" onclick="window.switchReturnTab('wtd')" style="padding:9px 12px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;">WTD</button>
+                      <button id="riTabMtd" onclick="window.switchReturnTab('mtd')" style="padding:9px 12px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;">MTD</button>
+                      <button id="riTabYtd" onclick="window.switchReturnTab('ytd')" style="padding:9px 12px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;">YTD</button>
+                    </div>
+                    <!-- Asset List -->
+                    <div id="returnInsightsList" style="max-height:285px;overflow-y:auto;padding:8px 10px;">
+                      <div class="animate-pulse flex flex-col gap-2">
+                        <div class="h-10 bg-slate-100 rounded-lg"></div>
+                        <div class="h-10 bg-slate-100 rounded-lg"></div>
+                        <div class="h-10 bg-slate-100 rounded-lg"></div>
+                        <div class="h-10 bg-slate-100 rounded-lg"></div>
                       </div>
                     </div>
-                    <button onclick="document.getElementById('newStrategyBtn')?.click()" style="margin-top:16px;width:100%;padding:11px;background:#7c3aed;color:white;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.15s;" onmouseenter="this.style.background='#6d28d9'" onmouseleave="this.style.background='#7c3aed'">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-                      Create New Strategy
-                    </button>
                   </div>
 
                   <!-- Right: News & Insights from Mint platform -->
@@ -1785,37 +1783,94 @@
       };
 
       let _browsePanelLoaded = false;
+      let _returnInsightsData = []; /* cached asset return data */
+      let _activeReturnTab = 'daily';
+
+      const _renderReturnInsights = (tab) => {
+        const listEl = document.getElementById('returnInsightsList');
+        if (!listEl) return;
+        const fieldMap = { daily: 'change_percent', wtd: 'wtd_performance', mtd: 'mtd_performance', ytd: 'ytd_performance' };
+        const field = fieldMap[tab] || 'change_percent';
+        const assets = (_returnInsightsData || [])
+          .map(a => ({ ...a, _val: a[field] != null ? Number(a[field]) : null }))
+          .filter(a => a._val != null)
+          .sort((a, b) => b._val - a._val);
+
+        if (!assets.length) {
+          listEl.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No ${tab.toUpperCase()} data available</div>`;
+          return;
+        }
+
+        const maxAbs = Math.max(...assets.map(a => Math.abs(a._val)), 0.01);
+        listEl.innerHTML = assets.map((a, i) => {
+          const val = a._val;
+          const pos = val >= 0;
+          const valStr = (pos ? '+' : '') + val.toFixed(2) + '%';
+          const barColor = pos ? '#dcfce7' : '#fee2e2';
+          const textColor = pos ? '#16a34a' : '#dc2626';
+          const barW = Math.round((Math.abs(val) / maxAbs) * 100);
+          const init = (a.symbol || '').replace('.JO','').slice(0,2).toUpperCase();
+          const logoEl = a.logo_url
+            ? `<img src="${a.logo_url}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid #e2e8f0;flex-shrink:0;" onerror="this.outerHTML='<div style=\\'width:28px;height:28px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#7c3aed;\\'>${init}</div>'">`
+            : `<div style="width:28px;height:28px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#7c3aed;flex-shrink:0;">${init}</div>`;
+          const sym = (a.symbol || '').replace('.JO','');
+          return `<div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:10px;margin-bottom:2px;background:${i % 2 === 0 ? '#fafafa' : 'white'};">
+            <span style="font-size:10px;color:#cbd5e1;font-weight:600;width:16px;text-align:right;flex-shrink:0;">${i+1}</span>
+            ${logoEl}
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12px;font-weight:700;color:#0f172a;line-height:1.2;">${sym}</div>
+              <div style="height:4px;background:#f1f5f9;border-radius:4px;margin-top:4px;overflow:hidden;">
+                <div style="height:100%;width:${barW}%;background:${barColor};border-radius:4px;"></div>
+              </div>
+            </div>
+            <span style="font-size:12px;font-weight:700;color:${textColor};flex-shrink:0;min-width:52px;text-align:right;">${valStr}</span>
+          </div>`;
+        }).join('');
+      };
+
+      window.switchReturnTab = (tab) => {
+        _activeReturnTab = tab;
+        const tabs = { daily: 'riTabDaily', wtd: 'riTabWtd', mtd: 'riTabMtd', ytd: 'riTabYtd' };
+        Object.entries(tabs).forEach(([key, id]) => {
+          const btn = document.getElementById(id);
+          if (!btn) return;
+          const active = key === tab;
+          btn.style.color = active ? '#7c3aed' : '#94a3b8';
+          btn.style.borderBottomColor = active ? '#7c3aed' : 'transparent';
+          btn.style.fontWeight = active ? '700' : '600';
+        });
+        _renderReturnInsights(tab);
+      };
+
       const loadStrategyBrowsePanel = async () => {
         if (_browsePanelLoaded) return;
         _browsePanelLoaded = true;
 
-        /* ── Stats from already-loaded strategy data ── */
-        const strategies = allStrategiesFullData || [];
-        const total = strategies.length;
-        const live = strategies.filter(s => s.is_public).length;
-
-        const elTotal = document.getElementById('browseTotalStrategies');
-        const elLive = document.getElementById('browseLiveStrategies');
-        if (elTotal) elTotal.textContent = total;
-        if (elLive) elLive.textContent = live;
-
-        /* Fetch investor count & AUM from stock_holdings */
+        /* ── Return Insights: fetch strategy assets with all return metrics ── */
         try {
-          const { data: hData } = await supabaseClient
-            .from('stock_holdings')
-            .select('investor_id, market_value')
-            .eq('is_active', true);
-          if (hData) {
-            const uniqueInvestors = new Set(hData.map(h => h.investor_id)).size;
-            const totalAUM = hData.reduce((sum, h) => sum + (Number(h.market_value) || 0), 0) / 100;
-            const elInv = document.getElementById('browseTotalInvestors');
-            const elAUM = document.getElementById('browseTotalAUM');
-            if (elInv) elInv.textContent = uniqueInvestors;
-            if (elAUM) elAUM.textContent = totalAUM >= 1e6
-              ? `R ${(totalAUM / 1e6).toFixed(1)}M`
-              : totalAUM >= 1e3 ? `R ${(totalAUM / 1e3).toFixed(0)}K` : `R ${totalAUM.toFixed(0)}`;
-          }
-        } catch(e) { /* silently ignore */ }
+          const stratSymbols = new Set();
+          (allStrategiesFullData || []).forEach(s => {
+            (Array.isArray(s.holdings) ? s.holdings : []).forEach(h => {
+              const sym = h.ticker || h.symbol || '';
+              if (sym) stratSymbols.add(sym);
+            });
+          });
+
+          let q = supabaseClient
+            .from('securities')
+            .select('symbol, name, logo_url, change_percent, ytd_performance, mtd_performance, wtd_performance')
+            .order('change_percent', { ascending: false });
+
+          if (stratSymbols.size > 0) q = q.in('symbol', [...stratSymbols]);
+          else q = q.eq('is_active', true).limit(40);
+
+          const { data: secData } = await q;
+          _returnInsightsData = secData || [];
+          _renderReturnInsights(_activeReturnTab);
+        } catch(e) {
+          const listEl = document.getElementById('returnInsightsList');
+          if (listEl) listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">Data unavailable</div>';
+        }
 
         /* ── News from News_articles ── */
         const listEl = document.getElementById('stratBrowseNewsList');
