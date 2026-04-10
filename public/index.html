@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <style>
     * {
       margin: 0;
@@ -1961,6 +1962,12 @@
     .strategy-holdings-compare.holdings-red .compare-value {
       color: #dc2626;
     }
+    .strategy-holdings-compare.holdings-pending-row .compare-label {
+      color: #d97706;
+    }
+    .strategy-holdings-compare.holdings-pending-row .compare-value {
+      color: #d97706;
+    }
 
     .strategy-group-card {
       cursor: pointer;
@@ -3419,6 +3426,8 @@
     .strategy-holdings-compare { font-size: 0.65rem !important; }
     .strategy-holdings-compare.holdings-green .compare-value { color: #16a34a !important; }
     .strategy-holdings-compare.holdings-red .compare-value { color: #dc2626 !important; }
+    .strategy-holdings-compare.holdings-pending-row .compare-label { color: #d97706 !important; }
+    .strategy-holdings-compare.holdings-pending-row .compare-value { color: #d97706 !important; }
     .holding-desc { font-size: 0.75rem !important; color: #6b7280 !important; margin-bottom: 9px !important; }
     .holding-tag { font-size: 0.69rem !important; font-weight: 600 !important; }
     .holding-card-muted { background: #fafbfc !important; border-color: #eef0f3 !important; }
@@ -6171,7 +6180,7 @@
 
       // Pending holdings: show badge instead of PnL
       const priceBlock = isPending
-        ? `<span class="holding-pending-badge">⏳ Pending Fill</span>`
+        ? `<span class="holding-pending-badge"><i class="fas fa-clock"></i> Pending Fill</span>`
         : `<div class="holding-price ${escapeHtml(pnlPriceClass)}">${escapeHtml(pnl)}</div>
               <div class="holding-change neutral">all time</div>`;
 
@@ -6202,8 +6211,10 @@
     const renderStrategyGroupCard = (strategyName, holdings, groupId) => {
       let totalValue = 0;
       let totalBottomValue = 0;
-      let totalUserHoldings = 0;   // sum of (avg_fill / 100) * quantity
-      let totalMarketHoldings = 0; // sum of (last_price / 100) * quantity
+      let totalUserHoldings = 0;   // sum of (avg_fill / 100) * quantity — filled only
+      let totalMarketHoldings = 0; // sum of (last_price / 100) * quantity — filled only
+      let pendingUserHoldings = 0;   // projected user holdings for pending items
+      let pendingMarketHoldings = 0; // projected market holdings for pending items
       let pendingCount = 0;
       holdings.forEach(row => {
         const isPending = !row.fill_date && !row.Fill_date;
@@ -6212,8 +6223,10 @@
         const currentPrice = security.last_price ? Number(security.last_price) / 100 : 0;
         const qty = Number(row.quantity) || 0;
         const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
-        // Only include filled holdings in PnL totals
-        if (!isPending) {
+        if (isPending) {
+          pendingUserHoldings += (avgFill / 100) * qty;
+          pendingMarketHoldings += currentPrice * qty;
+        } else {
           totalUserHoldings += (avgFill / 100) * qty;
           totalMarketHoldings += currentPrice * qty;
         }
@@ -6227,8 +6240,11 @@
         } else {
           rowBottom = mv;
         }
-        totalValue += mv;
-        totalBottomValue += rowBottom;
+        // Only include filled holdings in PnL totals
+        if (!isPending) {
+          totalValue += mv;
+          totalBottomValue += rowBottom;
+        }
       });
 
       // Display total bottom value divided by 100
@@ -6261,6 +6277,12 @@
       const fmtUserH = 'R ' + totalUserHoldings.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const fmtMarketH = 'R ' + totalMarketHoldings.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+      // Projected totals once pending holdings are filled
+      const projUserH = totalUserHoldings + pendingUserHoldings;
+      const projMarketH = totalMarketHoldings + pendingMarketHoldings;
+      const fmtProjUserH = 'R ' + projUserH.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const fmtProjMarketH = 'R ' + projMarketH.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
       const assetsHtml = holdings.map(row => renderStockHoldingCard(row)).join('');
 
       return `
@@ -6275,7 +6297,11 @@
               <div class="strategy-holdings-compare ${holdingsCompareClass}">
                 <span><span class="compare-label">User</span> <span class="compare-value">${escapeHtml(fmtUserH)}</span></span>
                 <span><span class="compare-label">Market</span> <span class="compare-value">${escapeHtml(fmtMarketH)}</span></span>
-              </div>
+              </div>${pendingCount ? `
+              <div class="strategy-holdings-compare holdings-pending-row">
+                <span><span class="compare-label"><i class="fas fa-clock" style="font-size:0.55rem;"></i> User</span> <span class="compare-value">${escapeHtml(fmtProjUserH)}</span></span>
+                <span><span class="compare-label"><i class="fas fa-clock" style="font-size:0.55rem;"></i> Market</span> <span class="compare-value">${escapeHtml(fmtProjMarketH)}</span></span>
+              </div>` : ''}
             </div>
           </div>
           <div class="holding-desc">${holdingCount} holding${holdingCount === 1 ? '' : 's'} in this strategy${pendingCount ? ` · <span style="color:#d97706;font-weight:600;">${pendingCount} pending</span>` : ''}</div>
