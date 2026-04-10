@@ -5913,55 +5913,109 @@
 
         const display = strategies.slice(0, 7);
 
-        const riskAccentColor = (risk) => {
-          const r = (risk || "").toLowerCase();
-          if (r === "low") return { bar: "#22c55e", pill: "#16a34a" };
-          if (r === "medium") return { bar: "#f59e0b", pill: "#d97706" };
-          if (r === "high") return { bar: "#ef4444", pill: "#dc2626" };
-          return { bar: "#6366f1", pill: "#4f46e5" };
+        /* Mini sparkline — gentle upward curve with purple dot, on light violet bg */
+        const sparkline = (i) => {
+          /* Each card gets a slightly different curve so they don't all look identical */
+          const curves = [
+            "M2 30 C8 26 15 22 24 18 C32 14 40 11 58 4",
+            "M2 28 C10 25 18 20 26 17 C36 13 46 9 58 5",
+            "M2 32 C8 28 16 23 25 19 C34 15 46 10 58 4",
+            "M2 30 C9 27 17 21 27 17 C38 12 48 8 58 5",
+            "M2 29 C7 26 14 21 23 18 C33 14 44 10 58 4",
+            "M2 31 C8 27 16 22 25 18 C35 13 46 9 58 4",
+            "M2 30 C9 25 17 21 26 17 C37 12 47 8 58 5",
+          ];
+          const d = curves[i % curves.length];
+          return `<div style="background:#f5f3ff;border-radius:8px;padding:5px 6px;flex-shrink:0;">
+            <svg width="60" height="34" viewBox="0 0 60 36" fill="none">
+              <defs><linearGradient id="sg${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7c3aed" stop-opacity="0.18"/><stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/></linearGradient></defs>
+              <path d="${d}" stroke="#7c3aed" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="58" cy="4" r="2.6" fill="#7c3aed"/>
+            </svg>
+          </div>`;
         };
 
-        const dots = `<div onclick="event.stopPropagation()" style="flex-shrink:0;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:default;">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="#94a3b8">
-            <circle cx="9" cy="6" r="1.8"/><circle cx="15" cy="6" r="1.8"/>
-            <circle cx="9" cy="12" r="1.8"/><circle cx="15" cy="12" r="1.8"/>
-            <circle cx="9" cy="18" r="1.8"/><circle cx="15" cy="18" r="1.8"/>
-          </svg>
-        </div>`;
+        /* Risk label mapping */
+        const riskDescriptor = (r) => {
+          const v = (r || "").toLowerCase();
+          if (v === "low") return "Conservative";
+          if (v === "medium") return "Balanced";
+          if (v === "high") return "Aggressive";
+          return r ? (r.charAt(0).toUpperCase() + r.slice(1).toLowerCase()) : "—";
+        };
 
         row.innerHTML = display.map((strategy, idx) => {
           const name = strategy.short_name || strategy.name || "Untitled";
-          const riskLabel = strategy.risk_level
-            ? strategy.risk_level.charAt(0).toUpperCase() + strategy.risk_level.slice(1).toLowerCase()
+          const riskDesc = riskDescriptor(strategy.risk_level);
+          const sector = strategy.sector || null;
+          const subtitle = [riskDesc, sector].filter(Boolean).join(" • ");
+
+          const minInv = strategy.min_investment ? Number(strategy.min_investment) : null;
+          const minStr = minInv
+            ? "R " + minInv.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
             : "—";
+
           const holdings = Array.isArray(strategy.holdings) ? strategy.holdings : [];
           const holdingsCount = holdings.length;
-          const colors = riskAccentColor(strategy.risk_level);
-          const initials = name.slice(0, 2).toUpperCase();
 
-          const logoHtml = strategy.icon_url
-            ? `<img src="${strategy.icon_url}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1.5px solid #f1f5f9;flex-shrink:0;background:#f8fafc;" onerror="this.outerHTML='<div style=\\'width:34px;height:34px;border-radius:50%;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#4f46e5;flex-shrink:0;\\'>${initials}</div>'">`
-            : `<div style="width:34px;height:34px;border-radius:50%;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#4f46e5;flex-shrink:0;">${initials}</div>`;
+          /* Stacked holding logo circles */
+          const visible = holdings.slice(0, 3);
+          const extra = holdingsCount > 3 ? holdingsCount - 3 : 0;
+          const iconHtml = visible.map((h, i) => {
+            const sym = h.ticker || h.symbol || (typeof h === "string" ? h : "");
+            const sec = globalSecuritiesMap
+              ? globalSecuritiesMap.get(sym) || globalSecuritiesMap.get(sym + ".JO")
+              : null;
+            const logo = sec?.logo_url || null;
+            const init = (sym || "?").slice(0, 2).toUpperCase();
+            const z = 10 - i;
+            const l = i * 16;
+            return logo
+              ? `<img src="${logo}" style="width:24px;height:24px;border-radius:50%;border:2px solid #fff;position:absolute;left:${l}px;z-index:${z};object-fit:cover;background:#f8fafc;" onerror="this.outerHTML='<div style=\\'position:absolute;left:${l}px;z-index:${z};width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:#4f46e5;\\'>${init}</div>'">`
+              : `<div style="position:absolute;left:${l}px;z-index:${z};width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:#4f46e5;">${init}</div>`;
+          }).join("");
+          const extraHtml = extra > 0
+            ? `<div style="position:absolute;left:${visible.length * 16}px;z-index:0;width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#64748b;">+${extra}</div>`
+            : "";
+          const iconsW = holdingsCount > 3 ? (visible.length * 16 + 24) : (visible.length > 0 ? (visible.length - 1) * 16 + 24 : 0);
+          const iconsBlock = holdingsCount > 0
+            ? `<div style="position:relative;height:24px;width:${iconsW}px;flex-shrink:0;">${iconHtml}${extraHtml}</div>`
+            : "";
+
+          /* Tags */
+          const sectorTag = sector
+            ? `<span style="font-size:10px;font-weight:500;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;padding:3px 9px;border-radius:20px;white-space:nowrap;">${sector}</span>`
+            : "";
+          const featuredTag = strategy.is_featured
+            ? `<span style="font-size:10px;font-weight:600;color:#7c3aed;background:#f5f3ff;border:1px solid #ddd6fe;padding:3px 9px;border-radius:20px;white-space:nowrap;">Featured</span>`
+            : "";
 
           return `<button type="button" data-strat-idx="${idx}"
-          style="flex-shrink:0;width:192px;display:flex;flex-direction:column;padding:14px;border-radius:16px;cursor:pointer;text-align:left;background:#ffffff;border:1.5px solid #e8edf3;box-shadow:0 2px 12px rgba(0,0,0,0.06);transition:all 0.18s;gap:10px;position:relative;overflow:hidden;outline:none;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none;">
-            <!-- subtle top accent bar -->
-            <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${colors.bar};opacity:0.6;border-radius:16px 16px 0 0;"></div>
-            <!-- header: icon + name/risk + dots -->
-            <div style="display:flex;align-items:center;gap:8px;">
-              ${logoHtml}
-              <div style="overflow:hidden;flex:1;min-width:0;">
-                <div style="font-size:11.5px;font-weight:700;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</div>
-                <div style="font-size:10px;font-weight:500;color:#94a3b8;margin-top:1px;">${riskLabel} Risk</div>
+          style="flex-shrink:0;width:224px;display:flex;flex-direction:column;padding:16px;border-radius:16px;cursor:pointer;text-align:left;background:#ffffff;border:1px solid #e8edf3;box-shadow:0 2px 12px rgba(0,0,0,0.06);transition:all 0.18s;position:relative;overflow:hidden;outline:none;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none;">
+            <!-- Name + sparkline -->
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:3px;">
+              <div style="min-width:0;flex:1;">
+                <div style="font-size:13.5px;font-weight:700;color:#0f172a;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</div>
+                <div style="font-size:10.5px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${subtitle}</div>
               </div>
-              ${dots}
+              ${sparkline(idx)}
             </div>
-            <!-- holdings count -->
-            <div style="font-size:19px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;line-height:1;">${holdingsCount}<span style="font-size:12px;font-weight:600;color:#64748b;margin-left:4px;">stocks</span></div>
-            <!-- risk pill -->
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;background:${colors.pill};color:#fff;letter-spacing:0.1px;">${riskLabel} Risk</span>
+            <!-- Min investment -->
+            <div style="font-size:10.5px;color:#94a3b8;margin-bottom:10px;">Min. ${minStr}</div>
+            <!-- Tags -->
+            ${(sectorTag || featuredTag) ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;">${sectorTag}${featuredTag}</div>` : ""}
+            <!-- YTD return -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid #f1f5f9;border-bottom:1px solid #f1f5f9;margin-bottom:10px;">
+              <span style="font-size:10.5px;color:#64748b;">YTD return</span>
+              <span style="font-size:10.5px;font-weight:700;color:#16a34a;">—</span>
             </div>
+            <!-- Holdings snapshot -->
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              ${iconsBlock}
+              <span style="font-size:10.5px;color:#64748b;">Holdings snapshot</span>
+            </div>
+            <!-- Provider -->
+            <div style="font-size:10.5px;color:#94a3b8;">Provider: <span style="color:#64748b;font-weight:500;">Mint</span></div>
           </button>`;
         }).join("");
 
@@ -5969,8 +6023,8 @@
           const idx = parseInt(btn.dataset.stratIdx, 10);
           btn.addEventListener("mouseenter", () => {
             btn.style.transform = "translateY(-2px)";
-            btn.style.boxShadow = "0 6px 20px rgba(0,0,0,0.10)";
-            btn.style.borderColor = "#c7d2df";
+            btn.style.boxShadow = "0 6px 24px rgba(124,58,237,0.12)";
+            btn.style.borderColor = "#c4b5fd";
           });
           btn.addEventListener("mouseleave", () => {
             btn.style.transform = "";
