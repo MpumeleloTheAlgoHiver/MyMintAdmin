@@ -1011,7 +1011,7 @@
             }
           </div>
         `;
-        initPerfChart(cumMonths, cumulative);
+        initPerfChart(cumMonths, cumulative, inv.inceptionDate);
         if (hasEnoughFor3M) initRollingChart(cumMonths, buildRolling3M(cumulative));
 
       } else if (currentTab === 'risk') {
@@ -1158,7 +1158,7 @@
     /* ─────────────────────────────────────────────────────── */
     /* CHARTS                                                  */
     /* ─────────────────────────────────────────────────────── */
-    function initPerfChart(months, cumulative) {
+    function initPerfChart(months, cumulative, inceptionDate) {
       const el = document.getElementById('perfChartEl');
       if (!el) return;
       if (window._perfChart) { try { window._perfChart.dispose(); } catch(e) {} }
@@ -1172,8 +1172,13 @@
         return;
       }
 
+      /* Format inception date as short label e.g. "15 Jan '23" */
+      const inceptionLabel = inceptionDate
+        ? new Date(inceptionDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: '2-digit' })
+        : '';
+
       /* Anchor line to 0 at inception so it draws up/down from the baseline */
-      const chartMonths = ['', ...months];
+      const chartMonths = [inceptionLabel, ...months];
       const chartData   = [0, ...cumulative];
 
       chart.setOption({
@@ -1182,7 +1187,7 @@
         grid: { top: 50, right: 20, bottom: 40, left: 50 },
         tooltip: { trigger: 'axis', formatter: (params) => {
           const p = params[0];
-          if (p.axisValue === '') return `Inception: <b>0.00%</b>`;
+          if (p.dataIndex === 0) return `${p.axisValue || 'Inception'}: <b>0.00%</b>`;
           return `${p.axisValue}<br/>${p.seriesName}: <b>${p.value >= 0 ? '+' : ''}${p.value}%</b>`;
         }},
         xAxis: { type: 'category', data: chartMonths, boundaryGap: false, axisLine: { lineStyle: { color: '#e2e8f0' } }, axisTick: { show: false }, axisLabel: { color: '#94a3b8', fontSize: 10, interval: Math.ceil(chartMonths.length / 8) } },
