@@ -1792,6 +1792,9 @@
 
         const fieldMap = { daily: 'change_percent', wtd: 'wtd_performance', mtd: 'mtd_performance', ytd: 'ytd_performance' };
         const field = fieldMap[tab] || 'change_percent';
+        if (tab === 'wtd' || tab === 'mtd') {
+          console.log(`[ReturnInsights] render ${tab}, data length=${(_returnInsightsData||[]).length}, sample:`, (_returnInsightsData||[])[0]);
+        }
         const all = (_returnInsightsData || [])
           .map(a => ({ ...a, _val: a[field] != null ? Number(a[field]) : null }))
           .filter(a => a._val != null)
@@ -1874,12 +1877,28 @@
           const listEl = document.getElementById('returnInsightsList');
           if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">Loading ${tab.toUpperCase()} data…</div>`;
 
+          /* If the browse panel hasn't loaded securities yet, wait up to 6 s */
+          if (!_returnInsightsData.length) {
+            await new Promise(resolve => {
+              let waited = 0;
+              const check = () => {
+                if (_returnInsightsData.length || waited >= 6000) return resolve();
+                waited += 200; setTimeout(check, 200);
+              };
+              check();
+            });
+          }
+
           try {
             const symbols = (_returnInsightsData || []).map(a => a.symbol).filter(Boolean);
+            console.log('[ReturnInsights] WTD/MTD fetch, symbols count:', symbols.length, 'first:', symbols[0]);
             if (symbols.length) {
               const resp = await fetch(`/api/security-performance?symbols=${encodeURIComponent(symbols.join(','))}`);
+              console.log('[ReturnInsights] server resp status:', resp.status);
               if (resp.ok) {
-                const { results } = await resp.json();
+                const json = await resp.json();
+                console.log('[ReturnInsights] server results count:', Object.keys(json.results || {}).length, 'sample:', Object.values(json.results||{})[0]);
+                const { results } = json;
                 /* Merge wtd/mtd into existing data */
                 _returnInsightsData = (_returnInsightsData || []).map(a => {
                   const r = results[a.symbol];

@@ -916,67 +916,62 @@ const server = http.createServer((req, res) => {
 
     (async () => {
       try {
-        const results = {};
-        for (const sym of symbols) {
-          const encodedSym = encodeURIComponent(sym);
+        console.log(`[PerfAPI] request for ${symbols.length} symbols`);
+        const now = new Date();
+        const dow = now.getDay();
+        const monday = new Date(now);
+        monday.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
+        monday.setHours(0, 0, 0, 0);
+        const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        const YF_HEADERS = { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' };
+
+        const fetchPerf = async (sym) => {
+          const enc = encodeURIComponent(sym);
           const perf = { symbol: sym, wtd_performance: null, mtd_performance: null };
 
-          /* WTD — last 5 trading days */
-          try {
-            const r = await fetch(
-              `https://query1.finance.yahoo.com/v8/finance/chart/${encodedSym}?interval=1d&range=5d`,
-              { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } }
-            );
-            if (r.ok) {
-              const d = await r.json();
-              const cr = d?.chart?.result?.[0];
-              if (cr) {
-                const timestamps = cr.timestamp || [];
-                const closes = cr.indicators?.quote?.[0]?.close || [];
-                const cur = cr.meta?.regularMarketPrice;
-                const now = new Date();
-                const dow = now.getDay();
-                const monday = new Date(now);
-                monday.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
-                monday.setHours(0, 0, 0, 0);
-                let startPrice = null;
-                for (let i = 0; i < timestamps.length; i++) {
-                  if (new Date(timestamps[i] * 1000) >= monday && closes[i] != null) { startPrice = closes[i]; break; }
-                }
-                if (startPrice == null) startPrice = closes.find(c => c != null);
-                if (startPrice && cur) perf.wtd_performance = ((cur - startPrice) / startPrice) * 100;
-              }
+          const calcReturn = (cr, cutoff) => {
+            const timestamps = cr.timestamp || [];
+            const closes = cr.indicators?.quote?.[0]?.close || [];
+            const cur = cr.meta?.regularMarketPrice;
+            if (!cur) return null;
+            let startPrice = null;
+            for (let i = 0; i < timestamps.length; i++) {
+              if (new Date(timestamps[i] * 1000) >= cutoff && closes[i] != null) { startPrice = closes[i]; break; }
             }
-          } catch { /* ignore */ }
+            if (startPrice == null) startPrice = closes.find(c => c != null);
+            return (startPrice && cur) ? ((cur - startPrice) / startPrice) * 100 : null;
+          };
 
-          /* MTD — last 1 month */
-          try {
-            const r = await fetch(
-              `https://query1.finance.yahoo.com/v8/finance/chart/${encodedSym}?interval=1d&range=1mo`,
-              { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } }
-            );
-            if (r.ok) {
-              const d = await r.json();
-              const cr = d?.chart?.result?.[0];
-              if (cr) {
-                const timestamps = cr.timestamp || [];
-                const closes = cr.indicators?.quote?.[0]?.close || [];
-                const cur = cr.meta?.regularMarketPrice;
-                const now = new Date();
-                const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-                let startPrice = null;
-                for (let i = 0; i < timestamps.length; i++) {
-                  if (new Date(timestamps[i] * 1000) >= firstOfMonth && closes[i] != null) { startPrice = closes[i]; break; }
-                }
-                if (startPrice == null) startPrice = closes.find(c => c != null);
-                if (startPrice && cur) perf.mtd_performance = ((cur - startPrice) / startPrice) * 100;
-              }
-            }
-          } catch { /* ignore */ }
+          const [wtdRes, mtdRes] = await Promise.allSettled([
+            fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=5d`, { headers: YF_HEADERS }),
+            fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=1mo`, { headers: YF_HEADERS })
+          ]);
 
-          results[sym] = perf;
-          await new Promise(r => setTimeout(r, 120)); /* rate limit */
+          if (wtdRes.status === 'fulfilled' && wtdRes.value.ok) {
+            const d = await wtdRes.value.json().catch(() => null);
+            const cr = d?.chart?.result?.[0];
+            if (cr) perf.wtd_performance = calcReturn(cr, monday);
+          }
+          if (mtdRes.status === 'fulfilled' && mtdRes.value.ok) {
+            const d = await mtdRes.value.json().catch(() => null);
+            const cr = d?.chart?.result?.[0];
+            if (cr) perf.mtd_performance = calcReturn(cr, firstOfMonth);
+          }
+          return perf;
+        };
+
+        /* Process in parallel batches of 8 to avoid overloading Yahoo Finance */
+        const results = {};
+        const BATCH = 8;
+        for (let i = 0; i < symbols.length; i += BATCH) {
+          const batch = symbols.slice(i, i + BATCH);
+          const perfs = await Promise.all(batch.map(fetchPerf));
+          perfs.forEach(p => { results[p.symbol] = p; });
+          if (i + BATCH < symbols.length) await new Promise(r => setTimeout(r, 300));
         }
+
+        console.log(`[PerfAPI] done — ${Object.values(results).filter(p => p.wtd_performance != null).length}/${symbols.length} with WTD data`);
         sendJson(res, 200, { results });
       } catch (err) {
         sendJson(res, 500, { error: err?.message || 'Failed' });
