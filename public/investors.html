@@ -1185,7 +1185,7 @@
           if (p.axisValue === '') return `Inception: <b>0.00%</b>`;
           return `${p.axisValue}<br/>${p.seriesName}: <b>${p.value >= 0 ? '+' : ''}${p.value}%</b>`;
         }},
-        xAxis: { type: 'category', data: chartMonths, axisLine: { lineStyle: { color: '#e2e8f0' } }, axisTick: { show: false }, axisLabel: { color: '#94a3b8', fontSize: 10, interval: Math.ceil(chartMonths.length / 8) } },
+        xAxis: { type: 'category', data: chartMonths, boundaryGap: false, axisLine: { lineStyle: { color: '#e2e8f0' } }, axisTick: { show: false }, axisLabel: { color: '#94a3b8', fontSize: 10, interval: Math.ceil(chartMonths.length / 8) } },
         yAxis: { type: 'value', axisLabel: { color: '#94a3b8', fontSize: 10, formatter: '{value}%' }, splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } }, min: v => Math.min(0, v.min) },
         series: [{
           name: 'Strategy',
