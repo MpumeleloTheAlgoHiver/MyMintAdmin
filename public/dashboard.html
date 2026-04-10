@@ -1789,7 +1789,18 @@
       const _renderReturnInsights = (tab) => {
         const listEl = document.getElementById('returnInsightsList');
         if (!listEl) return;
-        const fieldMap = { daily: 'change_percent', wtd: 'wtd_performance', mtd: 'mtd_performance', ytd: 'ytd_performance' };
+
+        /* WTD / MTD not stored in DB — show a clear message */
+        if (tab === 'wtd' || tab === 'mtd') {
+          listEl.innerHTML = `<div style="text-align:center;padding:28px 16px;">
+            <div style="font-size:24px;margin-bottom:8px;">📊</div>
+            <div style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:4px;">${tab.toUpperCase()} data not tracked</div>
+            <div style="font-size:11px;color:#94a3b8;">This period isn't stored in the database yet.</div>
+          </div>`;
+          return;
+        }
+
+        const fieldMap = { daily: 'change_percent', ytd: 'ytd_performance' };
         const field = fieldMap[tab] || 'change_percent';
         const all = (_returnInsightsData || [])
           .map(a => ({ ...a, _val: a[field] != null ? Number(a[field]) : null }))
@@ -1801,8 +1812,9 @@
           return;
         }
 
-        const gainers = all.filter(a => a._val > 0).slice(0, 4);
-        const losers  = all.filter(a => a._val < 0).slice(-4).reverse();
+        /* Split into top gainers / losers; include flat in gainers if nothing positive */
+        const gainers = all.filter(a => a._val >= 0).slice(0, 4);
+        const losers  = [...all].reverse().filter(a => a._val <= 0).slice(0, 4);
         const maxGain = Math.max(...gainers.map(a => a._val), 0.001);
         const maxLoss = Math.max(...losers.map(a => Math.abs(a._val)), 0.001);
 
@@ -1881,15 +1893,17 @@
             });
           });
 
+          /* Only select confirmed columns — mtd/wtd don't exist in this table */
           let q = supabaseClient
             .from('securities')
-            .select('symbol, name, logo_url, change_percent, ytd_performance, mtd_performance, wtd_performance')
-            .order('change_percent', { ascending: false });
+            .select('symbol, name, logo_url, change_percent, ytd_performance')
+            .order('change_percent', { ascending: false, nullsFirst: false });
 
           if (stratSymbols.size > 0) q = q.in('symbol', [...stratSymbols]);
           else q = q.eq('is_active', true).limit(40);
 
-          const { data: secData } = await q;
+          const { data: secData, error: secErr } = await q;
+          if (secErr) throw secErr;
           _returnInsightsData = secData || [];
           _renderReturnInsights(_activeReturnTab);
         } catch(e) {
