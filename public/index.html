@@ -3696,6 +3696,18 @@
             <button class="bank-filter-option" type="button" data-bank-filter="unlinked" role="menuitem">Unlinked bank</button>
           </div>
         </div>
+        <div class="bank-filter-wrap">
+          <button class="quick-filter-pill" id="familyFilterBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="familyFilterMenu">
+            <svg class="fpill-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2.5a3 3 0 110 6 3 3 0 010-6zm-4.25 9a2.75 2.75 0 015.5 0V12h-5.5v-.5zm8.5 0a2.75 2.75 0 015.5 0V12h-5.5v-.5zM1.5 17a4.5 4.5 0 014.5-4.5h8A4.5 4.5 0 0118.5 17v.5h-17V17z"/></svg>
+            Parent/Child
+            <svg class="fpill-chevron" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"/></svg>
+          </button>
+          <div class="bank-filter-menu" id="familyFilterMenu" role="menu" aria-label="Parent child filter">
+            <button class="bank-filter-option active" type="button" data-family-filter="all" role="menuitem">All</button>
+            <button class="bank-filter-option" type="button" data-family-filter="parent" role="menuitem">Parent</button>
+            <button class="bank-filter-option" type="button" data-family-filter="child" role="menuitem">Child</button>
+          </div>
+        </div>
       </div>
       <!-- Divider -->
       <div class="tnav-divider" aria-hidden="true"></div>
@@ -4268,6 +4280,9 @@
     const bankFilterBtn = document.getElementById('bankFilterBtn');
     const bankFilterMenu = document.getElementById('bankFilterMenu');
     const bankFilterOptions = Array.from(document.querySelectorAll('[data-bank-filter]'));
+    const familyFilterBtn = document.getElementById('familyFilterBtn');
+    const familyFilterMenu = document.getElementById('familyFilterMenu');
+    const familyFilterOptions = Array.from(document.querySelectorAll('[data-family-filter]'));
     const completedTableViewBtn = document.getElementById('completedTableViewBtn');
     const notCompletedEmailViewBtn = document.getElementById('notCompletedEmailViewBtn');
     const completedTablePanel = document.getElementById('completedTablePanel');
@@ -4278,7 +4293,8 @@
     const searchInput = document.querySelector('.top-search input');
     const activeProfileFilters = {
       kyc: 'all',
-      bank: 'all'
+      bank: 'all',
+      family: 'all'
     };
     const JSPDF_PRIMARY_SRC = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
     const JSPDF_FALLBACK_SRC = 'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js';
@@ -4291,6 +4307,7 @@
     const holdingsByUserMap = {};
     const securitiesByIdMap = {};
     const strategiesByIdMap = {};
+    const familyRoleFlagsByUserId = {};
     const PACK_SECTIONS_PAGE_SIZE = 4;
     let completedTableOpen = false;
     let completedTableEntries = [];
@@ -6091,6 +6108,16 @@
         return false;
       };
 
+      const getFamilyRoleForProfile = (profile) => {
+        const profileId = String(profile?.id || '');
+        if (!profileId) return 'unknown';
+        const roleFlags = familyRoleFlagsByUserId[profileId];
+        if (!roleFlags) return 'unknown';
+        if (roleFlags.child) return 'child';
+        if (roleFlags.parent) return 'parent';
+        return 'unknown';
+      };
+
       const filtered = allProfiles.filter(profile => {
         const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
         const uid = profile.id || '';
@@ -6111,7 +6138,12 @@
           || (activeProfileFilters.bank === 'linked' && bankInitiated)
           || (activeProfileFilters.bank === 'unlinked' && !bankInitiated);
 
-        return matchesQuery && matchesKyc && matchesBank;
+        const familyRole = getFamilyRoleForProfile(profile);
+        const matchesFamily = activeProfileFilters.family === 'all'
+          || (activeProfileFilters.family === 'parent' && familyRole === 'parent')
+          || (activeProfileFilters.family === 'child' && familyRole === 'child');
+
+        return matchesQuery && matchesKyc && matchesBank && matchesFamily;
       });
 
       const completedFilterActive = activeProfileFilters.kyc === 'completed';
@@ -6495,6 +6527,7 @@
       Object.keys(holdingsByUserMap).forEach(key => delete holdingsByUserMap[key]);
       Object.keys(securitiesByIdMap).forEach(key => delete securitiesByIdMap[key]);
       Object.keys(strategiesByIdMap).forEach(key => delete strategiesByIdMap[key]);
+      Object.keys(familyRoleFlagsByUserId).forEach(key => delete familyRoleFlagsByUserId[key]);
 
       try {
         const { data, error } = await supabaseClient
@@ -6511,11 +6544,14 @@
         let kycMap = {};
 
         if (userIds.length) {
-          const [onboardingRes, packRes, allocationsRes, holdingsRes] = await Promise.all([
+          const [onboardingRes, packRes, allocationsRes, holdingsRes, familyByPrimaryRes, familyByLinkedRes, familyByParentRes] = await Promise.all([
             supabaseClient.from('user_onboarding').select('*').in('user_id', userIds),
             supabaseClient.from('user_onboarding_pack_details').select('*').in('user_id', userIds),
             supabaseClient.from('allocations').select('user_id, asset_class, weight, value, return_1d, return_1w, return_1m, return_ytd, return_1y, as_of_date, security_id, created_at, updated_at').in('user_id', userIds).order('updated_at', { ascending: false }),
-            supabaseClient.from('stock_holdings').select('user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", as_of_date, strategy_id, strategy_name_snapshot, trade_side, is_active, created_at, updated_at').eq('is_active', true).eq('trade_side', 'BUY').in('user_id', userIds).order('updated_at', { ascending: false })
+            supabaseClient.from('stock_holdings').select('user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", as_of_date, strategy_id, strategy_name_snapshot, trade_side, is_active, created_at, updated_at').eq('is_active', true).eq('trade_side', 'BUY').in('user_id', userIds).order('updated_at', { ascending: false }),
+            supabaseClient.from('family_members').select('id, primary_user_id, parent_id, linked_user_id, relationship').in('primary_user_id', userIds),
+            supabaseClient.from('family_members').select('id, primary_user_id, parent_id, linked_user_id, relationship').in('linked_user_id', userIds),
+            supabaseClient.from('family_members').select('id, primary_user_id, parent_id, linked_user_id, relationship').in('parent_id', userIds)
           ]);
 
           if (!onboardingRes.error && onboardingRes.data) {
@@ -6544,6 +6580,34 @@
               allocationsByUserMap[row.user_id].push(row);
             });
           }
+
+          const familyRowsById = {};
+          [familyByPrimaryRes, familyByLinkedRes, familyByParentRes].forEach((res) => {
+            if (res?.error || !Array.isArray(res?.data)) return;
+            res.data.forEach((row) => {
+              if (row?.id) familyRowsById[row.id] = row;
+            });
+          });
+
+          Object.values(familyRowsById).forEach((row) => {
+            const relationship = normalizeKycStatusText(row.relationship || '');
+            const parentUserId = String(row.primary_user_id || row.parent_id || '').trim();
+            const linkedUserId = String(row.linked_user_id || '').trim();
+
+            if (parentUserId) {
+              if (!familyRoleFlagsByUserId[parentUserId]) familyRoleFlagsByUserId[parentUserId] = { parent: false, child: false };
+              familyRoleFlagsByUserId[parentUserId].parent = true;
+            }
+
+            if (linkedUserId) {
+              if (!familyRoleFlagsByUserId[linkedUserId]) familyRoleFlagsByUserId[linkedUserId] = { parent: false, child: false };
+              if (relationship === 'child') {
+                familyRoleFlagsByUserId[linkedUserId].child = true;
+              } else {
+                familyRoleFlagsByUserId[linkedUserId].parent = true;
+              }
+            }
+          });
 
           const holdingsRows = (!holdingsRes.error && holdingsRes.data) ? holdingsRes.data : [];
           const allocationsRows = (!allocationsRes.error && allocationsRes.data) ? allocationsRes.data : [];
@@ -8466,14 +8530,45 @@
       });
     }
 
+    if (familyFilterBtn && familyFilterMenu) {
+      familyFilterBtn.addEventListener('click', () => {
+        const willOpen = !familyFilterMenu.classList.contains('active');
+        familyFilterMenu.classList.toggle('active', willOpen);
+        familyFilterBtn.setAttribute('aria-expanded', String(willOpen));
+      });
+    }
+
+    if (familyFilterOptions.length) {
+      familyFilterOptions.forEach((option) => {
+        option.addEventListener('click', () => {
+          const value = option.dataset.familyFilter || 'all';
+          activeProfileFilters.family = value;
+          familyFilterOptions.forEach((item) => item.classList.toggle('active', item === option));
+          if (familyFilterMenu) familyFilterMenu.classList.remove('active');
+          if (familyFilterBtn) familyFilterBtn.setAttribute('aria-expanded', 'false');
+          applySearchFilter();
+        });
+      });
+    }
+
     document.addEventListener('click', (event) => {
-      if (!bankFilterMenu || !bankFilterBtn) return;
-      const withinMenu = bankFilterMenu.contains(event.target);
-      const withinBtn = bankFilterBtn.contains(event.target);
-      if (withinMenu || withinBtn) return;
-      if (!bankFilterMenu.classList.contains('active')) return;
-      bankFilterMenu.classList.remove('active');
-      bankFilterBtn.setAttribute('aria-expanded', 'false');
+      if (bankFilterMenu && bankFilterBtn) {
+        const withinBankMenu = bankFilterMenu.contains(event.target);
+        const withinBankBtn = bankFilterBtn.contains(event.target);
+        if (!withinBankMenu && !withinBankBtn && bankFilterMenu.classList.contains('active')) {
+          bankFilterMenu.classList.remove('active');
+          bankFilterBtn.setAttribute('aria-expanded', 'false');
+        }
+      }
+
+      if (familyFilterMenu && familyFilterBtn) {
+        const withinFamilyMenu = familyFilterMenu.contains(event.target);
+        const withinFamilyBtn = familyFilterBtn.contains(event.target);
+        if (!withinFamilyMenu && !withinFamilyBtn && familyFilterMenu.classList.contains('active')) {
+          familyFilterMenu.classList.remove('active');
+          familyFilterBtn.setAttribute('aria-expanded', 'false');
+        }
+      }
     });
 
     requireSession().then((ok) => {
