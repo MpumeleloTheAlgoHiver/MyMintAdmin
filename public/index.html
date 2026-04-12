@@ -6047,14 +6047,36 @@
       existingUsers.forEach(renderProfileItem);
     };
 
-    const getParentNameForFamilyMember = (familyMember) => {
-      const parentUserId = familyMember.primary_user_id || familyMember.parent_id;
-      if (!parentUserId) return 'Unknown parent';
-      const parentProfile = allProfiles.find(p => String(p.id) === String(parentUserId));
-      if (parentProfile) {
-        return [parentProfile.first_name, parentProfile.last_name].filter(Boolean).join(' ') || parentProfile.email || parentUserId;
+    const calculateAgeFromDate = (dateValue) => {
+      if (!dateValue) return null;
+      const dob = new Date(dateValue);
+      if (Number.isNaN(dob.getTime())) return null;
+
+      const now = new Date();
+      let age = now.getFullYear() - dob.getFullYear();
+      const monthDiff = now.getMonth() - dob.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) {
+        age -= 1;
       }
-      return parentUserId;
+      return age >= 0 ? age : null;
+    };
+
+    const getLinkedParentsForFamilyMember = (familyMember) => {
+      const parentIds = [familyMember.primary_user_id, familyMember.parent_id]
+        .map((id) => String(id || '').trim())
+        .filter(Boolean);
+      const uniqueParentIds = Array.from(new Set(parentIds));
+
+      return uniqueParentIds.map((parentId) => {
+        const parentProfile = allProfiles.find((p) => String(p.id) === parentId);
+        if (!parentProfile) {
+          return { id: parentId, name: parentId };
+        }
+        const parentName = [parentProfile.first_name, parentProfile.last_name].filter(Boolean).join(' ')
+          || parentProfile.email
+          || parentId;
+        return { id: parentId, name: parentName };
+      });
     };
 
     const renderFamilyChildren = (searchQuery = '') => {
@@ -6084,6 +6106,11 @@
         const clone = profileTemplate.content.firstElementChild.cloneNode(true);
         const fullName = [child.first_name, child.last_name].filter(Boolean).join(' ') || 'Unknown Child';
         const uid = child.id || '-';
+        const currentAge = calculateAgeFromDate(child.date_of_birth);
+        const parentLinks = getLinkedParentsForFamilyMember(child);
+        const parentSummary = parentLinks.length
+          ? parentLinks.map((p) => p.name).join(', ')
+          : 'Unknown';
 
         if (child.id) clone.dataset.profileId = child.id;
 
@@ -6095,11 +6122,12 @@
         setText(clone, '[data-website]', '-');
         setText(clone, '[data-phone]', '-');
 
-        // Row email slot → show gender + DOB as subtitle
+        // Row subtitle for child card
         clone.querySelectorAll('[data-row-email]').forEach(el => {
           const parts = [];
           if (child.gender) parts.push(child.gender);
-          if (child.date_of_birth) parts.push(`DOB: ${child.date_of_birth}`);
+          if (currentAge !== null) parts.push(`Age: ${currentAge}`);
+          if (parentLinks.length) parts.push(`Parent: ${parentSummary}`);
           el.textContent = parts.join(' · ') || '';
           const sep = el.nextElementSibling;
           if (sep && sep.classList.contains('simple-uid-sep')) {
@@ -6155,14 +6183,18 @@
             const cardTitle = detailCards[0].querySelector('.card-title');
             if (cardTitle) cardTitle.lastChild.textContent = ' Child details';
             const rows = detailCards[0].querySelectorAll('.detail-row');
-            const parentName = getParentNameForFamilyMember(child);
-            const parentId = child.primary_user_id || child.parent_id || '-';
+            const linkedParentNames = parentLinks.length
+              ? parentLinks.map((p) => p.name).join(', ')
+              : 'Unknown';
+            const linkedParentIds = parentLinks.length
+              ? parentLinks.map((p) => p.id).join(', ')
+              : '-';
             const detailData = [
-              { label: 'Parent', value: parentName },
-              { label: 'Parent UID', value: parentId },
+              { label: 'Linked Parent(s)', value: linkedParentNames },
+              { label: 'Parent UID(s)', value: linkedParentIds },
               { label: 'Relationship', value: child.relationship || '-' },
               { label: 'Gender', value: child.gender || '-' },
-              { label: 'Date of Birth', value: child.date_of_birth || '-' },
+              { label: 'Current Age', value: currentAge !== null ? String(currentAge) : '-' },
               { label: 'ID Number', value: child.id_number || '-' },
               { label: 'Mint Number', value: child.mint_number || '-' },
               { label: 'Balance', value: child.available_balance != null ? `R ${Number(child.available_balance).toFixed(2)}` : 'R 0.00' },
