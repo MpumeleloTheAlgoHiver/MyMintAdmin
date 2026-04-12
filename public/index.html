@@ -305,6 +305,164 @@
       font-weight: 600;
     }
 
+    .bank-filter-sep {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 6px;
+    }
+
+    /* ── Certificate viewer modal ── */
+    .cert-modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(0,0,0,0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .cert-modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .cert-modal {
+      background: #fff;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 640px;
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+      overflow: hidden;
+    }
+    .cert-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .cert-modal-header h3 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #1f2937;
+    }
+    .cert-modal-close {
+      background: none;
+      border: none;
+      font-size: 1.3rem;
+      cursor: pointer;
+      color: #6b7280;
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+    .cert-modal-close:hover { background: #f3f4f6; }
+    .cert-modal-body {
+      flex: 1;
+      overflow: auto;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+      background: #f9fafb;
+    }
+    .cert-modal-body img {
+      max-width: 100%;
+      max-height: 60vh;
+      border-radius: 8px;
+      object-fit: contain;
+    }
+    .cert-modal-body iframe {
+      width: 100%;
+      height: 60vh;
+      border: none;
+      border-radius: 8px;
+    }
+    .cert-modal-body .cert-no-preview {
+      color: #6b7280;
+      font-size: 0.9rem;
+      text-align: center;
+    }
+    .cert-modal-body .cert-no-preview a {
+      color: #7c3aed;
+      text-decoration: underline;
+    }
+    .cert-modal-footer {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      justify-content: flex-end;
+    }
+    .cert-modal-footer .cert-btn {
+      padding: 8px 20px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s ease, opacity 0.2s ease;
+    }
+    .cert-modal-footer .cert-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .cert-btn-accept {
+      background: #10b981;
+      color: #fff;
+    }
+    .cert-btn-accept:hover:not(:disabled) { background: #059669; }
+    .cert-btn-reject {
+      background: #ef4444;
+      color: #fff;
+    }
+    .cert-btn-reject:hover:not(:disabled) { background: #dc2626; }
+    .cert-btn-cancel {
+      background: #f3f4f6;
+      color: #374151;
+    }
+    .cert-btn-cancel:hover:not(:disabled) { background: #e5e7eb; }
+
+    /* ── Child KYC badge variants ── */
+    .child-kyc-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 6px;
+      text-transform: capitalize;
+    }
+    .child-kyc-badge.pending { background: #fef3c7; color: #92400e; }
+    .child-kyc-badge.completed { background: #d1fae5; color: #065f46; }
+    .child-kyc-badge.rejected { background: #fee2e2; color: #991b1b; }
+
+    /* ── Certificate link button in child card ── */
+    .cert-view-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #ede9fe;
+      color: #5b21b6;
+      border: none;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      margin-top: 4px;
+    }
+    .cert-view-btn:hover { background: #ddd6fe; }
+
     .table-view-toggle-btn {
       display: none;
       align-items: center;
@@ -3706,6 +3864,16 @@
             <button class="bank-filter-option active" type="button" data-family-filter="all" role="menuitem">All</button>
             <button class="bank-filter-option" type="button" data-family-filter="parent" role="menuitem">Parent</button>
             <button class="bank-filter-option" type="button" data-family-filter="child" role="menuitem">Child</button>
+            <div class="bank-filter-sep" aria-hidden="true"></div>
+            <button class="bank-filter-option" type="button" data-family-filter="child-pending" role="menuitem">
+              <span class="fpill-dot fpill-amber" aria-hidden="true"></span>Pending Children
+            </button>
+            <button class="bank-filter-option" type="button" data-family-filter="child-completed" role="menuitem">
+              <span class="fpill-dot fpill-green" aria-hidden="true"></span>Verified Children
+            </button>
+            <button class="bank-filter-option" type="button" data-family-filter="child-rejected" role="menuitem">
+              <span class="fpill-dot fpill-red" aria-hidden="true"></span>Rejected Children
+            </button>
           </div>
         </div>
       </div>
@@ -6079,12 +6247,17 @@
       });
     };
 
-    const renderFamilyChildren = (searchQuery = '') => {
+    const renderFamilyChildren = (searchQuery = '', kycStatusFilter = 'all') => {
       if (!profilesList || !profileTemplate) return;
       profilesList.innerHTML = '';
 
       const childRows = allFamilyMembers
         .filter(row => normalizeKycStatusText(row.relationship || '') === 'child')
+        .filter(row => {
+          if (kycStatusFilter === 'all') return true;
+          const status = normalizeKycStatusText(row.kyc_status || 'pending');
+          return status === kycStatusFilter;
+        })
         .filter(row => {
           if (!searchQuery) return true;
           const fullName = [row.first_name, row.last_name].filter(Boolean).join(' ').toLowerCase();
@@ -6136,11 +6309,11 @@
           }
         });
 
-        // KYC badge → show "Child" badge in a teal color
+        // KYC badge → show child KYC status
+        const childKycStatus = normalizeKycStatusText(child.kyc_status || 'pending');
         clone.querySelectorAll('[data-row-kyc]').forEach(el => {
-          el.textContent = 'Child';
-          el.className = 'row-kyc-badge';
-          el.style.cssText = 'background:#dbeafe;color:#1e40af;border-color:#93c5fd;';
+          el.textContent = childKycStatus === 'completed' ? 'Verified' : childKycStatus === 'rejected' ? 'Rejected' : 'Pending';
+          el.className = 'child-kyc-badge ' + childKycStatus;
         });
 
         // Signed in today badge → hide
@@ -6190,6 +6363,7 @@
             const linkedParentIds = parentLinks.length
               ? parentLinks.map((p) => p.id).join(', ')
               : '-';
+            const kycLabel = childKycStatus === 'completed' ? 'Verified' : childKycStatus === 'rejected' ? 'Rejected' : 'Pending';
             const detailData = [
               { label: 'Linked Parent(s)', value: linkedParentNames },
               { label: 'Parent UID(s)', value: linkedParentIds },
@@ -6199,6 +6373,7 @@
               { label: 'ID Number', value: child.id_number || '-' },
               { label: 'Mint Number', value: child.mint_number || '-' },
               { label: 'Balance', value: child.available_balance != null ? `R ${Number(child.available_balance).toFixed(2)}` : 'R 0.00' },
+              { label: 'KYC Status', value: kycLabel },
               { label: 'Created', value: child.created_at || '-' },
             ];
             // Clear existing rows and rebuild
@@ -6210,6 +6385,27 @@
               row.innerHTML = `<div class="detail-label">${escapeHtml(d.label)}</div><div class="detail-value">${escapeHtml(d.value)}</div>`;
               fragment.appendChild(row);
             });
+
+            // Certificate view button
+            const certRow = document.createElement('div');
+            certRow.className = 'detail-row';
+            const certUrl = child.certificate_url || '';
+            if (certUrl) {
+              certRow.innerHTML = `<div class="detail-label">Certificate</div><div class="detail-value"><button class="cert-view-btn" type="button" data-cert-review data-child-id="${escapeHtml(String(child.id))}" data-cert-url="${escapeHtml(certUrl)}" data-child-name="${escapeHtml(fullName)}" data-child-kyc="${escapeHtml(childKycStatus)}"><i class="fa-solid fa-file-certificate" aria-hidden="true"></i> View Certificate</button></div>`;
+            } else {
+              certRow.innerHTML = `<div class="detail-label">Certificate</div><div class="detail-value" style="color:#9ca3af;">No certificate uploaded</div>`;
+            }
+            fragment.appendChild(certRow);
+
+            // Accept/Reject action row (only for pending children with certificate)
+            if (childKycStatus === 'pending' && certUrl) {
+              const actionRow = document.createElement('div');
+              actionRow.className = 'detail-row';
+              actionRow.style.cssText = 'padding-top:8px;';
+              actionRow.innerHTML = `<div class="detail-label">Actions</div><div class="detail-value" style="display:flex;gap:8px;"><button class="cert-btn cert-btn-accept" type="button" style="padding:5px 14px;font-size:0.78rem;" data-child-accept="${escapeHtml(String(child.id))}">Accept</button><button class="cert-btn cert-btn-reject" type="button" style="padding:5px 14px;font-size:0.78rem;" data-child-reject="${escapeHtml(String(child.id))}">Reject</button></div>`;
+              fragment.appendChild(actionRow);
+            }
+
             detailCards[0].appendChild(fragment);
           }
           // Hide contact details, mandate, computershare cards
@@ -6223,6 +6419,165 @@
         profilesList.appendChild(clone);
       });
     };
+
+    // ── Certificate modal logic ──
+    const certModalOverlay = document.getElementById('certModalOverlay');
+    const certModalTitle = document.getElementById('certModalTitle');
+    const certModalBody = document.getElementById('certModalBody');
+    const certModalClose = document.getElementById('certModalClose');
+    const certModalCancelBtn = document.getElementById('certModalCancelBtn');
+    const certModalAcceptBtn = document.getElementById('certModalAcceptBtn');
+    const certModalRejectBtn = document.getElementById('certModalRejectBtn');
+    let certModalChildId = null;
+
+    const openCertModal = (childId, certUrl, childName, childKyc) => {
+      certModalChildId = childId;
+      if (certModalTitle) certModalTitle.textContent = `Certificate — ${childName}`;
+
+      // Render certificate preview
+      if (certModalBody) {
+        const lowerUrl = (certUrl || '').toLowerCase();
+        const isImage = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(lowerUrl);
+        const isPdf = /\.pdf(\?|$)/i.test(lowerUrl);
+
+        if (isImage) {
+          certModalBody.innerHTML = `<img src="${escapeHtml(certUrl)}" alt="Certificate" />`;
+        } else if (isPdf) {
+          certModalBody.innerHTML = `<iframe src="${escapeHtml(certUrl)}" title="Certificate PDF"></iframe>`;
+        } else if (certUrl) {
+          certModalBody.innerHTML = `<div class="cert-no-preview">Cannot preview this file type.<br><a href="${escapeHtml(certUrl)}" target="_blank" rel="noopener noreferrer">Open in new tab</a></div>`;
+        } else {
+          certModalBody.innerHTML = `<div class="cert-no-preview">No certificate uploaded.</div>`;
+        }
+      }
+
+      // Show/hide accept/reject based on current KYC status
+      const isPending = childKyc === 'pending';
+      const certFooter = document.getElementById('certModalFooter');
+      if (certModalAcceptBtn) certModalAcceptBtn.style.display = isPending ? '' : 'none';
+      if (certModalRejectBtn) certModalRejectBtn.style.display = isPending ? '' : 'none';
+
+      if (certModalOverlay) certModalOverlay.classList.add('active');
+    };
+
+    const closeCertModal = () => {
+      certModalChildId = null;
+      if (certModalOverlay) certModalOverlay.classList.remove('active');
+    };
+
+    if (certModalClose) certModalClose.addEventListener('click', closeCertModal);
+    if (certModalCancelBtn) certModalCancelBtn.addEventListener('click', closeCertModal);
+    if (certModalOverlay) {
+      certModalOverlay.addEventListener('click', (e) => {
+        if (e.target === certModalOverlay) closeCertModal();
+      });
+    }
+
+    const updateChildKycStatus = async (childId, newStatus) => {
+      const { data: sessionData } = await supabaseClient.auth.getSession();
+      const userId = sessionData?.session?.user?.id;
+
+      const { error } = await supabaseClient
+        .from('family_members')
+        .update({
+          kyc_status: newStatus,
+          kyc_reviewed_by: userId || null,
+          kyc_reviewed_at: new Date().toISOString()
+        })
+        .eq('id', childId);
+
+      if (error) throw error;
+
+      // Update local state
+      const member = allFamilyMembers.find(m => String(m.id) === String(childId));
+      if (member) {
+        member.kyc_status = newStatus;
+        member.kyc_reviewed_by = userId || null;
+        member.kyc_reviewed_at = new Date().toISOString();
+      }
+    };
+
+    const handleChildKycAction = async (childId, action) => {
+      const newStatus = action === 'accept' ? 'completed' : 'rejected';
+      const actionLabel = action === 'accept' ? 'Accepting' : 'Rejecting';
+      const btn = action === 'accept' ? certModalAcceptBtn : certModalRejectBtn;
+      const otherBtn = action === 'accept' ? certModalRejectBtn : certModalAcceptBtn;
+
+      if (btn) { btn.disabled = true; btn.textContent = `${actionLabel}...`; }
+      if (otherBtn) otherBtn.disabled = true;
+
+      try {
+        await updateChildKycStatus(childId, newStatus);
+        closeCertModal();
+        applySearchFilter();
+      } catch (err) {
+        console.error(`Child KYC ${action} failed:`, err);
+        alert(`Failed to ${action} child: ${err.message || 'Unknown error'}`);
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = action === 'accept' ? 'Accept' : 'Reject'; }
+        if (otherBtn) otherBtn.disabled = false;
+      }
+    };
+
+    if (certModalAcceptBtn) {
+      certModalAcceptBtn.addEventListener('click', () => {
+        if (certModalChildId) handleChildKycAction(certModalChildId, 'accept');
+      });
+    }
+    if (certModalRejectBtn) {
+      certModalRejectBtn.addEventListener('click', () => {
+        if (certModalChildId) handleChildKycAction(certModalChildId, 'reject');
+      });
+    }
+
+    // Delegated handler for certificate view buttons and inline accept/reject
+    document.addEventListener('click', (e) => {
+      const certReviewBtn = e.target.closest('[data-cert-review]');
+      if (certReviewBtn) {
+        e.preventDefault();
+        openCertModal(
+          certReviewBtn.dataset.childId,
+          certReviewBtn.dataset.certUrl,
+          certReviewBtn.dataset.childName,
+          certReviewBtn.dataset.childKyc
+        );
+        return;
+      }
+
+      const acceptBtn = e.target.closest('[data-child-accept]');
+      if (acceptBtn) {
+        e.preventDefault();
+        const childId = acceptBtn.dataset.childAccept;
+        acceptBtn.disabled = true;
+        acceptBtn.textContent = 'Accepting...';
+        updateChildKycStatus(childId, 'completed')
+          .then(() => applySearchFilter())
+          .catch((err) => {
+            console.error('Accept failed:', err);
+            alert('Failed to accept: ' + (err.message || 'Unknown error'));
+            acceptBtn.disabled = false;
+            acceptBtn.textContent = 'Accept';
+          });
+        return;
+      }
+
+      const rejectBtn = e.target.closest('[data-child-reject]');
+      if (rejectBtn) {
+        e.preventDefault();
+        const childId = rejectBtn.dataset.childReject;
+        rejectBtn.disabled = true;
+        rejectBtn.textContent = 'Rejecting...';
+        updateChildKycStatus(childId, 'rejected')
+          .then(() => applySearchFilter())
+          .catch((err) => {
+            console.error('Reject failed:', err);
+            alert('Failed to reject: ' + (err.message || 'Unknown error'));
+            rejectBtn.disabled = false;
+            rejectBtn.textContent = 'Reject';
+          });
+        return;
+      }
+    });
 
     const applySearchFilter = () => {
       const query = searchInput?.value?.trim().toLowerCase() || '';
@@ -6297,8 +6652,13 @@
       };
 
       // --- When "Child" filter is active, render family_members children instead of profiles ---
-      if (activeProfileFilters.family === 'child') {
-        renderFamilyChildren(query);
+      const familyFilter = activeProfileFilters.family;
+      if (familyFilter === 'child' || familyFilter === 'child-pending' || familyFilter === 'child-completed' || familyFilter === 'child-rejected') {
+        const childKycFilter = familyFilter === 'child-pending' ? 'pending'
+          : familyFilter === 'child-completed' ? 'completed'
+          : familyFilter === 'child-rejected' ? 'rejected'
+          : 'all';
+        renderFamilyChildren(query, childKycFilter);
         return;
       }
 
@@ -6739,7 +7099,7 @@
           // Fetch ALL family_members (not filtered by userIds) — RLS policy controls access
           const familyRes = await supabaseClient
             .from('family_members')
-            .select('id, primary_user_id, parent_id, linked_user_id, relationship, first_name, last_name, gender, date_of_birth, id_number, available_balance, avatar_url, avatar_color, mint_number, spouse_email, created_at, updated_at')
+            .select('id, primary_user_id, parent_id, linked_user_id, relationship, first_name, last_name, gender, date_of_birth, id_number, available_balance, avatar_url, avatar_color, mint_number, spouse_email, certificate_url, kyc_status, kyc_reviewed_by, kyc_reviewed_at, created_at, updated_at')
             .order('created_at', { ascending: false });
 
           if (!onboardingRes.error && onboardingRes.data) {
@@ -8816,6 +9176,25 @@
       });
     })();
   </script>
+
+<!-- Certificate viewer modal -->
+<div class="cert-modal-overlay" id="certModalOverlay">
+  <div class="cert-modal">
+    <div class="cert-modal-header">
+      <h3 id="certModalTitle">Birth Certificate</h3>
+      <button class="cert-modal-close" id="certModalClose" type="button" aria-label="Close">&times;</button>
+    </div>
+    <div class="cert-modal-body" id="certModalBody">
+      <div class="cert-no-preview">No certificate uploaded.</div>
+    </div>
+    <div class="cert-modal-footer" id="certModalFooter">
+      <button class="cert-btn cert-btn-cancel" id="certModalCancelBtn" type="button">Cancel</button>
+      <button class="cert-btn cert-btn-reject" id="certModalRejectBtn" type="button">Reject</button>
+      <button class="cert-btn cert-btn-accept" id="certModalAcceptBtn" type="button">Accept</button>
+    </div>
+  </div>
+</div>
+
 <div id="mintAppOverlay" style="display:none;position:fixed;inset:0;z-index:99998;background:#0f172a;">
   <div style="position:absolute;top:0;left:0;right:0;height:44px;background:#0f172a;display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:1;">
     <div style="display:flex;align-items:center;gap:8px;">
