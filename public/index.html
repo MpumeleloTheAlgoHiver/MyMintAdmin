@@ -6706,15 +6706,18 @@
         let kycMap = {};
 
         if (userIds.length) {
-          const [onboardingRes, packRes, allocationsRes, holdingsRes, familyByPrimaryRes, familyByLinkedRes, familyByParentRes] = await Promise.all([
+          const [onboardingRes, packRes, allocationsRes, holdingsRes] = await Promise.all([
             supabaseClient.from('user_onboarding').select('*').in('user_id', userIds),
             supabaseClient.from('user_onboarding_pack_details').select('*').in('user_id', userIds),
             supabaseClient.from('allocations').select('user_id, asset_class, weight, value, return_1d, return_1w, return_1m, return_ytd, return_1y, as_of_date, security_id, created_at, updated_at').in('user_id', userIds).order('updated_at', { ascending: false }),
-            supabaseClient.from('stock_holdings').select('user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", as_of_date, strategy_id, strategy_name_snapshot, trade_side, is_active, created_at, updated_at').eq('is_active', true).eq('trade_side', 'BUY').in('user_id', userIds).order('updated_at', { ascending: false }),
-            supabaseClient.from('family_members').select('id, primary_user_id, parent_id, linked_user_id, relationship, first_name, last_name, gender, date_of_birth, id_number, available_balance, avatar_url, avatar_color, mint_number, created_at, updated_at').in('primary_user_id', userIds),
-            supabaseClient.from('family_members').select('id, primary_user_id, parent_id, linked_user_id, relationship, first_name, last_name, gender, date_of_birth, id_number, available_balance, avatar_url, avatar_color, mint_number, created_at, updated_at').in('linked_user_id', userIds),
-            supabaseClient.from('family_members').select('id, primary_user_id, parent_id, linked_user_id, relationship, first_name, last_name, gender, date_of_birth, id_number, available_balance, avatar_url, avatar_color, mint_number, created_at, updated_at').in('parent_id', userIds)
+            supabaseClient.from('stock_holdings').select('user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", as_of_date, strategy_id, strategy_name_snapshot, trade_side, is_active, created_at, updated_at').eq('is_active', true).eq('trade_side', 'BUY').in('user_id', userIds).order('updated_at', { ascending: false })
           ]);
+
+          // Fetch ALL family_members (not filtered by userIds) — RLS policy controls access
+          const familyRes = await supabaseClient
+            .from('family_members')
+            .select('id, primary_user_id, parent_id, linked_user_id, relationship, first_name, last_name, gender, date_of_birth, id_number, available_balance, avatar_url, avatar_color, mint_number, spouse_email, created_at, updated_at')
+            .order('created_at', { ascending: false });
 
           if (!onboardingRes.error && onboardingRes.data) {
             kycMap = onboardingRes.data.reduce((acc, row) => {
@@ -6744,12 +6747,14 @@
           }
 
           const familyRowsById = {};
-          [familyByPrimaryRes, familyByLinkedRes, familyByParentRes].forEach((res) => {
-            if (res?.error || !Array.isArray(res?.data)) return;
-            res.data.forEach((row) => {
+          if (!familyRes.error && Array.isArray(familyRes.data)) {
+            familyRes.data.forEach((row) => {
               if (row?.id) familyRowsById[row.id] = row;
             });
-          });
+          }
+          if (familyRes.error) {
+            console.warn('family_members query blocked (check RLS policy):', familyRes.error.message);
+          }
 
           allFamilyMembers = Object.values(familyRowsById);
 
