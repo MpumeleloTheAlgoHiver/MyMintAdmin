@@ -6443,34 +6443,62 @@
     const certModalRejectBtn = document.getElementById('certModalRejectBtn');
     let certModalChildId = null;
 
-    const openCertModal = (childId, certUrl, childName, childKyc) => {
+    // Resolve a storage:// URI to a Supabase signed HTTPS URL
+    const resolveStorageUrl = async (rawUrl) => {
+      if (!rawUrl) return null;
+      if (!rawUrl.startsWith('storage://')) return rawUrl;
+
+      // storage://bucket-name/path/to/file
+      const withoutScheme = rawUrl.slice('storage://'.length);
+      const slashIdx = withoutScheme.indexOf('/');
+      if (slashIdx === -1) return null;
+      const bucket = withoutScheme.slice(0, slashIdx);
+      const path = withoutScheme.slice(slashIdx + 1);
+
+      const { data, error } = await supabaseClient.storage
+        .from(bucket)
+        .createSignedUrl(path, 60 * 60); // 1-hour expiry
+
+      if (error || !data?.signedUrl) {
+        console.error('Could not create signed URL:', error?.message || 'no signedUrl');
+        return null;
+      }
+      return data.signedUrl;
+    };
+
+    const openCertModal = async (childId, certUrl, childName, childKyc) => {
       certModalChildId = childId;
       if (certModalTitle) certModalTitle.textContent = `Certificate — ${childName}`;
 
-      // Render certificate preview
-      if (certModalBody) {
-        const lowerUrl = (certUrl || '').toLowerCase();
-        const isImage = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(lowerUrl);
-        const isPdf = /\.pdf(\?|$)/i.test(lowerUrl);
-
-        if (isImage) {
-          certModalBody.innerHTML = `<img src="${escapeHtml(certUrl)}" alt="Certificate" />`;
-        } else if (isPdf) {
-          certModalBody.innerHTML = `<iframe src="${escapeHtml(certUrl)}" title="Certificate PDF"></iframe>`;
-        } else if (certUrl) {
-          certModalBody.innerHTML = `<div class="cert-no-preview">Cannot preview this file type.<br><a href="${escapeHtml(certUrl)}" target="_blank" rel="noopener noreferrer">Open in new tab</a></div>`;
-        } else {
-          certModalBody.innerHTML = `<div class="cert-no-preview">No certificate uploaded.</div>`;
-        }
-      }
+      // Show loading state while resolving URL
+      if (certModalBody) certModalBody.innerHTML = `<div class="cert-no-preview">Loading certificate…</div>`;
+      if (certModalOverlay) certModalOverlay.classList.add('active');
 
       // Show/hide accept/reject based on current KYC status
       const isPending = childKyc === 'pending';
-      const certFooter = document.getElementById('certModalFooter');
       if (certModalAcceptBtn) certModalAcceptBtn.style.display = isPending ? '' : 'none';
       if (certModalRejectBtn) certModalRejectBtn.style.display = isPending ? '' : 'none';
 
-      if (certModalOverlay) certModalOverlay.classList.add('active');
+      // Resolve storage:// URIs to a signed HTTPS URL
+      const resolvedUrl = await resolveStorageUrl(certUrl);
+
+      if (!certModalBody) return;
+      if (!resolvedUrl) {
+        certModalBody.innerHTML = `<div class="cert-no-preview">Could not load certificate.<br>The file may not be accessible.</div>`;
+        return;
+      }
+
+      const lowerUrl = resolvedUrl.toLowerCase().split('?')[0];
+      const isImage = /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(lowerUrl);
+      const isPdf = /\.pdf$/.test(lowerUrl);
+
+      if (isImage) {
+        certModalBody.innerHTML = `<img src="${escapeHtml(resolvedUrl)}" alt="Certificate" />`;
+      } else if (isPdf) {
+        certModalBody.innerHTML = `<iframe src="${escapeHtml(resolvedUrl)}" title="Certificate PDF"></iframe>`;
+      } else {
+        certModalBody.innerHTML = `<div class="cert-no-preview">Cannot preview this file type.<br><a href="${escapeHtml(resolvedUrl)}" target="_blank" rel="noopener noreferrer">Open in new tab</a></div>`;
+      }
     };
 
     const closeCertModal = () => {
