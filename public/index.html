@@ -434,6 +434,13 @@
       border-radius: 10px;
     }
     .cert-btn-cancel:hover:not(:disabled) { background: #ede9fe; border-color: #c4b5fd; }
+    .cert-btn-download {
+      background: #e0f2fe;
+      color: #0c4a6e;
+      border: 1px solid #bae6fd;
+      border-radius: 10px;
+    }
+    .cert-btn-download:hover:not(:disabled) { background: #cffafe; border-color: #7dd3fc; }
 
     /* ── Child KYC badge variants ── */
     .child-kyc-badge {
@@ -4436,6 +4443,7 @@
     </div>
     <div class="cert-modal-footer" id="certModalFooter">
       <button class="cert-btn cert-btn-cancel" id="certModalCancelBtn" type="button">Cancel</button>
+      <button class="cert-btn cert-btn-download" id="certModalDownloadBtn" type="button">Download</button>
       <button class="cert-btn cert-btn-reject" id="certModalRejectBtn" type="button">Reject</button>
       <button class="cert-btn cert-btn-accept" id="certModalAcceptBtn" type="button">Accept</button>
     </div>
@@ -6439,9 +6447,22 @@
     const certModalBody = document.getElementById('certModalBody');
     const certModalClose = document.getElementById('certModalClose');
     const certModalCancelBtn = document.getElementById('certModalCancelBtn');
+    const certModalDownloadBtn = document.getElementById('certModalDownloadBtn');
     const certModalAcceptBtn = document.getElementById('certModalAcceptBtn');
     const certModalRejectBtn = document.getElementById('certModalRejectBtn');
     let certModalChildId = null;
+    let certModalResolvedUrl = null;
+    let certModalBlobUrl = null;
+
+    const filenameFromUrl = (url, fallback = 'certificate') => {
+      try {
+        const parsed = new URL(url);
+        const file = parsed.pathname.split('/').filter(Boolean).pop();
+        return file ? decodeURIComponent(file) : fallback;
+      } catch {
+        return fallback;
+      }
+    };
 
     // Resolve a storage:// URI to a Supabase signed HTTPS URL
     const resolveStorageUrl = async (rawUrl) => {
@@ -6468,11 +6489,17 @@
 
     const openCertModal = async (childId, certUrl, childName, childKyc) => {
       certModalChildId = childId;
+      certModalResolvedUrl = null;
+      if (certModalBlobUrl) {
+        URL.revokeObjectURL(certModalBlobUrl);
+        certModalBlobUrl = null;
+      }
       if (certModalTitle) certModalTitle.textContent = `Certificate — ${childName}`;
 
       // Show loading state while resolving URL
       if (certModalBody) certModalBody.innerHTML = `<div class="cert-no-preview">Loading certificate…</div>`;
       if (certModalOverlay) certModalOverlay.classList.add('active');
+      if (certModalDownloadBtn) certModalDownloadBtn.style.display = 'none';
 
       // Show/hide accept/reject based on current KYC status
       const isPending = childKyc === 'pending';
@@ -6481,6 +6508,11 @@
 
       // Resolve storage:// URIs to a signed HTTPS URL
       const resolvedUrl = await resolveStorageUrl(certUrl);
+      certModalResolvedUrl = resolvedUrl || null;
+
+      if (certModalDownloadBtn) {
+        certModalDownloadBtn.style.display = resolvedUrl ? '' : 'none';
+      }
 
       if (!certModalBody) return;
       if (!resolvedUrl) {
@@ -6488,21 +6520,36 @@
         return;
       }
 
-      const lowerUrl = resolvedUrl.toLowerCase().split('?')[0];
-      const isImage = /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(lowerUrl);
-      const isPdf = /\.pdf$/.test(lowerUrl);
+      // Fetch blob and detect MIME type so images/PDFs render even with bad extensions
+      try {
+        const fileResponse = await fetch(resolvedUrl);
+        if (!fileResponse.ok) throw new Error(`HTTP ${fileResponse.status}`);
+        const fileBlob = await fileResponse.blob();
+        certModalBlobUrl = URL.createObjectURL(fileBlob);
+        const mime = String(fileBlob.type || '').toLowerCase();
+        const isImageMime = mime.startsWith('image/');
+        const isPdfMime = mime === 'application/pdf';
 
-      if (isImage) {
-        certModalBody.innerHTML = `<img src="${escapeHtml(resolvedUrl)}" alt="Certificate" />`;
-      } else if (isPdf) {
-        certModalBody.innerHTML = `<iframe src="${escapeHtml(resolvedUrl)}" title="Certificate PDF"></iframe>`;
-      } else {
-        certModalBody.innerHTML = `<div class="cert-no-preview">Cannot preview this file type.<br><a href="${escapeHtml(resolvedUrl)}" target="_blank" rel="noopener noreferrer">Open in new tab</a></div>`;
+        if (isImageMime) {
+          certModalBody.innerHTML = `<img src="${escapeHtml(certModalBlobUrl)}" alt="Certificate" />`;
+        } else if (isPdfMime) {
+          certModalBody.innerHTML = `<iframe src="${escapeHtml(certModalBlobUrl)}" title="Certificate PDF"></iframe>`;
+        } else {
+          certModalBody.innerHTML = `<div class="cert-no-preview">Preview is not available for this file type.<br>Use Download to open it locally.</div>`;
+        }
+      } catch (error) {
+        console.error('Certificate preview fetch failed:', error?.message || error);
+        certModalBody.innerHTML = `<div class="cert-no-preview">Could not preview this file.<br><a href="${escapeHtml(resolvedUrl)}" target="_blank" rel="noopener noreferrer">Open in new tab</a></div>`;
       }
     };
 
     const closeCertModal = () => {
       certModalChildId = null;
+      certModalResolvedUrl = null;
+      if (certModalBlobUrl) {
+        URL.revokeObjectURL(certModalBlobUrl);
+        certModalBlobUrl = null;
+      }
       if (certModalOverlay) certModalOverlay.classList.remove('active');
     };
 
@@ -6511,6 +6558,27 @@
     if (certModalOverlay) {
       certModalOverlay.addEventListener('click', (e) => {
         if (e.target === certModalOverlay) closeCertModal();
+      });
+    }
+    if (certModalDownloadBtn) {
+      certModalDownloadBtn.addEventListener('click', async () => {
+        if (!certModalResolvedUrl) return;
+        try {
+          const response = await fetch(certModalResolvedUrl);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const blob = await response.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = filenameFromUrl(certModalResolvedUrl, 'certificate');
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(blobUrl);
+        } catch (error) {
+          console.error('Certificate download failed:', error?.message || error);
+          window.open(certModalResolvedUrl, '_blank', 'noopener,noreferrer');
+        }
       });
     }
 
