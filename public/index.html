@@ -6786,7 +6786,7 @@
             const parentUserId = String(row.primary_user_id || row.parent_id || '').trim();
             const linkedUserId = String(row.linked_user_id || '').trim();
 
-            if (parentUserId) {
+            if (parentUserId && relationship === 'child') {
               if (!familyRoleFlagsByUserId[parentUserId]) familyRoleFlagsByUserId[parentUserId] = { parent: false, child: false };
               familyRoleFlagsByUserId[parentUserId].parent = true;
             }
@@ -6795,8 +6795,6 @@
               if (!familyRoleFlagsByUserId[linkedUserId]) familyRoleFlagsByUserId[linkedUserId] = { parent: false, child: false };
               if (relationship === 'child') {
                 familyRoleFlagsByUserId[linkedUserId].child = true;
-              } else {
-                familyRoleFlagsByUserId[linkedUserId].parent = true;
               }
             }
           });
