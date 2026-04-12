@@ -6464,27 +6464,59 @@
       }
     };
 
-    // Resolve a storage:// URI to a Supabase signed HTTPS URL
+    // Resolve a storage:// URI or Supabase public/signed URL to a fetchable HTTPS URL
     const resolveStorageUrl = async (rawUrl) => {
       if (!rawUrl) return null;
-      if (!rawUrl.startsWith('storage://')) return rawUrl;
 
-      // storage://bucket-name/path/to/file
-      const withoutScheme = rawUrl.slice('storage://'.length);
-      const slashIdx = withoutScheme.indexOf('/');
-      if (slashIdx === -1) return null;
-      const bucket = withoutScheme.slice(0, slashIdx);
-      const path = withoutScheme.slice(slashIdx + 1);
+      // Already a plain HTTPS URL — use it directly (public bucket URL or external link)
+      if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) return rawUrl;
 
-      const { data, error } = await supabaseClient.storage
-        .from(bucket)
-        .createSignedUrl(path, 60 * 60); // 1-hour expiry
+      // storage://bucket-name/path/to/file → signed URL
+      if (rawUrl.startsWith('storage://')) {
+        const withoutScheme = rawUrl.slice('storage://'.length);
+        const slashIdx = withoutScheme.indexOf('/');
+        if (slashIdx === -1) return null;
+        const bucket = withoutScheme.slice(0, slashIdx);
+        const filePath = withoutScheme.slice(slashIdx + 1);
 
-      if (error || !data?.signedUrl) {
-        console.error('Could not create signed URL:', error?.message || 'no signedUrl');
+        // Try signed URL first
+        const { data, error } = await supabaseClient.storage
+          .from(bucket)
+          .createSignedUrl(filePath, 60 * 60);
+
+        if (!error && data?.signedUrl) return data.signedUrl;
+        console.warn('Signed URL failed, trying public URL:', error?.message);
+
+        // Fallback: try public URL (works for public buckets)
+        const { data: publicData } = supabaseClient.storage
+          .from(bucket)
+          .getPublicUrl(filePath);
+
+        if (publicData?.publicUrl) return publicData.publicUrl;
+        console.error('Could not resolve storage URL:', rawUrl);
         return null;
       }
-      return data.signedUrl;
+
+      // Bare path like "bucket/path/file.jpg" — try as storage path
+      const slashIdx = rawUrl.indexOf('/');
+      if (slashIdx > 0) {
+        const bucket = rawUrl.slice(0, slashIdx);
+        const filePath = rawUrl.slice(slashIdx + 1);
+
+        const { data, error } = await supabaseClient.storage
+          .from(bucket)
+          .createSignedUrl(filePath, 60 * 60);
+
+        if (!error && data?.signedUrl) return data.signedUrl;
+
+        const { data: publicData } = supabaseClient.storage
+          .from(bucket)
+          .getPublicUrl(filePath);
+
+        if (publicData?.publicUrl) return publicData.publicUrl;
+      }
+
+      return null;
     };
 
     const openCertModal = async (childId, certUrl, childName, childKyc) => {
