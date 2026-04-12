@@ -6113,6 +6113,7 @@
           : 'Unknown';
 
         if (child.id) clone.dataset.profileId = child.id;
+        clone.dataset.familyChild = 'true';
 
         setText(clone, '[data-name]', fullName);
         setText(clone, '[data-uid]', `UID: ${uid}`);
@@ -6217,16 +6218,6 @@
           if (mandateCard) mandateCard.style.display = 'none';
           const csCard = leftColumn.querySelector('[data-computershare-actions]');
           if (csCard) csCard.style.display = 'none';
-        }
-
-        // Show/hide details on chevron click (same as profiles)
-        const showBtn = clone.querySelector('.show-details-btn');
-        const detailsEl = clone.querySelector('.detailed-view');
-        if (showBtn && detailsEl) {
-          showBtn.addEventListener('click', () => {
-            const isOpen = detailsEl.classList.toggle('active');
-            showBtn.classList.toggle('is-open', isOpen);
-          });
         }
 
         profilesList.appendChild(clone);
@@ -8504,6 +8495,9 @@
           else expandedProfileIds.delete(String(profileId));
         }
         if (!isNowOpen) return;
+
+        // Skip pack refresh for family child cards – they have no profile data to refresh
+        if (item.dataset.familyChild === 'true') return;
 
         button.classList.add('is-loading');
         button.title = 'Refreshing profile...';
