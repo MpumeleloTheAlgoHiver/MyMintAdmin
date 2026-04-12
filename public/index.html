@@ -6268,6 +6268,7 @@
         .filter(row => {
           if (kycStatusFilter === 'all') return true;
           const status = normalizeKycStatusText(row.kyc_status || 'pending');
+          if (kycStatusFilter === 'not-completed') return status !== 'completed';
           return status === kycStatusFilter;
         })
         .filter(row => {
@@ -6666,9 +6667,12 @@
       // --- When "Child" filter is active, render family_members children instead of profiles ---
       const familyFilter = activeProfileFilters.family;
       if (familyFilter === 'child' || familyFilter === 'child-pending' || familyFilter === 'child-completed' || familyFilter === 'child-rejected') {
-        const childKycFilter = familyFilter === 'child-pending' ? 'pending'
-          : familyFilter === 'child-completed' ? 'completed'
-          : familyFilter === 'child-rejected' ? 'rejected'
+        // Map the top KYC pill to a child kyc status filter
+        const kycPill = activeProfileFilters.kyc;
+        const childKycFilter = kycPill === 'completed' ? 'completed'
+          : kycPill === 'pending' ? 'pending'
+          : kycPill === 'rejected' ? 'rejected'
+          : kycPill === 'not-completed' ? 'not-completed'
           : 'all';
         renderFamilyChildren(query, childKycFilter);
         return;
