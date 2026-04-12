@@ -403,32 +403,37 @@
     }
     .cert-modal-footer .cert-btn {
       padding: 8px 20px;
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 0.85rem;
       font-weight: 600;
-      border: none;
       cursor: pointer;
-      transition: background 0.2s ease, opacity 0.2s ease;
+      transition: background 0.15s ease, border-color 0.15s ease, opacity 0.2s ease;
     }
     .cert-modal-footer .cert-btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
     .cert-btn-accept {
-      background: #10b981;
-      color: #fff;
+      background: #d1fae5;
+      color: #065f46;
+      border: 1px solid #6ee7b7;
+      border-radius: 10px;
     }
-    .cert-btn-accept:hover:not(:disabled) { background: #059669; }
+    .cert-btn-accept:hover:not(:disabled) { background: #a7f3d0; border-color: #34d399; }
     .cert-btn-reject {
-      background: #ef4444;
-      color: #fff;
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fca5a5;
+      border-radius: 10px;
     }
-    .cert-btn-reject:hover:not(:disabled) { background: #dc2626; }
+    .cert-btn-reject:hover:not(:disabled) { background: #fecaca; border-color: #f87171; }
     .cert-btn-cancel {
-      background: #f3f4f6;
-      color: #374151;
+      background: #f5f3ff;
+      color: #5b21b6;
+      border: 1px solid #ddd6fe;
+      border-radius: 10px;
     }
-    .cert-btn-cancel:hover:not(:disabled) { background: #e5e7eb; }
+    .cert-btn-cancel:hover:not(:disabled) { background: #ede9fe; border-color: #c4b5fd; }
 
     /* ── Child KYC badge variants ── */
     .child-kyc-badge {
@@ -3864,16 +3869,6 @@
             <button class="bank-filter-option active" type="button" data-family-filter="all" role="menuitem">All</button>
             <button class="bank-filter-option" type="button" data-family-filter="parent" role="menuitem">Parent</button>
             <button class="bank-filter-option" type="button" data-family-filter="child" role="menuitem">Child</button>
-            <div class="bank-filter-sep" aria-hidden="true"></div>
-            <button class="bank-filter-option" type="button" data-family-filter="child-pending" role="menuitem">
-              <span class="fpill-dot fpill-amber" aria-hidden="true"></span>Pending Children
-            </button>
-            <button class="bank-filter-option" type="button" data-family-filter="child-completed" role="menuitem">
-              <span class="fpill-dot fpill-green" aria-hidden="true"></span>Verified Children
-            </button>
-            <button class="bank-filter-option" type="button" data-family-filter="child-rejected" role="menuitem">
-              <span class="fpill-dot fpill-red" aria-hidden="true"></span>Rejected Children
-            </button>
           </div>
         </div>
       </div>
