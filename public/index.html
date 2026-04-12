@@ -4308,6 +4308,7 @@
     const securitiesByIdMap = {};
     const strategiesByIdMap = {};
     const familyRoleFlagsByUserId = {};
+    let allFamilyMembers = [];
     const PACK_SECTIONS_PAGE_SIZE = 4;
     let completedTableOpen = false;
     let completedTableEntries = [];
@@ -6046,6 +6047,160 @@
       existingUsers.forEach(renderProfileItem);
     };
 
+    const getParentNameForFamilyMember = (familyMember) => {
+      const parentUserId = familyMember.primary_user_id || familyMember.parent_id;
+      if (!parentUserId) return 'Unknown parent';
+      const parentProfile = allProfiles.find(p => String(p.id) === String(parentUserId));
+      if (parentProfile) {
+        return [parentProfile.first_name, parentProfile.last_name].filter(Boolean).join(' ') || parentProfile.email || parentUserId;
+      }
+      return parentUserId;
+    };
+
+    const renderFamilyChildren = (searchQuery = '') => {
+      if (!profilesList || !profileTemplate) return;
+      profilesList.innerHTML = '';
+
+      const childRows = allFamilyMembers
+        .filter(row => normalizeKycStatusText(row.relationship || '') === 'child')
+        .filter(row => {
+          if (!searchQuery) return true;
+          const fullName = [row.first_name, row.last_name].filter(Boolean).join(' ').toLowerCase();
+          return fullName.includes(searchQuery)
+            || String(row.id || '').toLowerCase().includes(searchQuery)
+            || String(row.id_number || '').toLowerCase().includes(searchQuery);
+        });
+
+      const totalCount = childRows.length;
+      if (userCount) userCount.textContent = String(totalCount);
+      if (userCountLabel) userCountLabel.textContent = totalCount === 1 ? 'child' : 'children';
+
+      if (!totalCount) {
+        profilesList.innerHTML = '<div class="profiles-loader"><div class="profiles-loader-text">No children found.</div></div>';
+        return;
+      }
+
+      childRows.forEach(child => {
+        const clone = profileTemplate.content.firstElementChild.cloneNode(true);
+        const fullName = [child.first_name, child.last_name].filter(Boolean).join(' ') || 'Unknown Child';
+        const uid = child.id || '-';
+
+        if (child.id) clone.dataset.profileId = child.id;
+
+        setText(clone, '[data-name]', fullName);
+        setText(clone, '[data-uid]', `UID: ${uid}`);
+        setText(clone, '[data-company]', fullName);
+        setText(clone, '[data-address]', '-');
+        setText(clone, '[data-created]', child.created_at || '-');
+        setText(clone, '[data-website]', '-');
+        setText(clone, '[data-phone]', '-');
+
+        // Row email slot → show gender + DOB as subtitle
+        clone.querySelectorAll('[data-row-email]').forEach(el => {
+          const parts = [];
+          if (child.gender) parts.push(child.gender);
+          if (child.date_of_birth) parts.push(`DOB: ${child.date_of_birth}`);
+          el.textContent = parts.join(' · ') || '';
+          const sep = el.nextElementSibling;
+          if (sep && sep.classList.contains('simple-uid-sep')) {
+            sep.style.display = parts.length ? '' : 'none';
+          }
+        });
+
+        // KYC badge → show "Child" badge in a teal color
+        clone.querySelectorAll('[data-row-kyc]').forEach(el => {
+          el.textContent = 'Child';
+          el.className = 'row-kyc-badge';
+          el.style.cssText = 'background:#dbeafe;color:#1e40af;border-color:#93c5fd;';
+        });
+
+        // Signed in today badge → hide
+        const signedBadge = clone.querySelector('[data-signed-in-today]');
+        if (signedBadge) signedBadge.classList.remove('active');
+
+        // Avatar
+        const initialsEl = clone.querySelector('[data-initials]');
+        if (initialsEl) {
+          if (child.avatar_url) {
+            initialsEl.textContent = '';
+            initialsEl.style.backgroundImage = `url('${child.avatar_url}')`;
+            initialsEl.style.backgroundSize = 'cover';
+            initialsEl.style.backgroundPosition = 'center';
+            initialsEl.style.color = 'transparent';
+          } else if (child.avatar_color) {
+            initialsEl.textContent = getInitials(fullName);
+            initialsEl.style.backgroundColor = child.avatar_color;
+          } else {
+            initialsEl.textContent = getInitials(fullName);
+          }
+        }
+
+        const companyAvatar = clone.querySelector('[data-company-avatar]');
+        if (companyAvatar && child.avatar_url) {
+          companyAvatar.innerHTML = '';
+          companyAvatar.style.backgroundImage = `url('${child.avatar_url}')`;
+          companyAvatar.style.backgroundSize = 'cover';
+          companyAvatar.style.backgroundPosition = 'center';
+        }
+
+        // KYC status in expanded view
+        setText(clone, '[data-kyc-status]', 'N/A');
+
+        // Replace the "Company details" card content with child-specific info
+        const leftColumn = clone.querySelector('.left-column');
+        if (leftColumn) {
+          const detailCards = leftColumn.querySelectorAll('.detail-card');
+          // Repurpose the first detail card ("Company details") → "Child Details"
+          if (detailCards[0]) {
+            const cardTitle = detailCards[0].querySelector('.card-title');
+            if (cardTitle) cardTitle.lastChild.textContent = ' Child details';
+            const rows = detailCards[0].querySelectorAll('.detail-row');
+            const parentName = getParentNameForFamilyMember(child);
+            const parentId = child.primary_user_id || child.parent_id || '-';
+            const detailData = [
+              { label: 'Parent', value: parentName },
+              { label: 'Parent UID', value: parentId },
+              { label: 'Relationship', value: child.relationship || '-' },
+              { label: 'Gender', value: child.gender || '-' },
+              { label: 'Date of Birth', value: child.date_of_birth || '-' },
+              { label: 'ID Number', value: child.id_number || '-' },
+              { label: 'Mint Number', value: child.mint_number || '-' },
+              { label: 'Balance', value: child.available_balance != null ? `R ${Number(child.available_balance).toFixed(2)}` : 'R 0.00' },
+              { label: 'Created', value: child.created_at || '-' },
+            ];
+            // Clear existing rows and rebuild
+            rows.forEach(r => r.remove());
+            const fragment = document.createDocumentFragment();
+            detailData.forEach(d => {
+              const row = document.createElement('div');
+              row.className = 'detail-row';
+              row.innerHTML = `<div class="detail-label">${escapeHtml(d.label)}</div><div class="detail-value">${escapeHtml(d.value)}</div>`;
+              fragment.appendChild(row);
+            });
+            detailCards[0].appendChild(fragment);
+          }
+          // Hide contact details, mandate, computershare cards
+          if (detailCards[1]) detailCards[1].style.display = 'none';
+          const mandateCard = leftColumn.querySelector('[data-mandate-actions]');
+          if (mandateCard) mandateCard.style.display = 'none';
+          const csCard = leftColumn.querySelector('[data-computershare-actions]');
+          if (csCard) csCard.style.display = 'none';
+        }
+
+        // Show/hide details on chevron click (same as profiles)
+        const showBtn = clone.querySelector('.show-details-btn');
+        const detailsEl = clone.querySelector('.detailed-view');
+        if (showBtn && detailsEl) {
+          showBtn.addEventListener('click', () => {
+            const isOpen = detailsEl.classList.toggle('active');
+            showBtn.classList.toggle('is-open', isOpen);
+          });
+        }
+
+        profilesList.appendChild(clone);
+      });
+    };
+
     const applySearchFilter = () => {
       const query = searchInput?.value?.trim().toLowerCase() || '';
 
@@ -6117,6 +6272,12 @@
         if (roleFlags.parent) return 'parent';
         return 'unknown';
       };
+
+      // --- When "Child" filter is active, render family_members children instead of profiles ---
+      if (activeProfileFilters.family === 'child') {
+        renderFamilyChildren(query);
+        return;
+      }
 
       const filtered = allProfiles.filter(profile => {
         const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
@@ -6528,6 +6689,7 @@
       Object.keys(securitiesByIdMap).forEach(key => delete securitiesByIdMap[key]);
       Object.keys(strategiesByIdMap).forEach(key => delete strategiesByIdMap[key]);
       Object.keys(familyRoleFlagsByUserId).forEach(key => delete familyRoleFlagsByUserId[key]);
+      allFamilyMembers = [];
 
       try {
         const { data, error } = await supabaseClient
@@ -6549,9 +6711,9 @@
             supabaseClient.from('user_onboarding_pack_details').select('*').in('user_id', userIds),
             supabaseClient.from('allocations').select('user_id, asset_class, weight, value, return_1d, return_1w, return_1m, return_ytd, return_1y, as_of_date, security_id, created_at, updated_at').in('user_id', userIds).order('updated_at', { ascending: false }),
             supabaseClient.from('stock_holdings').select('user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", as_of_date, strategy_id, strategy_name_snapshot, trade_side, is_active, created_at, updated_at').eq('is_active', true).eq('trade_side', 'BUY').in('user_id', userIds).order('updated_at', { ascending: false }),
-            supabaseClient.from('family_members').select('id, primary_user_id, parent_id, linked_user_id, relationship').in('primary_user_id', userIds),
-            supabaseClient.from('family_members').select('id, primary_user_id, parent_id, linked_user_id, relationship').in('linked_user_id', userIds),
-            supabaseClient.from('family_members').select('id, primary_user_id, parent_id, linked_user_id, relationship').in('parent_id', userIds)
+            supabaseClient.from('family_members').select('id, primary_user_id, parent_id, linked_user_id, relationship, first_name, last_name, gender, date_of_birth, id_number, available_balance, avatar_url, avatar_color, mint_number, created_at, updated_at').in('primary_user_id', userIds),
+            supabaseClient.from('family_members').select('id, primary_user_id, parent_id, linked_user_id, relationship, first_name, last_name, gender, date_of_birth, id_number, available_balance, avatar_url, avatar_color, mint_number, created_at, updated_at').in('linked_user_id', userIds),
+            supabaseClient.from('family_members').select('id, primary_user_id, parent_id, linked_user_id, relationship, first_name, last_name, gender, date_of_birth, id_number, available_balance, avatar_url, avatar_color, mint_number, created_at, updated_at').in('parent_id', userIds)
           ]);
 
           if (!onboardingRes.error && onboardingRes.data) {
@@ -6589,7 +6751,9 @@
             });
           });
 
-          Object.values(familyRowsById).forEach((row) => {
+          allFamilyMembers = Object.values(familyRowsById);
+
+          allFamilyMembers.forEach((row) => {
             const relationship = normalizeKycStatusText(row.relationship || '');
             const parentUserId = String(row.primary_user_id || row.parent_id || '').trim();
             const linkedUserId = String(row.linked_user_id || '').trim();
