@@ -3991,66 +3991,63 @@
       const profilesMap = {};
       const onboardingPackDetailsMap = {};
       const strategiesMap = {};
-      if (securityIds.length) {
-        const { data: securityRows, error: securityError } = await supabaseClient
-          .from('securities')
-          .select('id, name, symbol, last_price, isin')
-          .in('id', securityIds);
+      const strategyIds = [...new Set(holdings.map((row) => row.strategy_id).filter(Boolean))];
 
-        if (securityError) {
-          console.error('Securities load error:', securityError);
-        } else {
-          (securityRows || []).forEach((security) => {
-            securitiesMap[security.id] = security;
-          });
-        }
+      const parallelQueries = [];
+
+      if (securityIds.length) {
+        parallelQueries.push(
+          supabaseClient
+            .from('securities')
+            .select('id, name, symbol, last_price, isin')
+            .in('id', securityIds)
+            .then(({ data, error }) => {
+              if (error) { console.error('Securities load error:', error); return; }
+              (data || []).forEach((s) => { securitiesMap[s.id] = s; });
+            })
+        );
       }
 
       if (userIds.length) {
-        const { data: profileRows, error: profileError } = await supabaseClient
-          .from('profiles')
-          .select('id, first_name, last_name, mint_number, id_number, address')
-          .in('id', userIds);
+        parallelQueries.push(
+          supabaseClient
+            .from('profiles')
+            .select('id, first_name, last_name, mint_number, id_number, address')
+            .in('id', userIds)
+            .then(({ data, error }) => {
+              if (error) { console.error('Profiles load error:', error); return; }
+              (data || []).forEach((p) => { profilesMap[p.id] = p; });
+            })
+        );
 
-        if (profileError) {
-          console.error('Profiles load error:', profileError);
-        } else {
-          (profileRows || []).forEach((profile) => {
-            profilesMap[profile.id] = profile;
-          });
-        }
-
-        const { data: packRows, error: packError } = await supabaseClient
-          .from('user_onboarding_pack_details')
-          .select('user_id, pack_details')
-          .in('user_id', userIds);
-
-        if (packError) {
-          console.error('Pack details load error:', packError);
-        } else {
-          (packRows || []).forEach((row) => {
-            if (row?.user_id) {
-              onboardingPackDetailsMap[row.user_id] = row.pack_details;
-            }
-          });
-        }
+        parallelQueries.push(
+          supabaseClient
+            .from('user_onboarding_pack_details')
+            .select('user_id, pack_details')
+            .in('user_id', userIds)
+            .then(({ data, error }) => {
+              if (error) { console.error('Pack details load error:', error); return; }
+              (data || []).forEach((row) => {
+                if (row?.user_id) onboardingPackDetailsMap[row.user_id] = row.pack_details;
+              });
+            })
+        );
       }
 
-      const strategyIds = [...new Set(holdings.map((row) => row.strategy_id).filter(Boolean))];
       if (strategyIds.length) {
-        const { data: strategyRows, error: strategyError } = await supabaseClient
-          .from('strategies')
-          .select('id, name, short_name, slug')
-          .in('id', strategyIds);
-
-        if (strategyError) {
-          console.error('Strategies load error:', strategyError);
-        } else {
-          (strategyRows || []).forEach((s) => {
-            strategiesMap[s.id] = s;
-          });
-        }
+        parallelQueries.push(
+          supabaseClient
+            .from('strategies')
+            .select('id, name, short_name, slug')
+            .in('id', strategyIds)
+            .then(({ data, error }) => {
+              if (error) { console.error('Strategies load error:', error); return; }
+              (data || []).forEach((s) => { strategiesMap[s.id] = s; });
+            })
+        );
       }
+
+      await Promise.all(parallelQueries);
 
       const archivedSourceIds = getArchivedSourceIds();
       updateOrderbookHeaderSequence();
@@ -4196,11 +4193,14 @@
 
       try {
         allOrderbookRows = await loadOrderbookClientSideFallback();
-        await reconcileArchivedBooksWithLiveHoldings();
-        await maybeBackfillLegacyArchiveSnapshots();
         applySearchFilter();
         renderStrateBirPreview();
         maybeCaptureFilledOrderbook();
+
+        // Run reconciliation tasks after initial render (non-blocking)
+        reconcileArchivedBooksWithLiveHoldings()
+          .then(() => maybeBackfillLegacyArchiveSnapshots())
+          .catch((err) => console.error('Post-render reconciliation error:', err?.message || err));
       } catch (error) {
         console.error('Orderbook load error:', error);
         orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">Could not load orderbook data.</td></tr>';
@@ -4577,19 +4577,22 @@
     requireSession().then(async (ok) => {
       if (!ok) return;
 
-      try {
-        const dbArchive = await loadFilledArchiveFromDb();
-        if (Array.isArray(dbArchive)) {
-          filledOrderbooksArchive = dbArchive;
-          persistFilledArchive();
-          updateOrderbookHeaderSequence();
-          renderFilledOrderbooks();
-        }
-      } catch (error) {
-        console.error('Could not load DB archive:', error?.message || error);
-      }
+      const archivePromise = loadFilledArchiveFromDb()
+        .then((dbArchive) => {
+          if (Array.isArray(dbArchive)) {
+            filledOrderbooksArchive = dbArchive;
+            persistFilledArchive();
+            updateOrderbookHeaderSequence();
+            renderFilledOrderbooks();
+          }
+        })
+        .catch((error) => {
+          console.error('Could not load DB archive:', error?.message || error);
+        });
 
-      loadOrderbook();
+      const orderbookPromise = loadOrderbook();
+
+      await Promise.all([archivePromise, orderbookPromise]);
     });
 
     startOrderbookTimer();
