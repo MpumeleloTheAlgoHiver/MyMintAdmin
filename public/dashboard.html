@@ -2012,18 +2012,22 @@
             });
           });
 
-          /* Only select confirmed columns — mtd/wtd don't exist in this table */
+          /* Fetch base security info then merge metrics from security_metrics */
           let q = supabaseClient
             .from('securities')
-            .select('symbol, name, logo_url, change_percent, ytd_performance')
-            .order('change_percent', { ascending: false, nullsFirst: false });
+            .select('id, symbol, name, logo_url')
+            .order('name', { ascending: true });
 
           if (stratSymbols.size > 0) q = q.in('symbol', [...stratSymbols]);
           else q = q.eq('is_active', true).limit(40);
 
           const { data: secData, error: secErr } = await q;
           if (secErr) throw secErr;
-          _returnInsightsData = secData || [];
+          const _riIds = (secData || []).map(s => s.id).filter(Boolean);
+          const _riMetrics = await fetchSecurityMetrics(_riIds);
+          _returnInsightsData = (secData || []).map(s => ({ ...s, ...(_riMetrics[s.id] || {}) }));
+          /* Sort by daily change descending */
+          _returnInsightsData.sort((a, b) => (b.change_percent ?? -Infinity) - (a.change_percent ?? -Infinity));
           /* Compute alert count and update badges */
           const alertCount = _returnInsightsData.filter(a => a.change_percent != null && Number(a.change_percent) <= ALERT_THRESHOLD).length;
           _updateAlertBadges(alertCount);
@@ -2987,6 +2991,53 @@
       let securitiesLoading = false;
       let holdingsQuantityMap = {};
 
+      /* ── Security Metrics Helper ──────────────────────────────────────────
+         Fetches the latest row from security_metrics for each given security ID
+         and returns an object keyed by security_id with columns mapped to the
+         names the rest of the codebase expects.
+         Column mapping:
+           last_close  (Rand)    → last_price  (stored as cents ×100)
+           change_pct  (decimal) → change_percent (percentage ×100)
+           r_ytd       (decimal) → ytd_performance (percentage ×100)
+           WTD_Return  (decimal) → wtd_performance (percentage ×100)
+           1M_Return   (decimal) → mtd_performance (percentage ×100)
+      ─────────────────────────────────────────────────────────────────────── */
+      const fetchSecurityMetrics = async (secIds) => {
+        if (!secIds || !secIds.length) return {};
+        const metricsMap = {};
+        const chunks = [];
+        for (let i = 0; i < secIds.length; i += 50) chunks.push(secIds.slice(i, i + 50));
+        const results = await Promise.all(
+          chunks.map(chunk =>
+            supabaseClient.from('security_metrics')
+              .select('*')
+              .in('security_id', chunk)
+              .order('as_of_date', { ascending: false })
+          )
+        );
+        results.forEach(({ data }) => {
+          if (!data) return;
+          data.forEach(m => {
+            if (metricsMap[m.security_id]) return; /* keep latest (first due to desc order) */
+            metricsMap[m.security_id] = {
+              last_price:       m.last_close   != null ? Math.round(m.last_close * 100)   : null,
+              change_percent:   m.change_pct   != null ? m.change_pct * 100               : null,
+              ytd_performance:  m.r_ytd        != null ? m.r_ytd * 100                    : null,
+              wtd_performance:  m['WTD_Return']!= null ? m['WTD_Return'] * 100            : null,
+              mtd_performance:  m['1M_Return'] != null ? m['1M_Return'] * 100             : null,
+              r_1y_performance: m.r_1y         != null ? m.r_1y * 100                     : null,
+              r_6m_performance: m.r_6m         != null ? m.r_6m * 100                     : null,
+              change_abs:       m.change_abs,
+              prev_close:       m.prev_close,
+              last_close_rand:  m.last_close,
+              volatility_30d:   m.volatility_30d,
+              avg_volume_30d:   m.avg_volume_30d,
+            };
+          });
+        });
+        return metricsMap;
+      };
+
       const loadAllSecurities = async (opts = {}) => {
         if (allSecuritiesCache !== null || securitiesLoading) return;
         securitiesLoading = true;
@@ -3003,12 +3054,11 @@
             .limit(200),
         ]);
 
-        /* Probe for columns progressively so partial schemas still show price data */
+        /* Load base security info (metrics now live in security_metrics table) */
         const _secSelectVariants = [
-          "id, symbol, name, logo_url, last_price, change_percent, market_cap, pe_ratio, dividend_per_share, dividend_yield, ytd_performance",
-          "id, symbol, name, logo_url, last_price, change_percent, market_cap",
-          "id, symbol, name, logo_url, last_price, change_percent",
-          "id, symbol, name, logo_url, last_price",
+          "id, symbol, name, logo_url, market_cap, pe_ratio, dividend_per_share, dividend_yield, sector",
+          "id, symbol, name, logo_url, market_cap",
+          "id, symbol, name, logo_url",
           "id, symbol, name",
         ];
         let data = null;
@@ -3023,6 +3073,9 @@
         }
         if (!data) console.error("Failed to load securities from any column variant");
 
+        /* Fetch live metrics from security_metrics and merge */
+        const _secIds = (data || []).map(s => s.id).filter(Boolean);
+        const _metricsMap = await fetchSecurityMetrics(_secIds);
 
         const symbolHoldingsMap = {};
         if (!strategiesResult.error && strategiesResult.data) {
@@ -3049,8 +3102,10 @@
             symbolHoldingsMap[sym] ||
             symbolHoldingsMap[normalizeSymbol(sym)] ||
             null;
+          const metrics = _metricsMap[s.id] || {};
           return {
             ...s,
+            ...metrics,
             _sym: sym,
             _totalShares: holdingData ? holdingData.shares : 0,
             _weight: holdingData ? holdingData.weight : 0,
@@ -3534,14 +3589,16 @@
           const symbols = holdings.map((h) => h.ticker || h.symbol || h);
           const { data } = await supabaseClient
             .from("securities")
-            .select("symbol, name, logo_url, last_price, change_percent, market_cap, pe_ratio, dividend_per_share, dividend_yield, ytd_performance")
+            .select("id, symbol, name, logo_url, market_cap, pe_ratio, dividend_per_share, dividend_yield, sector")
             .in("symbol", symbols);
           if (data) {
+            const _m = await fetchSecurityMetrics(data.map(s => s.id).filter(Boolean));
             securitiesMap = new Map();
             data.forEach((s) => {
-              securitiesMap.set(s.symbol, s);
+              const merged = { ...s, ...(_m[s.id] || {}) };
+              securitiesMap.set(s.symbol, merged);
               const norm = normalizeSymbol(s.symbol);
-              if (norm !== s.symbol) securitiesMap.set(norm, s);
+              if (norm !== s.symbol) securitiesMap.set(norm, merged);
             });
           }
         }
@@ -3732,7 +3789,7 @@
             chunks.map((chunk) =>
               supabaseClient
                 .from("securities")
-                .select("symbol, name, logo_url, last_price, change_percent, market_cap, pe_ratio, dividend_per_share, dividend_yield, ytd_performance")
+                .select("id, symbol, name, logo_url, market_cap, pe_ratio, dividend_per_share, dividend_yield, sector")
                 .in("symbol", chunk),
             ),
           );
@@ -3744,6 +3801,13 @@
                 if (norm !== s.symbol) securitiesMap.set(norm, s);
               });
           });
+          /* Merge live metrics from security_metrics */
+          const _mapIds = [...new Set([...securitiesMap.values()].map(s => s.id).filter(Boolean))];
+          const _mapMetrics = await fetchSecurityMetrics(_mapIds);
+          for (const [sym, s] of securitiesMap.entries()) {
+            const m = _mapMetrics[s.id];
+            if (m) securitiesMap.set(sym, { ...s, ...m });
+          }
         }
 
         globalSecuritiesMap = securitiesMap;
@@ -4117,14 +4181,17 @@
           ];
           const { data: secs } = await supabaseClient
             .from("securities")
-            .select("symbol, name, logo_url, last_price, change_percent, market_cap, pe_ratio, dividend_per_share, dividend_yield, ytd_performance")
+            .select("id, symbol, name, logo_url, market_cap, pe_ratio, dividend_per_share, dividend_yield, sector")
             .in("symbol", allSymbols);
-          if (secs)
+          if (secs) {
+            const _sm = await fetchSecurityMetrics(secs.map(s => s.id).filter(Boolean));
             secs.forEach((s) => {
-              securitiesMap.set(s.symbol, s);
+              const merged = { ...s, ...(_sm[s.id] || {}) };
+              securitiesMap.set(s.symbol, merged);
               const norm = normalizeSymbol(s.symbol);
-              if (norm !== s.symbol) securitiesMap.set(norm, s);
+              if (norm !== s.symbol) securitiesMap.set(norm, merged);
             });
+          }
         }
 
         const totalWeight = holdings.reduce(
@@ -4558,17 +4625,23 @@
             _chunks.map((syms) =>
               supabaseClient
                 .from("securities")
-                .select("symbol, last_price")
+                .select("id, symbol")
                 .in("symbol", syms),
             ),
           );
           _overviewSecMap = new Map();
+          const _ovSecIds = [];
+          _secResults.forEach(({ data: secs }) => {
+            if (secs) secs.forEach((s) => { if (s.id) _ovSecIds.push(s.id); });
+          });
+          const _ovMetrics = await fetchSecurityMetrics(_ovSecIds);
           _secResults.forEach(({ data: secs }) => {
             if (secs)
               secs.forEach((s) => {
-                _overviewSecMap.set(s.symbol, s);
+                const merged = { ...s, ...(_ovMetrics[s.id] || {}) };
+                _overviewSecMap.set(s.symbol, merged);
                 const norm = normalizeSymbol(s.symbol || "");
-                if (norm && norm !== s.symbol) _overviewSecMap.set(norm, s);
+                if (norm && norm !== s.symbol) _overviewSecMap.set(norm, merged);
               });
           });
         }
@@ -4869,12 +4942,16 @@
         if (symbols.length > 0) {
           const { data: secs } = await supabaseClient
             .from('securities')
-            .select('symbol, name, last_price, change_percent, sector')
+            .select('id, symbol, name, sector')
             .in('symbol', symbols);
-          if (secs) secs.forEach(s => {
-            secMap.set(s.symbol, s);
-            secMap.set(normalizeSymbol(s.symbol), s);
-          });
+          if (secs) {
+            const _om = await fetchSecurityMetrics(secs.map(s => s.id).filter(Boolean));
+            secs.forEach(s => {
+              const merged = { ...s, ...(_om[s.id] || {}) };
+              secMap.set(s.symbol, merged);
+              secMap.set(normalizeSymbol(s.symbol), merged);
+            });
+          }
         }
 
         window.__dbgBreadcrumb('ovSelect:fetch-investors');
@@ -4902,7 +4979,7 @@
               .eq('status', 'posted')
               .gte('amount', 10000),
             sids.length
-              ? supabaseClient.from('securities').select('id, last_price').in('id', sids)
+              ? supabaseClient.from('security_metrics').select('security_id, last_close').in('security_id', sids).order('as_of_date', { ascending: false })
               : Promise.resolve({ data: [] })
           ];
           const [{ data: profs }, { data: txnRows }, { data: secRows }] = await Promise.all(fetches);
@@ -4912,7 +4989,13 @@
             if (d && (!txnInceptionMap[t.user_id] || d < txnInceptionMap[t.user_id]))
               txnInceptionMap[t.user_id] = d;
           });
-          (secRows || []).forEach(s => { secPriceMap[s.id] = Number(s.last_price) || 0; });
+          /* last_close is in Rand; store as cents (×100) to keep existing /100 division below */
+          const _seenSec = new Set();
+          (secRows || []).forEach(s => {
+            if (_seenSec.has(s.security_id)) return;
+            _seenSec.add(s.security_id);
+            secPriceMap[s.security_id] = s.last_close != null ? Math.round(s.last_close * 100) : 0;
+          });
         }
 
         /* Compute AUM from live prices (qty × last_price / 100) or fall back to cost basis */
@@ -5224,7 +5307,7 @@
 
           let query = supabaseClient
             .from('securities')
-            .select('symbol, name, logo_url, last_price, change_percent')
+            .select('id, symbol, name, logo_url')
             .order('symbol', { ascending: true });
 
           if (stratSymbols.size > 0) {
@@ -5237,7 +5320,9 @@
 
           const { data: secs, error } = await query;
           if (error) throw error;
-          const items = (secs || []).map(s => ({
+          const _ovListMetrics = await fetchSecurityMetrics((secs || []).map(s => s.id).filter(Boolean));
+          const secsWithMetrics = (secs || []).map(s => ({ ...s, ...(_ovListMetrics[s.id] || {}) }));
+          const items = secsWithMetrics.map(s => ({
             sym: (s.symbol || '').replace('.JO', ''),
             logo: s.logo_url || null,
             price: s.last_price != null ? Number(s.last_price) / 100 : null,
@@ -6803,14 +6888,17 @@
           if (!secMap || secMap.size === 0) {
             const { data } = await supabaseClient
               .from("securities")
-              .select("symbol, name, logo_url, last_price, change_percent, market_cap, pe_ratio, dividend_per_share, dividend_yield, ytd_performance")
+              .select("id, symbol, name, logo_url, market_cap, pe_ratio, dividend_per_share, dividend_yield, sector")
               .in("symbol", symbols);
             secMap = new Map();
-            if (data)
+            if (data) {
+              const _esm = await fetchSecurityMetrics(data.map(s => s.id).filter(Boolean));
               data.forEach((s) => {
-                secMap.set(s.symbol, s);
-                secMap.set(normalizeSymbol(s.symbol), s);
+                const merged = { ...s, ...(_esm[s.id] || {}) };
+                secMap.set(s.symbol, merged);
+                secMap.set(normalizeSymbol(s.symbol), merged);
               });
+            }
           }
           holdings.forEach((h) => {
             const sym = h.ticker || h.symbol || "";
@@ -7715,14 +7803,15 @@
         const symbols = rebIsins.map(i => i.fullSymbol).filter(Boolean);
         if (symbols.length) {
           try {
-            const { data: secRows } = await supabaseClient.from("securities").select("id, symbol, name, last_price").in("symbol", symbols);
+            const { data: secRows } = await supabaseClient.from("securities").select("id, symbol, name").in("symbol", symbols);
+            const _rebMetrics = await fetchSecurityMetrics((secRows || []).map(s => s.id).filter(Boolean));
             const codeBySecId = {};
             (secRows || []).forEach(s => { codeBySecId[s.id] = s.symbol.replace(/\.[A-Z]+$/, ""); });
 
             const secBySymbol = new Map();
             (secRows || []).forEach(s => {
               if (!s?.symbol) return;
-              secBySymbol.set(String(s.symbol), s);
+              secBySymbol.set(String(s.symbol), { ...s, ...(_rebMetrics[s.id] || {}) });
             });
 
             rebIsins = rebIsins.map((isin) => {
@@ -8548,13 +8637,15 @@
         if (symbols.length) {
           const { data: secRows, error: secErr } = await supabaseClient
             .from("securities")
-            .select("symbol, name, last_price")
+            .select("id, symbol, name")
             .in("symbol", symbols);
           if (secErr) throw new Error(secErr.message || "Failed to load latest security prices.");
+          const _miMetrics = await fetchSecurityMetrics((secRows || []).map(s => s.id).filter(Boolean));
           (secRows || []).forEach((row) => {
             const symbol = String(row.symbol || "");
             const norm = normalizeSymbol(symbol);
-            const price = Number(row.last_price || 0) / 100;
+            const metrics = _miMetrics[row.id] || {};
+            const price = Number(metrics.last_price || 0) / 100;
             if (symbol) {
               priceBySymbol.set(symbol, Number.isFinite(price) ? price : 0);
               if (row.name) nameBySymbol.set(symbol, String(row.name));
