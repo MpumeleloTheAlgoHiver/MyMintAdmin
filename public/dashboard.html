@@ -670,7 +670,7 @@
         <button id="viewSwitcherBtn" onclick="viewSwitcherToggle(event)"
           style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:10px;background:#ede9fe;border:none;cursor:pointer;text-align:left;box-sizing:border-box;transition:background 0.15s;outline:none;" onmouseover="this.style.background='#ddd6fe'" onmouseout="this.style.background='#ede9fe'">
           <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#7c3aed;flex-shrink:0;"><path d="M3 3h7v7H3zm0 11h7v7H3zm11-11h7v7h-7zm0 11h7v7h-7z"/></svg>
-          <span style="flex:1;font-size:13px;font-weight:600;color:#5b21b6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Strategy View</span>
+          <span style="flex:1;font-size:13px;font-weight:600;color:#5b21b6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Investments</span>
           <svg id="viewSwitcherChevron" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" style="width:12px;height:12px;flex-shrink:0;transition:transform 0.2s;"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         <div id="viewSwitcherDropdown">
@@ -678,7 +678,7 @@
             <div style="padding:3px 0 2px 10px;">
               <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;background:#f5f3ff;">
                 <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#7c3aed;flex-shrink:0;"><path d="M3 3h7v7H3zm0 11h7v7H3zm11-11h7v7h-7zm0 11h7v7h-7z"/></svg>
-                <span style="flex:1;font-size:12px;font-weight:600;color:#5b21b6;">Strategy View</span>
+                <span style="flex:1;font-size:12px;font-weight:600;color:#5b21b6;">Investments</span>
                 <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#7c3aed" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </div>
             </div>
@@ -1685,6 +1685,7 @@
       let strategyInvestorFilter = "all";   // "all" | "invested" | "not-invested"
       let strategyInvestedIds = new Set();  // strategy IDs that have ≥1 real investor
       let strategyYtdMap = new Map();       // strategy_id → YTD return (decimal, e.g. 0.1419)
+      let currentAdminName = null;          // logged-in admin's full name, loaded at init
 
       /* ── View-only mode for invested strategies ──────────────────────── */
       let strategyViewOnlyMode = false;
@@ -3785,10 +3786,101 @@
               : "text-slate-500");
       };
 
+      /* ── Strategist picker modal ── */
+      const STRATEGIST_LIST = ['Lonwabo Damane', 'Lethabo Maloma', 'Juan van Wyk'];
+
+      const pickStrategist = () => new Promise((resolve) => {
+        const existing = document.getElementById('_strategistPickerModal');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = '_strategistPickerModal';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99990;background:rgba(15,23,42,0.45);display:flex;align-items:center;justify-content:center;padding:16px;';
+
+        overlay.innerHTML = `
+          <div style="background:#fff;border-radius:20px;padding:28px 28px 24px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,0.18);position:relative;">
+            <h3 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 4px;">Who is the Strategist?</h3>
+            <p style="font-size:13px;color:#64748b;margin:0 0 20px;">Select the person creating this strategy.</p>
+
+            <div id="_stratPickerList" style="display:flex;flex-direction:column;gap:8px;">
+              ${STRATEGIST_LIST.map(name => `
+                <button type="button" data-name="${name}"
+                  style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;text-align:left;transition:all 0.15s;outline:none;"
+                  onmouseover="this.style.borderColor='#7c3aed';this.style.background='#f5f3ff'"
+                  onmouseout="this.style.borderColor='#e2e8f0';this.style.background='#fff'">
+                  <div style="width:34px;height:34px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="#7c3aed"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+                  </div>
+                  <span style="font-size:14px;font-weight:600;color:#1e293b;">${name}</span>
+                </button>`).join('')}
+
+              <button type="button" id="_stratPickerAddNew"
+                style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:1.5px dashed #c4b5fd;background:#faf5ff;cursor:pointer;text-align:left;transition:all 0.15s;outline:none;"
+                onmouseover="this.style.borderColor='#7c3aed';this.style.background='#f5f3ff'"
+                onmouseout="this.style.borderColor='#c4b5fd';this.style.background='#faf5ff'">
+                <div style="width:34px;height:34px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="#7c3aed"><path d="M19 11h-6V5h-2v6H5v2h6v6h2v-6h6z"/></svg>
+                </div>
+                <span style="font-size:14px;font-weight:600;color:#7c3aed;">Add new Strategist</span>
+              </button>
+            </div>
+
+            <div id="_stratPickerNewRow" style="display:none;margin-top:12px;gap:8px;flex-direction:column;">
+              <input id="_stratPickerNewInput" type="text" placeholder="Full name e.g. Jane Smith"
+                style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid #e2e8f0;font-size:14px;color:#1e293b;outline:none;box-sizing:border-box;"
+                onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#e2e8f0'">
+              <button type="button" id="_stratPickerNewConfirm"
+                style="padding:10px 18px;border-radius:10px;background:#7c3aed;color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;">
+                Confirm
+              </button>
+            </div>
+
+            <button type="button" id="_stratPickerCancel"
+              style="margin-top:16px;width:100%;padding:10px;border-radius:10px;border:1px solid #e2e8f0;background:transparent;font-size:13px;color:#64748b;cursor:pointer;font-weight:500;">
+              Cancel
+            </button>
+          </div>`;
+
+        document.body.appendChild(overlay);
+
+        const close = (val) => { overlay.remove(); resolve(val); };
+
+        overlay.querySelectorAll('[data-name]').forEach(btn => {
+          btn.addEventListener('click', () => close(btn.dataset.name));
+        });
+
+        document.getElementById('_stratPickerAddNew').addEventListener('click', () => {
+          document.getElementById('_stratPickerAddNew').style.display = 'none';
+          const newRow = document.getElementById('_stratPickerNewRow');
+          newRow.style.display = 'flex';
+          document.getElementById('_stratPickerNewInput').focus();
+        });
+
+        document.getElementById('_stratPickerNewConfirm').addEventListener('click', () => {
+          const val = (document.getElementById('_stratPickerNewInput').value || '').trim();
+          if (!val) { document.getElementById('_stratPickerNewInput').style.borderColor = '#ef4444'; return; }
+          close(val);
+        });
+
+        document.getElementById('_stratPickerNewInput').addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') document.getElementById('_stratPickerNewConfirm').click();
+        });
+
+        document.getElementById('_stratPickerCancel').addEventListener('click', () => close(null));
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(null); });
+      });
+
       const handleStrategySubmit = async (event) => {
         event.preventDefault();
         if (!strategyForm) return;
         if (strategyViewOnlyMode) return;  /* block saves in read-only mode */
+
+        /* For new strategies, ask who the strategist is before anything else */
+        let chosenStrategist = null;
+        if (!editingStrategyId) {
+          chosenStrategist = await pickStrategist();
+          if (!chosenStrategist) return; /* user cancelled */
+        }
 
         /* Require password before saving */
         const confirmed = await confirmWithPassword(
@@ -3848,6 +3940,7 @@
             strategyForm.querySelector("#strategyIsFeatured")?.checked || false,
           status: "active",
           holdings: holdingsPayload.length > 0 ? holdingsPayload : null,
+          ...(editingStrategyId ? {} : { provider_name: chosenStrategist || null }),
         };
 
         if (!payload.name) {
@@ -4411,7 +4504,7 @@
         const { data, error } = await supabaseClient
           .from("strategies")
           .select(
-            "id, slug, name, short_name, description, objective, risk_level, sector, min_investment, base_currency, is_featured, is_public, status, created_at, holdings",
+            "id, slug, name, short_name, description, objective, risk_level, sector, min_investment, base_currency, is_featured, is_public, status, created_at, holdings, provider_name, tags",
           )
           .order("created_at", { ascending: false });
 
@@ -4918,11 +5011,16 @@
           inp.focus();
           return;
         }
+
+        /* Ask who the strategist is before creating */
+        const chosenStrategist = await pickStrategist();
+        if (!chosenStrategist) return; /* user cancelled */
+
         if (btn) { btn.textContent = 'Creating…'; btn.disabled = true; }
         document.getElementById('ovStratPanel').style.display = 'none';
         const { data: insertData, error } = await supabaseClient
           .from('strategies')
-          .insert([{ name, slug: createStrategySlug(name), status: 'active', is_public: false, is_featured: false }])
+          .insert([{ name, slug: createStrategySlug(name), status: 'active', is_public: false, is_featured: false, provider_name: chosenStrategist }])
           .select('id')
           .single();
         if (error || !insertData?.id) {
@@ -4931,7 +5029,7 @@
           return;
         }
         const newId = insertData.id;
-        const minimalStrat = { id: newId, name, slug: createStrategySlug(name), status: 'active', is_public: false, is_featured: false, holdings: [] };
+        const minimalStrat = { id: newId, name, slug: createStrategySlug(name), status: 'active', is_public: false, is_featured: false, holdings: [], provider_name: chosenStrategist };
         /* Inject into local arrays so editStrategy can find it immediately */
         allStrategiesFullData = [minimalStrat, ...(allStrategiesFullData || [])];
         _ovAllStrategies = window._ovAllStrategies = [minimalStrat, ...(_ovAllStrategies || [])];
@@ -6581,8 +6679,10 @@
           const dailyDisplay = fmtYtd(dailyReturn);
           const dailyClr = ytdColor(dailyReturn);
 
-          /* Provider */
-          const provider = strategy.provider_name || "Mint";
+          /* Strategist — use provider_name if set (and not the old "Mint" default) */
+          const provider = (strategy.provider_name && !["Mint", "MINT", "MINT "].includes(strategy.provider_name.trim()))
+            ? strategy.provider_name.trim()
+            : null;
 
           return `<button type="button" data-strat-idx="${idx}"
           style="flex-shrink:0;width:320px;display:flex;flex-direction:column;padding:16px;border-radius:16px;cursor:pointer;text-align:left;background:#ffffff;border:1px solid #f1f5f9;box-shadow:0 1px 2px rgba(0,0,0,0.05);transition:box-shadow 0.18s,border-color 0.18s;outline:none;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none;">
@@ -6611,11 +6711,11 @@
             </div>
             <!-- Holdings snapshot -->
             ${holdingsBlock}
-            <!-- Provider -->
-            <div style="margin-top:12px;display:flex;align-items:center;gap:8px;">
-              <span style="font-size:12px;color:#64748b;">Provider:</span>
+            <!-- Strategist -->
+            ${provider ? `<div style="margin-top:12px;display:flex;align-items:center;gap:8px;">
+              <span style="font-size:12px;color:#64748b;">Strategist:</span>
               <span style="font-size:12px;font-weight:600;color:#334155;">${provider}</span>
-            </div>
+            </div>` : ""}
           </button>`;
         }).join("");
 
@@ -6881,6 +6981,17 @@
         const ok = await requireSession();
         if (!ok) { window.__dbgBreadcrumb('DOMContentLoaded:no-session'); return; }
         window.__dbgBreadcrumb('DOMContentLoaded:session-ok');
+
+        supabaseClient.auth.getUser().then(({ data: { user } }) => {
+          if (user?.id) {
+            supabaseClient.from('profiles').select('first_name, last_name').eq('id', user.id).maybeSingle().then(({ data: prof }) => {
+              if (prof) {
+                const full = [prof.first_name, prof.last_name].filter(Boolean).join(' ');
+                if (full) { currentAdminName = full; renderTopAssetsRow(); }
+              }
+            });
+          }
+        }).catch(() => {});
 
         loadStrategies().catch(err => console.error('[Init] loadStrategies failed:', err));
         loadTopHoldings().catch(err => console.error('[Init] loadTopHoldings failed:', err));
