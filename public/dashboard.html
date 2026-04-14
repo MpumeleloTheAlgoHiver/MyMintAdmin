@@ -5011,11 +5011,16 @@
           inp.focus();
           return;
         }
+
+        /* Ask who the strategist is before creating */
+        const chosenStrategist = await pickStrategist();
+        if (!chosenStrategist) return; /* user cancelled */
+
         if (btn) { btn.textContent = 'Creating…'; btn.disabled = true; }
         document.getElementById('ovStratPanel').style.display = 'none';
         const { data: insertData, error } = await supabaseClient
           .from('strategies')
-          .insert([{ name, slug: createStrategySlug(name), status: 'active', is_public: false, is_featured: false }])
+          .insert([{ name, slug: createStrategySlug(name), status: 'active', is_public: false, is_featured: false, provider_name: chosenStrategist }])
           .select('id')
           .single();
         if (error || !insertData?.id) {
@@ -5024,7 +5029,7 @@
           return;
         }
         const newId = insertData.id;
-        const minimalStrat = { id: newId, name, slug: createStrategySlug(name), status: 'active', is_public: false, is_featured: false, holdings: [] };
+        const minimalStrat = { id: newId, name, slug: createStrategySlug(name), status: 'active', is_public: false, is_featured: false, holdings: [], provider_name: chosenStrategist };
         /* Inject into local arrays so editStrategy can find it immediately */
         allStrategiesFullData = [minimalStrat, ...(allStrategiesFullData || [])];
         _ovAllStrategies = window._ovAllStrategies = [minimalStrat, ...(_ovAllStrategies || [])];
