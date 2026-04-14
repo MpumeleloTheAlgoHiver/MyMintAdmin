@@ -3849,6 +3849,7 @@
             strategyForm.querySelector("#strategyIsFeatured")?.checked || false,
           status: "active",
           holdings: holdingsPayload.length > 0 ? holdingsPayload : null,
+          ...(editingStrategyId ? {} : { provider_name: currentAdminName || null }),
         };
 
         if (!payload.name) {
