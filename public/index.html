@@ -3092,7 +3092,9 @@
       margin-bottom: 14px;
     }
 
-    /* Responsive */
+    /* ═══ Responsive ═══ */
+
+    /* ── Large tablets / narrow desktops ── */
     @media screen and (max-width: 1200px) {
       .content-area {
         flex-direction: column;
@@ -3102,8 +3104,64 @@
         flex: 1;
         width: 100%;
       }
+
+      /* Let top-nav wrap into two rows */
+      .top-nav {
+        flex-wrap: wrap;
+        height: auto;
+        min-height: unset;
+        padding: 12px 20px;
+        gap: 8px 16px;
+      }
+
+      /* Title takes full width on first row */
+      .tnav-title { flex-shrink: 1; min-width: 0; }
+
+      /* Hide vertical dividers when wrapping */
+      .tnav-divider { display: none; }
+
+      /* Pills row wraps to second line */
+      .tnav-pills {
+        order: 3;
+        flex: 1 1 100%;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      /* Search + toggles stay beside title */
+      .tnav-actions {
+        order: 2;
+        flex-shrink: 0;
+        margin-left: auto;
+      }
+
+      /* Stat cards: 2-col */
+      .client-stats-strip { grid-template-columns: repeat(2, 1fr); }
     }
 
+    /* ── Small tablets ── */
+    @media screen and (max-width: 900px) {
+      .tnav-actions {
+        order: 3;
+        flex: 1 1 100%;
+      }
+
+      .tnav-actions .top-search { flex: 1; max-width: none; min-width: 0; }
+
+      .tnav-pills {
+        order: 2;
+        flex: 1 1 100%;
+      }
+
+      /* Bank/Parent-Child dropdowns stack better */
+      .bank-filter-wrap { margin-left: 0; padding-left: 0; }
+      .bank-filter-wrap::before { display: none; }
+
+      /* Subtitle under title smaller */
+      .clients-page-sub { font-size: 10.5px; }
+    }
+
+    /* ── Mobile ── */
     @media screen and (max-width: 768px) {
       .sidebar {
         display: none;
@@ -3114,11 +3172,11 @@
       }
 
       .content-area {
-        padding: 20px;
+        padding: 16px;
       }
 
       .simple-view {
-        padding: 18px 20px 24px;
+        padding: 14px 14px 20px !important;
       }
 
       .simple-view-header {
@@ -3130,17 +3188,60 @@
         width: 100%;
       }
 
-      .quick-filter-row {
-        width: 100%;
-      }
-
+      .quick-filter-row,
       .quick-filter-stack {
         width: 100%;
       }
 
       .top-nav {
-        padding: 15px 20px;
+        padding: 10px 14px;
+        gap: 8px 10px;
       }
+
+      /* Stack: title row → pills row → actions row */
+      .tnav-title { flex: 1 1 auto; min-width: 0; }
+
+      .tnav-pills {
+        order: 2;
+        flex: 1 1 100%;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+
+      .tnav-actions {
+        order: 3;
+        flex: 1 1 100%;
+      }
+
+      .tnav-actions .top-search { flex: 1; max-width: none; min-width: 0; }
+
+      /* Smaller pills on mobile */
+      .quick-filter-pill {
+        font-size: 11px !important;
+        padding: 5px 9px !important;
+        height: 28px;
+      }
+
+      /* Bank/Parent-Child dropdown menus: full width on mobile */
+      .bank-filter-menu {
+        min-width: 140px;
+        right: auto;
+        left: 0;
+      }
+
+      /* Stat cards: 2-col */
+      .client-stats-strip { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .csc-value { font-size: 22px; }
+      .csc-label { font-size: 9.5px; }
+
+      /* Client list header: hide on mobile, info visible in rows */
+      .clients-list-hd { display: none; }
+
+      /* Row layout: tighter */
+      .simple-row { padding: 10px 10px !important; min-height: 54px; }
+      .simple-left { gap: 10px !important; }
+      .simple-avatar { width: 34px !important; height: 34px !important; font-size: 12px !important; }
+      .simple-mid { flex: 0 0 auto; }
 
       .company-info {
         flex-direction: column;
@@ -3155,6 +3256,39 @@
         flex: 1;
         justify-content: center;
       }
+
+      /* Title sizing */
+      .clients-page-title { font-size: 17px; }
+      .clients-page-sub { font-size: 10px; }
+
+      /* User count badge: smaller */
+      .user-count-badge { height: 26px; padding: 0 8px; font-size: 11px; }
+    }
+
+    /* ── Very small phones ── */
+    @media screen and (max-width: 480px) {
+      .top-nav { padding: 8px 10px; gap: 6px 8px; }
+      .tnav-title-row { flex-wrap: wrap; gap: 6px; }
+      .clients-page-title { font-size: 15px; }
+      .clients-page-sub { font-size: 9.5px; }
+
+      /* Stats stay 2-col but tighter */
+      .client-stats-strip { grid-template-columns: 1fr 1fr; gap: 6px; }
+      .csc-value { font-size: 20px; }
+
+      /* Compact pills */
+      .quick-filter-pill { font-size: 10.5px !important; padding: 4px 7px !important; height: 26px; }
+
+      /* Bank/Parent-Child pills: hide icon text, keep compact */
+      .bank-filter-wrap .fpill-icon { width: 12px; height: 12px; }
+      .bank-filter-wrap .fpill-chevron { width: 10px; height: 10px; }
+
+      /* Table/Email view toggles: full width */
+      .table-view-toggle-btn { flex: 1; text-align: center; justify-content: center; }
+
+      /* Search input smaller */
+      .filter-bar .top-search input,
+      .tnav-actions .top-search input { height: 30px; font-size: 12px; }
     }
   </style>
   <style>
