@@ -6615,7 +6615,18 @@
           // ── Hydrate history timeline with real family_transactions ──
           const historyView = rightColumn.querySelector('.history-view');
           if (historyView) {
-            const childTxs = allFamilyTransactions.filter(tx => String(tx.member_id) === String(child.id));
+            const childParentIds = [child.primary_user_id, child.parent_id]
+              .map((id) => String(id || '').trim())
+              .filter(Boolean);
+
+            // Primary link: member_id references family_members.id (expected schema)
+            // Fallback link: parent-level rows that may not have member_id populated yet.
+            const childTxs = allFamilyTransactions.filter((tx) => {
+              const txMemberId = String(tx.member_id || '').trim();
+              const txParentId = String(tx.parent_id || '').trim();
+              if (txMemberId && txMemberId === String(child.id)) return true;
+              return !txMemberId && childParentIds.includes(txParentId);
+            });
 
             if (!childTxs.length) {
               historyView.innerHTML = `
@@ -6624,6 +6635,7 @@
                   <svg viewBox="0 0 24 24" width="40" height="40" fill="#d1d5db" style="margin-bottom:10px;"><path d="M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 117 7c-1.93 0-3.68-.78-4.95-2.05l-1.41 1.41A8.96 8.96 0 0013 21a9 9 0 000-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
                   <div style="font-size:13px;font-weight:500;">No transactions yet</div>
                   <div style="font-size:11.5px;margin-top:4px;color:#b0b7c5;">Transactions will appear here once activity begins.</div>
+                  <div style="font-size:10.5px;margin-top:8px;color:#c0c7d4;">Loaded transactions: ${allFamilyTransactions.length}</div>
                 </div>`;
             } else {
               const txTypeConfig = {
