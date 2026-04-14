@@ -1685,6 +1685,7 @@
       let strategyInvestorFilter = "all";   // "all" | "invested" | "not-invested"
       let strategyInvestedIds = new Set();  // strategy IDs that have ≥1 real investor
       let strategyYtdMap = new Map();       // strategy_id → YTD return (decimal, e.g. 0.1419)
+      let currentAdminName = null;          // logged-in admin's full name, loaded at init
 
       /* ── View-only mode for invested strategies ──────────────────────── */
       let strategyViewOnlyMode = false;
@@ -6581,8 +6582,10 @@
           const dailyDisplay = fmtYtd(dailyReturn);
           const dailyClr = ytdColor(dailyReturn);
 
-          /* Strategist */
-          const provider = strategy.provider_name || null;
+          /* Strategist — use provider_name if set (and not the old "Mint" default),
+             otherwise fall back to the logged-in admin's name */
+          const rawProvider = strategy.provider_name && strategy.provider_name !== "Mint" ? strategy.provider_name : null;
+          const provider = rawProvider || currentAdminName || null;
 
           return `<button type="button" data-strat-idx="${idx}"
           style="flex-shrink:0;width:320px;display:flex;flex-direction:column;padding:16px;border-radius:16px;cursor:pointer;text-align:left;background:#ffffff;border:1px solid #f1f5f9;box-shadow:0 1px 2px rgba(0,0,0,0.05);transition:box-shadow 0.18s,border-color 0.18s;outline:none;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none;">
@@ -6881,6 +6884,17 @@
         const ok = await requireSession();
         if (!ok) { window.__dbgBreadcrumb('DOMContentLoaded:no-session'); return; }
         window.__dbgBreadcrumb('DOMContentLoaded:session-ok');
+
+        supabaseClient.auth.getUser().then(({ data: { user } }) => {
+          if (user?.id) {
+            supabaseClient.from('profiles').select('first_name, last_name').eq('id', user.id).maybeSingle().then(({ data: prof }) => {
+              if (prof) {
+                const full = [prof.first_name, prof.last_name].filter(Boolean).join(' ');
+                if (full) { currentAdminName = full; renderTopAssetsRow(); }
+              }
+            });
+          }
+        }).catch(() => {});
 
         loadStrategies().catch(err => console.error('[Init] loadStrategies failed:', err));
         loadTopHoldings().catch(err => console.error('[Init] loadTopHoldings failed:', err));
