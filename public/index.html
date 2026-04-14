@@ -6384,6 +6384,30 @@
       return age >= 0 ? age : null;
     };
 
+    const inferGenderFromIdNumber = (idNumber) => {
+      const digits = String(idNumber || '').replace(/\D/g, '');
+      // SA ID format: YYMMDDSSSSCAZ where SSSS encodes gender (<5000 female, >=5000 male)
+      if (digits.length < 10) return '';
+      const seq = Number.parseInt(digits.slice(6, 10), 10);
+      if (Number.isNaN(seq)) return '';
+      return seq >= 5000 ? 'Boy' : 'Girl';
+    };
+
+    const normalizeChildGenderDisplay = (rawGender, idNumber) => {
+      const value = String(rawGender || '').trim().toLowerCase();
+      const map = {
+        boy: 'Boy',
+        girl: 'Girl',
+        son: 'Boy',
+        daughter: 'Girl',
+        baby: 'Baby',
+        infant: 'Infant',
+        other: 'Other'
+      };
+      if (value && map[value]) return map[value];
+      return inferGenderFromIdNumber(idNumber);
+    };
+
     const getLinkedParentsForFamilyMember = (familyMember) => {
       const parentIds = [familyMember.primary_user_id, familyMember.parent_id]
         .map((id) => String(id || '').trim())
@@ -6450,7 +6474,7 @@
       childRows.forEach(child => {
         const clone = profileTemplate.content.firstElementChild.cloneNode(true);
         const fullName = [child.first_name, child.last_name].filter(Boolean).join(' ') || 'Unknown Child';
-        const childGender = String(child.gender || '').trim();
+        const childGender = normalizeChildGenderDisplay(child.gender, child.id_number);
         const uid = child.id || '-';
         const currentAge = calculateAgeFromDate(child.date_of_birth);
         const parentLinks = getLinkedParentsForFamilyMember(child);
@@ -7025,7 +7049,7 @@
 
             const zip = new JsZip();
             const fullName = [child.first_name, child.last_name].filter(Boolean).join(' ') || 'Unknown Child';
-            const childGender = String(child.gender || '').trim();
+            const childGender = normalizeChildGenderDisplay(child.gender, child.id_number);
             const safeFileName = fullName.replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
             const parentLinks = getLinkedParentsForFamilyMember(child);
             const parentMintNumbers = getParentMintNumbersForFamilyMember(child);
