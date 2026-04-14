@@ -4411,7 +4411,7 @@
         const { data, error } = await supabaseClient
           .from("strategies")
           .select(
-            "id, slug, name, short_name, description, objective, risk_level, sector, min_investment, base_currency, is_featured, is_public, status, created_at, holdings",
+            "id, slug, name, short_name, description, objective, risk_level, sector, min_investment, base_currency, is_featured, is_public, status, created_at, holdings, provider_name, tags",
           )
           .order("created_at", { ascending: false });
 
@@ -6581,8 +6581,8 @@
           const dailyDisplay = fmtYtd(dailyReturn);
           const dailyClr = ytdColor(dailyReturn);
 
-          /* Provider */
-          const provider = strategy.provider_name || "Mint";
+          /* Strategist */
+          const provider = strategy.provider_name || null;
 
           return `<button type="button" data-strat-idx="${idx}"
           style="flex-shrink:0;width:320px;display:flex;flex-direction:column;padding:16px;border-radius:16px;cursor:pointer;text-align:left;background:#ffffff;border:1px solid #f1f5f9;box-shadow:0 1px 2px rgba(0,0,0,0.05);transition:box-shadow 0.18s,border-color 0.18s;outline:none;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none;">
@@ -6611,11 +6611,11 @@
             </div>
             <!-- Holdings snapshot -->
             ${holdingsBlock}
-            <!-- Provider -->
-            <div style="margin-top:12px;display:flex;align-items:center;gap:8px;">
-              <span style="font-size:12px;color:#64748b;">Provider:</span>
+            <!-- Strategist -->
+            ${provider ? `<div style="margin-top:12px;display:flex;align-items:center;gap:8px;">
+              <span style="font-size:12px;color:#64748b;">Strategist:</span>
               <span style="font-size:12px;font-weight:600;color:#334155;">${provider}</span>
-            </div>
+            </div>` : ""}
           </button>`;
         }).join("");
 
