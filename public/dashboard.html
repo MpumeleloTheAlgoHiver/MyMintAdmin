@@ -1181,10 +1181,10 @@
                           <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Stock Price</th>
                           <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Daily %</th>
                           <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Market Value</th>
-                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Market Cap</th>
-                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">P/E</th>
-                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Div/Share</th>
-                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Div Yield</th>
+                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">WTD%</th>
+                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">MTD%</th>
+                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">1Y%</th>
+                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Volatility</th>
                           <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">YTD</th>
                           <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px;">Weight</th>
                           <th style="width: 44px;"></th>
@@ -3056,8 +3056,6 @@
 
         /* Load base security info (metrics now live in security_metrics table) */
         const _secSelectVariants = [
-          "id, symbol, name, logo_url, market_cap, pe_ratio, dividend_per_share, dividend_yield, sector",
-          "id, symbol, name, logo_url, market_cap",
           "id, symbol, name, logo_url",
           "id, symbol, name",
         ];
@@ -3173,12 +3171,12 @@
               logo_url: btn.dataset.logo || null,
               shares: 1,
               weight: 0,
-              market_cap: cached.market_cap ?? null,
-              pe_ratio: cached.pe_ratio ?? null,
-              dividend_per_share: cached.dividend_per_share ?? null,
-              dividend_yield: cached.dividend_yield ?? null,
-              ytd_performance: cached.ytd_performance ?? null,
-              change_percent: cached.change_percent ?? null,
+              wtd_performance:  cached.wtd_performance  ?? null,
+              mtd_performance:  cached.mtd_performance  ?? null,
+              r_1y_performance: cached.r_1y_performance ?? null,
+              volatility_30d:   cached.volatility_30d   ?? null,
+              ytd_performance:  cached.ytd_performance  ?? null,
+              change_percent:   cached.change_percent   ?? null,
             });
             securitySearchInput.value = "";
             renderSecuritiesDropdown("");
@@ -3297,10 +3295,16 @@
             const ytdColor = ytd == null ? "#94a3b8" : ytd >= 0 ? "#16a34a" : "#dc2626";
 
             const priceFmt = h.last_price ? "R " + (Number(h.last_price) / 100).toFixed(2) : "—";
-            const mcFmt = fmtCompact(h.market_cap);
-            const peFmt = h.pe_ratio != null ? Number(h.pe_ratio).toFixed(1) : "—";
-            const divShareFmt = h.dividend_per_share != null ? "R " + Number(h.dividend_per_share).toFixed(2) : "—";
-            const divYldFmt = h.dividend_yield != null ? Number(h.dividend_yield).toFixed(2) + "%" : "—";
+            const wtd = h.wtd_performance != null ? Number(h.wtd_performance) : null;
+            const wtdStr = wtd != null ? (wtd >= 0 ? "+" : "") + wtd.toFixed(2) + "%" : "—";
+            const wtdColor = wtd == null ? "#94a3b8" : wtd >= 0 ? "#16a34a" : "#dc2626";
+            const mtd = h.mtd_performance != null ? Number(h.mtd_performance) : null;
+            const mtdStr = mtd != null ? (mtd >= 0 ? "+" : "") + mtd.toFixed(2) + "%" : "—";
+            const mtdColor = mtd == null ? "#94a3b8" : mtd >= 0 ? "#16a34a" : "#dc2626";
+            const r1y = h.r_1y_performance != null ? Number(h.r_1y_performance) : null;
+            const r1yStr = r1y != null ? (r1y >= 0 ? "+" : "") + r1y.toFixed(2) + "%" : "—";
+            const r1yColor = r1y == null ? "#94a3b8" : r1y >= 0 ? "#16a34a" : "#dc2626";
+            const volFmt = h.volatility_30d != null ? (Number(h.volatility_30d) * 100).toFixed(2) + "%" : "—";
 
             return `
         <tr style="border-bottom:1px solid #f1f5f9;transition:background 0.12s;"
@@ -3334,16 +3338,16 @@
             <span class="holding-mv" style="font-size:13px;font-weight:500;color:#334155;">R ${mv}</span>
           </td>
           <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
-            <span style="font-size:12px;font-weight:500;color:#334155;">${mcFmt}</span>
+            <span style="font-size:12px;font-weight:600;color:${wtdColor};">${wtdStr}</span>
           </td>
           <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
-            <span style="font-size:12px;font-weight:500;color:#334155;">${peFmt}</span>
+            <span style="font-size:12px;font-weight:600;color:${mtdColor};">${mtdStr}</span>
           </td>
           <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
-            <span style="font-size:12px;font-weight:500;color:#334155;">${divShareFmt}</span>
+            <span style="font-size:12px;font-weight:600;color:${r1yColor};">${r1yStr}</span>
           </td>
           <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
-            <span style="font-size:12px;font-weight:500;color:#334155;">${divYldFmt}</span>
+            <span style="font-size:12px;font-weight:500;color:#334155;">${volFmt}</span>
           </td>
           <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
             <span style="font-size:12px;font-weight:600;color:${ytdColor};">${ytdStr}</span>
@@ -3589,7 +3593,7 @@
           const symbols = holdings.map((h) => h.ticker || h.symbol || h);
           const { data } = await supabaseClient
             .from("securities")
-            .select("id, symbol, name, logo_url, market_cap, pe_ratio, dividend_per_share, dividend_yield, sector")
+            .select("id, symbol, name, logo_url")
             .in("symbol", symbols);
           if (data) {
             const _m = await fetchSecurityMetrics(data.map(s => s.id).filter(Boolean));
@@ -3789,7 +3793,7 @@
             chunks.map((chunk) =>
               supabaseClient
                 .from("securities")
-                .select("id, symbol, name, logo_url, market_cap, pe_ratio, dividend_per_share, dividend_yield, sector")
+                .select("id, symbol, name, logo_url")
                 .in("symbol", chunk),
             ),
           );
@@ -4181,7 +4185,7 @@
           ];
           const { data: secs } = await supabaseClient
             .from("securities")
-            .select("id, symbol, name, logo_url, market_cap, pe_ratio, dividend_per_share, dividend_yield, sector")
+            .select("id, symbol, name, logo_url")
             .in("symbol", allSymbols);
           if (secs) {
             const _sm = await fetchSecurityMetrics(secs.map(s => s.id).filter(Boolean));
@@ -6621,12 +6625,12 @@
                     logo_url: sec.logo_url || null,
                     shares: 1,
                     weight: 0,
-                    market_cap: sec.market_cap ?? null,
-                    pe_ratio: sec.pe_ratio ?? null,
-                    dividend_per_share: sec.dividend_per_share ?? null,
-                    dividend_yield: sec.dividend_yield ?? null,
-                    ytd_performance: sec.ytd_performance ?? null,
-                    change_percent: sec.change_percent ?? null,
+                    wtd_performance:  sec.wtd_performance  ?? null,
+                    mtd_performance:  sec.mtd_performance  ?? null,
+                    r_1y_performance: sec.r_1y_performance ?? null,
+                    volatility_30d:   sec.volatility_30d   ?? null,
+                    ytd_performance:  sec.ytd_performance  ?? null,
+                    change_percent:   sec.change_percent   ?? null,
                   });
                   renderTopAssetsRow();
                 }
@@ -6888,7 +6892,7 @@
           if (!secMap || secMap.size === 0) {
             const { data } = await supabaseClient
               .from("securities")
-              .select("id, symbol, name, logo_url, market_cap, pe_ratio, dividend_per_share, dividend_yield, sector")
+              .select("id, symbol, name, logo_url")
               .in("symbol", symbols);
             secMap = new Map();
             if (data) {
@@ -6915,12 +6919,12 @@
               logo_url: sec.logo_url || null,
               market_value: 0,
               weight: 0,
-              change_percent: sec.change_percent ?? h.change_percent ?? null,
-              market_cap: sec.market_cap ?? h.market_cap ?? null,
-              pe_ratio: sec.pe_ratio ?? h.pe_ratio ?? null,
-              dividend_per_share: sec.dividend_per_share ?? h.dividend_per_share ?? null,
-              dividend_yield: sec.dividend_yield ?? h.dividend_yield ?? null,
-              ytd_performance: sec.ytd_performance ?? h.ytd_performance ?? null,
+              change_percent:   sec.change_percent   ?? h.change_percent   ?? null,
+              wtd_performance:  sec.wtd_performance  ?? null,
+              mtd_performance:  sec.mtd_performance  ?? null,
+              r_1y_performance: sec.r_1y_performance ?? null,
+              volatility_30d:   sec.volatility_30d   ?? null,
+              ytd_performance:  sec.ytd_performance  ?? h.ytd_performance  ?? null,
             });
           });
         }
