@@ -6674,6 +6674,21 @@
           // ── Hydrate holdings view using the child's linked auth user ID ──
           if (child.linked_user_id) {
             renderHoldingsForItem(clone, child.linked_user_id);
+          } else {
+            // No linked auth account — clear placeholder cards and show empty state
+            const hv = clone.querySelector('.holdings-view');
+            if (hv) {
+              const strategyContainer = hv.querySelector('[data-holdings-strategy]');
+              const stocksContainer = hv.querySelector('[data-holdings-stocks]');
+              const emptyStateEl = hv.querySelector('[data-holdings-empty]');
+              const summaryEl = hv.querySelector('[data-holdings-summary]');
+              const sections = Array.from(hv.querySelectorAll('.holdings-section'));
+              if (strategyContainer) strategyContainer.innerHTML = '';
+              if (stocksContainer) stocksContainer.innerHTML = '';
+              if (summaryEl) summaryEl.textContent = 'No holdings';
+              if (emptyStateEl) emptyStateEl.classList.add('active');
+              sections.forEach(s => { s.style.display = 'none'; });
+            }
           }
         }
 
