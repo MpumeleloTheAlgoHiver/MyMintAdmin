@@ -4631,6 +4631,7 @@
     const strategiesByIdMap = {};
     const familyRoleFlagsByUserId = {};
     let allFamilyMembers = [];
+    let allFamilyTransactions = [];
     const PACK_SECTIONS_PAGE_SIZE = 4;
     let completedTableOpen = false;
     let completedTableEntries = [];
@@ -6571,6 +6572,106 @@
           if (csCard) csCard.style.display = 'none';
         }
 
+        // ── Right column: hydrate history, hide irrelevant tabs, add download pack ──
+        const rightColumn = clone.querySelector('.right-column');
+        if (rightColumn) {
+          // Hide KYC tab, Pack tab, Documents tab — not relevant for children
+          const kycTab = rightColumn.querySelector('[data-kyc]');
+          if (kycTab) kycTab.style.display = 'none';
+          const packTab = rightColumn.querySelector('[data-pack]');
+          if (packTab) packTab.style.display = 'none';
+          const docsBtn = rightColumn.querySelector('[data-images]');
+          if (docsBtn) docsBtn.style.display = 'none';
+          const reviewPulse = rightColumn.querySelector('.tabs-header-status');
+          if (reviewPulse) reviewPulse.style.display = 'none';
+
+          // Rename filter tabs for child context
+          const holdingsTab = rightColumn.querySelector('[data-view="holdings"]');
+          if (holdingsTab) holdingsTab.style.display = 'none';
+          const packDetailsTab = rightColumn.querySelector('[data-view="pack-details"]');
+          if (packDetailsTab) {
+            packDetailsTab.textContent = '↓ Download Pack';
+            packDetailsTab.dataset.childDownloadPack = String(child.id);
+            packDetailsTab.removeAttribute('data-view');
+          }
+
+          // ── Hydrate history timeline with real family_transactions ──
+          const historyView = rightColumn.querySelector('.history-view');
+          if (historyView) {
+            const childTxs = allFamilyTransactions.filter(tx => String(tx.member_id) === String(child.id));
+
+            if (!childTxs.length) {
+              historyView.innerHTML = `
+                <h2 class="timeline-header">Transaction History</h2>
+                <div style="text-align:center;padding:40px 20px;color:#94a3b8;">
+                  <svg viewBox="0 0 24 24" width="40" height="40" fill="#d1d5db" style="margin-bottom:10px;"><path d="M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 117 7c-1.93 0-3.68-.78-4.95-2.05l-1.41 1.41A8.96 8.96 0 0013 21a9 9 0 000-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+                  <div style="font-size:13px;font-weight:500;">No transactions yet</div>
+                  <div style="font-size:11.5px;margin-top:4px;color:#b0b7c5;">Transactions will appear here once activity begins.</div>
+                </div>`;
+            } else {
+              const txTypeConfig = {
+                allowance: { icon: '💰', color: '#22c55e', label: 'Allowance' },
+                investment: { icon: '📈', color: '#7c3aed', label: 'Investment' },
+                member_joined: { icon: '👤', color: '#3b82f6', label: 'Member Joined' },
+                goal_funding: { icon: '🎯', color: '#f59e0b', label: 'Goal Funding' },
+              };
+
+              let txRows = '';
+              childTxs.forEach(tx => {
+                const cfg = txTypeConfig[tx.type] || { icon: '📋', color: '#6b7280', label: tx.type || 'Transaction' };
+                const amt = Number(tx.amount || 0);
+                const amtStr = amt >= 0 ? `+R ${amt.toFixed(2)}` : `-R ${Math.abs(amt).toFixed(2)}`;
+                const amtColor = amt >= 0 ? '#22c55e' : '#ef4444';
+                const dateStr = tx.created_at ? new Date(tx.created_at).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+                const statusBadge = tx.status === 'completed'
+                  ? '<span style="background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:600;">Completed</span>'
+                  : `<span style="background:#fef3c7;color:#b45309;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:600;">${escapeHtml(tx.status || 'unknown')}</span>`;
+
+                txRows += `<tr>
+                  <td style="white-space:nowrap;">${cfg.icon} ${escapeHtml(cfg.label)}</td>
+                  <td style="font-weight:600;color:${amtColor};white-space:nowrap;">${amtStr}</td>
+                  <td>${escapeHtml(tx.description || '-')}</td>
+                  <td>${escapeHtml(tx.strategy || '-')}</td>
+                  <td>${statusBadge}</td>
+                  <td style="color:#94a3b8;white-space:nowrap;">${dateStr}</td>
+                </tr>`;
+              });
+
+              historyView.innerHTML = `
+                <h2 class="timeline-header">Transaction History</h2>
+                <div style="overflow-x:auto;">
+                  <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+                    <thead>
+                      <tr style="text-align:left;border-bottom:2px solid #e8e8f0;">
+                        <th style="padding:8px 10px;color:#64748b;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Type</th>
+                        <th style="padding:8px 10px;color:#64748b;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Amount</th>
+                        <th style="padding:8px 10px;color:#64748b;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Description</th>
+                        <th style="padding:8px 10px;color:#64748b;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Strategy</th>
+                        <th style="padding:8px 10px;color:#64748b;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Status</th>
+                        <th style="padding:8px 10px;color:#64748b;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>${txRows}</tbody>
+                  </table>
+                </div>`;
+            }
+
+            // Add table row styling
+            const tbody = historyView.querySelector('tbody');
+            if (tbody) {
+              tbody.querySelectorAll('tr').forEach(tr => {
+                tr.style.borderBottom = '1px solid #f1f5f9';
+                tr.querySelectorAll('td').forEach(td => {
+                  td.style.padding = '10px 10px';
+                  td.style.verticalAlign = 'middle';
+                });
+                tr.addEventListener('mouseenter', () => tr.style.background = '#f8fafc');
+                tr.addEventListener('mouseleave', () => tr.style.background = 'transparent');
+              });
+            }
+          }
+        }
+
         profilesList.appendChild(clone);
       });
     };
@@ -6850,6 +6951,219 @@
             rejectBtn.disabled = false;
             rejectBtn.textContent = 'Reject';
           });
+        return;
+      }
+
+      // ── Download Pack for child: certificate + formatted PDF ──
+      const downloadPackBtn = e.target.closest('[data-child-download-pack]');
+      if (downloadPackBtn) {
+        e.preventDefault();
+        const childId = downloadPackBtn.dataset.childDownloadPack;
+        const child = allFamilyMembers.find(m => String(m.id) === String(childId));
+        if (!child) return;
+
+        const originalText = downloadPackBtn.textContent;
+        downloadPackBtn.disabled = true;
+        downloadPackBtn.textContent = 'Preparing…';
+
+        (async () => {
+          try {
+            const JsPdfCtor = await ensureJsPdfLoaded();
+            const JsZip = window.JSZip;
+            if (!JsPdfCtor) throw new Error('Could not load jsPDF');
+            if (!JsZip) throw new Error('Could not load JSZip');
+
+            const zip = new JsZip();
+            const fullName = [child.first_name, child.last_name].filter(Boolean).join(' ') || 'Unknown Child';
+            const safeFileName = fullName.replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
+            const parentLinks = getLinkedParentsForFamilyMember(child);
+            const currentAge = calculateAgeFromDate(child.date_of_birth);
+            const childKyc = normalizeKycStatusText(child.kyc_status || 'pending');
+            const kycLabel = childKyc === 'completed' ? 'Verified' : childKyc === 'rejected' ? 'Rejected' : 'Pending';
+
+            // ── Build PDF with child details ──
+            const doc = new JsPdfCtor({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const pageW = doc.internal.pageSize.getWidth();
+            let y = 20;
+
+            // Header bar
+            doc.setFillColor(124, 58, 237);
+            doc.rect(0, 0, pageW, 35, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(20);
+            doc.setFont(undefined, 'bold');
+            doc.text('MyMint — Child Profile', 15, 23);
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Generated: ${new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })}`, pageW - 15, 23, { align: 'right' });
+
+            y = 48;
+            doc.setTextColor(15, 23, 42);
+            doc.setFontSize(16);
+            doc.setFont(undefined, 'bold');
+            doc.text(fullName, 15, y);
+            y += 10;
+
+            // Child details table
+            const details = [
+              ['Full Name', fullName],
+              ['Date of Birth', child.date_of_birth || '-'],
+              ['Current Age', currentAge !== null ? `${currentAge} years` : '-'],
+              ['Gender', child.gender || '-'],
+              ['ID Number', child.id_number || '-'],
+              ['Mint Number', child.mint_number || '-'],
+              ['Relationship', child.relationship || '-'],
+              ['Available Balance', child.available_balance != null ? `R ${Number(child.available_balance).toFixed(2)}` : 'R 0.00'],
+              ['KYC Status', kycLabel],
+              ['Linked Parent(s)', parentLinks.length ? parentLinks.map(p => p.name).join(', ') : 'Unknown'],
+              ['Parent UID(s)', parentLinks.length ? parentLinks.map(p => p.id).join(', ') : '-'],
+              ['Certificate', child.certificate_url ? 'Uploaded' : 'Not uploaded'],
+              ['Created', child.created_at ? new Date(child.created_at).toLocaleDateString('en-ZA') : '-'],
+              ['Last Updated', child.updated_at ? new Date(child.updated_at).toLocaleDateString('en-ZA') : '-'],
+            ];
+
+            doc.setFontSize(10);
+            const colLabelX = 15;
+            const colValueX = 70;
+            const rowH = 8;
+
+            // Table header
+            doc.setFillColor(248, 249, 252);
+            doc.rect(10, y - 1, pageW - 20, rowH, 'F');
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(100, 116, 139);
+            doc.text('Field', colLabelX, y + 5);
+            doc.text('Value', colValueX, y + 5);
+            y += rowH + 2;
+
+            doc.setFont(undefined, 'normal');
+            doc.setTextColor(15, 23, 42);
+            details.forEach(([label, value], idx) => {
+              if (y > 270) {
+                doc.addPage();
+                y = 20;
+              }
+              if (idx % 2 === 0) {
+                doc.setFillColor(248, 250, 252);
+                doc.rect(10, y - 1, pageW - 20, rowH, 'F');
+              }
+              doc.setFont(undefined, 'bold');
+              doc.setTextColor(71, 85, 105);
+              doc.text(String(label), colLabelX, y + 5);
+              doc.setFont(undefined, 'normal');
+              doc.setTextColor(15, 23, 42);
+              // Truncate long values
+              const valStr = String(value);
+              const maxW = pageW - colValueX - 15;
+              const truncated = doc.getTextWidth(valStr) > maxW
+                ? doc.splitTextToSize(valStr, maxW)[0]
+                : valStr;
+              doc.text(truncated, colValueX, y + 5);
+              y += rowH;
+            });
+
+            // Transaction history section
+            const childTxs = allFamilyTransactions.filter(tx => String(tx.member_id) === String(childId));
+            if (childTxs.length) {
+              y += 10;
+              if (y > 250) { doc.addPage(); y = 20; }
+              doc.setFontSize(14);
+              doc.setFont(undefined, 'bold');
+              doc.setTextColor(15, 23, 42);
+              doc.text('Transaction History', 15, y);
+              y += 8;
+
+              doc.setFontSize(9);
+              // Table header
+              doc.setFillColor(248, 249, 252);
+              doc.rect(10, y - 1, pageW - 20, 7, 'F');
+              doc.setFont(undefined, 'bold');
+              doc.setTextColor(100, 116, 139);
+              const txCols = [15, 45, 75, 115, 145, 170];
+              doc.text('Type', txCols[0], y + 4);
+              doc.text('Amount', txCols[1], y + 4);
+              doc.text('Description', txCols[2], y + 4);
+              doc.text('Strategy', txCols[3], y + 4);
+              doc.text('Status', txCols[4], y + 4);
+              doc.text('Date', txCols[5], y + 4);
+              y += 8;
+
+              doc.setFont(undefined, 'normal');
+              doc.setTextColor(15, 23, 42);
+              childTxs.forEach((tx, idx) => {
+                if (y > 275) { doc.addPage(); y = 20; }
+                if (idx % 2 === 0) {
+                  doc.setFillColor(248, 250, 252);
+                  doc.rect(10, y - 1, pageW - 20, 7, 'F');
+                }
+                const amt = Number(tx.amount || 0);
+                doc.text(tx.type || '-', txCols[0], y + 4);
+                doc.text(`R ${amt.toFixed(2)}`, txCols[1], y + 4);
+                doc.text(String(tx.description || '-').slice(0, 25), txCols[2], y + 4);
+                doc.text(String(tx.strategy || '-').slice(0, 18), txCols[3], y + 4);
+                doc.text(tx.status || '-', txCols[4], y + 4);
+                doc.text(tx.created_at ? new Date(tx.created_at).toLocaleDateString('en-ZA') : '-', txCols[5], y + 4);
+                y += 7;
+              });
+            }
+
+            // Footer
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+              doc.setPage(i);
+              doc.setFontSize(8);
+              doc.setTextColor(148, 163, 184);
+              doc.text(`MyMint Admin — Confidential`, 15, 290);
+              doc.text(`Page ${i} of ${pageCount}`, pageW - 15, 290, { align: 'right' });
+            }
+
+            const pdfBlob = doc.output('blob');
+            zip.file(`${safeFileName}_Details.pdf`, pdfBlob);
+
+            // ── Download certificate if available ──
+            if (child.certificate_url) {
+              try {
+                const certResolvedUrl = await resolveStorageUrl(child.certificate_url);
+                if (certResolvedUrl) {
+                  const certResponse = await fetch(certResolvedUrl);
+                  if (certResponse.ok) {
+                    const certBlob = await certResponse.blob();
+                    const mime = String(certBlob.type || '');
+                    let ext = 'bin';
+                    if (mime.includes('pdf')) ext = 'pdf';
+                    else if (mime.includes('png')) ext = 'png';
+                    else if (mime.includes('jpeg') || mime.includes('jpg')) ext = 'jpg';
+                    else if (mime.includes('gif')) ext = 'gif';
+                    else if (mime.includes('webp')) ext = 'webp';
+                    else {
+                      const urlExt = child.certificate_url.split('.').pop()?.split('?')[0]?.toLowerCase();
+                      if (['pdf','png','jpg','jpeg','gif','webp'].includes(urlExt)) ext = urlExt;
+                    }
+                    zip.file(`${safeFileName}_Certificate.${ext}`, certBlob);
+                  }
+                }
+              } catch (certErr) {
+                console.warn('Could not download certificate for pack:', certErr);
+              }
+            }
+
+            // ── Generate and download ZIP ──
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(zipBlob);
+            link.download = `${safeFileName}_Pack.zip`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(link.href);
+          } catch (err) {
+            console.error('Download Pack error:', err);
+            alert('Failed to generate pack: ' + (err.message || 'Unknown error'));
+          } finally {
+            downloadPackBtn.disabled = false;
+            downloadPackBtn.textContent = originalText;
+          }
+        })();
         return;
       }
     });
@@ -7374,11 +7688,17 @@
             supabaseClient.from('stock_holdings').select('user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", as_of_date, strategy_id, strategy_name_snapshot, trade_side, is_active, created_at, updated_at').eq('is_active', true).eq('trade_side', 'BUY').in('user_id', userIds).order('updated_at', { ascending: false })
           ]);
 
-          // Fetch ALL family_members (not filtered by userIds) — RLS policy controls access
-          const familyRes = await supabaseClient
-            .from('family_members')
-            .select('id, primary_user_id, parent_id, linked_user_id, relationship, first_name, last_name, gender, date_of_birth, id_number, available_balance, avatar_url, avatar_color, mint_number, spouse_email, certificate_url, kyc_status, kyc_reviewed_by, kyc_reviewed_at, created_at, updated_at')
-            .order('created_at', { ascending: false });
+          // Fetch ALL family_members + transactions (not filtered by userIds) — RLS policy controls access
+          const [familyRes, familyTxRes] = await Promise.all([
+            supabaseClient
+              .from('family_members')
+              .select('id, primary_user_id, parent_id, linked_user_id, relationship, first_name, last_name, gender, date_of_birth, id_number, available_balance, avatar_url, avatar_color, mint_number, spouse_email, certificate_url, kyc_status, kyc_reviewed_by, kyc_reviewed_at, created_at, updated_at')
+              .order('created_at', { ascending: false }),
+            supabaseClient
+              .from('family_transactions')
+              .select('id, parent_id, member_id, type, amount, description, strategy, status, created_at')
+              .order('created_at', { ascending: false })
+          ]);
 
           if (!onboardingRes.error && onboardingRes.data) {
             kycMap = onboardingRes.data.reduce((acc, row) => {
@@ -7418,6 +7738,13 @@
           }
 
           allFamilyMembers = Object.values(familyRowsById);
+
+          if (!familyTxRes.error && Array.isArray(familyTxRes.data)) {
+            allFamilyTransactions = familyTxRes.data;
+          } else {
+            allFamilyTransactions = [];
+            if (familyTxRes.error) console.warn('family_transactions query error:', familyTxRes.error.message);
+          }
 
           allFamilyMembers.forEach((row) => {
             const relationship = normalizeKycStatusText(row.relationship || '');
