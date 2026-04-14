@@ -6450,6 +6450,7 @@
       childRows.forEach(child => {
         const clone = profileTemplate.content.firstElementChild.cloneNode(true);
         const fullName = [child.first_name, child.last_name].filter(Boolean).join(' ') || 'Unknown Child';
+        const childGender = String(child.gender || '').trim();
         const uid = child.id || '-';
         const currentAge = calculateAgeFromDate(child.date_of_birth);
         const parentLinks = getLinkedParentsForFamilyMember(child);
@@ -6472,7 +6473,7 @@
         // Row subtitle for child card
         clone.querySelectorAll('[data-row-email]').forEach(el => {
           const parts = [];
-          if (child.gender) parts.push(child.gender);
+          if (childGender) parts.push(childGender);
           if (currentAge !== null) parts.push(`Age: ${currentAge}`);
           if (parentLinks.length) parts.push(`Parent: ${parentSummary}`);
           el.textContent = parts.join(' · ') || '';
@@ -6541,7 +6542,7 @@
               { label: 'Linked Parent(s)', value: linkedParentNames },
               { label: 'Parent UID(s)', value: linkedParentIds },
               { label: 'Relationship', value: child.relationship || '-' },
-              { label: 'Gender', value: child.gender || '-' },
+              { label: 'Gender', value: childGender || '-' },
               { label: 'Current Age', value: currentAge !== null ? String(currentAge) : '-' },
               { label: 'ID Number', value: child.id_number || '-' },
               { label: 'Mint Number', value: parentMintNumbers },
@@ -7024,6 +7025,7 @@
 
             const zip = new JsZip();
             const fullName = [child.first_name, child.last_name].filter(Boolean).join(' ') || 'Unknown Child';
+            const childGender = String(child.gender || '').trim();
             const safeFileName = fullName.replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
             const parentLinks = getLinkedParentsForFamilyMember(child);
             const parentMintNumbers = getParentMintNumbersForFamilyMember(child);
@@ -7059,7 +7061,7 @@
               ['Full Name', fullName],
               ['Date of Birth', child.date_of_birth || '-'],
               ['Current Age', currentAge !== null ? `${currentAge} years` : '-'],
-              ['Gender', child.gender || '-'],
+              ['Gender', childGender || '-'],
               ['ID Number', child.id_number || '-'],
               ['Mint Number', parentMintNumbers],
               ['Relationship', child.relationship || '-'],
