@@ -3786,10 +3786,101 @@
               : "text-slate-500");
       };
 
+      /* ── Strategist picker modal ── */
+      const STRATEGIST_LIST = ['Lonwabo Damane', 'Lethabo Maloma', 'Juan van Wyk'];
+
+      const pickStrategist = () => new Promise((resolve) => {
+        const existing = document.getElementById('_strategistPickerModal');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = '_strategistPickerModal';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99990;background:rgba(15,23,42,0.45);display:flex;align-items:center;justify-content:center;padding:16px;';
+
+        overlay.innerHTML = `
+          <div style="background:#fff;border-radius:20px;padding:28px 28px 24px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,0.18);position:relative;">
+            <h3 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 4px;">Who is the Strategist?</h3>
+            <p style="font-size:13px;color:#64748b;margin:0 0 20px;">Select the person creating this strategy.</p>
+
+            <div id="_stratPickerList" style="display:flex;flex-direction:column;gap:8px;">
+              ${STRATEGIST_LIST.map(name => `
+                <button type="button" data-name="${name}"
+                  style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;text-align:left;transition:all 0.15s;outline:none;"
+                  onmouseover="this.style.borderColor='#7c3aed';this.style.background='#f5f3ff'"
+                  onmouseout="this.style.borderColor='#e2e8f0';this.style.background='#fff'">
+                  <div style="width:34px;height:34px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="#7c3aed"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+                  </div>
+                  <span style="font-size:14px;font-weight:600;color:#1e293b;">${name}</span>
+                </button>`).join('')}
+
+              <button type="button" id="_stratPickerAddNew"
+                style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:1.5px dashed #c4b5fd;background:#faf5ff;cursor:pointer;text-align:left;transition:all 0.15s;outline:none;"
+                onmouseover="this.style.borderColor='#7c3aed';this.style.background='#f5f3ff'"
+                onmouseout="this.style.borderColor='#c4b5fd';this.style.background='#faf5ff'">
+                <div style="width:34px;height:34px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="#7c3aed"><path d="M19 11h-6V5h-2v6H5v2h6v6h2v-6h6z"/></svg>
+                </div>
+                <span style="font-size:14px;font-weight:600;color:#7c3aed;">Add new Strategist</span>
+              </button>
+            </div>
+
+            <div id="_stratPickerNewRow" style="display:none;margin-top:12px;gap:8px;flex-direction:column;">
+              <input id="_stratPickerNewInput" type="text" placeholder="Full name e.g. Jane Smith"
+                style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid #e2e8f0;font-size:14px;color:#1e293b;outline:none;box-sizing:border-box;"
+                onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#e2e8f0'">
+              <button type="button" id="_stratPickerNewConfirm"
+                style="padding:10px 18px;border-radius:10px;background:#7c3aed;color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;">
+                Confirm
+              </button>
+            </div>
+
+            <button type="button" id="_stratPickerCancel"
+              style="margin-top:16px;width:100%;padding:10px;border-radius:10px;border:1px solid #e2e8f0;background:transparent;font-size:13px;color:#64748b;cursor:pointer;font-weight:500;">
+              Cancel
+            </button>
+          </div>`;
+
+        document.body.appendChild(overlay);
+
+        const close = (val) => { overlay.remove(); resolve(val); };
+
+        overlay.querySelectorAll('[data-name]').forEach(btn => {
+          btn.addEventListener('click', () => close(btn.dataset.name));
+        });
+
+        document.getElementById('_stratPickerAddNew').addEventListener('click', () => {
+          document.getElementById('_stratPickerAddNew').style.display = 'none';
+          const newRow = document.getElementById('_stratPickerNewRow');
+          newRow.style.display = 'flex';
+          document.getElementById('_stratPickerNewInput').focus();
+        });
+
+        document.getElementById('_stratPickerNewConfirm').addEventListener('click', () => {
+          const val = (document.getElementById('_stratPickerNewInput').value || '').trim();
+          if (!val) { document.getElementById('_stratPickerNewInput').style.borderColor = '#ef4444'; return; }
+          close(val);
+        });
+
+        document.getElementById('_stratPickerNewInput').addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') document.getElementById('_stratPickerNewConfirm').click();
+        });
+
+        document.getElementById('_stratPickerCancel').addEventListener('click', () => close(null));
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(null); });
+      });
+
       const handleStrategySubmit = async (event) => {
         event.preventDefault();
         if (!strategyForm) return;
         if (strategyViewOnlyMode) return;  /* block saves in read-only mode */
+
+        /* For new strategies, ask who the strategist is before anything else */
+        let chosenStrategist = null;
+        if (!editingStrategyId) {
+          chosenStrategist = await pickStrategist();
+          if (!chosenStrategist) return; /* user cancelled */
+        }
 
         /* Require password before saving */
         const confirmed = await confirmWithPassword(
@@ -3849,7 +3940,7 @@
             strategyForm.querySelector("#strategyIsFeatured")?.checked || false,
           status: "active",
           holdings: holdingsPayload.length > 0 ? holdingsPayload : null,
-          ...(editingStrategyId ? {} : { provider_name: currentAdminName || null }),
+          ...(editingStrategyId ? {} : { provider_name: chosenStrategist || null }),
         };
 
         if (!payload.name) {
