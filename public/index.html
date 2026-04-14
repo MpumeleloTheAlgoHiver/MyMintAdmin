@@ -6585,9 +6585,9 @@
           const reviewPulse = rightColumn.querySelector('.tabs-header-status');
           if (reviewPulse) reviewPulse.style.display = 'none';
 
-          // Rename filter tabs for child context
+          // Show holdings tab (children can have strategy/stock holdings via linked_user_id)
           const holdingsTab = rightColumn.querySelector('[data-view="holdings"]');
-          if (holdingsTab) holdingsTab.style.display = 'none';
+          if (holdingsTab) holdingsTab.style.display = '';
           const packDetailsTab = rightColumn.querySelector('[data-view="pack-details"]');
           if (packDetailsTab) {
             packDetailsTab.textContent = '↓ Download Pack';
@@ -6669,6 +6669,11 @@
                 tr.addEventListener('mouseleave', () => tr.style.background = 'transparent');
               });
             }
+          }
+
+          // ── Hydrate holdings view using the child's linked auth user ID ──
+          if (child.linked_user_id) {
+            renderHoldingsForItem(clone, child.linked_user_id);
           }
         }
 
