@@ -1672,21 +1672,21 @@
 
       /* ── Holdings table column config ───────────────────────────────── */
       const _HC = [
-        { k:'last_close',     l:'last_close (R)',  t:'Source: last_close',           v:true,  isReturn:false },
-        { k:'prev_close',     l:'prev_close (R)',  t:'Previous closing price (Rand)', v:false, isReturn:false },
-        { k:'change_abs',     l:'change_abs (R)',  t:'Absolute daily change (Rand)',  v:false, isReturn:false },
-        { k:'change_pct',     l:'change_pct',      t:'Source: change_pct × 100',     v:true,  isReturn:true  },
-        { k:'mkt_value',      l:'Mkt Value',       t:'Shares × last_close',           v:true,  isReturn:false, isMv:true },
-        { k:'WTD_Return',     l:'WTD_Return',      t:'Source: WTD_Return × 100',     v:true,  isReturn:true  },
-        { k:'1W_Return',      l:'1W_Return',       t:'Source: 1W_Return × 100',      v:false, isReturn:true  },
-        { k:'1M_Return',      l:'1M_Return',       t:'Source: 1M_Return × 100',      v:true,  isReturn:true  },
-        { k:'3M_Return',      l:'3M_Return',       t:'Source: 3M_Return × 100',      v:false, isReturn:true  },
-        { k:'r_6m',           l:'r_6m',            t:'Source: r_6m × 100',           v:false, isReturn:true  },
-        { k:'r_1y',           l:'r_1y',            t:'Source: r_1y × 100',           v:true,  isReturn:true  },
-        { k:'volatility_30d', l:'volatility_30d',  t:'Source: volatility_30d × 100', v:true,  isReturn:false },
-        { k:'avg_volume_30d', l:'avg_volume_30d',  t:'30-day average daily volume',  v:false, isReturn:false },
-        { k:'r_ytd',          l:'r_ytd',           t:'Source: r_ytd × 100',          v:true,  isReturn:true  },
-        { k:'weight',         l:'Weight',          t:'From strategy holdings',        v:true,  isReturn:false, isWt:true },
+        { k:'last_close',     l:'Price (R)',         t:'Source: last_close',           v:true,  isReturn:false },
+        { k:'prev_close',     l:'Prev Close (R)',    t:'Source: prev_close',           v:false, isReturn:false },
+        { k:'change_abs',     l:'Day Change (R)',    t:'Source: change_abs',           v:false, isReturn:false },
+        { k:'change_pct',     l:'Day Change %',     t:'Source: change_pct × 100',     v:true,  isReturn:true  },
+        { k:'mkt_value',      l:'Market Value',     t:'Shares × last_close',          v:true,  isReturn:false, isMv:true },
+        { k:'WTD_Return',     l:'WTD %',            t:'Source: WTD_Return × 100',     v:true,  isReturn:true  },
+        { k:'1W_Return',      l:'1 Week %',         t:'Source: 1W_Return × 100',      v:false, isReturn:true  },
+        { k:'1M_Return',      l:'1 Month %',        t:'Source: 1M_Return × 100',      v:true,  isReturn:true  },
+        { k:'3M_Return',      l:'3 Month %',        t:'Source: 3M_Return × 100',      v:false, isReturn:true  },
+        { k:'r_6m',           l:'6 Month %',        t:'Source: r_6m × 100',           v:false, isReturn:true  },
+        { k:'r_1y',           l:'1 Year %',         t:'Source: r_1y × 100',           v:true,  isReturn:true  },
+        { k:'volatility_30d', l:'Volatility (30D)', t:'Source: volatility_30d × 100', v:true,  isReturn:false },
+        { k:'avg_volume_30d', l:'Avg Volume (30D)', t:'Source: avg_volume_30d',        v:false, isReturn:false },
+        { k:'r_ytd',          l:'YTD %',            t:'Source: r_ytd × 100',          v:true,  isReturn:true  },
+        { k:'weight',         l:'Weight',           t:'From strategy holdings',        v:true,  isReturn:false, isWt:true },
       ];
       let _holdingSort   = { key: null, dir: 1 };
       let _holdingFilter = { col: '', sign: 'all' };
