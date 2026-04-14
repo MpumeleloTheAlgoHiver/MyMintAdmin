@@ -6402,6 +6402,22 @@
       });
     };
 
+    const getParentMintNumbersForFamilyMember = (familyMember) => {
+      const parentIds = [familyMember.primary_user_id, familyMember.parent_id]
+        .map((id) => String(id || '').trim())
+        .filter(Boolean);
+      const uniqueParentIds = Array.from(new Set(parentIds));
+
+      const mints = uniqueParentIds
+        .map((parentId) => {
+          const parentProfile = allProfiles.find((p) => String(p.id) === parentId);
+          return String(parentProfile?.mint_number || '').trim();
+        })
+        .filter(Boolean);
+
+      return mints.length ? mints.join(', ') : '-';
+    };
+
     const renderFamilyChildren = (searchQuery = '', kycStatusFilter = 'all') => {
       if (!profilesList || !profileTemplate) return;
       profilesList.innerHTML = '';
@@ -6437,6 +6453,7 @@
         const uid = child.id || '-';
         const currentAge = calculateAgeFromDate(child.date_of_birth);
         const parentLinks = getLinkedParentsForFamilyMember(child);
+        const parentMintNumbers = getParentMintNumbersForFamilyMember(child);
         const parentSummary = parentLinks.length
           ? parentLinks.map((p) => p.name).join(', ')
           : 'Unknown';
@@ -6527,7 +6544,7 @@
               { label: 'Gender', value: child.gender || '-' },
               { label: 'Current Age', value: currentAge !== null ? String(currentAge) : '-' },
               { label: 'ID Number', value: child.id_number || '-' },
-              { label: 'Mint Number', value: child.mint_number || '-' },
+              { label: 'Mint Number', value: parentMintNumbers },
               { label: 'Balance', value: child.available_balance != null ? `R ${Number(child.available_balance).toFixed(2)}` : 'R 0.00' },
               { label: 'KYC Status', value: kycLabel },
               { label: 'Created', value: child.created_at || '-' },
@@ -6997,6 +7014,7 @@
             const fullName = [child.first_name, child.last_name].filter(Boolean).join(' ') || 'Unknown Child';
             const safeFileName = fullName.replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
             const parentLinks = getLinkedParentsForFamilyMember(child);
+            const parentMintNumbers = getParentMintNumbersForFamilyMember(child);
             const currentAge = calculateAgeFromDate(child.date_of_birth);
             const childKyc = normalizeKycStatusText(child.kyc_status || 'pending');
             const kycLabel = childKyc === 'completed' ? 'Verified' : childKyc === 'rejected' ? 'Rejected' : 'Pending';
@@ -7031,7 +7049,7 @@
               ['Current Age', currentAge !== null ? `${currentAge} years` : '-'],
               ['Gender', child.gender || '-'],
               ['ID Number', child.id_number || '-'],
-              ['Mint Number', child.mint_number || '-'],
+              ['Mint Number', parentMintNumbers],
               ['Relationship', child.relationship || '-'],
               ['Available Balance', child.available_balance != null ? `R ${Number(child.available_balance).toFixed(2)}` : 'R 0.00'],
               ['KYC Status', kycLabel],
