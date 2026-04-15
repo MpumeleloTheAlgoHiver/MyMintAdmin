@@ -6651,12 +6651,16 @@
       return uniqueParentIds.map((parentId) => {
         const parentProfile = allProfiles.find((p) => String(p.id) === parentId);
         if (!parentProfile) {
-          return { id: parentId, name: parentId };
+          return { id: parentId, name: parentId, mintNumber: '-' };
         }
         const parentName = [parentProfile.first_name, parentProfile.last_name].filter(Boolean).join(' ')
           || parentProfile.email
           || parentId;
-        return { id: parentId, name: parentName };
+        return {
+          id: parentId,
+          name: parentName,
+          mintNumber: String(parentProfile.mint_number || '').trim() || '-'
+        };
       });
     };
 
@@ -6779,10 +6783,14 @@
             const linkedParentIds = parentLinks.length
               ? parentLinks.map((p) => p.id).join(', ')
               : '-';
+            const linkedParentMintNumbers = parentLinks.length
+              ? parentLinks.map((p) => p.mintNumber || '-').join(', ')
+              : '-';
             const certificateLabel = getChildCertificateStatusLabel(childCertStatus);
             const detailData = [
               { label: 'Linked Parent(s)', value: linkedParentNames },
               { label: 'Parent UID(s)', value: linkedParentIds },
+              { label: 'Parent Mint Number(s)', value: linkedParentMintNumbers },
               { label: 'Relationship', value: child.relationship || '-' },
               { label: 'Gender', value: childGender || '-' },
               { label: 'Current Age', value: currentAge !== null ? String(currentAge) : '-' },
