@@ -442,23 +442,44 @@
     }
     .cert-btn-download:hover:not(:disabled) { background: #cffafe; border-color: #7dd3fc; }
     .cert-btn-reevaluate {
-      background: #fef3c7;
-      color: #92400e;
-      border: 1px solid #fcd34d;
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: #fff;
+      border: none;
       border-radius: 10px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      box-shadow: 0 2px 6px rgba(217,119,6,0.28);
+      transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
     }
-    .cert-btn-reevaluate:hover:not(:disabled) { background: #fde68a; border-color: #f59e0b; }
+    .cert-btn-reevaluate:hover:not(:disabled) {
+      background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+      box-shadow: 0 4px 10px rgba(180,83,9,0.32);
+      transform: translateY(-1px);
+    }
+    .cert-btn-reevaluate:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
     .cert-status-note {
       display: inline-flex;
       align-items: center;
-      padding: 6px 10px;
-      border-radius: 999px;
-      font-size: 0.78rem;
+      gap: 4px;
+      font-size: 0.7rem;
       font-weight: 600;
-      background: #fff7ed;
-      color: #9a3412;
-      border: 1px solid #fdba74;
+      color: #b45309;
+      background: none;
+      border: none;
+      padding: 0;
       white-space: nowrap;
+      letter-spacing: 0.01em;
+      opacity: 0.85;
+    }
+    .cert-status-note::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #f87171;
+      flex-shrink: 0;
     }
 
     /* ── Child documents modal ── */
@@ -6803,7 +6824,7 @@
               const reevaluateRow = document.createElement('div');
               reevaluateRow.className = 'detail-row';
               reevaluateRow.style.cssText = 'padding-top:8px;';
-              reevaluateRow.innerHTML = `<div class="detail-label">Actions</div><div class="detail-value" style="display:flex;gap:8px;align-items:center;"><span class="cert-status-note" style="padding:4px 8px;font-size:0.72rem;">Rejected by admin</span><button class="cert-btn cert-btn-reevaluate" type="button" style="padding:5px 14px;font-size:0.78rem;" data-child-reevaluate="${escapeHtml(String(child.id))}">Re-evaluate</button></div>`;
+              reevaluateRow.innerHTML = `<div class="detail-label">Actions</div><div class="detail-value" style="display:flex;flex-direction:column;gap:8px;"><span class="cert-status-note">Rejected by admin</span><button class="cert-btn cert-btn-reevaluate" type="button" style="padding:6px 16px;align-self:flex-start;" data-child-reevaluate="${escapeHtml(String(child.id))}">Re-evaluate</button></div>`;
               fragment.appendChild(reevaluateRow);
             }
 
