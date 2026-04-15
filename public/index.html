@@ -441,6 +441,25 @@
       border-radius: 10px;
     }
     .cert-btn-download:hover:not(:disabled) { background: #cffafe; border-color: #7dd3fc; }
+    .cert-btn-reevaluate {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fcd34d;
+      border-radius: 10px;
+    }
+    .cert-btn-reevaluate:hover:not(:disabled) { background: #fde68a; border-color: #f59e0b; }
+    .cert-status-note {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: #fff7ed;
+      color: #9a3412;
+      border: 1px solid #fdba74;
+      white-space: nowrap;
+    }
 
     /* ── Child documents modal ── */
     .child-docs-overlay {
@@ -605,6 +624,8 @@
     }
     .child-kyc-badge.pending { background: #fef3c7; color: #92400e; }
     .child-kyc-badge.completed { background: #d1fae5; color: #065f46; }
+    .child-kyc-badge.verified { background: #d1fae5; color: #065f46; }
+    .child-kyc-badge.accepted { background: #d1fae5; color: #065f46; }
     .child-kyc-badge.rejected { background: #fee2e2; color: #991b1b; }
 
     /* ── Certificate link button in child card ── */
@@ -4728,6 +4749,8 @@
     <div class="cert-modal-footer" id="certModalFooter">
       <button class="cert-btn cert-btn-cancel" id="certModalCancelBtn" type="button">Cancel</button>
       <button class="cert-btn cert-btn-download" id="certModalDownloadBtn" type="button">Download</button>
+      <span class="cert-status-note" id="certModalDecisionNote">Rejected by admin</span>
+      <button class="cert-btn cert-btn-reevaluate" id="certModalReevaluateBtn" type="button">Re-evaluate</button>
       <button class="cert-btn cert-btn-reject" id="certModalRejectBtn" type="button">Reject</button>
       <button class="cert-btn cert-btn-accept" id="certModalAcceptBtn" type="button">Accept</button>
     </div>
@@ -5782,6 +5805,28 @@
 
     const normalizeKycStatusText = (value) => String(value || '').trim().toLowerCase();
 
+    const normalizeChildCertificateStatus = (value) => {
+      const normalized = normalizeKycStatusText(value);
+      if (!normalized) return 'pending';
+      if (normalized.includes('reject') || normalized.includes('declin')) return 'rejected';
+      if (
+        normalized.includes('verif')
+        || normalized.includes('accept')
+        || normalized.includes('approv')
+        || normalized.includes('complet')
+      ) {
+        return 'verified';
+      }
+      return 'pending';
+    };
+
+    const getChildCertificateStatusLabel = (status) => {
+      const normalized = normalizeChildCertificateStatus(status);
+      if (normalized === 'verified') return 'Accepted';
+      if (normalized === 'rejected') return 'Rejected';
+      return 'Pending';
+    };
+
     const isKycCompletedValue = (status) => {
       const normalized = normalizeKycStatusText(status);
       if (!normalized) return false;
@@ -6602,8 +6647,9 @@
         .filter(row => normalizeKycStatusText(row.relationship || '') === 'child')
         .filter(row => {
           if (kycStatusFilter === 'all') return true;
-          const status = normalizeKycStatusText(row.kyc_status || 'pending');
-          if (kycStatusFilter === 'not-completed') return status !== 'completed';
+          const status = normalizeChildCertificateStatus(row.certificate_verification_status || row.kyc_status || 'pending');
+          if (kycStatusFilter === 'not-completed') return status !== 'verified';
+          if (kycStatusFilter === 'completed') return status === 'verified';
           return status === kycStatusFilter;
         })
         .filter(row => {
@@ -6659,10 +6705,10 @@
         });
 
         // KYC badge → show child KYC status
-        const childKycStatus = normalizeKycStatusText(child.kyc_status || 'pending');
+        const childCertStatus = normalizeChildCertificateStatus(child.certificate_verification_status || 'pending');
         clone.querySelectorAll('[data-row-kyc]').forEach(el => {
-          el.textContent = childKycStatus === 'completed' ? 'Verified' : childKycStatus === 'rejected' ? 'Rejected' : 'Pending';
-          el.className = 'child-kyc-badge ' + childKycStatus;
+          el.textContent = getChildCertificateStatusLabel(childCertStatus);
+          el.className = 'child-kyc-badge ' + childCertStatus;
         });
 
         // Signed in today badge → hide
@@ -6712,7 +6758,7 @@
             const linkedParentIds = parentLinks.length
               ? parentLinks.map((p) => p.id).join(', ')
               : '-';
-            const kycLabel = childKycStatus === 'completed' ? 'Verified' : childKycStatus === 'rejected' ? 'Rejected' : 'Pending';
+            const certificateLabel = getChildCertificateStatusLabel(childCertStatus);
             const detailData = [
               { label: 'Linked Parent(s)', value: linkedParentNames },
               { label: 'Parent UID(s)', value: linkedParentIds },
@@ -6722,7 +6768,7 @@
               { label: 'ID Number', value: child.id_number || '-' },
               { label: 'Mint Number', value: child.mint_number || '-' },
               { label: 'Balance', value: child.available_balance != null ? `R ${Number(child.available_balance).toFixed(2)}` : 'R 0.00' },
-              { label: 'KYC Status', value: kycLabel },
+              { label: 'Certificate Status', value: certificateLabel },
               { label: 'Created', value: child.created_at || '-' },
             ];
             // Clear existing rows and rebuild
@@ -6740,19 +6786,25 @@
             certRow.className = 'detail-row';
             const certUrl = child.certificate_url || '';
             if (certUrl) {
-              certRow.innerHTML = `<div class="detail-label">Certificate</div><div class="detail-value"><button class="cert-view-btn" type="button" data-cert-review data-child-id="${escapeHtml(String(child.id))}" data-cert-url="${escapeHtml(certUrl)}" data-child-name="${escapeHtml(fullName)}" data-child-kyc="${escapeHtml(childKycStatus)}"><i class="fa-solid fa-file-certificate" aria-hidden="true"></i> View Certificate</button></div>`;
+              certRow.innerHTML = `<div class="detail-label">Certificate</div><div class="detail-value"><button class="cert-view-btn" type="button" data-cert-review data-child-id="${escapeHtml(String(child.id))}" data-cert-url="${escapeHtml(certUrl)}" data-child-name="${escapeHtml(fullName)}" data-child-kyc="${escapeHtml(childCertStatus)}"><i class="fa-solid fa-file-certificate" aria-hidden="true"></i> View Certificate</button></div>`;
             } else {
               certRow.innerHTML = `<div class="detail-label">Certificate</div><div class="detail-value" style="color:#9ca3af;">No certificate uploaded</div>`;
             }
             fragment.appendChild(certRow);
 
-            // Accept/Reject action row (only for pending children with certificate)
-            if (childKycStatus === 'pending' && certUrl) {
+            // Action row follows certificate decision state
+            if (childCertStatus === 'pending' && certUrl) {
               const actionRow = document.createElement('div');
               actionRow.className = 'detail-row';
               actionRow.style.cssText = 'padding-top:8px;';
               actionRow.innerHTML = `<div class="detail-label">Actions</div><div class="detail-value" style="display:flex;gap:8px;"><button class="cert-btn cert-btn-accept" type="button" style="padding:5px 14px;font-size:0.78rem;" data-child-accept="${escapeHtml(String(child.id))}">Accept</button><button class="cert-btn cert-btn-reject" type="button" style="padding:5px 14px;font-size:0.78rem;" data-child-reject="${escapeHtml(String(child.id))}">Reject</button></div>`;
               fragment.appendChild(actionRow);
+            } else if (childCertStatus === 'rejected' && certUrl) {
+              const reevaluateRow = document.createElement('div');
+              reevaluateRow.className = 'detail-row';
+              reevaluateRow.style.cssText = 'padding-top:8px;';
+              reevaluateRow.innerHTML = `<div class="detail-label">Actions</div><div class="detail-value" style="display:flex;gap:8px;align-items:center;"><span class="cert-status-note" style="padding:4px 8px;font-size:0.72rem;">Rejected by admin</span><button class="cert-btn cert-btn-reevaluate" type="button" style="padding:5px 14px;font-size:0.78rem;" data-child-reevaluate="${escapeHtml(String(child.id))}">Re-evaluate</button></div>`;
+              fragment.appendChild(reevaluateRow);
             }
 
             detailCards[0].appendChild(fragment);
@@ -6905,6 +6957,13 @@
           }
         }
 
+        if (expandedProfileIds.has(String(child.id))) {
+          const detailsEl = clone.querySelector('.detailed-view');
+          const btnEl = clone.querySelector('.show-details-btn');
+          if (detailsEl) detailsEl.classList.add('active');
+          if (btnEl) btnEl.classList.add('is-open');
+        }
+
         profilesList.appendChild(clone);
       });
     };
@@ -6916,6 +6975,8 @@
     const certModalClose = document.getElementById('certModalClose');
     const certModalCancelBtn = document.getElementById('certModalCancelBtn');
     const certModalDownloadBtn = document.getElementById('certModalDownloadBtn');
+    const certModalDecisionNote = document.getElementById('certModalDecisionNote');
+    const certModalReevaluateBtn = document.getElementById('certModalReevaluateBtn');
     const certModalAcceptBtn = document.getElementById('certModalAcceptBtn');
     const certModalRejectBtn = document.getElementById('certModalRejectBtn');
     const childDocsOverlay = document.getElementById('childDocsOverlay');
@@ -7231,9 +7292,13 @@
       if (certModalDownloadBtn) certModalDownloadBtn.style.display = 'none';
 
       // Show/hide accept/reject based on current KYC status
-      const isPending = childKyc === 'pending';
+      const certDecisionStatus = normalizeChildCertificateStatus(childKyc);
+      const isPending = certDecisionStatus === 'pending';
+      const isRejected = certDecisionStatus === 'rejected';
       if (certModalAcceptBtn) certModalAcceptBtn.style.display = isPending ? '' : 'none';
       if (certModalRejectBtn) certModalRejectBtn.style.display = isPending ? '' : 'none';
+      if (certModalDecisionNote) certModalDecisionNote.style.display = isRejected ? '' : 'none';
+      if (certModalReevaluateBtn) certModalReevaluateBtn.style.display = isRejected ? '' : 'none';
 
       // Resolve storage:// URIs to a signed HTTPS URL
       const resolvedUrl = await resolveStorageUrl(certUrl);
@@ -7319,12 +7384,13 @@
     }
 
 
-    // Update only certificate_verification_status to 'verified', leave KYC unchanged
-    const updateChildCertificateStatus = async (childId) => {
+    // Update certificate_verification_status without mutating KYC review status
+    const updateChildCertificateStatus = async (childId, nextStatus = 'verified') => {
+      const normalizedStatus = normalizeChildCertificateStatus(nextStatus);
       const { error } = await supabaseClient
         .from('family_members')
         .update({
-          certificate_verification_status: 'verified'
+          certificate_verification_status: normalizedStatus
         })
         .eq('id', childId);
 
@@ -7333,7 +7399,7 @@
       // Update local state
       const member = allFamilyMembers.find(m => String(m.id) === String(childId));
       if (member) {
-        member.certificate_verification_status = 'verified';
+        member.certificate_verification_status = normalizedStatus;
       }
     };
 
@@ -7362,36 +7428,66 @@
       }
     };
 
-    const handleChildKycAction = async (childId, action) => {
-      const newStatus = action === 'accept' ? 'completed' : 'rejected';
-      const actionLabel = action === 'accept' ? 'Accepting' : 'Rejecting';
-      const btn = action === 'accept' ? certModalAcceptBtn : certModalRejectBtn;
-      const otherBtn = action === 'accept' ? certModalRejectBtn : certModalAcceptBtn;
+    const handleChildCertificateAction = async (childId, action) => {
+      const statusByAction = {
+        accept: 'verified',
+        reject: 'rejected',
+        reevaluate: 'pending'
+      };
+      const actionLabelByAction = {
+        accept: 'Accepting',
+        reject: 'Rejecting',
+        reevaluate: 'Re-evaluating'
+      };
+      const buttonByAction = {
+        accept: certModalAcceptBtn,
+        reject: certModalRejectBtn,
+        reevaluate: certModalReevaluateBtn
+      };
+
+      const newStatus = statusByAction[action] || 'pending';
+      const actionLabel = actionLabelByAction[action] || 'Updating';
+      const btn = buttonByAction[action] || null;
+      const otherBtns = [certModalAcceptBtn, certModalRejectBtn, certModalReevaluateBtn].filter(Boolean).filter((candidate) => candidate !== btn);
 
       if (btn) { btn.disabled = true; btn.textContent = `${actionLabel}...`; }
-      if (otherBtn) otherBtn.disabled = true;
+      otherBtns.forEach((otherBtn) => { otherBtn.disabled = true; });
 
       try {
-        await updateChildKycStatus(childId, newStatus);
+        await updateChildCertificateStatus(childId, newStatus);
         closeCertModal();
+        expandedProfileIds.add(String(childId));
         applySearchFilter();
       } catch (err) {
-        console.error(`Child KYC ${action} failed:`, err);
-        alert(`Failed to ${action} child: ${err.message || 'Unknown error'}`);
+        console.error(`Child certificate ${action} failed:`, err);
+        alert(`Failed to ${action} certificate: ${err.message || 'Unknown error'}`);
       } finally {
-        if (btn) { btn.disabled = false; btn.textContent = action === 'accept' ? 'Accept' : 'Reject'; }
-        if (otherBtn) otherBtn.disabled = false;
+        const labelByAction = {
+          accept: 'Accept',
+          reject: 'Reject',
+          reevaluate: 'Re-evaluate'
+        };
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = labelByAction[action] || 'Update';
+        }
+        otherBtns.forEach((otherBtn) => { otherBtn.disabled = false; });
       }
     };
 
     if (certModalAcceptBtn) {
       certModalAcceptBtn.addEventListener('click', () => {
-        if (certModalChildId) handleChildKycAction(certModalChildId, 'accept');
+        if (certModalChildId) handleChildCertificateAction(certModalChildId, 'accept');
       });
     }
     if (certModalRejectBtn) {
       certModalRejectBtn.addEventListener('click', () => {
-        if (certModalChildId) handleChildKycAction(certModalChildId, 'reject');
+        if (certModalChildId) handleChildCertificateAction(certModalChildId, 'reject');
+      });
+    }
+    if (certModalReevaluateBtn) {
+      certModalReevaluateBtn.addEventListener('click', () => {
+        if (certModalChildId) handleChildCertificateAction(certModalChildId, 'reevaluate');
       });
     }
 
@@ -7469,8 +7565,11 @@
         const childId = acceptBtn.dataset.childAccept;
         acceptBtn.disabled = true;
         acceptBtn.textContent = 'Accepting...';
-        updateChildCertificateStatus(childId)
-          .then(() => applySearchFilter())
+        updateChildCertificateStatus(childId, 'verified')
+          .then(() => {
+            expandedProfileIds.add(String(childId));
+            applySearchFilter();
+          })
           .catch((err) => {
             console.error('Accept failed:', err);
             alert('Failed to accept: ' + (err.message || 'Unknown error'));
@@ -7486,13 +7585,36 @@
         const childId = rejectBtn.dataset.childReject;
         rejectBtn.disabled = true;
         rejectBtn.textContent = 'Rejecting...';
-        updateChildKycStatus(childId, 'rejected')
-          .then(() => applySearchFilter())
+        updateChildCertificateStatus(childId, 'rejected')
+          .then(() => {
+            expandedProfileIds.add(String(childId));
+            applySearchFilter();
+          })
           .catch((err) => {
             console.error('Reject failed:', err);
             alert('Failed to reject: ' + (err.message || 'Unknown error'));
             rejectBtn.disabled = false;
             rejectBtn.textContent = 'Reject';
+          });
+        return;
+      }
+
+      const reevaluateBtn = e.target.closest('[data-child-reevaluate]');
+      if (reevaluateBtn) {
+        e.preventDefault();
+        const childId = reevaluateBtn.dataset.childReevaluate;
+        reevaluateBtn.disabled = true;
+        reevaluateBtn.textContent = 'Re-evaluating...';
+        updateChildCertificateStatus(childId, 'pending')
+          .then(() => {
+            expandedProfileIds.add(String(childId));
+            applySearchFilter();
+          })
+          .catch((err) => {
+            console.error('Re-evaluate failed:', err);
+            alert('Failed to re-evaluate: ' + (err.message || 'Unknown error'));
+            reevaluateBtn.disabled = false;
+            reevaluateBtn.textContent = 'Re-evaluate';
           });
         return;
       }
