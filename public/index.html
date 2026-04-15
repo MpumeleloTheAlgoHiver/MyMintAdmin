@@ -7321,15 +7321,10 @@
 
     // Update only certificate_verification_status to 'verified', leave KYC unchanged
     const updateChildCertificateStatus = async (childId) => {
-      const { data: sessionData } = await supabaseClient.auth.getSession();
-      const userId = sessionData?.session?.user?.id;
-
       const { error } = await supabaseClient
         .from('family_members')
         .update({
-          certificate_verification_status: 'verified',
-          certificate_verified_by: userId || null,
-          certificate_verified_at: new Date().toISOString()
+          certificate_verification_status: 'verified'
         })
         .eq('id', childId);
 
@@ -7339,8 +7334,6 @@
       const member = allFamilyMembers.find(m => String(m.id) === String(childId));
       if (member) {
         member.certificate_verification_status = 'verified';
-        member.certificate_verified_by = userId || null;
-        member.certificate_verified_at = new Date().toISOString();
       }
     };
 
