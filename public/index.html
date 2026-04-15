@@ -442,6 +442,156 @@
     }
     .cert-btn-download:hover:not(:disabled) { background: #cffafe; border-color: #7dd3fc; }
 
+    /* ── Child documents modal ── */
+    .child-docs-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      background: rgba(0,0,0,0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .child-docs-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .child-docs-modal {
+      background: #fff;
+      border-radius: 16px;
+      width: 94%;
+      max-width: 860px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+    }
+    .child-docs-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      background: #fafbff;
+    }
+    .child-docs-title-wrap h3 {
+      margin: 0;
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: #111827;
+    }
+    .child-docs-title-wrap p {
+      margin: 4px 0 0;
+      font-size: 0.78rem;
+      color: #6b7280;
+    }
+    .child-docs-close {
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      color: #6b7280;
+      padding: 4px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .child-docs-close:hover { background: #f3f4f6; }
+    .child-docs-body {
+      padding: 14px 16px;
+      overflow: auto;
+      background: #fff;
+    }
+    .child-docs-list {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .child-docs-list th {
+      text-align: left;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #64748b;
+      padding: 8px 10px;
+      border-bottom: 2px solid #e8e8f0;
+      background: #fafbff;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .child-docs-list td {
+      padding: 10px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #1f2937;
+      vertical-align: middle;
+    }
+    .child-docs-row:hover { background: #f8fafc; }
+    .child-doc-bucket {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #4338ca;
+      font-weight: 600;
+      font-size: 10.5px;
+    }
+    .child-doc-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .child-doc-action-btn {
+      border: 1px solid #dbe3ef;
+      background: #fff;
+      color: #334155;
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .child-doc-action-btn:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+    }
+    .child-docs-empty {
+      text-align: center;
+      color: #6b7280;
+      padding: 30px 14px;
+      font-size: 0.88rem;
+    }
+    .child-docs-footer {
+      border-top: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      justify-content: flex-end;
+      background: #fafbff;
+    }
+    @media screen and (max-width: 768px) {
+      .child-docs-modal {
+        width: 97%;
+        max-height: 94vh;
+      }
+      .child-docs-list {
+        font-size: 11px;
+      }
+      .child-docs-list th,
+      .child-docs-list td {
+        padding: 8px 6px;
+      }
+      .child-docs-header {
+        padding: 12px;
+      }
+      .child-docs-body {
+        padding: 10px;
+      }
+    }
+
     /* ── Child KYC badge variants ── */
     .child-kyc-badge {
       display: inline-flex;
@@ -4584,6 +4734,24 @@
   </div>
 </div>
 
+<div class="child-docs-overlay" id="childDocsOverlay">
+  <div class="child-docs-modal">
+    <div class="child-docs-header">
+      <div class="child-docs-title-wrap">
+        <h3 id="childDocsTitle">Child Documents</h3>
+        <p>Files from birth-certificates and signed-agreements buckets.</p>
+      </div>
+      <button class="child-docs-close" id="childDocsClose" type="button" aria-label="Close">&times;</button>
+    </div>
+    <div class="child-docs-body" id="childDocsBody">
+      <div class="child-docs-empty">Loading documents...</div>
+    </div>
+    <div class="child-docs-footer">
+      <button class="cert-btn cert-btn-cancel" id="childDocsCancel" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -6623,7 +6791,15 @@
           const packTab = rightColumn.querySelector('[data-pack]');
           if (packTab) packTab.style.display = 'none';
           const docsBtn = rightColumn.querySelector('[data-images]');
-          if (docsBtn) docsBtn.style.display = 'none';
+          if (docsBtn) {
+            docsBtn.style.display = '';
+            docsBtn.dataset.childDocs = 'true';
+            docsBtn.dataset.childId = String(child.id || '');
+            docsBtn.dataset.childName = fullName;
+            docsBtn.dataset.childIdNumber = String(child.id_number || '');
+            docsBtn.dataset.childLinkedUserId = String(child.linked_user_id || '');
+            docsBtn.dataset.childCertUrl = String(child.certificate_url || '');
+          }
           const reviewPulse = rightColumn.querySelector('.tabs-header-status');
           if (reviewPulse) reviewPulse.style.display = 'none';
 
@@ -6759,9 +6935,15 @@
     const certModalDownloadBtn = document.getElementById('certModalDownloadBtn');
     const certModalAcceptBtn = document.getElementById('certModalAcceptBtn');
     const certModalRejectBtn = document.getElementById('certModalRejectBtn');
+    const childDocsOverlay = document.getElementById('childDocsOverlay');
+    const childDocsTitle = document.getElementById('childDocsTitle');
+    const childDocsBody = document.getElementById('childDocsBody');
+    const childDocsClose = document.getElementById('childDocsClose');
+    const childDocsCancel = document.getElementById('childDocsCancel');
     let certModalChildId = null;
     let certModalResolvedUrl = null;
     let certModalBlobUrl = null;
+    const CHILD_DOC_BUCKETS = ['birth-certificates', 'signed-agreements'];
 
     const filenameFromUrl = (url, fallback = 'certificate') => {
       try {
@@ -6771,6 +6953,229 @@
       } catch {
         return fallback;
       }
+    };
+
+    const parseStoragePointerFromUrl = (rawUrl) => {
+      if (!rawUrl) return null;
+      const value = String(rawUrl).trim();
+      if (!value) return null;
+
+      if (value.startsWith('storage://')) {
+        const withoutScheme = value.slice('storage://'.length);
+        const slashIdx = withoutScheme.indexOf('/');
+        if (slashIdx <= 0) return null;
+        return {
+          bucket: withoutScheme.slice(0, slashIdx),
+          path: withoutScheme.slice(slashIdx + 1)
+        };
+      }
+
+      if (value.startsWith('http://') || value.startsWith('https://')) {
+        try {
+          const parsed = new URL(value);
+          const marker = '/storage/v1/object/';
+          const markerIdx = parsed.pathname.indexOf(marker);
+          if (markerIdx !== -1) {
+            const rest = parsed.pathname.slice(markerIdx + marker.length);
+            const parts = rest.split('/').filter(Boolean);
+            if (parts[0] === 'public' && parts.length >= 3) {
+              const bucket = parts[1];
+              const path = parts.slice(2).join('/');
+              return { bucket, path: decodeURIComponent(path) };
+            }
+            if (parts[0] === 'sign' && parts.length >= 4) {
+              const bucket = parts[2];
+              const path = parts.slice(3).join('/');
+              return { bucket, path: decodeURIComponent(path) };
+            }
+          }
+        } catch {
+          return null;
+        }
+      }
+
+      const slashIdx = value.indexOf('/');
+      if (slashIdx > 0) {
+        return { bucket: value.slice(0, slashIdx), path: value.slice(slashIdx + 1) };
+      }
+
+      return null;
+    };
+
+    const resolveBucketObjectUrl = async (bucket, filePath) => {
+      if (!bucket || !filePath) return null;
+      const { data, error } = await supabaseClient.storage
+        .from(bucket)
+        .createSignedUrl(filePath, 60 * 60);
+
+      if (!error && data?.signedUrl) return data.signedUrl;
+
+      const { data: publicData } = supabaseClient.storage
+        .from(bucket)
+        .getPublicUrl(filePath);
+      return publicData?.publicUrl || null;
+    };
+
+    const listBucketFilesRecursive = async (bucket, rootPath = '', maxDepth = 3) => {
+      const files = [];
+      const queue = [{ path: rootPath, depth: 0 }];
+      let visited = 0;
+      const VISIT_LIMIT = 900;
+
+      while (queue.length) {
+        const current = queue.shift();
+        if (!current || current.depth > maxDepth || visited >= VISIT_LIMIT) continue;
+        visited += 1;
+
+        const { data, error } = await supabaseClient.storage
+          .from(bucket)
+          .list(current.path, {
+            limit: 200,
+            offset: 0,
+            sortBy: { column: 'updated_at', order: 'desc' }
+          });
+
+        if (error || !Array.isArray(data)) continue;
+
+        data.forEach((entry) => {
+          if (!entry?.name) return;
+          const nextPath = current.path ? `${current.path}/${entry.name}` : entry.name;
+          const isFile = Boolean(entry.id) || Boolean(entry.metadata);
+          if (isFile) {
+            files.push({
+              bucket,
+              path: nextPath,
+              name: entry.name,
+              created_at: entry.created_at || '',
+              updated_at: entry.updated_at || ''
+            });
+          } else if (current.depth < maxDepth) {
+            queue.push({ path: nextPath, depth: current.depth + 1 });
+          }
+        });
+      }
+
+      return files;
+    };
+
+    const buildChildDocTokens = (child) => {
+      const tokens = new Set();
+      const addToken = (value) => {
+        const token = String(value || '').trim().toLowerCase();
+        if (!token) return;
+        if (token.length < 3) return;
+        tokens.add(token);
+        tokens.add(token.replace(/\s+/g, ''));
+      };
+
+      addToken(child.id);
+      addToken(child.linked_user_id);
+      addToken(child.id_number);
+      addToken(child.first_name);
+      addToken(child.last_name);
+      addToken([child.first_name, child.last_name].filter(Boolean).join(' '));
+
+      return Array.from(tokens);
+    };
+
+    const getChildDocuments = async (child) => {
+      const results = [];
+      const seen = new Set();
+      const tokens = buildChildDocTokens(child);
+
+      const addDoc = (doc) => {
+        if (!doc?.bucket || !doc?.path) return;
+        const key = `${doc.bucket}::${doc.path}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        results.push(doc);
+      };
+
+      const certPointer = parseStoragePointerFromUrl(child.certificate_url || '');
+      if (certPointer?.bucket && certPointer?.path) {
+        addDoc({
+          bucket: certPointer.bucket,
+          path: certPointer.path,
+          name: certPointer.path.split('/').pop() || 'certificate',
+          created_at: '',
+          updated_at: '',
+          source: 'certificate_url'
+        });
+      }
+
+      const bucketFiles = await Promise.all(CHILD_DOC_BUCKETS.map((bucket) => listBucketFilesRecursive(bucket, '', 3)));
+      bucketFiles.flat().forEach((doc) => {
+        const haystack = `${doc.path} ${doc.name}`.toLowerCase();
+        const matched = tokens.some((token) => haystack.includes(token));
+        if (matched) addDoc(doc);
+      });
+
+      results.sort((a, b) => new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime());
+      return results;
+    };
+
+    const renderChildDocsBody = (docs) => {
+      if (!childDocsBody) return;
+      if (!docs.length) {
+        childDocsBody.innerHTML = '<div class="child-docs-empty">No child-specific documents found in birth-certificates or signed-agreements.</div>';
+        return;
+      }
+
+      const rows = docs.map((doc, idx) => {
+        const updated = doc.updated_at || doc.created_at;
+        const updatedLabel = updated
+          ? new Date(updated).toLocaleString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+          : '-';
+        return `<tr class="child-docs-row">
+          <td><span class="child-doc-bucket">${escapeHtml(doc.bucket)}</span></td>
+          <td>${escapeHtml(doc.name || '-')}</td>
+          <td style="color:#64748b;">${escapeHtml(doc.path)}</td>
+          <td style="white-space:nowrap;color:#94a3b8;">${escapeHtml(updatedLabel)}</td>
+          <td>
+            <span class="child-doc-actions">
+              <button type="button" class="child-doc-action-btn" data-child-doc-open="${idx}">Open</button>
+              <button type="button" class="child-doc-action-btn" data-child-doc-download="${idx}">Download</button>
+            </span>
+          </td>
+        </tr>`;
+      }).join('');
+
+      childDocsBody.innerHTML = `<table class="child-docs-list">
+        <thead>
+          <tr>
+            <th>Bucket</th>
+            <th>File</th>
+            <th>Path</th>
+            <th>Updated</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    };
+
+    let childDocsEntries = [];
+
+    const openChildDocsModal = async (child) => {
+      if (!childDocsOverlay || !childDocsBody) return;
+      if (childDocsTitle) {
+        const childName = [child.first_name, child.last_name].filter(Boolean).join(' ') || 'Unknown Child';
+        childDocsTitle.textContent = `Documents — ${childName}`;
+      }
+      childDocsOverlay.classList.add('active');
+      childDocsBody.innerHTML = '<div class="child-docs-empty">Loading child documents...</div>';
+      try {
+        childDocsEntries = await getChildDocuments(child);
+        renderChildDocsBody(childDocsEntries);
+      } catch (error) {
+        console.error('Failed to load child documents:', error);
+        childDocsBody.innerHTML = '<div class="child-docs-empty">Could not load documents for this child.</div>';
+      }
+    };
+
+    const closeChildDocsModal = () => {
+      childDocsEntries = [];
+      if (childDocsOverlay) childDocsOverlay.classList.remove('active');
     };
 
     // Resolve a storage:// URI or Supabase public/signed URL to a fetchable HTTPS URL
@@ -6901,6 +7306,13 @@
         if (e.target === certModalOverlay) closeCertModal();
       });
     }
+    if (childDocsClose) childDocsClose.addEventListener('click', closeChildDocsModal);
+    if (childDocsCancel) childDocsCancel.addEventListener('click', closeChildDocsModal);
+    if (childDocsOverlay) {
+      childDocsOverlay.addEventListener('click', (e) => {
+        if (e.target === childDocsOverlay) closeChildDocsModal();
+      });
+    }
     if (certModalDownloadBtn) {
       certModalDownloadBtn.addEventListener('click', async () => {
         if (!certModalResolvedUrl) return;
@@ -6991,6 +7403,60 @@
           certReviewBtn.dataset.childName,
           certReviewBtn.dataset.childKyc
         );
+        return;
+      }
+
+      const childDocOpenBtn = e.target.closest('[data-child-doc-open]');
+      if (childDocOpenBtn) {
+        e.preventDefault();
+        const index = Number(childDocOpenBtn.dataset.childDocOpen || '-1');
+        const doc = childDocsEntries[index];
+        if (!doc) return;
+        resolveBucketObjectUrl(doc.bucket, doc.path)
+          .then((url) => {
+            if (!url) throw new Error('Could not resolve document URL');
+            window.open(url, '_blank', 'noopener,noreferrer');
+          })
+          .catch((error) => {
+            console.error('Open child document failed:', error);
+            alert('Could not open this document. Please check storage permissions.');
+          });
+        return;
+      }
+
+      const childDocDownloadBtn = e.target.closest('[data-child-doc-download]');
+      if (childDocDownloadBtn) {
+        e.preventDefault();
+        const index = Number(childDocDownloadBtn.dataset.childDocDownload || '-1');
+        const doc = childDocsEntries[index];
+        if (!doc) return;
+        const original = childDocDownloadBtn.textContent;
+        childDocDownloadBtn.disabled = true;
+        childDocDownloadBtn.textContent = 'Downloading...';
+
+        resolveBucketObjectUrl(doc.bucket, doc.path)
+          .then(async (url) => {
+            if (!url) throw new Error('Could not resolve document URL');
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = doc.name || 'document';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(blobUrl);
+          })
+          .catch((error) => {
+            console.error('Download child document failed:', error);
+            alert('Could not download this document. Please check storage permissions.');
+          })
+          .finally(() => {
+            childDocDownloadBtn.disabled = false;
+            childDocDownloadBtn.textContent = original;
+          });
         return;
       }
 
@@ -9375,6 +9841,17 @@
 
         if (tab.dataset.images === 'true') {
           const item = tab.closest('.simple-item');
+
+          if (item?.dataset?.familyChild === 'true') {
+            const child = allFamilyMembers.find((row) => String(row.id) === String(item.dataset.profileId));
+            if (!child) {
+              console.warn('Child record not found for documents modal.');
+              return;
+            }
+            openChildDocsModal(child);
+            return;
+          }
+
           const externalUserId = item?.dataset?.externalUserId;
           if (!externalUserId) {
             console.warn('No Sumsub external user id found for this profile.');
