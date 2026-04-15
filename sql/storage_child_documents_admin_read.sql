@@ -1,8 +1,8 @@
 -- Allow specific admin users to view child documents in storage buckets.
 -- Buckets covered: birth-certificates, signed-agreements
-
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE storage.buckets ENABLE ROW LEVEL SECURITY;
+-- NOTE:
+-- Do not ALTER storage.objects/storage.buckets here; those statements require table ownership.
+-- Supabase storage RLS is already enabled in managed projects.
 
 DROP POLICY IF EXISTS "admin_users_view_child_docs_objects" ON storage.objects;
 CREATE POLICY "admin_users_view_child_docs_objects"
