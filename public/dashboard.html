@@ -1166,63 +1166,55 @@
                     <option value="">Sector…</option>
                   </select>
 
+                  <!-- Holdings table toolbar -->
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+                    <!-- Columns picker -->
+                    <div style="position:relative;display:inline-block;">
+                      <button type="button" onclick="document.getElementById('holdingColsPanel').classList.toggle('hidden')" style="display:flex;align-items:center;gap:5px;padding:5px 11px;border:1px solid #e2e8f0;border-radius:7px;background:#fff;font-size:11px;font-weight:600;color:#475569;cursor:pointer;white-space:nowrap;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                        Columns
+                      </button>
+                      <div id="holdingColsPanel" class="hidden" style="position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 4px 18px rgba(0,0,0,0.11);padding:12px 14px;z-index:99;min-width:190px;"></div>
+                    </div>
+                    <!-- Filter picker -->
+                    <div style="position:relative;display:inline-block;">
+                      <button type="button" onclick="document.getElementById('holdingFilterPanel').classList.toggle('hidden')" style="display:flex;align-items:center;gap:5px;padding:5px 11px;border:1px solid #e2e8f0;border-radius:7px;background:#fff;font-size:11px;font-weight:600;color:#475569;cursor:pointer;white-space:nowrap;">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                        Filter
+                      </button>
+                      <div id="holdingFilterPanel" class="hidden" style="position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 4px 18px rgba(0,0,0,0.11);padding:12px 14px;z-index:99;min-width:210px;"></div>
+                    </div>
+                    <!-- Active state badges -->
+                    <span id="holdingSortBadge" style="display:none;font-size:10px;font-weight:600;color:#7c3aed;background:#f5f3ff;padding:3px 9px;border-radius:20px;"></span>
+                    <button type="button" id="holdingResetBtn" onclick="resetHoldingFilters()" style="display:none;font-size:10px;font-weight:600;color:#94a3b8;padding:3px 9px;border:1px solid #e2e8f0;border-radius:20px;background:#fff;cursor:pointer;">✕ Reset</button>
+                  </div>
+
                   <!-- Holdings table -->
                   <div style="overflow-x: auto">
-                    <table style="width: 100%; border-collapse: collapse; min-width: 560px;">
-                      <thead>
-                        <tr style="background: #f8fafc; border-bottom: 1.5px solid #e8edf3;">
-                          <th style="padding: 9px 16px; text-align: left; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap; min-width: 200px;">
-                            Ticker &nbsp;<span
-                              id="holdingsCount"
-                              style="font-size: 10px; font-weight: 500; color: #94a3b8; background: #f1f5f9; padding: 1px 7px; border-radius: 20px;"
-                            >0 assets</span>
-                          </th>
-                          <th style="padding: 9px 16px; text-align: left; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Shares</th>
-                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Stock Price</th>
-                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Daily %</th>
-                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Market Value</th>
-                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Market Cap</th>
-                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">P/E</th>
-                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Div/Share</th>
-                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">Div Yield</th>
-                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px; white-space: nowrap;">YTD</th>
-                          <th style="padding: 9px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.4px;">Weight</th>
-                          <th style="width: 44px;"></th>
-                        </tr>
-                      </thead>
+                    <table id="holdingsTbl" style="width: 100%; border-collapse: collapse; min-width: 560px;">
+                      <thead id="holdingsTableHead"></thead>
                       <!-- Holdings rows rendered by JS -->
                       <tbody id="holdingsContainer"></tbody>
-                      <tfoot>
-                        <tr style="background: #f8fafc; border-top: 1.5px solid #e8edf3;">
-                          <td style="padding: 10px 16px; font-size: 12px; font-weight: 600; color: #64748b; white-space: nowrap;">Total Position</td>
-                          <td></td>
-                          <td colspan="2"></td>
-                          <td style="padding: 10px 16px; text-align: right; font-size: 13px; font-weight: 600; color: #334155;" id="totalMvFooter">R 0.00</td>
-                          <td colspan="5"></td>
-                          <td style="padding: 10px 16px; text-align: right;">
-                            <span id="totalWeightDisplay" style="font-size: 13px; font-weight: 700; color: #7c3aed;">0%</span>
-                          </td>
-                          <td style="padding: 10px 16px; white-space: nowrap;">
-                            <div style="display: flex; align-items: center; gap: 14px; justify-content: flex-end;">
-                              <div>
-                                <p style="font-size: 10px; font-weight: 500; color: #7c3aed; margin: 0 0 1px;">Min. Investment</p>
-                                <p id="minInvestmentDisplay" style="font-size: 13px; font-weight: 700; color: #6d28d9; margin: 0;">R 0</p>
-                              </div>
-                              <input id="strategyIsPublic" name="is_public" type="checkbox" style="display:none;" />
-                              <input id="strategyIsFeatured" name="is_featured" type="checkbox" style="display:none;" />
-                              <p id="strategyFormMessage" style="font-size: 11px; color: #64748b; margin: 0; max-width: 160px;"></p>
-                              <button
-                                type="submit"
-                                id="strategySubmitBtn"
-                                style="padding: 8px 20px; background: #7c3aed; color: #fff; border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; box-shadow: 0 1px 3px rgba(124,58,237,0.25);"
-                                onmouseenter="this.style.background='#6d28d9'"
-                                onmouseleave="this.style.background='#7c3aed'"
-                              ><span>Save strategy</span></button>
-                            </div>
-                          </td>
-                        </tr>
-                      </tfoot>
+                      <tfoot id="holdingsTableFoot"></tfoot>
                     </table>
+                  </div>
+
+                  <!-- Form footer: totals + submit -->
+                  <div style="display:flex;align-items:center;justify-content:flex-end;gap:14px;padding:12px 4px 4px;flex-wrap:wrap;">
+                    <div>
+                      <p style="font-size: 10px; font-weight: 500; color: #7c3aed; margin: 0 0 1px;">Min. Investment</p>
+                      <p id="minInvestmentDisplay" style="font-size: 13px; font-weight: 700; color: #6d28d9; margin: 0;">R 0</p>
+                    </div>
+                    <input id="strategyIsPublic" name="is_public" type="checkbox" style="display:none;" />
+                    <input id="strategyIsFeatured" name="is_featured" type="checkbox" style="display:none;" />
+                    <p id="strategyFormMessage" style="font-size: 11px; color: #64748b; margin: 0; max-width: 160px;"></p>
+                    <button
+                      type="submit"
+                      id="strategySubmitBtn"
+                      style="padding: 8px 20px; background: #7c3aed; color: #fff; border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; box-shadow: 0 1px 3px rgba(124,58,237,0.25);"
+                      onmouseenter="this.style.background='#6d28d9'"
+                      onmouseleave="this.style.background='#7c3aed'"
+                    ><span>Save strategy</span></button>
                   </div>
 
                   <!-- hidden compat stubs -->
@@ -1677,6 +1669,29 @@
       let _overviewSecMap = null;
       let allStrategiesFullData = [];
       let formHoldings = [];
+
+      /* ── Holdings table column config ───────────────────────────────── */
+      const _HC = [
+        { k:'last_close',     l:'Price (R)',         t:'Source: last_close',           v:true,  isReturn:false },
+        { k:'prev_close',     l:'Prev Close (R)',    t:'Source: prev_close',           v:false, isReturn:false },
+        { k:'change_abs',     l:'Day Change (R)',    t:'Source: change_abs',           v:false, isReturn:false },
+        { k:'change_pct',     l:'Day Change %',     t:'Source: change_pct × 100',     v:true,  isReturn:true  },
+        { k:'mkt_value',      l:'Market Value',     t:'Shares × last_close',          v:true,  isReturn:false, isMv:true },
+        { k:'WTD_Return',     l:'WTD %',            t:'Source: WTD_Return × 100',     v:true,  isReturn:true  },
+        { k:'1W_Return',      l:'1 Week %',         t:'Source: 1W_Return × 100',      v:false, isReturn:true  },
+        { k:'1M_Return',      l:'1 Month %',        t:'Source: 1M_Return × 100',      v:true,  isReturn:true  },
+        { k:'3M_Return',      l:'3 Month %',        t:'Source: 3M_Return × 100',      v:false, isReturn:true  },
+        { k:'r_6m',           l:'6 Month %',        t:'Source: r_6m × 100',           v:false, isReturn:true  },
+        { k:'r_1y',           l:'1 Year %',         t:'Source: r_1y × 100',           v:true,  isReturn:true  },
+        { k:'volatility_30d', l:'Volatility (30D)', t:'Source: volatility_30d × 100', v:true,  isReturn:false },
+        { k:'avg_volume_30d', l:'Avg Volume (30D)', t:'Source: avg_volume_30d',        v:false, isReturn:false },
+        { k:'r_ytd',          l:'YTD %',            t:'Source: r_ytd × 100',          v:true,  isReturn:true  },
+        { k:'weight',         l:'Weight',           t:'From strategy holdings',        v:true,  isReturn:false, isWt:true },
+      ];
+      let _holdingSort   = { key: null, dir: 1 };
+      let _holdingFilter = { col: '', sign: 'all' };
+      /* ─────────────────────────────────────────────────────────────────── */
+
       let editingStrategyId = null;
       let activeStrategyTabId = null;
       Object.defineProperty(window, '_activeStrategyTabId', { get() { return activeStrategyTabId; }, configurable: true });
@@ -2012,18 +2027,22 @@
             });
           });
 
-          /* Only select confirmed columns — mtd/wtd don't exist in this table */
+          /* Fetch base security info then merge metrics from security_metrics */
           let q = supabaseClient
             .from('securities')
-            .select('symbol, name, logo_url, change_percent, ytd_performance')
-            .order('change_percent', { ascending: false, nullsFirst: false });
+            .select('id, symbol, name, logo_url')
+            .order('name', { ascending: true });
 
           if (stratSymbols.size > 0) q = q.in('symbol', [...stratSymbols]);
           else q = q.eq('is_active', true).limit(40);
 
           const { data: secData, error: secErr } = await q;
           if (secErr) throw secErr;
-          _returnInsightsData = secData || [];
+          const _riIds = (secData || []).map(s => s.id).filter(Boolean);
+          const _riMetrics = await fetchSecurityMetrics(_riIds);
+          _returnInsightsData = (secData || []).map(s => ({ ...s, ...(_riMetrics[s.id] || {}) }));
+          /* Sort by daily change descending */
+          _returnInsightsData.sort((a, b) => (b.change_percent ?? -Infinity) - (a.change_percent ?? -Infinity));
           /* Compute alert count and update badges */
           const alertCount = _returnInsightsData.filter(a => a.change_percent != null && Number(a.change_percent) <= ALERT_THRESHOLD).length;
           _updateAlertBadges(alertCount);
@@ -2987,6 +3006,55 @@
       let securitiesLoading = false;
       let holdingsQuantityMap = {};
 
+      /* ── Security Metrics Helper ──────────────────────────────────────────
+         Fetches the latest row from security_metrics for each given security ID
+         and returns an object keyed by security_id with columns mapped to the
+         names the rest of the codebase expects.
+         Column mapping:
+           last_close  (Rand)    → last_price  (stored as cents ×100)
+           change_pct  (decimal) → change_percent (percentage ×100)
+           r_ytd       (decimal) → ytd_performance (percentage ×100)
+           WTD_Return  (decimal) → wtd_performance (percentage ×100)
+           1M_Return   (decimal) → mtd_performance (percentage ×100)
+      ─────────────────────────────────────────────────────────────────────── */
+      const fetchSecurityMetrics = async (secIds) => {
+        if (!secIds || !secIds.length) return {};
+        const metricsMap = {};
+        const chunks = [];
+        for (let i = 0; i < secIds.length; i += 50) chunks.push(secIds.slice(i, i + 50));
+        const results = await Promise.all(
+          chunks.map(chunk =>
+            supabaseClient.from('security_metrics')
+              .select('*')
+              .in('security_id', chunk)
+              .order('as_of_date', { ascending: false })
+          )
+        );
+        results.forEach(({ data }) => {
+          if (!data) return;
+          data.forEach(m => {
+            if (metricsMap[m.security_id]) return; /* keep latest (first due to desc order) */
+            metricsMap[m.security_id] = {
+              last_price:       m.last_close   != null ? Math.round(m.last_close * 100)   : null,
+              change_percent:   m.change_pct   != null ? m.change_pct * 100               : null,
+              ytd_performance:  m.r_ytd        != null ? m.r_ytd * 100                    : null,
+              wtd_performance:  m['WTD_Return']!= null ? m['WTD_Return'] * 100            : null,
+              mtd_performance:  m['1M_Return'] != null ? m['1M_Return'] * 100             : null,
+              r_1y_performance: m.r_1y         != null ? m.r_1y * 100                     : null,
+              r_6m_performance: m.r_6m         != null ? m.r_6m * 100                     : null,
+              w1_performance:   m['1W_Return'] != null ? m['1W_Return'] * 100             : null,
+              m3_performance:   m['3M_Return'] != null ? m['3M_Return'] * 100             : null,
+              change_abs:       m.change_abs,
+              prev_close:       m.prev_close,
+              last_close_rand:  m.last_close,
+              volatility_30d:   m.volatility_30d,
+              avg_volume_30d:   m.avg_volume_30d,
+            };
+          });
+        });
+        return metricsMap;
+      };
+
       const loadAllSecurities = async (opts = {}) => {
         if (allSecuritiesCache !== null || securitiesLoading) return;
         securitiesLoading = true;
@@ -3003,12 +3071,9 @@
             .limit(200),
         ]);
 
-        /* Probe for columns progressively so partial schemas still show price data */
+        /* Load base security info (metrics now live in security_metrics table) */
         const _secSelectVariants = [
-          "id, symbol, name, logo_url, last_price, change_percent, market_cap, pe_ratio, dividend_per_share, dividend_yield, ytd_performance",
-          "id, symbol, name, logo_url, last_price, change_percent, market_cap",
-          "id, symbol, name, logo_url, last_price, change_percent",
-          "id, symbol, name, logo_url, last_price",
+          "id, symbol, name, logo_url",
           "id, symbol, name",
         ];
         let data = null;
@@ -3023,6 +3088,9 @@
         }
         if (!data) console.error("Failed to load securities from any column variant");
 
+        /* Fetch live metrics from security_metrics and merge */
+        const _secIds = (data || []).map(s => s.id).filter(Boolean);
+        const _metricsMap = await fetchSecurityMetrics(_secIds);
 
         const symbolHoldingsMap = {};
         if (!strategiesResult.error && strategiesResult.data) {
@@ -3049,8 +3117,10 @@
             symbolHoldingsMap[sym] ||
             symbolHoldingsMap[normalizeSymbol(sym)] ||
             null;
+          const metrics = _metricsMap[s.id] || {};
           return {
             ...s,
+            ...metrics,
             _sym: sym,
             _totalShares: holdingData ? holdingData.shares : 0,
             _weight: holdingData ? holdingData.weight : 0,
@@ -3118,12 +3188,18 @@
               logo_url: btn.dataset.logo || null,
               shares: 1,
               weight: 0,
-              market_cap: cached.market_cap ?? null,
-              pe_ratio: cached.pe_ratio ?? null,
-              dividend_per_share: cached.dividend_per_share ?? null,
-              dividend_yield: cached.dividend_yield ?? null,
-              ytd_performance: cached.ytd_performance ?? null,
-              change_percent: cached.change_percent ?? null,
+              change_percent:   cached.change_percent   ?? null,
+              wtd_performance:  cached.wtd_performance  ?? null,
+              mtd_performance:  cached.mtd_performance  ?? null,
+              w1_performance:   cached.w1_performance   ?? null,
+              m3_performance:   cached.m3_performance   ?? null,
+              r_1y_performance: cached.r_1y_performance ?? null,
+              r_6m_performance: cached.r_6m_performance ?? null,
+              ytd_performance:  cached.ytd_performance  ?? null,
+              volatility_30d:   cached.volatility_30d   ?? null,
+              avg_volume_30d:   cached.avg_volume_30d   ?? null,
+              prev_close:       cached.prev_close       ?? null,
+              change_abs:       cached.change_abs       ?? null,
             });
             securitySearchInput.value = "";
             renderSecuritiesDropdown("");
@@ -3163,18 +3239,16 @@
               : 0;
         });
         const totalWeight = formHoldings.reduce((sum, h) => sum + h.weight, 0);
-        totalWeightDisplay.textContent =
-          totalWeight > 0 ? totalWeight.toFixed(1) + "%" : "0%";
-        totalWeightDisplay.style.color =
-          Math.abs(totalWeight - 100) < 0.5 ? "#059669" : "#7c3aed";
-        const minInvestment =
-          totalMarketValue > 0 ? Math.round(totalMarketValue) : 0;
-        minInvestmentDisplay.textContent =
-          minInvestment > 0 ? formatCurrency(minInvestment) : "R 0";
-        holdingsCountEl.textContent =
-          formHoldings.length +
-          " asset" +
-          (formHoldings.length !== 1 ? "s" : "");
+        const _twd = document.getElementById("totalWeightDisplay");
+        if (_twd) {
+          _twd.textContent = totalWeight > 0 ? totalWeight.toFixed(1) + "%" : "0%";
+          _twd.style.color = Math.abs(totalWeight - 100) < 0.5 ? "#059669" : "#7c3aed";
+        }
+        const minInvestment = totalMarketValue > 0 ? Math.round(totalMarketValue) : 0;
+        const _mid = document.getElementById("minInvestmentDisplay");
+        if (_mid) _mid.textContent = minInvestment > 0 ? formatCurrency(minInvestment) : "R 0";
+        const _hce = document.getElementById("holdingsCount");
+        if (_hce) _hce.textContent = formHoldings.length + " asset" + (formHoldings.length !== 1 ? "s" : "");
         const totalMvFooter = document.getElementById("totalMvFooter");
         if (totalMvFooter)
           totalMvFooter.textContent = "R " + totalMarketValue.toFixed(2);
@@ -3207,104 +3281,236 @@
         return "R " + (Number(val) / 100).toFixed(2);
       };
 
-      const renderFormHoldings = () => {
-        /* Show/hide the submit button based on whether there are holdings */
-        const _sbtn = document.getElementById("strategySubmitBtn");
-        if (_sbtn) _sbtn.style.display = formHoldings.length > 0 ? "" : "none";
+      /* ── Per-column sort value extractor ───────────────────────────── */
+      const _hcSortVal = (k, h) => {
+        switch (k) {
+          case 'last_close':     return h.last_price ? h.last_price / 100 : 0;
+          case 'prev_close':     return h.prev_close || 0;
+          case 'change_abs':     return h.change_abs || 0;
+          case 'change_pct':     return h.change_percent || 0;
+          case 'mkt_value':      return h.market_value || 0;
+          case 'WTD_Return':     return h.wtd_performance || 0;
+          case '1W_Return':      return h.w1_performance || 0;
+          case '1M_Return':      return h.mtd_performance || 0;
+          case '3M_Return':      return h.m3_performance || 0;
+          case 'r_6m':           return h.r_6m_performance || 0;
+          case 'r_1y':           return h.r_1y_performance || 0;
+          case 'volatility_30d': return h.volatility_30d || 0;
+          case 'avg_volume_30d': return h.avg_volume_30d || 0;
+          case 'r_ytd':          return h.ytd_performance || 0;
+          case 'weight':         return h.weight || 0;
+          default: return 0;
+        }
+      };
 
-        if (formHoldings.length === 0) {
-          holdingsContainer.innerHTML = `
-          <tr>
-            <td colspan="12" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;">
-              No holdings yet — search and add securities above
-            </td>
+      /* ── Per-column cell renderer ───────────────────────────────────── */
+      const _hcRender = (k, h) => {
+        const fp = (v) => {
+          const n = v != null ? Number(v) : null;
+          if (n == null) return { s: '—', c: '#94a3b8' };
+          return { s: (n >= 0 ? '+' : '') + n.toFixed(2) + '%', c: n >= 0 ? '#16a34a' : '#dc2626' };
+        };
+        switch (k) {
+          case 'last_close':
+            return `<span style="font-size:13px;font-weight:500;color:#334155;">${h.last_price ? 'R ' + (h.last_price / 100).toFixed(2) : '—'}</span>`;
+          case 'prev_close':
+            return `<span style="font-size:12px;color:#64748b;">${h.prev_close != null ? 'R ' + Number(h.prev_close).toFixed(2) : '—'}</span>`;
+          case 'change_abs': {
+            const v = h.change_abs; const c = v == null ? '#94a3b8' : v >= 0 ? '#16a34a' : '#dc2626';
+            return `<span style="font-size:12px;font-weight:600;color:${c};">${v != null ? (v >= 0 ? '+' : '') + 'R ' + Number(v).toFixed(2) : '—'}</span>`;
+          }
+          case 'change_pct':     { const p = fp(h.change_percent);    return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
+          case 'mkt_value':      return `<span class="holding-mv" style="font-size:13px;font-weight:500;color:#334155;">R ${(h.market_value || 0).toFixed(2)}</span>`;
+          case 'WTD_Return':     { const p = fp(h.wtd_performance);   return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
+          case '1W_Return':      { const p = fp(h.w1_performance);    return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
+          case '1M_Return':      { const p = fp(h.mtd_performance);   return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
+          case '3M_Return':      { const p = fp(h.m3_performance);    return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
+          case 'r_6m':           { const p = fp(h.r_6m_performance);  return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
+          case 'r_1y':           { const p = fp(h.r_1y_performance);  return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
+          case 'volatility_30d':
+            return `<span style="font-size:12px;color:#334155;">${h.volatility_30d != null ? (h.volatility_30d * 100).toFixed(2) + '%' : '—'}</span>`;
+          case 'avg_volume_30d':
+            return `<span style="font-size:12px;color:#64748b;">${h.avg_volume_30d != null ? Math.round(h.avg_volume_30d).toLocaleString('en-ZA') : '—'}</span>`;
+          case 'r_ytd':   { const p = fp(h.ytd_performance); return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
+          case 'weight':  return `<span class="holding-weight" style="font-size:13px;font-weight:700;color:#7c3aed;">${(h.weight || 0).toFixed(1)}%</span>`;
+          default: return '—';
+        }
+      };
+
+      /* ── Main render function ───────────────────────────────────────── */
+      const renderFormHoldings = () => {
+        const _sbtn = document.getElementById('strategySubmitBtn');
+        if (_sbtn) _sbtn.style.display = formHoldings.length > 0 ? '' : 'none';
+
+        const thead = document.getElementById('holdingsTableHead');
+        const tfoot = document.getElementById('holdingsTableFoot');
+        const el    = document.getElementById('holdingsContainer');
+        if (!el) return;
+
+        const visCols = _HC.filter(c => c.v);
+        const thS     = `padding:9px 16px;text-align:right;font-size:11px;font-weight:600;color:#94a3b8;letter-spacing:0.4px;white-space:nowrap;cursor:pointer;user-select:none;`;
+        const arr     = (k) => _holdingSort.key !== k
+          ? ` <span style="opacity:0.3;font-size:9px;">⇅</span>`
+          : _holdingSort.dir > 0 ? ` <span style="color:#7c3aed;font-size:9px;">▲</span>` : ` <span style="color:#7c3aed;font-size:9px;">▼</span>`;
+
+        /* thead */
+        if (thead) {
+          const cnt = formHoldings.length;
+          thead.innerHTML = `<tr style="background:#f8fafc;border-bottom:1.5px solid #e8edf3;">
+            <th style="padding:9px 16px;text-align:left;font-size:11px;font-weight:600;color:#94a3b8;letter-spacing:0.4px;white-space:nowrap;min-width:200px;">
+              Ticker &nbsp;<span id="holdingsCount" style="font-size:10px;font-weight:500;color:#94a3b8;background:#f1f5f9;padding:1px 7px;border-radius:20px;">${cnt} ${cnt === 1 ? 'asset' : 'assets'}</span>
+            </th>
+            <th style="padding:9px 16px;text-align:left;font-size:11px;font-weight:600;color:#94a3b8;letter-spacing:0.4px;white-space:nowrap;">Shares</th>
+            ${visCols.map(c => `<th title="${c.t}" style="${thS}" onclick="sortHoldingBy('${c.k}')">${c.l}${arr(c.k)}</th>`).join('')}
+            <th style="width:44px;"></th>
           </tr>`;
+        }
+
+        /* Columns panel */
+        const colsPanel = document.getElementById('holdingColsPanel');
+        if (colsPanel) {
+          colsPanel.innerHTML = `
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Show / Hide Columns</div>
+            ${_HC.map(c => `<label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:12px;color:#334155;white-space:nowrap;">
+              <input type="checkbox" ${c.v ? 'checked' : ''} onchange="toggleHoldingCol('${c.k}',this.checked)" style="width:13px;height:13px;accent-color:#7c3aed;cursor:pointer;flex-shrink:0;">
+              ${c.l}
+            </label>`).join('')}`;
+        }
+
+        /* Filter panel */
+        const filterPanel = document.getElementById('holdingFilterPanel');
+        const returnCols  = _HC.filter(c => c.isReturn);
+        if (filterPanel) {
+          filterPanel.innerHTML = `
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">Filter by Return Column</div>
+            <div style="margin-bottom:10px;">
+              <div style="font-size:11px;color:#64748b;margin-bottom:4px;">Column</div>
+              <select onchange="_holdingFilter.col=this.value;renderFormHoldings();" style="width:100%;font-size:12px;border:1px solid #e2e8f0;border-radius:6px;padding:5px 7px;color:#334155;background:#fff;">
+                <option value="">All columns</option>
+                ${returnCols.map(c => `<option value="${c.k}" ${_holdingFilter.col === c.k ? 'selected' : ''}>${c.l}</option>`).join('')}
+              </select>
+            </div>
+            <div style="font-size:11px;color:#64748b;margin-bottom:4px;">Show</div>
+            ${[{v:'all',label:'All rows'},{v:'pos',label:'Positive only (> 0%)'},{v:'neg',label:'Negative only (< 0%)'}].map(s => `
+              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:12px;color:#334155;">
+                <input type="radio" name="holdingFilterSign" value="${s.v}" ${_holdingFilter.sign === s.v ? 'checked' : ''} onchange="_holdingFilter.sign=this.value;renderFormHoldings();" style="accent-color:#7c3aed;">
+                ${s.label}
+              </label>`).join('')}`;
+        }
+
+        /* Empty state */
+        if (formHoldings.length === 0) {
+          el.innerHTML = `<tr><td colspan="${2 + visCols.length + 1}" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;">No holdings yet — search and add securities above</td></tr>`;
+          if (tfoot) tfoot.innerHTML = '';
+          _updateHoldingBadge();
           return;
         }
-        holdingsContainer.innerHTML = formHoldings
-          .map((h, i) => {
-            const ticker = (h.symbol || "").replace(".JO", "");
-            const initials = ticker.slice(0, 2);
-            const logoEl = h.logo_url
-              ? `<img src="${h.logo_url}" alt="${ticker}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"
-               onerror="this.parentElement.innerHTML='<span style=\\'font-size:10px;font-weight:700;color:#fff;\\'>${initials}</span>'">`
-              : `<span style="font-size:10px;font-weight:700;color:#fff;">${initials}</span>`;
-            const mv = (h.market_value || 0).toFixed(2);
 
-            /* Daily % */
-            const chg = h.change_percent != null ? Number(h.change_percent) : null;
-            const chgStr = chg != null ? (chg >= 0 ? "+" : "") + chg.toFixed(2) + "%" : "—";
-            const chgColor = chg == null ? "#94a3b8" : chg >= 0 ? "#16a34a" : "#dc2626";
+        /* Sort */
+        let rows = [...formHoldings];
+        if (_holdingSort.key) {
+          rows.sort((a, b) => _holdingSort.dir * (_hcSortVal(_holdingSort.key, a) - _hcSortVal(_holdingSort.key, b)));
+        }
 
-            /* YTD */
-            const ytd = h.ytd_performance != null ? Number(h.ytd_performance) : null;
-            const ytdStr = ytd != null ? (ytd >= 0 ? "+" : "") + ytd.toFixed(2) + "%" : "—";
-            const ytdColor = ytd == null ? "#94a3b8" : ytd >= 0 ? "#16a34a" : "#dc2626";
+        /* Filter */
+        if (_holdingFilter.col && _holdingFilter.sign !== 'all') {
+          rows = rows.filter(h => {
+            const v = _hcSortVal(_holdingFilter.col, h);
+            return _holdingFilter.sign === 'pos' ? v > 0 : v < 0;
+          });
+        }
 
-            const priceFmt = h.last_price ? "R " + (Number(h.last_price) / 100).toFixed(2) : "—";
-            const mcFmt = fmtCompact(h.market_cap);
-            const peFmt = h.pe_ratio != null ? Number(h.pe_ratio).toFixed(1) : "—";
-            const divShareFmt = h.dividend_per_share != null ? "R " + Number(h.dividend_per_share).toFixed(2) : "—";
-            const divYldFmt = h.dividend_yield != null ? Number(h.dividend_yield).toFixed(2) + "%" : "—";
-
-            return `
-        <tr style="border-bottom:1px solid #f1f5f9;transition:background 0.12s;"
-            onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
-          <td style="padding:10px 16px;">
-            <div style="display:flex;align-items:center;gap:10px;">
-              <div style="width:34px;height:34px;border-radius:50%;background:#1e293b;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">${logoEl}</div>
-              <div>
-                <div style="font-size:13px;font-weight:700;color:#1e293b;line-height:1.3;">${ticker}</div>
-                <div style="font-size:11px;color:#94a3b8;line-height:1.3;">${h.name || ticker}</div>
+        /* Rows */
+        el.innerHTML = rows.map(h => {
+          const origIdx  = formHoldings.indexOf(h);
+          const ticker   = (h.symbol || '').replace('.JO', '');
+          const initials = ticker.slice(0, 2);
+          const logoEl   = h.logo_url
+            ? `<img src="${h.logo_url}" alt="${ticker}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentElement.innerHTML='<span style=\\'font-size:10px;font-weight:700;color:#fff;\\'>${initials}</span>'">`
+            : `<span style="font-size:10px;font-weight:700;color:#fff;">${initials}</span>`;
+          return `<tr style="border-bottom:1px solid #f1f5f9;transition:background 0.12s;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
+            <td style="padding:10px 16px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:34px;height:34px;border-radius:50%;background:#1e293b;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">${logoEl}</div>
+                <div>
+                  <div style="font-size:13px;font-weight:700;color:#1e293b;line-height:1.3;">${ticker}</div>
+                  <div style="font-size:11px;color:#94a3b8;line-height:1.3;">${h.name || ticker}</div>
+                </div>
               </div>
-            </div>
-          </td>
-          <td style="padding:10px 16px;">
-            <div style="display:flex;align-items:center;gap:5px;">
-              <button type="button" data-dec="${i}" style="width:26px;height:26px;border-radius:7px;background:#f1f5f9;border:1px solid #e2e8f0;cursor:pointer;font-size:15px;font-weight:600;color:#64748b;display:flex;align-items:center;justify-content:center;line-height:1;transition:all 0.1s;"
-                onmouseenter="this.style.background='#ede9fe';this.style.borderColor='#c4b5fd';this.style.color='#7c3aed'" onmouseleave="this.style.background='#f1f5f9';this.style.borderColor='#e2e8f0';this.style.color='#64748b'">−</button>
-              <input type="number" data-shares="${i}" value="${Math.max(1, Number(h.shares) || 1)}" min="1"
-                style="width:46px;text-align:center;font-size:13px;font-weight:600;color:#1e293b;border:1px solid #e2e8f0;border-radius:7px;padding:4px 2px;outline:none;-moz-appearance:textfield;background:#fff;">
-              <button type="button" data-inc="${i}" style="width:26px;height:26px;border-radius:7px;background:#f1f5f9;border:1px solid #e2e8f0;cursor:pointer;font-size:15px;font-weight:600;color:#64748b;display:flex;align-items:center;justify-content:center;line-height:1;transition:all 0.1s;"
-                onmouseenter="this.style.background='#ede9fe';this.style.borderColor='#c4b5fd';this.style.color='#7c3aed'" onmouseleave="this.style.background='#f1f5f9';this.style.borderColor='#e2e8f0';this.style.color='#64748b'">+</button>
-            </div>
-          </td>
-          <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
-            <span style="font-size:13px;font-weight:500;color:#334155;">${priceFmt}</span>
-          </td>
-          <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
-            <span style="font-size:12px;font-weight:600;color:${chgColor};">${chgStr}</span>
-          </td>
-          <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
-            <span class="holding-mv" style="font-size:13px;font-weight:500;color:#334155;">R ${mv}</span>
-          </td>
-          <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
-            <span style="font-size:12px;font-weight:500;color:#334155;">${mcFmt}</span>
-          </td>
-          <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
-            <span style="font-size:12px;font-weight:500;color:#334155;">${peFmt}</span>
-          </td>
-          <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
-            <span style="font-size:12px;font-weight:500;color:#334155;">${divShareFmt}</span>
-          </td>
-          <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
-            <span style="font-size:12px;font-weight:500;color:#334155;">${divYldFmt}</span>
-          </td>
-          <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
-            <span style="font-size:12px;font-weight:600;color:${ytdColor};">${ytdStr}</span>
-          </td>
-          <td style="padding:10px 16px;text-align:right;white-space:nowrap;">
-            <span class="holding-weight" style="font-size:13px;font-weight:700;color:#7c3aed;">${h.weight.toFixed(1)}%</span>
-          </td>
-          <td style="padding:10px 12px;text-align:center;">
-            <button type="button" data-remove="${i}" style="width:26px;height:26px;border-radius:7px;background:transparent;border:1px solid #e2e8f0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.1s;"
-              onmouseenter="this.style.background='#fff5f5';this.style.borderColor='#fca5a5'" onmouseleave="this.style.background='transparent';this.style.borderColor='#e2e8f0'">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
-            </button>
-          </td>
-        </tr>`;
-          })
-          .join("");
+            </td>
+            <td style="padding:10px 16px;">
+              <div style="display:flex;align-items:center;gap:5px;">
+                <button type="button" data-dec="${origIdx}" style="width:26px;height:26px;border-radius:7px;background:#f1f5f9;border:1px solid #e2e8f0;cursor:pointer;font-size:15px;font-weight:600;color:#64748b;display:flex;align-items:center;justify-content:center;line-height:1;transition:all 0.1s;" onmouseenter="this.style.background='#ede9fe';this.style.borderColor='#c4b5fd';this.style.color='#7c3aed'" onmouseleave="this.style.background='#f1f5f9';this.style.borderColor='#e2e8f0';this.style.color='#64748b'">−</button>
+                <input type="number" data-shares="${origIdx}" value="${Math.max(1, Number(h.shares) || 1)}" min="1" style="width:46px;text-align:center;font-size:13px;font-weight:600;color:#1e293b;border:1px solid #e2e8f0;border-radius:7px;padding:4px 2px;outline:none;-moz-appearance:textfield;background:#fff;">
+                <button type="button" data-inc="${origIdx}" style="width:26px;height:26px;border-radius:7px;background:#f1f5f9;border:1px solid #e2e8f0;cursor:pointer;font-size:15px;font-weight:600;color:#64748b;display:flex;align-items:center;justify-content:center;line-height:1;transition:all 0.1s;" onmouseenter="this.style.background='#ede9fe';this.style.borderColor='#c4b5fd';this.style.color='#7c3aed'" onmouseleave="this.style.background='#f1f5f9';this.style.borderColor='#e2e8f0';this.style.color='#64748b'">+</button>
+              </div>
+            </td>
+            ${visCols.map(c => `<td style="padding:10px 16px;text-align:right;white-space:nowrap;">${_hcRender(c.k, h)}</td>`).join('')}
+            <td style="padding:10px 12px;text-align:center;">
+              <button type="button" data-remove="${origIdx}" style="width:26px;height:26px;border-radius:7px;background:transparent;border:1px solid #e2e8f0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.1s;" onmouseenter="this.style.background='#fff5f5';this.style.borderColor='#fca5a5'" onmouseleave="this.style.background='transparent';this.style.borderColor='#e2e8f0'">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </td>
+          </tr>`;
+        }).join('');
+
+        /* tfoot — rebuild colspans dynamically */
+        if (tfoot) {
+          const mvIdx     = visCols.findIndex(c => c.isMv);
+          const wtIdx     = visCols.findIndex(c => c.isWt);
+          const leftCols  = mvIdx >= 0 ? mvIdx : (wtIdx >= 0 ? wtIdx : visCols.length);
+          const midCols   = (mvIdx >= 0 && wtIdx > mvIdx) ? wtIdx - mvIdx - 1 : 0;
+          const rightCols = wtIdx >= 0 ? visCols.length - wtIdx - 1 : 0;
+          tfoot.innerHTML = `<tr style="background:#f8fafc;border-top:1.5px solid #e8edf3;">
+            <td style="padding:10px 16px;font-size:12px;font-weight:600;color:#64748b;white-space:nowrap;">Total Position</td>
+            <td></td>
+            ${leftCols  > 0 ? `<td colspan="${leftCols}"></td>`  : ''}
+            ${mvIdx >= 0 ? `<td style="padding:10px 16px;text-align:right;font-size:13px;font-weight:600;color:#334155;" id="totalMvFooter">R 0.00</td>` : ''}
+            ${midCols   > 0 ? `<td colspan="${midCols}"></td>`   : ''}
+            ${wtIdx >= 0 ? `<td style="padding:10px 16px;text-align:right;"><span id="totalWeightDisplay" style="font-size:13px;font-weight:700;color:#7c3aed;">0%</span></td>` : ''}
+            ${rightCols > 0 ? `<td colspan="${rightCols}"></td>` : ''}
+            <td></td>
+          </tr>`;
+        }
+
+        _updateHoldingBadge();
+        recalculate();
+      };
+
+      /* badge & reset button state */
+      const _updateHoldingBadge = () => {
+        const badge    = document.getElementById('holdingSortBadge');
+        const resetBtn = document.getElementById('holdingResetBtn');
+        if (!badge || !resetBtn) return;
+        const hasSort   = !!_holdingSort.key;
+        const hasFilter = _holdingFilter.col && _holdingFilter.sign !== 'all';
+        if (hasSort || hasFilter) {
+          const parts = [];
+          if (hasSort)   parts.push(`Sort: ${_holdingSort.key} ${_holdingSort.dir > 0 ? '▲' : '▼'}`);
+          if (hasFilter) parts.push(`Filter: ${_holdingFilter.col} ${_holdingFilter.sign === 'pos' ? '> 0' : '< 0'}`);
+          badge.textContent  = parts.join(' · ');
+          badge.style.display    = '';
+          resetBtn.style.display = '';
+        } else {
+          badge.style.display    = 'none';
+          resetBtn.style.display = 'none';
+        }
+      };
+
+      /* global onclick handlers exposed for inline HTML */
+      window.sortHoldingBy = (key) => {
+        _holdingSort.key === key ? (_holdingSort.dir *= -1) : (_holdingSort.key = key, _holdingSort.dir = 1);
+        renderFormHoldings();
+      };
+      window.toggleHoldingCol = (key, visible) => {
+        const col = _HC.find(c => c.k === key);
+        if (col) col.v = visible;
+        renderFormHoldings();
+      };
+      window.resetHoldingFilters = () => {
+        _holdingSort   = { key: null, dir: 1 };
+        _holdingFilter = { col: '', sign: 'all' };
+        renderFormHoldings();
       };
 
       holdingsContainer.addEventListener("click", (e) => {
@@ -3534,14 +3740,16 @@
           const symbols = holdings.map((h) => h.ticker || h.symbol || h);
           const { data } = await supabaseClient
             .from("securities")
-            .select("symbol, name, logo_url, last_price, change_percent, market_cap, pe_ratio, dividend_per_share, dividend_yield, ytd_performance")
+            .select("id, symbol, name, logo_url")
             .in("symbol", symbols);
           if (data) {
+            const _m = await fetchSecurityMetrics(data.map(s => s.id).filter(Boolean));
             securitiesMap = new Map();
             data.forEach((s) => {
-              securitiesMap.set(s.symbol, s);
+              const merged = { ...s, ...(_m[s.id] || {}) };
+              securitiesMap.set(s.symbol, merged);
               const norm = normalizeSymbol(s.symbol);
-              if (norm !== s.symbol) securitiesMap.set(norm, s);
+              if (norm !== s.symbol) securitiesMap.set(norm, merged);
             });
           }
         }
@@ -3732,7 +3940,7 @@
             chunks.map((chunk) =>
               supabaseClient
                 .from("securities")
-                .select("symbol, name, logo_url, last_price, change_percent, market_cap, pe_ratio, dividend_per_share, dividend_yield, ytd_performance")
+                .select("id, symbol, name, logo_url")
                 .in("symbol", chunk),
             ),
           );
@@ -3744,6 +3952,13 @@
                 if (norm !== s.symbol) securitiesMap.set(norm, s);
               });
           });
+          /* Merge live metrics from security_metrics */
+          const _mapIds = [...new Set([...securitiesMap.values()].map(s => s.id).filter(Boolean))];
+          const _mapMetrics = await fetchSecurityMetrics(_mapIds);
+          for (const [sym, s] of securitiesMap.entries()) {
+            const m = _mapMetrics[s.id];
+            if (m) securitiesMap.set(sym, { ...s, ...m });
+          }
         }
 
         globalSecuritiesMap = securitiesMap;
@@ -4117,14 +4332,17 @@
           ];
           const { data: secs } = await supabaseClient
             .from("securities")
-            .select("symbol, name, logo_url, last_price, change_percent, market_cap, pe_ratio, dividend_per_share, dividend_yield, ytd_performance")
+            .select("id, symbol, name, logo_url")
             .in("symbol", allSymbols);
-          if (secs)
+          if (secs) {
+            const _sm = await fetchSecurityMetrics(secs.map(s => s.id).filter(Boolean));
             secs.forEach((s) => {
-              securitiesMap.set(s.symbol, s);
+              const merged = { ...s, ...(_sm[s.id] || {}) };
+              securitiesMap.set(s.symbol, merged);
               const norm = normalizeSymbol(s.symbol);
-              if (norm !== s.symbol) securitiesMap.set(norm, s);
+              if (norm !== s.symbol) securitiesMap.set(norm, merged);
             });
+          }
         }
 
         const totalWeight = holdings.reduce(
@@ -4558,17 +4776,23 @@
             _chunks.map((syms) =>
               supabaseClient
                 .from("securities")
-                .select("symbol, last_price")
+                .select("id, symbol")
                 .in("symbol", syms),
             ),
           );
           _overviewSecMap = new Map();
+          const _ovSecIds = [];
+          _secResults.forEach(({ data: secs }) => {
+            if (secs) secs.forEach((s) => { if (s.id) _ovSecIds.push(s.id); });
+          });
+          const _ovMetrics = await fetchSecurityMetrics(_ovSecIds);
           _secResults.forEach(({ data: secs }) => {
             if (secs)
               secs.forEach((s) => {
-                _overviewSecMap.set(s.symbol, s);
+                const merged = { ...s, ...(_ovMetrics[s.id] || {}) };
+                _overviewSecMap.set(s.symbol, merged);
                 const norm = normalizeSymbol(s.symbol || "");
-                if (norm && norm !== s.symbol) _overviewSecMap.set(norm, s);
+                if (norm && norm !== s.symbol) _overviewSecMap.set(norm, merged);
               });
           });
         }
@@ -4869,12 +5093,16 @@
         if (symbols.length > 0) {
           const { data: secs } = await supabaseClient
             .from('securities')
-            .select('symbol, name, last_price, change_percent, sector')
+            .select('id, symbol, name, sector')
             .in('symbol', symbols);
-          if (secs) secs.forEach(s => {
-            secMap.set(s.symbol, s);
-            secMap.set(normalizeSymbol(s.symbol), s);
-          });
+          if (secs) {
+            const _om = await fetchSecurityMetrics(secs.map(s => s.id).filter(Boolean));
+            secs.forEach(s => {
+              const merged = { ...s, ...(_om[s.id] || {}) };
+              secMap.set(s.symbol, merged);
+              secMap.set(normalizeSymbol(s.symbol), merged);
+            });
+          }
         }
 
         window.__dbgBreadcrumb('ovSelect:fetch-investors');
@@ -4902,7 +5130,7 @@
               .eq('status', 'posted')
               .gte('amount', 10000),
             sids.length
-              ? supabaseClient.from('securities').select('id, last_price').in('id', sids)
+              ? supabaseClient.from('security_metrics').select('security_id, last_close').in('security_id', sids).order('as_of_date', { ascending: false })
               : Promise.resolve({ data: [] })
           ];
           const [{ data: profs }, { data: txnRows }, { data: secRows }] = await Promise.all(fetches);
@@ -4912,7 +5140,13 @@
             if (d && (!txnInceptionMap[t.user_id] || d < txnInceptionMap[t.user_id]))
               txnInceptionMap[t.user_id] = d;
           });
-          (secRows || []).forEach(s => { secPriceMap[s.id] = Number(s.last_price) || 0; });
+          /* last_close is in Rand; store as cents (×100) to keep existing /100 division below */
+          const _seenSec = new Set();
+          (secRows || []).forEach(s => {
+            if (_seenSec.has(s.security_id)) return;
+            _seenSec.add(s.security_id);
+            secPriceMap[s.security_id] = s.last_close != null ? Math.round(s.last_close * 100) : 0;
+          });
         }
 
         /* Compute AUM from live prices (qty × last_price / 100) or fall back to cost basis */
@@ -5224,7 +5458,7 @@
 
           let query = supabaseClient
             .from('securities')
-            .select('symbol, name, logo_url, last_price, change_percent')
+            .select('id, symbol, name, logo_url')
             .order('symbol', { ascending: true });
 
           if (stratSymbols.size > 0) {
@@ -5237,7 +5471,9 @@
 
           const { data: secs, error } = await query;
           if (error) throw error;
-          const items = (secs || []).map(s => ({
+          const _ovListMetrics = await fetchSecurityMetrics((secs || []).map(s => s.id).filter(Boolean));
+          const secsWithMetrics = (secs || []).map(s => ({ ...s, ...(_ovListMetrics[s.id] || {}) }));
+          const items = secsWithMetrics.map(s => ({
             sym: (s.symbol || '').replace('.JO', ''),
             logo: s.logo_url || null,
             price: s.last_price != null ? Number(s.last_price) / 100 : null,
@@ -6536,12 +6772,18 @@
                     logo_url: sec.logo_url || null,
                     shares: 1,
                     weight: 0,
-                    market_cap: sec.market_cap ?? null,
-                    pe_ratio: sec.pe_ratio ?? null,
-                    dividend_per_share: sec.dividend_per_share ?? null,
-                    dividend_yield: sec.dividend_yield ?? null,
-                    ytd_performance: sec.ytd_performance ?? null,
-                    change_percent: sec.change_percent ?? null,
+                    change_percent:   sec.change_percent   ?? null,
+                    wtd_performance:  sec.wtd_performance  ?? null,
+                    mtd_performance:  sec.mtd_performance  ?? null,
+                    w1_performance:   sec.w1_performance   ?? null,
+                    m3_performance:   sec.m3_performance   ?? null,
+                    r_1y_performance: sec.r_1y_performance ?? null,
+                    r_6m_performance: sec.r_6m_performance ?? null,
+                    ytd_performance:  sec.ytd_performance  ?? null,
+                    volatility_30d:   sec.volatility_30d   ?? null,
+                    avg_volume_30d:   sec.avg_volume_30d   ?? null,
+                    prev_close:       sec.prev_close       ?? null,
+                    change_abs:       sec.change_abs       ?? null,
                   });
                   renderTopAssetsRow();
                 }
@@ -6803,14 +7045,17 @@
           if (!secMap || secMap.size === 0) {
             const { data } = await supabaseClient
               .from("securities")
-              .select("symbol, name, logo_url, last_price, change_percent, market_cap, pe_ratio, dividend_per_share, dividend_yield, ytd_performance")
+              .select("id, symbol, name, logo_url")
               .in("symbol", symbols);
             secMap = new Map();
-            if (data)
+            if (data) {
+              const _esm = await fetchSecurityMetrics(data.map(s => s.id).filter(Boolean));
               data.forEach((s) => {
-                secMap.set(s.symbol, s);
-                secMap.set(normalizeSymbol(s.symbol), s);
+                const merged = { ...s, ...(_esm[s.id] || {}) };
+                secMap.set(s.symbol, merged);
+                secMap.set(normalizeSymbol(s.symbol), merged);
               });
+            }
           }
           holdings.forEach((h) => {
             const sym = h.ticker || h.symbol || "";
@@ -6827,12 +7072,18 @@
               logo_url: sec.logo_url || null,
               market_value: 0,
               weight: 0,
-              change_percent: sec.change_percent ?? h.change_percent ?? null,
-              market_cap: sec.market_cap ?? h.market_cap ?? null,
-              pe_ratio: sec.pe_ratio ?? h.pe_ratio ?? null,
-              dividend_per_share: sec.dividend_per_share ?? h.dividend_per_share ?? null,
-              dividend_yield: sec.dividend_yield ?? h.dividend_yield ?? null,
-              ytd_performance: sec.ytd_performance ?? h.ytd_performance ?? null,
+              change_percent:   sec.change_percent   ?? h.change_percent   ?? null,
+              wtd_performance:  sec.wtd_performance  ?? null,
+              mtd_performance:  sec.mtd_performance  ?? null,
+              w1_performance:   sec.w1_performance   ?? null,
+              m3_performance:   sec.m3_performance   ?? null,
+              r_1y_performance: sec.r_1y_performance ?? null,
+              r_6m_performance: sec.r_6m_performance ?? null,
+              ytd_performance:  sec.ytd_performance  ?? h.ytd_performance  ?? null,
+              volatility_30d:   sec.volatility_30d   ?? null,
+              avg_volume_30d:   sec.avg_volume_30d   ?? null,
+              prev_close:       sec.prev_close       ?? null,
+              change_abs:       sec.change_abs       ?? null,
             });
           });
         }
@@ -7715,14 +7966,15 @@
         const symbols = rebIsins.map(i => i.fullSymbol).filter(Boolean);
         if (symbols.length) {
           try {
-            const { data: secRows } = await supabaseClient.from("securities").select("id, symbol, name, last_price").in("symbol", symbols);
+            const { data: secRows } = await supabaseClient.from("securities").select("id, symbol, name").in("symbol", symbols);
+            const _rebMetrics = await fetchSecurityMetrics((secRows || []).map(s => s.id).filter(Boolean));
             const codeBySecId = {};
             (secRows || []).forEach(s => { codeBySecId[s.id] = s.symbol.replace(/\.[A-Z]+$/, ""); });
 
             const secBySymbol = new Map();
             (secRows || []).forEach(s => {
               if (!s?.symbol) return;
-              secBySymbol.set(String(s.symbol), s);
+              secBySymbol.set(String(s.symbol), { ...s, ...(_rebMetrics[s.id] || {}) });
             });
 
             rebIsins = rebIsins.map((isin) => {
@@ -8548,13 +8800,15 @@
         if (symbols.length) {
           const { data: secRows, error: secErr } = await supabaseClient
             .from("securities")
-            .select("symbol, name, last_price")
+            .select("id, symbol, name")
             .in("symbol", symbols);
           if (secErr) throw new Error(secErr.message || "Failed to load latest security prices.");
+          const _miMetrics = await fetchSecurityMetrics((secRows || []).map(s => s.id).filter(Boolean));
           (secRows || []).forEach((row) => {
             const symbol = String(row.symbol || "");
             const norm = normalizeSymbol(symbol);
-            const price = Number(row.last_price || 0) / 100;
+            const metrics = _miMetrics[row.id] || {};
+            const price = Number(metrics.last_price || 0) / 100;
             if (symbol) {
               priceBySymbol.set(symbol, Number.isFinite(price) ? price : 0);
               if (row.name) nameBySymbol.set(symbol, String(row.name));
