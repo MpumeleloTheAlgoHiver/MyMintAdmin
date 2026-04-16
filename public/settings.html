@@ -477,14 +477,14 @@
           const secIds=[...new Set(holdings.map(h=>h.security_id).filter(Boolean))];
           const strIds=[...new Set(holdings.map(h=>h.strategy_id).filter(Boolean))];
           const secMap={}, strMap={};
-          if(secIds.length){ const {data:s}=await supabaseClient.from('securities_c').select('id,symbol,name,last_price').in('id',secIds); (s||[]).forEach(x=>secMap[x.id]=x); }
+          if(secIds.length){ const {data:s}=await supabaseClient.from('securities_c').select('id,symbol,name,last_price,logo_url').in('id',secIds); (s||[]).forEach(x=>secMap[x.id]=x); }
           if(strIds.length){ const {data:s}=await supabaseClient.from('strategies_c').select('id,name,short_name,risk_level').in('id',strIds); (s||[]).forEach(x=>strMap[x.id]=x); }
           let tv=0,tc=0;
           const fh=holdings.filter(h=>secMap[h.security_id]).map(h=>{
             const sec=secMap[h.security_id],qty=Number(h.quantity||0),af=Number(h.avg_fill||0),ip=!af;
             const lp=Number(sec.last_price||af),mv=(lp*qty)/100,cb=(af*qty)/100,pr=mv-cb,pp=cb>0?(pr/cb)*100:0;
             if(!ip){tv+=mv;tc+=cb;}
-            return {symbol:sec.symbol,name:sec.name,value:mv,pnlRands:pr,pnlPct:pp,isPending:ip,strategyId:h.strategy_id};
+            return {symbol:sec.symbol,name:sec.name,logo:sec.logo_url||'',value:mv,pnlRands:pr,pnlPct:pp,isPending:ip,strategyId:h.strategy_id};
           }).sort((a,b)=>b.value-a.value);
           const sa={};
           fh.forEach(h=>{ if(!h.strategyId) return; if(!sa[h.strategyId]) sa[h.strategyId]={value:0,count:0}; if(!h.isPending) sa[h.strategyId].value+=h.value; sa[h.strategyId].count+=1; });
@@ -496,7 +496,8 @@
           document.getElementById('cpStrategiesCount').textContent=se.length;
           document.getElementById('cpHoldingsList').innerHTML=fh.length?fh.map(h=>{
             const cls=h.pnlRands>=0?'cp-pnl-pos':'cp-pnl-neg';
-            return `<div class="cp-card"><div class="cp-row"><div><div style="font-size:13px;font-weight:700;">${escapeHtml(h.symbol)}${h.isPending?' <span class="cp-pending">Pending</span>':''}</div><div class="cp-muted" style="font-size:11px;">${escapeHtml(h.name)}</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:700;">R${fmt(h.value)}</div>${h.isPending?'<div class="cp-muted" style="font-size:11px;">Awaiting fill</div>':`<div class="${cls}" style="font-size:11px;font-weight:600;">${h.pnlRands>=0?'+':'-'}R${fmt(Math.abs(h.pnlRands))}</div>`}</div></div></div>`;
+            const logoHtml=h.logo?`<img src="${escapeHtml(h.logo)}" style="width:28px;height:28px;border-radius:8px;object-fit:cover;flex-shrink:0;border:1px solid #f2f2f7;" onerror="this.style.display='none'">`:`<div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#a855f7);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;">${escapeHtml((h.symbol||'?')[0])}</div>`;
+            return `<div class="cp-card"><div class="cp-row" style="align-items:center;">${logoHtml}<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">${escapeHtml(h.symbol)}${h.isPending?' <span class="cp-pending">Pending</span>':''}</div><div class="cp-muted" style="font-size:11px;">${escapeHtml(h.name)}</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:700;">R${fmt(h.value)}</div>${h.isPending?'<div class="cp-muted" style="font-size:11px;">Awaiting fill</div>':`<div class="${cls}" style="font-size:11px;font-weight:600;">${h.pnlRands>=0?'+':'-'}R${fmt(Math.abs(h.pnlRands))}</div>`}</div></div></div>`;
           }).join(''):'<div class="client-empty">No active holdings</div>';
           document.getElementById('cpStrategiesList').innerHTML=se.length?se.map(s=>`<div class="cp-card"><div style="font-size:13px;font-weight:700;">${escapeHtml(s.strategy.name||s.strategy.short_name)}</div><div class="cp-row" style="margin-top:4px;"><span class="cp-muted" style="font-size:11px;">${escapeHtml(s.strategy.risk_level||'Balanced')} · ${s.count} holding${s.count===1?'':'s'}</span><span style="font-size:12px;font-weight:700;">R${fmt(s.value)}</span></div></div>`).join(''):'<div class="client-empty">No strategies</div>';
           document.getElementById('cpTransactionsList').innerHTML=transactions.length?transactions.map(t=>{
