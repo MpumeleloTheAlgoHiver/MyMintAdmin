@@ -358,11 +358,11 @@
       /* Fetch strategies + active investor counts in parallel */
       const [{ data: strategies, error }, { data: holdingRows }] = await Promise.all([
         supabaseClient
-          .from('strategies')
+          .from('strategies_c')
           .select('id, name, short_name, description, risk_level, sector, status, is_public, holdings')
           .order('name'),
         supabaseClient
-          .from('stock_holdings')
+          .from('stock_holdings_c')
           .select('strategy_id, user_id')
           .eq('is_active', true)
           .eq('trade_side', 'BUY')
@@ -455,7 +455,7 @@
         </div>`;
 
       const { data: strategy, error: stratError } = await supabaseClient
-        .from('strategies')
+        .from('strategies_c')
         .select('id, slug, name, short_name, description, risk_level, sector, tags, base_currency, icon_url, image_url, holdings, min_investment, is_public, is_featured, status, created_at')
         .eq('id', strategyId)
         .maybeSingle();
@@ -479,7 +479,7 @@
       if (holdings.length > 0) {
         const symbols = holdings.map(h => h.ticker || h.symbol || h);
         const allSymbols = [...new Set([...symbols, ...symbols.map(normalizeSymbol)])];
-        const { data: secs } = await supabaseClient.from('securities').select('symbol, name, logo_url, last_price, change_percent').in('symbol', allSymbols);
+        const { data: secs } = await supabaseClient.from('securities_c').select('symbol, name, logo_url, last_price, change_percent').in('symbol', allSymbols);
         if (secs) secs.forEach(s => { securitiesMap.set(s.symbol, s); const norm = normalizeSymbol(s.symbol); if (norm !== s.symbol) securitiesMap.set(norm, s); });
       }
 

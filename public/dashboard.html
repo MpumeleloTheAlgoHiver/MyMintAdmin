@@ -2119,7 +2119,7 @@
 
           /* Fetch base security info then merge metrics from security_metrics */
           let q = supabaseClient
-            .from('securities')
+            .from('securities_c')
             .select('id, symbol, name, logo_url')
             .order('name', { ascending: true });
 
@@ -3234,7 +3234,7 @@
 
         const [strategiesResult] = await Promise.all([
           supabaseClient
-            .from("strategies")
+            .from("strategies_c")
             .select("holdings, created_at")
             .order("created_at", { ascending: false })
             .limit(200),
@@ -3248,7 +3248,7 @@
         let data = null;
         for (const _cols of _secSelectVariants) {
           const _r = await supabaseClient
-            .from("securities")
+            .from("securities_c")
             .select(_cols)
             .eq("is_active", true)
             .order("name", { ascending: true })
@@ -3908,7 +3908,7 @@
         ) {
           const symbols = holdings.map((h) => h.ticker || h.symbol || h);
           const { data } = await supabaseClient
-            .from("securities")
+            .from("securities_c")
             .select("id, symbol, name, logo_url")
             .in("symbol", symbols);
           if (data) {
@@ -4108,7 +4108,7 @@
           const results = await Promise.all(
             chunks.map((chunk) =>
               supabaseClient
-                .from("securities")
+                .from("securities_c")
                 .select("id, symbol, name, logo_url")
                 .in("symbol", chunk),
             ),
@@ -4356,12 +4356,12 @@
         let error, newStrategyId;
         if (isEditing) {
           ({ error } = await supabaseClient
-            .from("strategies")
+            .from("strategies_c")
             .update(payload)
             .eq("id", editingStrategyId));
         } else {
           const { data: insertData, error: insertError } = await supabaseClient
-            .from("strategies")
+            .from("strategies_c")
             .insert([payload])
             .select("id")
             .single();
@@ -4467,7 +4467,7 @@
           '<div class="flex items-center justify-center py-20"><div class="text-center"><div class="w-10 h-10 border-2 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div><p class="text-sm text-slate-500">Loading factsheet...</p></div></div>';
 
         const { data: strategy, error: stratError } = await supabaseClient
-          .from("strategies")
+          .from("strategies_c")
           .select(
             "id, slug, name, short_name, description, risk_level, sector, tags, base_currency, icon_url, image_url, holdings, min_investment, is_public, is_featured, status, created_at",
           )
@@ -4500,7 +4500,7 @@
             ...new Set([...symbols, ...symbols.map(normalizeSymbol)]),
           ];
           const { data: secs } = await supabaseClient
-            .from("securities")
+            .from("securities_c")
             .select("id, symbol, name, logo_url")
             .in("symbol", allSymbols);
           if (secs) {
@@ -4889,7 +4889,7 @@
       const loadStrategies = async () => {
         window.__dbgBreadcrumb('loadStrategies:start');
         const { data, error } = await supabaseClient
-          .from("strategies")
+          .from("strategies_c")
           .select(
             "id, slug, name, short_name, description, objective, risk_level, sector, min_investment, base_currency, is_featured, is_public, status, created_at, holdings, provider_name, tags",
           )
@@ -4944,7 +4944,7 @@
           const _secResults = await Promise.all(
             _chunks.map((syms) =>
               supabaseClient
-                .from("securities")
+                .from("securities_c")
                 .select("id, symbol")
                 .in("symbol", syms),
             ),
@@ -5261,7 +5261,7 @@
         const secMap = new Map(_ovSecMap);
         if (symbols.length > 0) {
           const { data: secs } = await supabaseClient
-            .from('securities')
+            .from('securities_c')
             .select('id, symbol, name, sector')
             .in('symbol', symbols);
           if (secs) {
@@ -5276,7 +5276,7 @@
 
         window.__dbgBreadcrumb('ovSelect:fetch-investors');
         const { data: investorRows } = await supabaseClient
-          .from('stock_holdings')
+          .from('stock_holdings_c')
           .select('user_id, quantity, avg_fill, market_value, strategy_id, trade_side, is_active, created_at, security_id')
           .eq('is_active', true)
           .eq('trade_side', 'BUY')
@@ -5422,7 +5422,7 @@
         if (btn) { btn.textContent = 'Creating…'; btn.disabled = true; }
         document.getElementById('ovStratPanel').style.display = 'none';
         const { data: insertData, error } = await supabaseClient
-          .from('strategies')
+          .from('strategies_c')
           .insert([{ name, slug: createStrategySlug(name), status: 'active', is_public: false, is_featured: false, provider_name: chosenStrategist }])
           .select('id')
           .single();
@@ -5626,7 +5626,7 @@
           });
 
           let query = supabaseClient
-            .from('securities')
+            .from('securities_c')
             .select('id, symbol, name, logo_url')
             .order('symbol', { ascending: true });
 
@@ -6060,7 +6060,7 @@
       const loadTopHoldings = async () => {
         const { data: holdingsRows, error: holdingsError } =
           await supabaseClient
-            .from("stock_holdings")
+            .from("stock_holdings_c")
             .select("security_id, user_id, quantity")
             .eq("is_active", true)
             .eq("trade_side", "BUY");
@@ -6134,7 +6134,7 @@
 
         const { data: securitiesRows, error: securitiesError } =
           await supabaseClient
-            .from("securities")
+            .from("securities_c")
             .select(
               "id, name, symbol, logo_url, description, market_cap, website, created_at, is_active",
             )
@@ -6218,7 +6218,7 @@
 
       const loadSectors = async () => {
         const { data } = await supabaseClient
-          .from("strategies")
+          .from("strategies_c")
           .select("sector");
         if (data) {
           const dbSectors = [
@@ -6362,7 +6362,7 @@
         );
         if (!confirmed) return;
         const { error } = await supabaseClient
-          .from("strategies")
+          .from("strategies_c")
           .update({ status: "archived", is_public: false })
           .eq("id", id);
         if (error) {
@@ -6380,7 +6380,7 @@
         );
         if (!confirmed) return;
         const { error } = await supabaseClient
-          .from("strategies")
+          .from("strategies_c")
           .delete()
           .eq("id", id);
         if (error) {
@@ -6392,7 +6392,7 @@
 
       const unarchiveStrategy = async (id) => {
         const { error } = await supabaseClient
-          .from("strategies")
+          .from("strategies_c")
           .update({ status: "active", is_public: true })
           .eq("id", id);
         if (error) {
@@ -6635,7 +6635,7 @@
           };
 
           const { error } = await supabaseClient
-            .from("strategies")
+            .from("strategies_c")
             .update(payload)
             .eq("id", strategy.id);
 
@@ -6766,7 +6766,7 @@
         if (!newName || !newName.trim() || newName.trim() === currentName)
           return;
         const { error } = await supabaseClient
-          .from("strategies")
+          .from("strategies_c")
           .update({ name: newName.trim() })
           .eq("id", strategyId);
         if (error) {
@@ -6810,7 +6810,7 @@
         try {
           /* stock_holdings has a strategy_id column — query it directly */
           const { data: holdRows } = await supabaseClient
-            .from("stock_holdings")
+            .from("stock_holdings_c")
             .select("strategy_id")
             .eq("is_active", true)
             .gt("quantity", 0);
@@ -7231,7 +7231,7 @@
           let secMap = securitiesMap;
           if (!secMap || secMap.size === 0) {
             const { data } = await supabaseClient
-              .from("securities")
+              .from("securities_c")
               .select("id, symbol, name, logo_url")
               .in("symbol", symbols);
             secMap = new Map();
@@ -8079,7 +8079,7 @@
           let rows = [];
           for (const cols of selectVariants) {
             const res = await supabaseClient
-              .from("securities")
+              .from("securities_c")
               .select(cols)
               .order("name", { ascending: true })
               .limit(1000);
@@ -8153,7 +8153,7 @@
         const symbols = rebIsins.map(i => i.fullSymbol).filter(Boolean);
         if (symbols.length) {
           try {
-            const { data: secRows } = await supabaseClient.from("securities").select("id, symbol, name").in("symbol", symbols);
+            const { data: secRows } = await supabaseClient.from("securities_c").select("id, symbol, name").in("symbol", symbols);
             const _rebMetrics = await fetchSecurityMetrics((secRows || []).map(s => s.id).filter(Boolean));
             const codeBySecId = {};
             (secRows || []).forEach(s => { codeBySecId[s.id] = s.symbol.replace(/\.[A-Z]+$/, ""); });
@@ -8180,7 +8180,7 @@
             const secIds = Object.keys(codeBySecId);
             if (secIds.length) {
               let holdingsQuery = supabaseClient
-                .from("stock_holdings")
+                .from("stock_holdings_c")
                 .select("security_id, user_id, quantity, strategy_id")
                 .eq("is_active", true)
                 .eq("trade_side", "BUY")
@@ -8986,7 +8986,7 @@
         const nameBySymbol = new Map();
         if (symbols.length) {
           const { data: secRows, error: secErr } = await supabaseClient
-            .from("securities")
+            .from("securities_c")
             .select("id, symbol, name")
             .in("symbol", symbols);
           if (secErr) throw new Error(secErr.message || "Failed to load latest security prices.");
@@ -9129,7 +9129,7 @@
 
         const { holdings, minInvestment } = await rebMergeAndRevalueStrategyHoldings(nextHoldings);
         const { error: strategyUpdateErr } = await supabaseClient
-          .from("strategies")
+          .from("strategies_c")
           .update({
             holdings: holdings.length ? holdings : null,
             min_investment: minInvestment,
@@ -9193,7 +9193,7 @@
           extraBuySelection?.instrument?.fullSymbol,
         ].filter(Boolean);
         const { data: secRows, error: secErr } = await supabaseClient
-          .from("securities")
+          .from("securities_c")
           .select("id, symbol")
           .in("symbol", symbolsToResolve);
         if (secErr) throw new Error(secErr.message || "Failed to resolve security IDs.");
@@ -9244,7 +9244,7 @@
         ])];
 
         const { data: existingRows, error: existingErr } = await supabaseClient
-          .from("stock_holdings")
+          .from("stock_holdings_c")
           .select("id, user_id, security_id, quantity, trade_side, is_active")
           .eq("strategy_id", strategyId)
           .eq("is_active", true)
@@ -9295,7 +9295,7 @@
         if (sellEventRows.length) {
           const insertRows = sellEventRows.map(({ _rowId, _remaining, ...rest }) => rest);
           const { error: sellEventErr } = await supabaseClient
-            .from("stock_holdings")
+            .from("stock_holdings_c")
             .insert(insertRows);
           if (sellEventErr) throw new Error(sellEventErr.message || "Failed to insert sell order events.");
         }
@@ -9306,7 +9306,7 @@
           if (!evt._rowId) continue;
           if (isFullExit || evt._remaining <= 0) {
             const { error: closeErr } = await supabaseClient
-              .from("stock_holdings")
+              .from("stock_holdings_c")
               .update({
                 is_active: false,
                 closed_reason: "POSITION_REPLACED",
@@ -9321,7 +9321,7 @@
             if (closeErr) throw new Error(closeErr.message || "Failed to close replaced position.");
           } else {
             const { error: partialErr } = await supabaseClient
-              .from("stock_holdings")
+              .from("stock_holdings_c")
               .update({
                 quantity: evt._remaining,
                 updated_at: nowIso,
@@ -9350,7 +9350,7 @@
           .filter((row) => row.quantity > 0);
         if (buyEventRows.length) {
           const { error: buyEventErr } = await supabaseClient
-            .from("stock_holdings")
+            .from("stock_holdings_c")
             .insert(buyEventRows);
           if (buyEventErr) throw new Error(buyEventErr.message || "Failed to insert buy order events.");
         }
@@ -9375,7 +9375,7 @@
             .filter((row) => row.quantity > 0);
           if (extraBuyEventRows.length) {
             const { error: extraBuyEventErr } = await supabaseClient
-              .from("stock_holdings")
+              .from("stock_holdings_c")
               .insert(extraBuyEventRows);
             if (extraBuyEventErr) throw new Error(extraBuyEventErr.message || "Failed to insert secondary buy order events.");
           }
@@ -9402,7 +9402,7 @@
             if (existingBuy) {
               const nextQty = Math.max(0, Number(existingBuy.quantity || 0) + buyQty);
               const { error: updateErr } = await supabaseClient
-                .from("stock_holdings")
+                .from("stock_holdings_c")
                 .update({
                   quantity: nextQty,
                   updated_at: nowIso,
@@ -9415,7 +9415,7 @@
               if (updateErr) throw new Error(updateErr.message || "Failed to update active buy bucket.");
             } else {
               const { error: insertErr } = await supabaseClient
-                .from("stock_holdings")
+                .from("stock_holdings_c")
                 .insert({
                   user_id: userId,
                   security_id: securityId,

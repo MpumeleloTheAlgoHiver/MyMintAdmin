@@ -468,12 +468,12 @@
     /* LOAD ALL INVESTORS                                      */
     /* ─────────────────────────────────────────────────────── */
     async function loadInvestors() {
-      const { data: stratList } = await supabaseClient.from('strategies').select('id, name, short_name');
+      const { data: stratList } = await supabaseClient.from('strategies_c').select('id, name, short_name');
       allStrategies = stratList || [];
 
       /* Fetch active buy holdings with created_at for inception date */
       const { data: holdings } = await supabaseClient
-        .from('stock_holdings')
+        .from('stock_holdings_c')
         .select('user_id, strategy_id, security_id, quantity, avg_fill, market_value, created_at, as_of_date')
         .eq('is_active', true)
         .eq('trade_side', 'BUY');
@@ -494,7 +494,7 @@
           .eq('status',    'posted')
           .gte('amount', 10000),   /* exclude tiny per-share test transactions */
         supabaseClient
-          .from('securities')
+          .from('securities_c')
           .select('id, last_price, AsOfTime')
           .in('id', secIds)
       ]);
@@ -675,7 +675,7 @@
 
       /* 1. Strategy holdings (for allocation tab) */
       const { data: stratData } = await supabaseClient
-        .from('strategies')
+        .from('strategies_c')
         .select('holdings, name, short_name')
         .eq('id', investor.strategyId)
         .maybeSingle();
@@ -772,7 +772,7 @@
           .eq('user_id', investor.userId)
           .order('created_at', { ascending: false }),
         supabaseClient
-          .from('stock_holdings')
+          .from('stock_holdings_c')
           .select('*, securities(code, description)')
           .eq('user_id', investor.userId)
           .eq('Status', 'inactive')

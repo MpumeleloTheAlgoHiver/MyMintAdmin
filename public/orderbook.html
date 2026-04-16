@@ -3969,7 +3969,7 @@
 
     const loadOrderbookClientSideFallback = async () => {
       const { data: holdingsRows, error: holdingsError } = await supabaseClient
-        .from('stock_holdings')
+        .from('stock_holdings_c')
         .select('id, user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, as_of_date, created_at, updated_at, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", avg_exit, strategy_id, trade_side, is_active, closed_reason, closed_at, rebalance_batch_id, strategy_name_snapshot')
         .order('updated_at', { ascending: false });
 
@@ -3998,7 +3998,7 @@
       if (securityIds.length) {
         parallelQueries.push(
           supabaseClient
-            .from('securities')
+            .from('securities_c')
             .select('id, name, symbol, last_price, isin')
             .in('id', securityIds)
             .then(({ data, error }) => {
@@ -4037,7 +4037,7 @@
       if (strategyIds.length) {
         parallelQueries.push(
           supabaseClient
-            .from('strategies')
+            .from('strategies_c')
             .select('id, name, short_name, slug')
             .in('id', strategyIds)
             .then(({ data, error }) => {
@@ -4546,7 +4546,7 @@
           // Note: We update both avg_fill and avg_exit to be safe, 
           // though usually one applies per row type.
           const { error } = await supabaseClient
-            .from('stock_holdings')
+            .from('stock_holdings_c')
             .update({ 
               avg_fill: newPriceCents,
               avg_exit: newPriceCents
