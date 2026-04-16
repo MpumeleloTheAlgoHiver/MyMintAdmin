@@ -712,9 +712,6 @@
       if (securitiesMap && holdingsCount > 0) {
         minInvestment = calculateMinInvestmentFromHoldings(holdings, securitiesMap);
       }
-      if (!minInvestment && strategy.min_investment) {
-        minInvestment = Number(strategy.min_investment);
-      }
 
       const totalWeight = holdings.reduce((sum, h) => sum + (Number(h.weight) || 0), 0);
 
