@@ -1708,7 +1708,10 @@
         { k:'1M_Return',      l:'1 Month %',        t:'Source: 1M_Return × 100',      v:true,  isReturn:true  },
         { k:'r_6m',           l:'6 Month %',        t:'Source: r_6m × 100',           v:false, isReturn:true  },
         { k:'r_1y',           l:'1 Year %',         t:'Source: r_1y × 100',           v:true,  isReturn:true  },
+        { k:'5y_return',      l:'5 Year %',         t:'Source: 5y_pct',               v:true,  isReturn:true  },
+        { k:'all_return',     l:'All Time %',       t:'Source: all_pct',              v:true,  isReturn:true  },
         { k:'r_ytd',          l:'YTD %',            t:'Source: r_ytd × 100',          v:true,  isReturn:true  },
+        { k:'as_of_date',     l:'As of Date',       t:'Source: as_of_date',           v:false, isReturn:false },
         { k:'weight',         l:'Weight',           t:'From strategy holdings',        v:true,  isReturn:false, isWt:true },
       ];
       let _holdingSort   = { key: null, dir: 1 };
@@ -3281,6 +3284,7 @@
             r_1y_performance:sr['1y_pct']     != null ? Number(sr['1y_pct'])                       : null,
             sr_5y_pct:       sr['5y_pct']     != null ? Number(sr['5y_pct'])                       : null,
             sr_all_pct:      sr['all_pct']    != null ? Number(sr['all_pct'])                      : null,
+            as_of_date:      sr['as_of_date'] ?? null,
           };
         });
 
@@ -3392,6 +3396,9 @@
               avg_volume_30d:   cached.avg_volume_30d   ?? null,
               prev_close:       cached.prev_close       ?? null,
               change_abs:       cached.change_abs       ?? null,
+              sr_5y_pct:        cached.sr_5y_pct        ?? null,
+              sr_all_pct:       cached.sr_all_pct       ?? null,
+              as_of_date:       cached.as_of_date       ?? null,
             });
             securitySearchInput.value = "";
             renderSecuritiesDropdown("");
@@ -3487,9 +3494,12 @@
           case '3M_Return':      return h.m3_performance || 0;
           case 'r_6m':           return h.r_6m_performance || 0;
           case 'r_1y':           return h.r_1y_performance || 0;
+          case '5y_return':      return h.sr_5y_pct || 0;
+          case 'all_return':     return h.sr_all_pct || 0;
           case 'volatility_30d': return h.volatility_30d || 0;
           case 'avg_volume_30d': return h.avg_volume_30d || 0;
           case 'r_ytd':          return h.ytd_performance || 0;
+          case 'as_of_date':     return h.as_of_date || '';
           case 'weight':         return h.weight || 0;
           default: return 0;
         }
@@ -3519,6 +3529,9 @@
           case '3M_Return':      { const p = fp(h.m3_performance);    return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
           case 'r_6m':           { const p = fp(h.r_6m_performance);  return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
           case 'r_1y':           { const p = fp(h.r_1y_performance);  return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
+          case '5y_return':      { const p = fp(h.sr_5y_pct);         return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
+          case 'all_return':     { const p = fp(h.sr_all_pct);        return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
+          case 'as_of_date':     return `<span style="font-size:12px;color:#64748b;">${h.as_of_date ? new Date(h.as_of_date).toLocaleDateString('en-ZA') : '—'}</span>`;
           case 'volatility_30d':
             return `<span style="font-size:12px;color:#334155;">${h.volatility_30d != null ? (h.volatility_30d * 100).toFixed(2) + '%' : '—'}</span>`;
           case 'avg_volume_30d':
@@ -7025,6 +7038,9 @@
                     avg_volume_30d:   sec.avg_volume_30d   ?? null,
                     prev_close:       sec.prev_close       ?? null,
                     change_abs:       sec.change_abs       ?? null,
+                    sr_5y_pct:        sec.sr_5y_pct        ?? null,
+                    sr_all_pct:       sec.sr_all_pct       ?? null,
+                    as_of_date:       sec.as_of_date       ?? null,
                   });
                   renderTopAssetsRow();
                 }
