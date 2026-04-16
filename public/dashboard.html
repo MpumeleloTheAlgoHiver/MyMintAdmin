@@ -2548,7 +2548,7 @@
             : null;
         const _minVal =
           _liveMin ||
-          (strategy.min_investment ? Number(strategy.min_investment) : null);
+          (strategy.min_investment ? Number(strategy.min_investment) / 100 : null);
         const minInvestment = _minVal
           ? formatCurrency(_minVal, strategy.base_currency || "ZAR")
           : "Not calculated";
@@ -2717,7 +2717,7 @@
             _overviewSecMap && _h.length > 0
               ? calculateMinInvestmentFromHoldings(_h, _overviewSecMap)
               : null;
-          return { item, score: _live || Number(item.min_investment) || 0 };
+          return { item, score: _live || (item.min_investment ? Number(item.min_investment) / 100 : 0) };
         });
 
         scored.sort((a, b) => b.score - a.score);
@@ -2748,7 +2748,7 @@
             const _min5 =
               _live5 ||
               (strategy.min_investment
-                ? Number(strategy.min_investment)
+                ? Number(strategy.min_investment) / 100
                 : null);
             const minInvestment = _min5
               ? formatCurrency(_min5, currency)
@@ -3850,7 +3850,7 @@
             securitiesMap,
           );
         if (!minInvestment && strategy.min_investment)
-          minInvestment = Number(strategy.min_investment);
+          minInvestment = Number(strategy.min_investment) / 100;
 
         const totalWeight = holdings.reduce(
           (sum, h) => sum + (Number(h.weight) || 0),
@@ -3968,7 +3968,7 @@
             holdings,
             securitiesMap || new Map(),
           ) ||
-          Number(strategy.min_investment) ||
+          (strategy.min_investment ? Number(strategy.min_investment) / 100 : null) ||
           null;
 
         const holdingsRows = holdings
@@ -5545,7 +5545,7 @@
             return {
               sym:    (s.symbol || '').replace('.JO', ''),
               logo:   s.logo_url || null,
-              price:  sr.current_price != null ? Number(sr.current_price) : null,
+              price:  sr.current_price != null ? Number(sr.current_price) / 100 : null,
               change: sr['1d_pct']     != null ? Number(sr['1d_pct'])     : null,
             };
           }).filter(item => item.sym);
