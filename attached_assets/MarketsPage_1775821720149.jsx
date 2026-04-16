@@ -368,7 +368,7 @@ const MarketsPage = ({ onBack, onOpenNotifications, onOpenStockDetail, onOpenNew
         const results = await Promise.all(
           chunks.map((symbols) => (
             supabase
-              .from("securities")
+              .from("securities_c")
               .select("id, symbol, logo_url, name, last_price")
               .in("symbol", symbols)
           )),

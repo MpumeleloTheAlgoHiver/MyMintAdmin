@@ -479,7 +479,7 @@
       if (holdings.length > 0) {
         const symbols = holdings.map(h => h.ticker || h.symbol || h);
         const allSymbols = [...new Set([...symbols, ...symbols.map(normalizeSymbol)])];
-        const { data: secs } = await supabaseClient.from('securities').select('symbol, name, logo_url, last_price, change_percent').in('symbol', allSymbols);
+        const { data: secs } = await supabaseClient.from('securities_c').select('symbol, name, logo_url, last_price, change_percent').in('symbol', allSymbols);
         if (secs) secs.forEach(s => { securitiesMap.set(s.symbol, s); const norm = normalizeSymbol(s.symbol); if (norm !== s.symbol) securitiesMap.set(norm, s); });
       }
 

@@ -515,7 +515,7 @@
       }
 
       const { data, error } = await supabaseClient
-        .from('securities')
+        .from('securities_c')
         .select('symbol, name, logo_url, last_price')
         .or(`symbol.ilike.%${query}%,name.ilike.%${query}%`)
         .limit(20);
@@ -772,7 +772,7 @@
       if (holdings.length > 0 && (!securitiesMap || securitiesMap.size === 0)) {
         const symbols = holdings.map(h => h.ticker || h.symbol || h);
         const { data } = await supabaseClient
-          .from('securities')
+          .from('securities_c')
           .select('symbol, name, logo_url, last_price, change_percent')
           .in('symbol', symbols);
         if (data) {
@@ -945,7 +945,7 @@
           chunks.push(symbolArr.slice(i, i + 50));
         }
         const results = await Promise.all(
-          chunks.map(chunk => supabaseClient.from('securities').select('symbol, name, logo_url, last_price, change_percent').in('symbol', chunk))
+          chunks.map(chunk => supabaseClient.from('securities_c').select('symbol, name, logo_url, last_price, change_percent').in('symbol', chunk))
         );
         results.forEach(({ data }) => {
           if (data) data.forEach(s => {

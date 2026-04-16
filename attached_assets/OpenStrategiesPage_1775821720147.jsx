@@ -203,7 +203,7 @@ const OpenStrategiesPage = ({ onBack, onOpenFactsheet }) => {
         const results = await Promise.all(
           chunks.map((symbols) => (
             supabase
-              .from("securities")
+              .from("securities_c")
               .select("symbol, name, logo_url, last_price")
               .in("symbol", symbols)
           )),

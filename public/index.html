@@ -8478,7 +8478,7 @@
 
           if (securityIds.length) {
             const { data: securityRows, error: securitiesError } = await supabaseClient
-              .from('securities')
+              .from('securities_c')
               .select('id, symbol, name, logo_url, last_price, "AsOfTime"')
               .in('id', securityIds);
 

@@ -494,7 +494,7 @@
           .eq('status',    'posted')
           .gte('amount', 10000),   /* exclude tiny per-share test transactions */
         supabaseClient
-          .from('securities')
+          .from('securities_c')
           .select('id, last_price, AsOfTime')
           .in('id', secIds)
       ]);

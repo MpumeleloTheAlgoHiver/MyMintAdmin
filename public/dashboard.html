@@ -2042,7 +2042,7 @@
 
           /* Fetch base security info then merge metrics from security_metrics */
           let q = supabaseClient
-            .from('securities')
+            .from('securities_c')
             .select('id, symbol, name, logo_url')
             .order('name', { ascending: true });
 
@@ -3092,7 +3092,7 @@
         let data = null;
         for (const _cols of _secSelectVariants) {
           const _r = await supabaseClient
-            .from("securities")
+            .from("securities_c")
             .select(_cols)
             .eq("is_active", true)
             .order("name", { ascending: true })
@@ -3752,7 +3752,7 @@
         ) {
           const symbols = holdings.map((h) => h.ticker || h.symbol || h);
           const { data } = await supabaseClient
-            .from("securities")
+            .from("securities_c")
             .select("id, symbol, name, logo_url")
             .in("symbol", symbols);
           if (data) {
@@ -3952,7 +3952,7 @@
           const results = await Promise.all(
             chunks.map((chunk) =>
               supabaseClient
-                .from("securities")
+                .from("securities_c")
                 .select("id, symbol, name, logo_url")
                 .in("symbol", chunk),
             ),
@@ -4344,7 +4344,7 @@
             ...new Set([...symbols, ...symbols.map(normalizeSymbol)]),
           ];
           const { data: secs } = await supabaseClient
-            .from("securities")
+            .from("securities_c")
             .select("id, symbol, name, logo_url")
             .in("symbol", allSymbols);
           if (secs) {
@@ -4788,7 +4788,7 @@
           const _secResults = await Promise.all(
             _chunks.map((syms) =>
               supabaseClient
-                .from("securities")
+                .from("securities_c")
                 .select("id, symbol")
                 .in("symbol", syms),
             ),
@@ -5105,7 +5105,7 @@
         const secMap = new Map(_ovSecMap);
         if (symbols.length > 0) {
           const { data: secs } = await supabaseClient
-            .from('securities')
+            .from('securities_c')
             .select('id, symbol, name, sector')
             .in('symbol', symbols);
           if (secs) {
@@ -5470,7 +5470,7 @@
           });
 
           let query = supabaseClient
-            .from('securities')
+            .from('securities_c')
             .select('id, symbol, name, logo_url')
             .order('symbol', { ascending: true });
 
@@ -5978,7 +5978,7 @@
 
         const { data: securitiesRows, error: securitiesError } =
           await supabaseClient
-            .from("securities")
+            .from("securities_c")
             .select(
               "id, name, symbol, logo_url, description, market_cap, website, created_at, is_active",
             )
@@ -7075,7 +7075,7 @@
           let secMap = securitiesMap;
           if (!secMap || secMap.size === 0) {
             const { data } = await supabaseClient
-              .from("securities")
+              .from("securities_c")
               .select("id, symbol, name, logo_url")
               .in("symbol", symbols);
             secMap = new Map();
@@ -7625,8 +7625,8 @@
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               </div>
               <div style="min-width:0;">
-                <p style="margin:0;font-size:13px;font-weight:700;line-height:1.3;">Trade sequence committed</p>
-                <p style="margin:3px 0 0;font-size:11px;color:#cbd5e1;line-height:1.35;">${rowCountText}</p>
+                <p style="margin:0;font-size:13px;font-weight:700;line-height:1.3;">Trade sequence committed <span style="font-size:10px;font-weight:600;color:#fbbf24;background:rgba(251,191,36,0.15);padding:1px 6px;border-radius:5px;margin-left:4px;">PENDING</span></p>
+                <p style="margin:3px 0 0;font-size:11px;color:#cbd5e1;line-height:1.35;">${rowCountText} · Go to Orderbook to Fill &amp; Settle</p>
               </div>
             </div>
             <button id="rebCommitToastClose" type="button" style="border:none;background:transparent;color:#cbd5e1;font-size:15px;line-height:1;cursor:pointer;padding:0 2px;">×</button>
@@ -7923,7 +7923,7 @@
           let rows = [];
           for (const cols of selectVariants) {
             const res = await supabaseClient
-              .from("securities")
+              .from("securities_c")
               .select(cols)
               .order("name", { ascending: true })
               .limit(1000);
@@ -7997,7 +7997,7 @@
         const symbols = rebIsins.map(i => i.fullSymbol).filter(Boolean);
         if (symbols.length) {
           try {
-            const { data: secRows } = await supabaseClient.from("securities").select("id, symbol, name").in("symbol", symbols);
+            const { data: secRows } = await supabaseClient.from("securities_c").select("id, symbol, name").in("symbol", symbols);
             const _rebMetrics = await fetchSecurityMetrics((secRows || []).map(s => s.id).filter(Boolean));
             const codeBySecId = {};
             (secRows || []).forEach(s => { codeBySecId[s.id] = s.symbol.replace(/\.[A-Z]+$/, ""); });
@@ -8830,7 +8830,7 @@
         const nameBySymbol = new Map();
         if (symbols.length) {
           const { data: secRows, error: secErr } = await supabaseClient
-            .from("securities")
+            .from("securities_c")
             .select("id, symbol, name")
             .in("symbol", symbols);
           if (secErr) throw new Error(secErr.message || "Failed to load latest security prices.");
@@ -9003,6 +9003,7 @@
       }
 
       async function rebPersistCommittedTradeSequence() {
+        /* ── Validation ── */
         const buyModal = document.getElementById("rebBuyModal");
         const buySelection = buyModal?._buySelection;
         if (!buySelection?.exec || !buySelection?.instrument) {
@@ -9031,13 +9032,28 @@
         const extraBuySelection = buySelection.extraBuy || null;
         const extraBuyExec = extraBuySelection?.exec || null;
 
+        /* ── Guard: block if a PENDING batch already exists for this strategy ── */
+        const { data: pendingBatches, error: pendingErr } = await supabaseClient
+          .from("rebalance_batch")
+          .select("id, status, sell_isin_code, buy_isin_code, created_at")
+          .eq("strategy_id", strategyId)
+          .eq("status", "PENDING");
+        if (pendingErr) throw new Error(pendingErr.message || "Failed to check pending batches.");
+        if (pendingBatches && pendingBatches.length > 0) {
+          const existing = pendingBatches[0];
+          throw new Error(
+            `A pending rebalance already exists for this strategy (batch ${existing.id.slice(0, 8)}… created ${new Date(existing.created_at).toLocaleString()}). Please settle or reverse it before committing a new one.`
+          );
+        }
+
+        /* ── Resolve security IDs ── */
         const symbolsToResolve = [
           rebSelectedIsin.fullSymbol,
           buySelection.instrument.fullSymbol,
           extraBuySelection?.instrument?.fullSymbol,
         ].filter(Boolean);
         const { data: secRows, error: secErr } = await supabaseClient
-          .from("securities")
+          .from("securities_c")
           .select("id, symbol")
           .in("symbol", symbolsToResolve);
         if (secErr) throw new Error(secErr.message || "Failed to resolve security IDs.");
@@ -9062,6 +9078,14 @@
           throw new Error("Secondary buy security must be different from the primary buy security.");
         }
 
+        /* ── Capture pre-rebalance snapshots (for reversal) ── */
+        const strategyRef = (allStrategiesFullData || []).find((s) => String(s.id) === String(strategyId));
+        const holdingsSnapshotBefore = strategyRef?.holdings
+          ? JSON.parse(JSON.stringify(strategyRef.holdings))
+          : null;
+        const walletSnapshotBefore = { ...rebWalletByClient };
+
+        /* ── Update strategy model (target allocation) ── */
         await rebReplaceStrategyHoldingAfterBuy({
           strategyId,
           soldIsin: rebSelectedIsin,
@@ -9070,12 +9094,15 @@
           buyExec,
         });
 
+        /* ── Generate batch ID & metadata ── */
         const rebalanceBatchId = (window.crypto && typeof window.crypto.randomUUID === "function")
           ? window.crypto.randomUUID()
-          : `reb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        const strategyRef = (allStrategiesFullData || []).find((s) => String(s.id) === String(strategyId));
+          : ("10000000-1000-4000-8000-100000000000".replace(/[018]/g, c =>
+              (+c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (+c / 4)))).toString(16)
+            ));
         const strategyNameSnapshot = strategyRef?.short_name || strategyRef?.name || "";
 
+        /* ── Read existing active positions (read-only — to compute sell quantities) ── */
         const userIds = [...new Set([
           ...clients.map((c) => String(c.id)),
           ...(buyExec.clientAllocations || []).map((a) => String(a.clientId)),
@@ -9108,180 +9135,128 @@
         }
 
         // Compute per-row sell quantity using the divisibility step ratio.
-        // reductionUnits / unitsPerLot gives the fraction of each client's position to sell.
         const reductionUnits = Number(rebSelectedStep.reductionUnits || 0);
         const unitsPerLot = Math.max(1, Number(rebSelectedIsin.unitsPerLot || 1));
         const sellFraction = reductionUnits / unitsPerLot;
         const isFullExit = sellFraction >= 1 || Number(rebSelectedStep.reductionPercent || 0) >= 100;
 
-        // Persist SELL order history rows first for broker/audit visibility.
+        /* ── Build SELL events → rebalance_event ── */
         const sellEventRows = activeSellRows.map((row) => {
           const totalQty = Math.abs(Number(row.quantity || 0));
           const soldQty = isFullExit ? totalQty : Math.max(0, Math.round(totalQty * sellFraction));
           return {
+            batch_id: rebalanceBatchId,
             user_id: row.user_id,
             security_id: sellSecurityId,
-            quantity: soldQty,
-            strategy_id: strategyId,
-            updated_at: nowIso,
             trade_side: "SELL",
-            is_active: false,
+            quantity: soldQty,
+            price_at_commit: Math.round(Number(rebSelectedIsin.currentPrice || 0) * 100),
+            avg_fill: null,
+            fill_date: null,
             closed_reason: "REBALANCE_EVENT_SELL",
-            closed_at: nowIso,
-            rebalance_batch_id: rebalanceBatchId,
             strategy_name_snapshot: strategyNameSnapshot,
-            _rowId: row.id,
-            _remaining: totalQty - soldQty,
-            avg_fill: Math.round(Number(rebSelectedIsin.currentPrice || 0) * 100),
-            Status: "inactive",
+            created_at: nowIso,
+            updated_at: nowIso,
           };
         });
-        if (sellEventRows.length) {
-          const insertRows = sellEventRows.map(({ _rowId, _remaining, ...rest }) => rest);
-          const { error: sellEventErr } = await supabaseClient
-            .from("stock_holdings")
-            .insert(insertRows);
-          if (sellEventErr) throw new Error(sellEventErr.message || "Failed to insert sell order events.");
-        }
 
-        // For full exits: close the entire active position.
-        // For partial sells: update the active row to reflect remaining quantity.
-        for (const evt of sellEventRows) {
-          if (!evt._rowId) continue;
-          if (isFullExit || evt._remaining <= 0) {
-            const { error: closeErr } = await supabaseClient
-              .from("stock_holdings")
-              .update({
-                is_active: false,
-                closed_reason: "POSITION_REPLACED",
-                closed_at: nowIso,
-                updated_at: nowIso,
-                rebalance_batch_id: rebalanceBatchId,
-                avg_exit: Math.round(Number(rebSelectedIsin.currentPrice || 0) * 100),
-                exit_date: nowIso.split("T")[0],
-                Status: "inactive",
-              })
-              .eq("id", evt._rowId);
-            if (closeErr) throw new Error(closeErr.message || "Failed to close replaced position.");
-          } else {
-            const { error: partialErr } = await supabaseClient
-              .from("stock_holdings")
-              .update({
-                quantity: evt._remaining,
-                updated_at: nowIso,
-              })
-              .eq("id", evt._rowId);
-            if (partialErr) throw new Error(partialErr.message || "Failed to update remaining position.");
-          }
-        }
-
-        // Persist BUY order history rows for orderbook audit trail.
+        /* ── Build primary BUY events → rebalance_event ── */
         const buyEventRows = (buyExec.clientAllocations || [])
           .map((alloc) => ({
+            batch_id: rebalanceBatchId,
             user_id: String(alloc.clientId),
             security_id: buySecurityId,
-            quantity: Number(alloc.shares || 0),
-            strategy_id: strategyId,
-            updated_at: nowIso,
             trade_side: "BUY",
-            is_active: false,
+            quantity: Number(alloc.shares || 0),
+            price_at_commit: Math.round(Number(buyExec.pricePerShare || 0) * 100),
+            avg_fill: null,
+            fill_date: null,
             closed_reason: "REBALANCE_EVENT_BUY",
-            closed_at: nowIso,
-            rebalance_batch_id: rebalanceBatchId,
             strategy_name_snapshot: strategyNameSnapshot,
-            Status: "inactive",
+            created_at: nowIso,
+            updated_at: nowIso,
           }))
           .filter((row) => row.quantity > 0);
-        if (buyEventRows.length) {
-          const { error: buyEventErr } = await supabaseClient
-            .from("stock_holdings")
-            .insert(buyEventRows);
-          if (buyEventErr) throw new Error(buyEventErr.message || "Failed to insert buy order events.");
-        }
 
+        /* ── Build extra BUY events (wallet-funded) → rebalance_event ── */
         let extraBuyEventRows = [];
         if (extraBuyExec) {
           extraBuyEventRows = (extraBuyExec.clientAllocations || [])
             .map((alloc) => ({
+              batch_id: rebalanceBatchId,
               user_id: String(alloc.clientId),
               security_id: extraBuySecurityId,
-              quantity: Number(alloc.shares || 0),
-              strategy_id: strategyId,
-              updated_at: nowIso,
               trade_side: "BUY",
-              is_active: false,
+              quantity: Number(alloc.shares || 0),
+              price_at_commit: Math.round(Number(extraBuyExec.pricePerShare || 0) * 100),
+              avg_fill: null,
+              fill_date: null,
               closed_reason: "REBALANCE_EVENT_BUY_WALLET",
-              closed_at: nowIso,
-              rebalance_batch_id: rebalanceBatchId,
               strategy_name_snapshot: strategyNameSnapshot,
-              Status: "inactive",
+              created_at: nowIso,
+              updated_at: nowIso,
             }))
             .filter((row) => row.quantity > 0);
-          if (extraBuyEventRows.length) {
-            const { error: extraBuyEventErr } = await supabaseClient
-              .from("stock_holdings")
-              .insert(extraBuyEventRows);
-            if (extraBuyEventErr) throw new Error(extraBuyEventErr.message || "Failed to insert secondary buy order events.");
-          }
         }
 
-        const applyActiveBuyAllocations = async (securityId, allocations) => {
-          const activeBuyRows = (existingRows || []).filter((row) => {
-            return String(row.security_id) === String(securityId)
-              && Number(row.quantity || 0) >= 0;
+        /* ── Compute batch-level totals ── */
+        const totalSellQty = sellEventRows.reduce((s, r) => s + Number(r.quantity || 0), 0);
+        const totalBuyQty = buyEventRows.reduce((s, r) => s + Number(r.quantity || 0), 0);
+        const totalExtraBuyQty = extraBuyEventRows.reduce((s, r) => s + Number(r.quantity || 0), 0);
+
+        const sellIsinCode = String(rebSelectedIsin.code || "");
+        const buyIsinCode = String(buySelection.instrument.code || "").replace(/\.[A-Z]+$/i, "");
+        const extraBuyIsinCode = extraBuySelection
+          ? String(extraBuySelection.instrument.code || "").replace(/\.[A-Z]+$/i, "")
+          : null;
+
+        const sellModal = document.getElementById("rebSellModal");
+        const netProceeds = sellModal?._execData?.netProceeds || 0;
+
+        /* ── Get current admin user ID ── */
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        const currentUserId = sessionData?.session?.user?.id || null;
+
+        /* ── Insert rebalance_batch (PENDING) ── */
+        const { error: batchErr } = await supabaseClient
+          .from("rebalance_batch")
+          .insert({
+            id: rebalanceBatchId,
+            strategy_id: strategyId,
+            status: "PENDING",
+            holdings_snapshot_before: holdingsSnapshotBefore,
+            wallet_snapshot_before: walletSnapshotBefore,
+            sell_security_id: sellSecurityId,
+            sell_isin_code: sellIsinCode,
+            total_sell_quantity: totalSellQty,
+            buy_security_id: buySecurityId,
+            buy_isin_code: buyIsinCode,
+            total_buy_quantity: totalBuyQty,
+            extra_buy_security_id: extraBuySecurityId || null,
+            extra_buy_isin_code: extraBuyIsinCode,
+            total_extra_buy_quantity: totalExtraBuyQty,
+            net_proceeds: netProceeds,
+            strategy_name_snapshot: strategyNameSnapshot,
+            created_by: currentUserId,
+            created_at: nowIso,
+            updated_at: nowIso,
           });
-          const activeBuyByUserId = activeBuyRows.reduce((acc, row) => {
-            const userId = String(row.user_id || "");
-            if (!userId || acc[userId]) return acc;
-            acc[userId] = row;
-            return acc;
-          }, {});
+        if (batchErr) throw new Error(batchErr.message || "Failed to create rebalance batch.");
 
-          for (const alloc of (allocations || [])) {
-            const userId = String(alloc.clientId || "");
-            const buyQty = Number(alloc.shares || 0);
-            if (!userId || buyQty <= 0) continue;
-
-            const existingBuy = activeBuyByUserId[userId];
-            if (existingBuy) {
-              const nextQty = Math.max(0, Number(existingBuy.quantity || 0) + buyQty);
-              const { error: updateErr } = await supabaseClient
-                .from("stock_holdings")
-                .update({
-                  quantity: nextQty,
-                  updated_at: nowIso,
-                  trade_side: "BUY",
-                  is_active: true,
-                  strategy_name_snapshot: strategyNameSnapshot,
-                  Status: "active",
-                })
-                .eq("id", existingBuy.id);
-              if (updateErr) throw new Error(updateErr.message || "Failed to update active buy bucket.");
-            } else {
-              const { error: insertErr } = await supabaseClient
-                .from("stock_holdings")
-                .insert({
-                  user_id: userId,
-                  security_id: securityId,
-                  quantity: buyQty,
-                  strategy_id: strategyId,
-                  updated_at: nowIso,
-                  trade_side: "BUY",
-                  is_active: true,
-                  rebalance_batch_id: rebalanceBatchId,
-                  strategy_name_snapshot: strategyNameSnapshot,
-                  Status: "active",
-                });
-              if (insertErr) throw new Error(insertErr.message || "Failed to insert active buy bucket row.");
-            }
-          }
-        };
-
-        await applyActiveBuyAllocations(buySecurityId, buyExec.clientAllocations || []);
-        if (extraBuyExec) {
-          await applyActiveBuyAllocations(extraBuySecurityId, extraBuyExec.clientAllocations || []);
+        /* ── Insert all rebalance events ── */
+        const allEvents = [...sellEventRows, ...buyEventRows, ...extraBuyEventRows];
+        if (allEvents.length) {
+          const { error: eventsErr } = await supabaseClient
+            .from("rebalance_event")
+            .insert(allEvents);
+          if (eventsErr) throw new Error(eventsErr.message || "Failed to insert rebalance events.");
         }
 
+        /* ── stock_holdings is NOT touched ──
+           Positions settle only when the admin fills & settles the batch
+           via the orderbook. This keeps client-facing data clean. */
+
+        /* ── Update wallet credits (admin-internal bookkeeping) ── */
         const walletBeforeByClient = buySelection.walletBeforeByClient || {};
         const walletAfterMainByClient = buySelection.walletAfterMainByClient || {};
         const finalWalletByClient = {};
@@ -9320,9 +9295,9 @@
         await rebLoadStrategy(strategyId);
 
         const tradeCsvRows = [];
-        const sellNominal = sellEventRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
-        const buyNominal = buyEventRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
-        const extraBuyNominal = extraBuyEventRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
+        const sellNominal = totalSellQty;
+        const buyNominal = totalBuyQty;
+        const extraBuyNominal = totalExtraBuyQty;
         if (sellNominal > 0) {
           tradeCsvRows.push({ side: "SELL", code: sellCode, nominal: sellNominal });
         }
