@@ -503,7 +503,7 @@
       const stratRet = stratRetRows && stratRetRows.length > 0 ? stratRetRows[stratRetRows.length - 1] : null;
 
       const totalWeight = holdings.reduce((sum, h) => sum + (Number(h.weight) || 0), 0);
-      const minInvestment = calculateMinInvestment(holdings, securitiesMap) || null;
+      const minInvestment = calculateMinInvestment(holdings, securitiesMap) || Number(strategy.min_investment) || null;
       const cashAmount = minInvestment ? minInvestment * 0.08 : null;
       const analyticsTimestamp = analytics?.computed_at || analytics?.as_of_date || null;
       const analyticsUnavailable = !analytics || analytics?.error;
