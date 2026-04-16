@@ -809,7 +809,7 @@
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             Edit Strategy
           </button>
-          <button onclick="window.openRebalancingModal()" style="display:flex;align-items:center;gap:5px;height:32px;padding:0 14px;border-radius:8px;background:#2563eb;color:white;border:none;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+          <button id="rebalanceNavBtn" onclick="window.openRebalancingModal()" style="display:none;align-items:center;gap:5px;height:32px;padding:0 14px;border-radius:8px;background:#2563eb;color:white;border:none;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;">
             Rebalance
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
           </button>
@@ -1802,12 +1802,25 @@
         renderTopAssetsRow(); /* swap between stock cards (editing) and strategy cards (browse) */
       };
 
-      /* Show/hide Factsheets + Edit Strategy nav buttons independently of workspace mode */
-      const _setStratBtnsVisible = (show) => {
+      /* Show/hide Factsheets + Edit Strategy + Rebalance nav buttons.
+         Pass `strat` when a strategy is selected to apply the correct button logic:
+           - live strategy WITH active investors  → Rebalance only (Edit hidden)
+           - live strategy WITHOUT investors      → Edit only     (Rebalance hidden)
+           - non-live strategy (any)              → Edit only     (Rebalance hidden) */
+      const _setStratBtnsVisible = (show, strat = null) => {
         const factsheetsBtn = document.getElementById("factsheetsNavBtn");
-        const editBtn = document.getElementById("editStrategyNavBtn");
-        if (factsheetsBtn) factsheetsBtn.style.display = show ? "flex" : "none";
-        if (editBtn) editBtn.style.display = show ? "flex" : "none";
+        const editBtn       = document.getElementById("editStrategyNavBtn");
+        const rebBtn        = document.getElementById("rebalanceNavBtn");
+        if (!show) {
+          if (factsheetsBtn) factsheetsBtn.style.display = "none";
+          if (editBtn)  editBtn.style.display  = "none";
+          if (rebBtn)   rebBtn.style.display   = "none";
+          return;
+        }
+        if (factsheetsBtn) factsheetsBtn.style.display = "flex";
+        const showRebalance = strat && !!strat.is_public && strategyInvestedIds.has(String(strat.id));
+        if (editBtn) editBtn.style.display = showRebalance ? "none" : "flex";
+        if (rebBtn)  rebBtn.style.display  = showRebalance ? "flex" : "none";
       };
 
       let _browsePanelLoaded = false;
@@ -5048,7 +5061,7 @@
 
       const _doOvSelectStrategy = async (idx, strat) => {
         try {
-        _setStratBtnsVisible(true); /* strategy selected — show Factsheets + Edit Strategy */
+        _setStratBtnsVisible(true, strat); /* strategy selected — show correct button based on live/users state */
         window.__dbgBreadcrumb('ovSelect:start val=' + idx);
         const sel = document.getElementById('ovStratSel');
         if (sel) sel.value = String(idx);
