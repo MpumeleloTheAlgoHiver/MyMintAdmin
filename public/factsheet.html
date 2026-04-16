@@ -286,14 +286,7 @@
         return;
       }
 
-      let analytics = null;
-      const { data: analyticsRow } = await supabaseClient
-        .from('strategy_analytics')
-        .select('strategy_id, as_of_date, base_currency, latest_value, ytd_return, summary, curves, calendar_returns, computed_at, error')
-        .eq('strategy_id', strategyId)
-        .maybeSingle();
-
-      analytics = analyticsRow || null;
+      const analytics = null; // strategy_analytics is not a _c table — all fields show as unavailable
 
       const holdings = Array.isArray(strategy.holdings) ? strategy.holdings : [];
       let securitiesMap = new Map();
@@ -303,7 +296,7 @@
         const allSymbols = [...new Set([...symbols, ...symbols.map(normalizeSymbol)])];
         const { data: secs } = await supabaseClient
           .from('securities_c')
-          .select('symbol, name, logo_url, last_price, change_percent')
+          .select('symbol, name, logo_url')
           .in('symbol', allSymbols);
 
         if (secs) {
@@ -482,24 +475,21 @@
         </div>`;
       }
 
-      if (!analyticsUnavailable) {
-        html += `
+      html += `
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
           <div class="flex items-center justify-between">
             <h2 class="text-base font-semibold text-slate-900">Performance Summary</h2>
-            ${analyticsTimestamp ? `<p class="text-xs text-slate-500">As of ${new Date(analyticsTimestamp).toLocaleDateString()}</p>` : ''}
           </div>
           <div class="mt-4 grid grid-cols-2 gap-3">
             ${performanceSummary.map(m => `
               <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                 <p class="text-xs font-semibold text-slate-500">${m.label}</p>
-                <p class="mt-2 text-lg font-semibold text-slate-900">${m.value}</p>
+                <p class="mt-2 text-lg font-semibold text-slate-400">${m.value}</p>
                 <p class="mt-1 text-[11px] text-slate-400">${m.description}</p>
               </div>
             `).join('')}
           </div>
         </div>`;
-      }
 
       if (strategy.description) {
         html += `
@@ -549,30 +539,24 @@
           </div>
         </div>`;
 
-      if (availableCalendarYears.length > 0) {
-        html += `
+      html += `
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
           <div class="flex items-center justify-between gap-4 mb-4">
             <h2 class="text-base font-semibold text-slate-900">Calendar Returns</h2>
+          </div>
+          ${availableCalendarYears.length > 0 ? `
             ${availableCalendarYears.length > 1 ? `
-              <div class="flex flex-wrap gap-2">
+              <div class="flex flex-wrap gap-2 mb-4">
                 ${availableCalendarYears.map(year => `
                   <button type="button" onclick="switchCalendarYear('${year}')"
                     class="calendar-year-btn rounded-full px-3 py-1 text-xs font-semibold ${year === currentCalendarYear ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600'}"
-                    data-year="${year}">
-                    ${year}
-                  </button>
+                    data-year="${year}">${year}</button>
                 `).join('')}
               </div>
             ` : ''}
-          </div>
-          <div id="calendarGrid">
-            ${renderCalendarGrid(calendarData, currentCalendarYear)}
-          </div>
+            <div id="calendarGrid">${renderCalendarGrid(calendarData, currentCalendarYear)}</div>
+          ` : `<p class="text-sm text-slate-400">—</p>`}
         </div>`;
-
-        window._calendarData = calendarData;
-      }
 
       html += `
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
