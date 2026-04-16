@@ -5653,14 +5653,16 @@
 
           const { data: secs, error } = await query;
           if (error) throw error;
-          const _ovListMetrics = await fetchSecurityMetrics((secs || []).map(s => s.id).filter(Boolean));
-          const secsWithMetrics = (secs || []).map(s => ({ ...s, ...(_ovListMetrics[s.id] || {}) }));
-          const items = secsWithMetrics.map(s => ({
-            sym: (s.symbol || '').replace('.JO', ''),
-            logo: s.logo_url || null,
-            price: s.last_price != null ? Number(s.last_price) / 100 : null,
-            change: s.change_percent != null ? Number(s.change_percent) : null
-          })).filter(item => item.sym);
+          const _ovStockRet = await fetchStockReturnsBySec((secs || []).map(s => s.id).filter(Boolean));
+          const items = (secs || []).map(s => {
+            const sr = _ovStockRet[s.id] || {};
+            return {
+              sym:    (s.symbol || '').replace('.JO', ''),
+              logo:   s.logo_url || null,
+              price:  sr.current_price != null ? Number(sr.current_price) : null,
+              change: sr['1d_pct']     != null ? Number(sr['1d_pct'])     : null,
+            };
+          }).filter(item => item.sym);
           _ovTickerRenderItems(track, items);
         } catch (e) {
           track.innerHTML = '<span style="font-size:11px;color:#94a3b8;padding:0 20px;font-family:ui-monospace,monospace;">Market data unavailable</span>';
