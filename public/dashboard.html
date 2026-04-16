@@ -9257,6 +9257,7 @@
         }
 
         /* ── Resolve security IDs ── */
+
         const symbolsToResolve = [
           rebSelectedIsin.fullSymbol,
           buySelection.instrument.fullSymbol,
@@ -9286,20 +9287,6 @@
         }
         if (extraBuySelection && String(extraBuySecurityId) === String(buySecurityId)) {
           throw new Error("Secondary buy security must be different from the primary buy security.");
-        }
-
-        /* ── Guard: block if a PENDING batch already exists for this strategy ── */
-        const { data: pendingBatches, error: pendingErr } = await supabaseClient
-          .from("rebalance_batch")
-          .select("id, status, sell_isin_code, buy_isin_code, created_at")
-          .eq("strategy_id", strategyId)
-          .eq("status", "PENDING");
-        if (pendingErr) throw new Error(pendingErr.message || "Failed to check pending batches.");
-        if (pendingBatches && pendingBatches.length > 0) {
-          const existing = pendingBatches[0];
-          throw new Error(
-            `A pending rebalance already exists for this strategy (batch ${existing.id.slice(0, 8)}… created ${new Date(existing.created_at).toLocaleString()}). Please settle or reverse it before committing a new one.`
-          );
         }
 
         /* ── Capture pre-rebalance snapshots (for reversal) ── */
