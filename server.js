@@ -826,7 +826,7 @@ const server = http.createServer((req, res) => {
         }
 
         const symbols = [...new Set(pledges.map(p => p.symbol))];
-        const pricesData = await fetchSupabaseJson(`/rest/v1/security_prices?symbol=in.(${symbols.map(s => `%22${s}%22`).join(',')})`, token);
+        const pricesData = await fetchSupabaseJson(`/rest/v1/security_prices_c?symbol=in.(${symbols.map(s => `%22${s}%22`).join(',')})`, token);
         
         const priceMap = {};
         (pricesData || []).forEach(p => { priceMap[p.symbol] = p.last_price; });

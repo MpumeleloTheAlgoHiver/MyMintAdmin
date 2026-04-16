@@ -748,7 +748,7 @@
 
         <span class="sidebar-section-label">System</span>
 
-        <a class="nav-icon" href="#" aria-label="Settings">
+        <a class="nav-icon" href="/settings.html" aria-label="Settings">
           <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
           Settings
         </a>
@@ -2040,7 +2040,7 @@
             });
           });
 
-          /* Fetch base security info then merge metrics from security_metrics */
+          /* Fetch base security info then merge metrics from security_metrics_c */
           let q = supabaseClient
             .from('securities_c')
             .select('id, symbol, name, logo_url')
@@ -3020,7 +3020,7 @@
       let holdingsQuantityMap = {};
 
       /* ── Security Metrics Helper ──────────────────────────────────────────
-         Fetches the latest row from security_metrics for each given security ID
+         Fetches the latest row from security_metrics_c for each given security ID
          and returns an object keyed by security_id with columns mapped to the
          names the rest of the codebase expects.
          Column mapping:
@@ -3037,7 +3037,7 @@
         for (let i = 0; i < secIds.length; i += 50) chunks.push(secIds.slice(i, i + 50));
         const results = await Promise.all(
           chunks.map(chunk =>
-            supabaseClient.from('security_metrics')
+            supabaseClient.from('security_metrics_c')
               .select('*')
               .in('security_id', chunk)
               .order('as_of_date', { ascending: false })
@@ -3084,7 +3084,7 @@
             .limit(200),
         ]);
 
-        /* Load base security info (metrics now live in security_metrics table) */
+        /* Load base security info (metrics now live in security_metrics_c table) */
         const _secSelectVariants = [
           "id, symbol, name, logo_url",
           "id, symbol, name",
@@ -3101,7 +3101,7 @@
         }
         if (!data) console.error("Failed to load securities from any column variant");
 
-        /* Fetch live metrics from security_metrics and merge */
+        /* Fetch live metrics from security_metrics_c and merge */
         const _secIds = (data || []).map(s => s.id).filter(Boolean);
         const _metricsMap = await fetchSecurityMetrics(_secIds);
 
@@ -3965,7 +3965,7 @@
                 if (norm !== s.symbol) securitiesMap.set(norm, s);
               });
           });
-          /* Merge live metrics from security_metrics */
+          /* Merge live metrics from security_metrics_c */
           const _mapIds = [...new Set([...securitiesMap.values()].map(s => s.id).filter(Boolean))];
           const _mapMetrics = await fetchSecurityMetrics(_mapIds);
           for (const [sym, s] of securitiesMap.entries()) {
@@ -5143,7 +5143,7 @@
               .eq('status', 'posted')
               .gte('amount', 10000),
             sids.length
-              ? supabaseClient.from('security_metrics').select('security_id, last_close').in('security_id', sids).order('as_of_date', { ascending: false })
+              ? supabaseClient.from('security_metrics_c').select('security_id, last_close').in('security_id', sids).order('as_of_date', { ascending: false })
               : Promise.resolve({ data: [] })
           ];
           const [{ data: profs }, { data: txnRows }, { data: secRows }] = await Promise.all(fetches);
