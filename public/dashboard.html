@@ -6947,8 +6947,28 @@
                 </div>`
               : "";
 
+            /* All period returns from stock_returns_c */
+            const fmtR = v => v != null ? `${v >= 0 ? '+' : ''}${Number(v).toFixed(2)}%` : '—';
+            const rClr = v => v == null ? '#94a3b8' : v >= 0 ? '#16a34a' : '#dc2626';
+            const periods = [
+              { label: '5D',  val: s.w1_performance   },
+              { label: '1M',  val: s.mtd_performance  },
+              { label: '6M',  val: s.r_6m_performance },
+              { label: 'YTD', val: s.ytd_performance  },
+              { label: '1Y',  val: s.r_1y_performance },
+              { label: '5Y',  val: s.sr_5y_pct        },
+              { label: 'All', val: s.sr_all_pct       },
+            ];
+            const returnsGrid = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px 6px;margin-top:2px;">
+              ${periods.map(p => `
+                <div style="display:flex;flex-direction:column;align-items:center;">
+                  <span style="font-size:8.5px;font-weight:500;color:#94a3b8;line-height:1.2;">${p.label}</span>
+                  <span style="font-size:9.5px;font-weight:700;color:${rClr(p.val)};line-height:1.3;">${fmtR(p.val)}</span>
+                </div>`).join('')}
+            </div>`;
+
             return `<button type="button" data-sym="${s.symbol}"
-              style="flex-shrink:0;width:192px;display:flex;flex-direction:column;padding:14px;border-radius:16px;cursor:pointer;text-align:left;background:#ffffff;border:${cardBorder};box-shadow:${cardShadow};transition:all 0.18s;gap:10px;position:relative;overflow:hidden;outline:none;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none;">
+              style="flex-shrink:0;width:232px;display:flex;flex-direction:column;padding:14px;border-radius:16px;cursor:pointer;text-align:left;background:#ffffff;border:${cardBorder};box-shadow:${cardShadow};transition:all 0.18s;gap:8px;position:relative;overflow:hidden;outline:none;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none;">
               <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${barColor};opacity:${isPos ? "0.6" : "0.5"};border-radius:16px 16px 0 0;"></div>
               ${addedBadge}
               <div style="display:flex;align-items:center;gap:8px;">
@@ -6959,10 +6979,11 @@
                 </div>
                 ${dots}
               </div>
-              <div style="font-size:19px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;line-height:1;"><span style="font-size:12px;font-weight:600;color:#64748b;margin-right:1px;">R</span>${price}</div>
-              <div style="display:flex;align-items:center;gap:6px;">
-                <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;background:${pillBg};color:#fff;letter-spacing:0.1px;">${chgStr}</span>
+              <div style="display:flex;align-items:baseline;gap:8px;">
+                <div style="font-size:18px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;line-height:1;"><span style="font-size:11px;font-weight:600;color:#64748b;margin-right:1px;">R</span>${price}</div>
+                <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;white-space:nowrap;background:${pillBg};color:#fff;">${fmtR(chgVal)} 1D</span>
               </div>
+              <div style="border-top:1px solid #f1f5f9;padding-top:6px;">${returnsGrid}</div>
             </button>`;
           }).join("");
 
