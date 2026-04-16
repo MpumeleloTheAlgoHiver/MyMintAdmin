@@ -3078,7 +3078,7 @@
 
         const [strategiesResult] = await Promise.all([
           supabaseClient
-            .from("strategies")
+            .from("strategies_c")
             .select("holdings, created_at")
             .order("created_at", { ascending: false })
             .limit(200),
@@ -4200,12 +4200,12 @@
         let error, newStrategyId;
         if (isEditing) {
           ({ error } = await supabaseClient
-            .from("strategies")
+            .from("strategies_c")
             .update(payload)
             .eq("id", editingStrategyId));
         } else {
           const { data: insertData, error: insertError } = await supabaseClient
-            .from("strategies")
+            .from("strategies_c")
             .insert([payload])
             .select("id")
             .single();
@@ -4311,7 +4311,7 @@
           '<div class="flex items-center justify-center py-20"><div class="text-center"><div class="w-10 h-10 border-2 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div><p class="text-sm text-slate-500">Loading factsheet...</p></div></div>';
 
         const { data: strategy, error: stratError } = await supabaseClient
-          .from("strategies")
+          .from("strategies_c")
           .select(
             "id, slug, name, short_name, description, risk_level, sector, tags, base_currency, icon_url, image_url, holdings, min_investment, is_public, is_featured, status, created_at",
           )
@@ -4733,7 +4733,7 @@
       const loadStrategies = async () => {
         window.__dbgBreadcrumb('loadStrategies:start');
         const { data, error } = await supabaseClient
-          .from("strategies")
+          .from("strategies_c")
           .select(
             "id, slug, name, short_name, description, objective, risk_level, sector, min_investment, base_currency, is_featured, is_public, status, created_at, holdings, provider_name, tags",
           )
@@ -5266,7 +5266,7 @@
         if (btn) { btn.textContent = 'Creating…'; btn.disabled = true; }
         document.getElementById('ovStratPanel').style.display = 'none';
         const { data: insertData, error } = await supabaseClient
-          .from('strategies')
+          .from('strategies_c')
           .insert([{ name, slug: createStrategySlug(name), status: 'active', is_public: false, is_featured: false, provider_name: chosenStrategist }])
           .select('id')
           .single();
@@ -6062,7 +6062,7 @@
 
       const loadSectors = async () => {
         const { data } = await supabaseClient
-          .from("strategies")
+          .from("strategies_c")
           .select("sector");
         if (data) {
           const dbSectors = [
@@ -6206,7 +6206,7 @@
         );
         if (!confirmed) return;
         const { error } = await supabaseClient
-          .from("strategies")
+          .from("strategies_c")
           .update({ status: "archived", is_public: false })
           .eq("id", id);
         if (error) {
@@ -6224,7 +6224,7 @@
         );
         if (!confirmed) return;
         const { error } = await supabaseClient
-          .from("strategies")
+          .from("strategies_c")
           .delete()
           .eq("id", id);
         if (error) {
@@ -6236,7 +6236,7 @@
 
       const unarchiveStrategy = async (id) => {
         const { error } = await supabaseClient
-          .from("strategies")
+          .from("strategies_c")
           .update({ status: "active", is_public: true })
           .eq("id", id);
         if (error) {
@@ -6478,8 +6478,8 @@
             is_featured: overlay.querySelector("#_sdIsFeatured").checked,
           };
 
-          const { error } = await supabaseClient
-            .from("strategies")
+            const { error } = await supabaseClient
+              .from("strategies_c")
             .update(payload)
             .eq("id", strategy.id);
 
@@ -6610,7 +6610,7 @@
         if (!newName || !newName.trim() || newName.trim() === currentName)
           return;
         const { error } = await supabaseClient
-          .from("strategies")
+          .from("strategies_c")
           .update({ name: newName.trim() })
           .eq("id", strategyId);
         if (error) {
@@ -8973,7 +8973,7 @@
 
         const { holdings, minInvestment } = await rebMergeAndRevalueStrategyHoldings(nextHoldings);
         const { error: strategyUpdateErr } = await supabaseClient
-          .from("strategies")
+          .from("strategies_c")
           .update({
             holdings: holdings.length ? holdings : null,
             min_investment: minInvestment,

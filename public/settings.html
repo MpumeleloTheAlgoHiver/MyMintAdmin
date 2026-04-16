@@ -5,1024 +5,740 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Settings — Admin</title>
     <style>html{opacity:0}</style>
-    <link rel="prefetch" href="/index.html">
-    <link rel="prefetch" href="/dashboard.html">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
       body {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         background: #f5f6fa;
-        min-height: 100vh;
-        overflow-x: hidden;
         color: #1e293b;
       }
-      html { scrollbar-color: #e5e7eb #ffffff; scrollbar-width: thin; }
-      ::-webkit-scrollbar { width: 10px; }
-      ::-webkit-scrollbar-track { background: #fff; }
-      ::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 8px; border: 2px solid #fff; }
-      ::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
-
-      /* ── Sidebar ── */
       .sidebar { position: fixed; left: 0; top: 0; width: 220px; height: 100vh; background: #fff; border-right: 1px solid #ede9fe; display: flex; flex-direction: column; z-index: 1000; overflow: hidden; }
       .sidebar-header { display: flex; align-items: center; gap: 10px; padding: 20px 20px 16px; border-bottom: 1px solid #f3f0ff; }
-      .sidebar-logo { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
-      .sidebar-brand { display: flex; flex-direction: column; }
-      .sidebar-brand-name { font-size: 14px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em; line-height: 1.2; }
+      .sidebar-logo { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+      .sidebar-brand-name { font-size: 14px; font-weight: 700; color: #0f172a; line-height: 1.2; }
       .sidebar-brand-sub { font-size: 10px; color: #94a3b8; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
       .sidebar-nav { flex: 1; display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 16px 12px; overflow-y: auto; }
       .sidebar-section-label { font-size: 10px; font-weight: 600; color: #94a3b8; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 8px 4px; margin-top: 8px; }
-      .sidebar-section-label:first-child { margin-top: 0; }
-      .nav-icon { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: pointer; transition: all 0.15s ease; text-decoration: none; color: #64748b; font-size: 13px; font-weight: 500; white-space: nowrap; }
-      .nav-icon svg { width: 18px; height: 18px; fill: #94a3b8; transition: fill 0.15s ease; flex-shrink: 0; }
+      .nav-icon { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; text-decoration: none; color: #64748b; font-size: 13px; font-weight: 500; }
+      .nav-icon svg { width: 18px; height: 18px; fill: #94a3b8; }
       .nav-icon:hover { background: #f5f3ff; color: #5b21b6; }
       .nav-icon:hover svg { fill: #7c3aed; }
       .nav-icon.active { background: #ede9fe; color: #5b21b6; font-weight: 600; }
       .nav-icon.active svg { fill: #7c3aed; }
       .sidebar-footer { border-top: 1px solid #f1f5f9; padding: 12px; }
       .sidebar-user { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; margin-bottom: 4px; }
-      .sidebar-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0; }
-      .sidebar-user-info { flex: 1; min-width: 0; }
+      .sidebar-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; }
       .sidebar-user-name { font-size: 12px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .sidebar-user-role { font-size: 10px; color: #94a3b8; font-weight: 500; }
-      .sidebar-signout { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: pointer; color: #ef4444; font-size: 13px; font-weight: 500; transition: all 0.15s ease; border: none; background: none; width: 100%; text-align: left; }
-      .sidebar-signout svg { width: 18px; height: 18px; fill: #ef4444; flex-shrink: 0; }
+      .sidebar-signout { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: pointer; color: #ef4444; font-size: 13px; font-weight: 500; border: none; background: none; width: 100%; text-align: left; }
+      .sidebar-signout svg { width: 18px; height: 18px; fill: #ef4444; }
       .sidebar-signout:hover { background: #fef2f2; }
 
-      /* ── Main ── */
-      .main-content { margin-left: 220px; min-height: 100vh; display: flex; flex-direction: column; }
-
-      /* ── iPhone Shell ── */
-      .iphone-container {
-        display: flex;
-        justify-content: center;
-        align-items: flex-start;
-        padding: 40px 20px;
-        min-height: calc(100vh - 60px);
+      .main { margin-left: 220px; min-height: 100vh; display: flex; flex-direction: column; }
+      .top-bar {
+        height: 58px; border-bottom: 1px solid #e2e8f0; background: rgba(255,255,255,0.96);
+        display: flex; align-items: center; gap: 10px; padding: 0 24px;
       }
-      .iphone-shell {
-        width: 390px;
+      .top-bar h1 { font-size: 16px; font-weight: 700; color: #1e293b; }
+      .top-bar svg { width: 20px; height: 20px; fill: #7c3aed; }
+
+      .page { padding: 26px; }
+      .landing { max-width: 920px; }
+      .hero {
+        background: linear-gradient(135deg, #120f2b 0%, #36206b 38%, #6d3fbe 100%);
+        border-radius: 22px;
+        padding: 24px;
+        color: #fff;
+        box-shadow: 0 20px 50px rgba(38, 16, 79, 0.25);
+        margin-bottom: 18px;
+      }
+      .hero h2 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 6px; }
+      .hero p { font-size: 13px; opacity: 0.85; max-width: 600px; }
+
+      .setting-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 14px;
+      }
+      .setting-card {
+        background: #fff;
+        border: 1px solid #e9e4ff;
+        border-radius: 18px;
+        padding: 16px;
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        cursor: pointer;
+        transition: transform .15s, box-shadow .15s, border-color .15s;
+      }
+      .setting-card:hover { transform: translateY(-2px); border-color: #d8ccff; box-shadow: 0 14px 28px rgba(108, 65, 198, .12); }
+      .setting-icon {
+        width: 38px; height: 38px; border-radius: 11px;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      }
+      .setting-icon svg { width: 18px; height: 18px; }
+      .setting-body h3 { font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+      .setting-body p { font-size: 12px; color: #64748b; line-height: 1.35; }
+
+      .studio { display: none; }
+      .studio.active { display: block; }
+      .studio-toolbar {
+        display: flex; align-items: center; justify-content: space-between;
+        background: #fff; border: 1px solid #e9e4ff; border-radius: 16px; padding: 10px 12px; margin-bottom: 14px;
+      }
+      .toolbar-left { display: flex; align-items: center; gap: 10px; }
+      .back-btn {
+        border: 1px solid #ddd6fe; color: #5b21b6; background: #f5f3ff;
+        border-radius: 10px; padding: 7px 10px; font-size: 12px; font-weight: 600; cursor: pointer;
+      }
+      .toolbar-title { font-size: 13px; font-weight: 700; color: #1e293b; }
+      .toolbar-sub { font-size: 11px; color: #94a3b8; }
+      .toolbar-right { display: flex; align-items: center; gap: 12px; }
+      .toggle-wrap { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #475569; font-weight: 600; }
+
+      .studio-grid {
+        display: grid;
+        grid-template-columns: minmax(380px, 470px) 1fr;
+        gap: 14px;
+      }
+
+      .preview-stage {
+        background: radial-gradient(circle at 10% 10%, #f2eeff 0, #ede9fe 32%, #f8fafc 100%);
+        border: 1px solid #e5e7eb;
+        border-radius: 20px;
+        padding: 18px;
         min-height: 780px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+      }
+      .phone-shell {
+        width: 390px;
+        min-height: 740px;
         background: #000;
         border-radius: 52px;
         padding: 14px;
-        box-shadow: 0 30px 80px rgba(0,0,0,0.25), 0 0 0 2px #1a1a1a;
-        position: relative;
+        box-shadow: 0 32px 72px rgba(2,6,23,.35), 0 0 0 2px #1f2937;
       }
-      .iphone-screen {
-        width: 100%;
-        height: 100%;
-        min-height: 752px;
+      .phone-screen {
         background: #f8f6fa;
         border-radius: 40px;
+        min-height: 712px;
         overflow: hidden;
         display: flex;
         flex-direction: column;
-        position: relative;
       }
-      .iphone-notch {
-        width: 126px;
-        height: 34px;
-        background: #000;
-        border-radius: 0 0 20px 20px;
-        margin: 0 auto;
-        position: relative;
-        z-index: 10;
-      }
+      .phone-notch { width: 126px; height: 34px; background: #000; border-radius: 0 0 20px 20px; margin: 0 auto; }
 
-      /* ── Settings List (iOS style) ── */
-      .settings-header {
-        padding: 12px 20px 16px;
-        text-align: center;
-      }
-      .settings-header h1 {
-        font-size: 28px;
-        font-weight: 700;
-        color: #1e293b;
-        letter-spacing: -0.02em;
-      }
-      .settings-group {
-        margin: 0 16px 16px;
+      .frame-off .phone-shell {
+        width: 390px;
+        min-height: 712px;
+        border-radius: 22px;
         background: #fff;
-        border-radius: 14px;
-        overflow: hidden;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        padding: 0;
+        box-shadow: 0 16px 30px rgba(15, 23, 42, .12);
       }
-      .settings-item {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 14px 16px;
-        cursor: pointer;
-        transition: background 0.12s;
-        border-bottom: 1px solid #f1f5f9;
-        text-decoration: none;
-        color: inherit;
-      }
-      .settings-item:last-child { border-bottom: none; }
-      .settings-item:hover { background: #f8fafc; }
-      .settings-item:active { background: #f1f5f9; }
-      .settings-icon {
-        width: 32px; height: 32px; border-radius: 8px;
-        display: flex; align-items: center; justify-content: center;
-        flex-shrink: 0;
-      }
-      .settings-icon svg { width: 18px; height: 18px; }
-      .settings-label { flex: 1; font-size: 15px; font-weight: 500; color: #1e293b; }
-      .settings-chevron { color: #c7c7cc; flex-shrink: 0; }
-      .settings-chevron svg { width: 16px; height: 16px; }
-      .settings-item.danger .settings-label { color: #ef4444; font-weight: 600; }
+      .frame-off .phone-screen { border-radius: 22px; min-height: 712px; }
+      .frame-off .phone-notch { display: none; }
 
-      /* ── Client View List ── */
-      .client-list-view { display: none; flex-direction: column; height: 100%; }
-      .client-list-view.active { display: flex; }
-      .client-list-header {
-        display: flex; align-items: center; gap: 12px;
-        padding: 12px 16px;
-        border-bottom: 1px solid #f1f5f9;
+      .client-list-view { display: flex; flex-direction: column; height: 100%; }
+      .client-list-head {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 14px 16px 10px; border-bottom: 1px solid #f1f5f9;
       }
-      .client-list-back {
-        width: 32px; height: 32px; border-radius: 50%;
-        background: #f1f5f9; border: none; cursor: pointer;
-        display: flex; align-items: center; justify-content: center;
-        transition: background 0.15s;
-      }
-      .client-list-back:hover { background: #e2e8f0; }
-      .client-list-back svg { width: 18px; height: 18px; color: #64748b; }
-      .client-list-title { font-size: 17px; font-weight: 700; color: #1e293b; }
-      .client-search {
-        margin: 12px 16px 8px;
-        padding: 10px 14px;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        background: #f8fafc;
-        font-size: 14px;
-        width: calc(100% - 32px);
-        outline: none;
-        transition: border-color 0.15s, box-shadow 0.15s;
-      }
-      .client-search:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.12); background: #fff; }
-      .client-scroll {
-        flex: 1; overflow-y: auto; padding: 8px 16px 20px;
-      }
-      .client-card {
-        display: flex; align-items: center; gap: 12px;
-        padding: 12px 14px; border-radius: 14px;
-        cursor: pointer; transition: all 0.15s;
-        margin-bottom: 4px;
-      }
+      .client-list-head h3 { font-size: 16px; font-weight: 700; color: #1e293b; }
+      .client-count { font-size: 11px; color: #5b21b6; background: #ede9fe; border-radius: 999px; padding: 4px 10px; font-weight: 700; }
+      .client-search { margin: 10px 16px; width: calc(100% - 32px); border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 12px; font-size: 13px; outline: none; background: #fff; }
+      .client-search:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,.12); }
+      .client-scroll { flex: 1; overflow-y: auto; padding: 4px 12px 18px; }
+      .client-card { display: flex; align-items: center; gap: 10px; padding: 11px 10px; border-radius: 12px; cursor: pointer; }
       .client-card:hover { background: #f5f3ff; }
-      .client-card:active { background: #ede9fe; transform: scale(0.98); }
-      .client-avatar {
-        width: 40px; height: 40px; border-radius: 50%;
-        background: linear-gradient(135deg, #7c3aed, #a855f7);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0;
-      }
-      .client-info { flex: 1; min-width: 0; }
-      .client-name { font-size: 14px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .client-strategy { font-size: 11px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .client-chevron { color: #c7c7cc; flex-shrink: 0; }
-      .client-chevron svg { width: 14px; height: 14px; }
-      .client-count-badge {
-        margin: 0 16px 12px;
-        padding: 6px 12px;
-        background: #ede9fe;
-        border-radius: 10px;
-        font-size: 12px;
-        font-weight: 600;
-        color: #5b21b6;
-        text-align: center;
-      }
-      .client-empty {
-        text-align: center; padding: 40px 20px;
-        color: #94a3b8; font-size: 13px;
-      }
+      .client-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg,#7c3aed,#a855f7); color: #fff; display:flex; align-items:center; justify-content:center; font-size: 12px; font-weight: 700; }
+      .client-name { font-size: 13px; font-weight: 700; color: #1e293b; }
+      .client-strategy { font-size: 11px; color: #64748b; }
+      .client-empty, .client-loading { text-align:center; font-size:12px; color:#94a3b8; padding:30px 12px; }
 
-      /* ── Client Profile Mobile Preview ── */
       .client-profile-view { display: none; flex-direction: column; height: 100%; }
       .client-profile-view.active { display: flex; }
-
-      .cp-gradient-header {
-        min-height: 220px;
-        padding: 12px 20px 24px;
-        color: #fff;
-        display: flex; flex-direction: column;
+      .cp-header {
+        min-height: 210px;
         background-image: linear-gradient(180deg, #0d0d12 0%, #25173e 4%, #4c2e75 10%, #8451b0 16%, #be84d8 22%, #daace6 26%, #ecd2ef 30%, #f6ecf7 34%, #fbf7fc 40%, #f8f6fa 100%);
+        padding: 12px 18px 22px;
       }
-      .cp-top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-      .cp-back-btn {
-        width: 32px; height: 32px; border-radius: 50%;
-        background: rgba(255,255,255,0.15); border: none; cursor: pointer;
-        display: flex; align-items: center; justify-content: center;
-        color: #fff; backdrop-filter: blur(8px);
-      }
-      .cp-back-btn:hover { background: rgba(255,255,255,0.25); }
-      .cp-avatar {
-        width: 56px; height: 56px; border-radius: 50%;
-        background: rgba(255,255,255,0.2); backdrop-filter: blur(8px);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 20px; font-weight: 700; color: #fff;
-        margin-bottom: 12px;
-        border: 2px solid rgba(255,255,255,0.3);
-      }
-      .cp-name { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px; }
-      .cp-email { font-size: 12px; opacity: 0.75; margin-bottom: 12px; }
-      .cp-balance-card {
-        background: rgba(255,255,255,0.12);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(255,255,255,0.15);
-        border-radius: 20px; padding: 16px 18px;
-      }
-      .cp-balance-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; font-weight: 600; margin-bottom: 4px; }
-      .cp-balance-value { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
-      .cp-balance-change { font-size: 11px; opacity: 0.8; margin-top: 4px; }
+      .cp-top { display:flex; align-items:center; justify-content:space-between; margin-bottom: 14px; }
+      .cp-back { width: 30px; height: 30px; border: none; border-radius: 50%; background: rgba(255,255,255,.18); color: #fff; cursor: pointer; }
+      .cp-title { font-size: 12px; color: #fff; opacity: .85; font-weight: 600; }
+      .cp-avatar { width: 52px; height: 52px; border-radius: 50%; background: rgba(255,255,255,.2); color: #fff; display:flex; align-items:center; justify-content:center; font-size: 17px; font-weight: 700; border: 2px solid rgba(255,255,255,.35); }
+      .cp-name { font-size: 21px; color: #fff; font-weight: 700; margin-top: 8px; }
+      .cp-email { font-size: 11px; color: rgba(255,255,255,.75); margin-top: 2px; }
+      .cp-balance { margin-top: 10px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.22); border-radius: 18px; padding: 12px 14px; color: #fff; }
+      .cp-balance .label { font-size: 10px; text-transform: uppercase; opacity: .8; letter-spacing: .08em; font-weight: 600; }
+      .cp-balance .val { font-size: 25px; font-weight: 700; margin-top: 4px; }
+      .cp-balance .delta { font-size: 11px; margin-top: 3px; opacity: .88; }
 
-      .cp-body {
-        flex: 1; overflow-y: auto;
-        background: #f8f6fa;
-        padding: 0 16px 24px;
-        margin-top: -12px;
-      }
-
-      /* Action Buttons Row */
-      .cp-actions-row {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 8px;
-        margin-bottom: 20px;
-        padding-top: 20px;
-      }
-      .cp-action-btn {
-        display: flex; flex-direction: column; align-items: center; gap: 6px;
-        padding: 12px 4px; border-radius: 16px;
-        background: #fff; border: none; cursor: default;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        font-size: 10px; font-weight: 600; color: #475569;
-      }
-      .cp-action-icon {
-        width: 30px; height: 30px; border-radius: 50%;
-        background: #f5f3ff; display: flex; align-items: center; justify-content: center;
-      }
-      .cp-action-icon svg { width: 14px; height: 14px; color: #7c3aed; }
-
-      /* Holdings / Strategies cards */
-      .cp-section { margin-bottom: 16px; }
-      .cp-section-header {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 0 4px; margin-bottom: 10px;
-      }
-      .cp-section-title { font-size: 14px; font-weight: 700; color: #1e293b; }
-      .cp-section-sub { font-size: 11px; color: #94a3b8; }
-
-      .cp-holding-card {
-        display: flex; align-items: center; gap: 12px;
-        padding: 14px 16px; border-radius: 16px;
-        background: #fff; margin-bottom: 8px;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-      }
-      .cp-holding-logo {
-        width: 40px; height: 40px; border-radius: 12px;
-        background: #f8fafc; display: flex; align-items: center; justify-content: center;
-        overflow: hidden; border: 1px solid #f1f5f9; flex-shrink: 0;
-      }
-      .cp-holding-logo img { width: 32px; height: 32px; object-fit: contain; }
-      .cp-holding-logo span { font-size: 11px; font-weight: 700; color: #64748b; }
-      .cp-holding-info { flex: 1; min-width: 0; }
-      .cp-holding-symbol { font-size: 13px; font-weight: 700; color: #1e293b; }
-      .cp-holding-name { font-size: 11px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .cp-holding-values { text-align: right; flex-shrink: 0; }
-      .cp-holding-value { font-size: 13px; font-weight: 700; }
-      .cp-holding-pnl { font-size: 11px; font-weight: 600; }
+      .cp-body { flex: 1; overflow-y: auto; padding: 10px 14px 20px; background: #f8f6fa; }
+      .cp-section { margin-bottom: 14px; }
+      .cp-section-head { display:flex; align-items:center; justify-content:space-between; padding: 0 4px; margin-bottom: 8px; }
+      .cp-section-head h4 { font-size: 13px; font-weight: 700; color: #1e293b; }
+      .cp-section-head span { font-size: 11px; color: #94a3b8; }
+      .cp-card { background: #fff; border-radius: 14px; padding: 12px; border: 1px solid #f1f5f9; margin-bottom: 8px; }
+      .cp-row { display:flex; align-items:center; justify-content:space-between; gap: 10px; }
       .cp-pnl-pos { color: #059669; }
       .cp-pnl-neg { color: #ef4444; }
-      .cp-pnl-neutral { color: #94a3b8; }
+      .cp-muted { color: #94a3b8; }
+      .cp-pending { font-size: 9px; font-weight: 700; color: #92400e; background: #fef3c7; border-radius: 6px; padding: 2px 7px; text-transform: uppercase; letter-spacing: .05em; }
 
-      .cp-strategy-card {
-        padding: 14px 16px; border-radius: 16px;
-        background: #fff; margin-bottom: 8px;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+      .inspector {
+        background: #fff;
+        border: 1px solid #e9e4ff;
+        border-radius: 20px;
+        padding: 16px;
+        min-height: 780px;
       }
-      .cp-strategy-name { font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 2px; }
-      .cp-strategy-meta { font-size: 11px; color: #94a3b8; margin-bottom: 8px; }
-      .cp-strategy-row { display: flex; justify-content: space-between; align-items: center; }
-      .cp-strategy-value-label { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
-      .cp-strategy-value { font-size: 16px; font-weight: 700; color: #1e293b; }
+      .inspector h3 { font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 10px; }
+      .inspector-note { font-size: 12px; color: #64748b; line-height: 1.4; margin-bottom: 12px; }
+      .inspector-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .metric { border: 1px solid #f1f5f9; border-radius: 12px; padding: 10px; background: #fafaff; }
+      .metric .k { font-size: 10px; text-transform: uppercase; color: #94a3b8; letter-spacing: .06em; font-weight: 700; }
+      .metric .v { font-size: 14px; margin-top: 4px; font-weight: 700; color: #1e293b; }
+      .inspector-list { border: 1px solid #f1f5f9; border-radius: 12px; padding: 10px; max-height: 310px; overflow-y: auto; background: #fff; }
+      .inspector-item { display:flex; justify-content:space-between; gap: 8px; font-size: 12px; padding: 7px 0; border-bottom: 1px dashed #f1f5f9; }
+      .inspector-item:last-child { border-bottom: none; }
+      .placeholder { color: #94a3b8; font-size: 12px; padding: 18px 0; text-align: center; }
 
-      .cp-empty-state {
-        text-align: center; padding: 32px 20px;
-        color: #94a3b8; font-size: 13px;
-      }
-      .cp-loading { text-align: center; padding: 40px 20px; color: #94a3b8; font-size: 13px; }
-
-      /* Settings top bar */
-      .settings-top-bar {
-        background: rgba(255,255,255,0.96);
-        backdrop-filter: blur(12px);
-        border-bottom: 1px solid #e2e8f0;
-        padding: 0 28px;
-        height: 56px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        position: sticky;
-        top: 0;
-        z-index: 100;
-      }
-      .settings-top-bar h2 {
-        font-size: 16px;
-        font-weight: 700;
-        color: #1e293b;
-      }
-
-      /* Pending badge */
-      .cp-pending-badge {
-        display: inline-flex;
-        align-items: center;
-        padding: 2px 8px;
-        border-radius: 6px;
-        font-size: 9px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        background: #fef3c7;
-        color: #92400e;
+      @media (max-width: 1300px) {
+        .studio-grid { grid-template-columns: 1fr; }
       }
     </style>
   </head>
   <body>
-    <!-- ── Sidebar ── -->
     <aside class="sidebar">
       <div class="sidebar-header">
-        <a class="sidebar-logo" href="/index.html">
-          <img src="/icon.png" alt="Mint" style="width:36px;height:36px;border-radius:10px;">
-        </a>
-        <div class="sidebar-brand">
+        <a class="sidebar-logo" href="/index.html"><img src="/icon.png" alt="Mint" style="width:36px;height:36px;border-radius:10px;"></a>
+        <div>
           <div class="sidebar-brand-name">Mint</div>
           <div class="sidebar-brand-sub">Admin Panel</div>
         </div>
       </div>
-
       <nav class="sidebar-nav">
         <span class="sidebar-section-label">Main</span>
-        <a class="nav-icon" href="/index.html" aria-label="Clients">
-          <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-          Clients
-        </a>
-
+        <a class="nav-icon" href="/index.html" aria-label="Clients"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>Clients</a>
         <span class="sidebar-section-label">Investments</span>
-        <a class="nav-icon" href="/dashboard.html" aria-label="Dashboard">
-          <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
-          Dashboard
-        </a>
-        <a class="nav-icon" href="/strategies.html" aria-label="Strategies">
-          <svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zm0 11h7v7H3zm11-11h7v7h-7zm0 11h7v7h-7z"/></svg>
-          Strategies
-        </a>
-        <a class="nav-icon" href="/factsheets.html" aria-label="Factsheets">
-          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
-          Factsheets
-        </a>
-        <a class="nav-icon" href="/investors.html" aria-label="Investors">
-          <svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
-          Investors
-        </a>
-
+        <a class="nav-icon" href="/dashboard.html" aria-label="Dashboard"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>Dashboard</a>
+        <a class="nav-icon" href="/strategies.html" aria-label="Strategies"><svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zm0 11h7v7H3zm11-11h7v7h-7zm0 11h7v7h-7z"/></svg>Strategies</a>
+        <a class="nav-icon" href="/factsheets.html" aria-label="Factsheets"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>Factsheets</a>
+        <a class="nav-icon" href="/investors.html" aria-label="Investors"><svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>Investors</a>
         <span class="sidebar-section-label">Banking</span>
-        <a class="nav-icon" href="/eft.html" aria-label="EFT Payments">
-          <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
-          EFT Payments
-        </a>
-        <a class="nav-icon" href="/orderbook.html" aria-label="Order Book">
-          <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
-          Order Book
-        </a>
-
+        <a class="nav-icon" href="/eft.html" aria-label="EFT Payments"><svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>EFT Payments</a>
+        <a class="nav-icon" href="/orderbook.html" aria-label="Order Book"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>Order Book</a>
         <span class="sidebar-section-label">System</span>
-        <a class="nav-icon active" href="/settings.html" aria-label="Settings">
-          <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
-          Settings
-        </a>
+        <a class="nav-icon active" href="/settings.html" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58z"/></svg>Settings</a>
       </nav>
-
       <div class="sidebar-footer">
         <div class="sidebar-user">
           <div class="sidebar-avatar" id="sidebarAvatarInitials">A</div>
-          <div class="sidebar-user-info">
+          <div>
             <div class="sidebar-user-name" id="sidebarUserEmail">Admin</div>
             <div class="sidebar-user-role">Administrator</div>
           </div>
         </div>
-        <button class="sidebar-signout" id="signOutBtn">
-          <svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
-          Sign out
-        </button>
+        <button class="sidebar-signout" id="signOutBtn"><svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>Sign out</button>
       </div>
     </aside>
 
-    <!-- ── Main Content ── -->
-    <main class="main-content">
-      <div class="settings-top-bar">
-        <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#7c3aed;flex-shrink:0;"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58z"/></svg>
-        <h2>Settings</h2>
-      </div>
+    <main class="main">
+      <div class="top-bar"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58z"/></svg><h1>Settings</h1></div>
 
-      <!-- iPhone Shell Container -->
-      <div class="iphone-container">
-        <div class="iphone-shell">
-          <div class="iphone-screen">
-            <div class="iphone-notch"></div>
+      <div class="page">
+        <section id="settingsLanding" class="landing">
+          <div class="hero">
+            <h2>Settings</h2>
+            <p>Use Client View Studio to preview exactly what clients see. Open it only when needed, keep your settings dashboard clean, and inspect live strategy/portfolio data side-by-side.</p>
+          </div>
 
-            <!-- ═══ View 1: Settings Menu ═══ -->
-            <div id="settingsMenuView" style="flex:1;overflow-y:auto;padding-top:8px;">
-              <div class="settings-header">
-                <h1>Settings</h1>
-              </div>
-
-              <!-- General group -->
-              <div class="settings-group">
-                <div class="settings-item" id="clientViewBtn">
-                  <div class="settings-icon" style="background:#ede9fe;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                  </div>
-                  <span class="settings-label">Client View</span>
-                  <div class="settings-chevron">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Account group -->
-              <div class="settings-group">
-                <div class="settings-item danger" id="logoutBtn">
-                  <div class="settings-icon" style="background:#fef2f2;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                  </div>
-                  <span class="settings-label">Log Out</span>
-                </div>
-              </div>
-
-              <div style="text-align:center;padding:20px;color:#c7c7cc;font-size:11px;">
-                Mint Admin v2.0
+          <div class="setting-grid">
+            <div id="openClientStudioBtn" class="setting-card">
+              <div class="setting-icon" style="background:#ede9fe;"><svg viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4"/><path d="M16 2v4"/><path d="M3 10h18"/></svg></div>
+              <div class="setting-body">
+                <h3>Client View</h3>
+                <p>Open the mobile preview studio with iPhone-style render, client selector, and detailed profile breakdown panel.</p>
               </div>
             </div>
 
-            <!-- ═══ View 2: Client List ═══ -->
-            <div id="clientListView" class="client-list-view">
-              <div class="client-list-header">
-                <button class="client-list-back" id="clientListBackBtn">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                </button>
-                <span class="client-list-title">Client View</span>
-              </div>
-              <input class="client-search" id="clientSearch" type="text" placeholder="Search clients…" />
-              <div class="client-count-badge" id="clientCountBadge">Loading…</div>
-              <div class="client-scroll" id="clientScrollArea">
-                <div class="cp-loading" id="clientListLoading">Loading clients…</div>
-              </div>
-            </div>
-
-            <!-- ═══ View 3: Client Profile Preview ═══ -->
-            <div id="clientProfileView" class="client-profile-view">
-              <div class="cp-gradient-header">
-                <div class="cp-top-bar">
-                  <button class="cp-back-btn" id="profileBackBtn">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><polyline points="15 18 9 12 15 6"/></svg>
-                  </button>
-                  <div style="font-size:13px;font-weight:600;opacity:0.8;">Client Preview</div>
-                  <div style="width:32px;"></div>
-                </div>
-                <div class="cp-avatar" id="cpAvatar">—</div>
-                <div class="cp-name" id="cpName">—</div>
-                <div class="cp-email" id="cpEmail">—</div>
-                <div class="cp-balance-card">
-                  <div class="cp-balance-label">Portfolio Value</div>
-                  <div class="cp-balance-value" id="cpBalance">R0.00</div>
-                  <div class="cp-balance-change" id="cpChange"></div>
-                </div>
-              </div>
-
-              <div class="cp-body" id="cpBody">
-                <!-- Actions row -->
-                <div class="cp-actions-row">
-                  <div class="cp-action-btn">
-                    <div class="cp-action-icon">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                    </div>
-                    <span>Invest</span>
-                  </div>
-                  <div class="cp-action-btn">
-                    <div class="cp-action-icon">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg>
-                    </div>
-                    <span>Deposit</span>
-                  </div>
-                  <div class="cp-action-btn">
-                    <div class="cp-action-icon">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-                    </div>
-                    <span>News</span>
-                  </div>
-                  <div class="cp-action-btn">
-                    <div class="cp-action-icon">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                    </div>
-                    <span>Goals</span>
-                  </div>
-                </div>
-
-                <!-- Holdings Section -->
-                <div class="cp-section" id="cpHoldingsSection">
-                  <div class="cp-section-header">
-                    <span class="cp-section-title">Holdings</span>
-                    <span class="cp-section-sub" id="cpHoldingsCount"></span>
-                  </div>
-                  <div id="cpHoldingsList"></div>
-                </div>
-
-                <!-- Strategies Section -->
-                <div class="cp-section" id="cpStrategiesSection">
-                  <div class="cp-section-header">
-                    <span class="cp-section-title">Strategies</span>
-                    <span class="cp-section-sub" id="cpStrategiesCount"></span>
-                  </div>
-                  <div id="cpStrategiesList"></div>
-                </div>
-
-                <!-- Transactions Section -->
-                <div class="cp-section" id="cpTransactionsSection">
-                  <div class="cp-section-header">
-                    <span class="cp-section-title">Recent Activity</span>
-                  </div>
-                  <div id="cpTransactionsList"></div>
-                </div>
+            <div id="logoutCard" class="setting-card">
+              <div class="setting-icon" style="background:#fef2f2;"><svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div>
+              <div class="setting-body">
+                <h3 style="color:#ef4444;">Log Out</h3>
+                <p>Sign out of the admin panel safely.</p>
               </div>
             </div>
           </div>
-        </div>
+        </section>
+
+        <section id="clientStudio" class="studio">
+          <div class="studio-toolbar">
+            <div class="toolbar-left">
+              <button id="backToSettingsBtn" class="back-btn">← Back to Settings</button>
+              <div>
+                <div class="toolbar-title">Client View Studio</div>
+                <div class="toolbar-sub">Apple-style preview · Studio split layout</div>
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <label class="toggle-wrap"><input id="frameToggle" type="checkbox" checked>Phone frame</label>
+            </div>
+          </div>
+
+          <div class="studio-grid">
+            <div class="preview-stage" id="previewStage">
+              <div class="phone-shell">
+                <div class="phone-screen">
+                  <div class="phone-notch"></div>
+
+                  <div id="clientListView" class="client-list-view">
+                    <div class="client-list-head">
+                      <h3>Client View</h3>
+                      <span id="clientCountBadge" class="client-count">Loading…</span>
+                    </div>
+                    <input id="clientSearch" class="client-search" type="text" placeholder="Search clients…" />
+                    <div id="clientScrollArea" class="client-scroll"><div id="clientListLoading" class="client-loading">Loading clients…</div></div>
+                  </div>
+
+                  <div id="clientProfileView" class="client-profile-view">
+                    <div class="cp-header">
+                      <div class="cp-top">
+                        <button id="profileBackBtn" class="cp-back">‹</button>
+                        <div class="cp-title">Client Preview</div>
+                        <div style="width:30px"></div>
+                      </div>
+                      <div id="cpAvatar" class="cp-avatar">—</div>
+                      <div id="cpName" class="cp-name">—</div>
+                      <div id="cpEmail" class="cp-email">—</div>
+                      <div class="cp-balance">
+                        <div class="label">Portfolio Value</div>
+                        <div id="cpBalance" class="val">R0.00</div>
+                        <div id="cpChange" class="delta"></div>
+                      </div>
+                    </div>
+                    <div class="cp-body">
+                      <div class="cp-section">
+                        <div class="cp-section-head"><h4>Holdings</h4><span id="cpHoldingsCount"></span></div>
+                        <div id="cpHoldingsList"></div>
+                      </div>
+                      <div class="cp-section">
+                        <div class="cp-section-head"><h4>Strategies</h4><span id="cpStrategiesCount"></span></div>
+                        <div id="cpStrategiesList"></div>
+                      </div>
+                      <div class="cp-section">
+                        <div class="cp-section-head"><h4>Recent Activity</h4><span></span></div>
+                        <div id="cpTransactionsList"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <aside class="inspector">
+              <h3>Client Breakdown</h3>
+              <p class="inspector-note" id="inspectorHint">Choose a client on the left to load a full mobile preview and a structured breakdown here.</p>
+
+              <div class="inspector-grid" id="inspectorMetrics">
+                <div class="metric"><div class="k">Client</div><div class="v" id="mClient">—</div></div>
+                <div class="metric"><div class="k">Portfolio</div><div class="v" id="mPortfolio">—</div></div>
+                <div class="metric"><div class="k">P&L</div><div class="v" id="mPnl">—</div></div>
+                <div class="metric"><div class="k">Strategies</div><div class="v" id="mStrategies">—</div></div>
+              </div>
+
+              <h3 style="margin-top:8px;">Top Holdings</h3>
+              <div id="inspectorHoldings" class="inspector-list"><div class="placeholder">No client selected</div></div>
+
+              <h3 style="margin-top:12px;">Recent Transactions</h3>
+              <div id="inspectorTransactions" class="inspector-list"><div class="placeholder">No client selected</div></div>
+            </aside>
+          </div>
+        </section>
       </div>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-    const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
+      const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    /* ══════════════════════════════════════════════════════════
-       AUTH GUARD
-    ══════════════════════════════════════════════════════════ */
-    (async () => {
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      if (!session) { window.location.href = '/signin.html'; return; }
+      const settingsLanding = document.getElementById('settingsLanding');
+      const clientStudio = document.getElementById('clientStudio');
+      const clientListView = document.getElementById('clientListView');
+      const clientProfileView = document.getElementById('clientProfileView');
+      const previewStage = document.getElementById('previewStage');
 
-      const email = session?.user?.email || '';
-      const nameEl = document.getElementById('sidebarUserEmail');
-      if (nameEl) nameEl.textContent = email || 'Admin';
-      const avatarEl = document.getElementById('sidebarAvatarInitials');
-      if (avatarEl) avatarEl.textContent = email ? email[0].toUpperCase() : 'A';
+      let allClients = [];
+      let selectedClient = null;
 
-      document.querySelector('html').style.opacity = '1';
-    })();
+      (async () => {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) { window.location.href = '/signin.html'; return; }
+        const email = session?.user?.email || '';
+        document.getElementById('sidebarUserEmail').textContent = email || 'Admin';
+        document.getElementById('sidebarAvatarInitials').textContent = email ? email[0].toUpperCase() : 'A';
+        document.querySelector('html').style.opacity = '1';
+      })();
 
-    /* ══════════════════════════════════════════════════════════
-       SIGN OUT
-    ══════════════════════════════════════════════════════════ */
-    const signOutBtn = document.getElementById('signOutBtn');
-    if (signOutBtn) {
-      signOutBtn.addEventListener('click', async () => {
+      async function signOut() {
         await supabaseClient.auth.signOut();
         window.location.href = '/signin.html';
+      }
+
+      document.getElementById('signOutBtn').addEventListener('click', signOut);
+      document.getElementById('logoutCard').addEventListener('click', signOut);
+
+      document.getElementById('openClientStudioBtn').addEventListener('click', async () => {
+        settingsLanding.style.display = 'none';
+        clientStudio.classList.add('active');
+        showPhoneView('list');
+        await loadClientsInStrategies();
       });
-    }
 
-    /* ══════════════════════════════════════════════════════════
-       LOGOUT (in-phone)
-    ══════════════════════════════════════════════════════════ */
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
-      if (!confirm('Sign out of the admin panel?')) return;
-      await supabaseClient.auth.signOut();
-      window.location.href = '/signin.html';
-    });
+      document.getElementById('backToSettingsBtn').addEventListener('click', () => {
+        clientStudio.classList.remove('active');
+        settingsLanding.style.display = 'block';
+      });
 
-    /* ══════════════════════════════════════════════════════════
-       VIEW NAVIGATION
-    ══════════════════════════════════════════════════════════ */
-    const settingsMenuView = document.getElementById('settingsMenuView');
-    const clientListView = document.getElementById('clientListView');
-    const clientProfileView = document.getElementById('clientProfileView');
+      document.getElementById('frameToggle').addEventListener('change', (e) => {
+        previewStage.classList.toggle('frame-off', !e.target.checked);
+      });
 
-    function showView(viewId) {
-      settingsMenuView.style.display = viewId === 'settings' ? 'block' : 'none';
-      clientListView.classList.toggle('active', viewId === 'clientList');
-      clientProfileView.classList.toggle('active', viewId === 'clientProfile');
-    }
+      document.getElementById('profileBackBtn').addEventListener('click', () => showPhoneView('list'));
 
-    document.getElementById('clientViewBtn').addEventListener('click', () => {
-      showView('clientList');
-      loadClientsInStrategies();
-    });
+      function showPhoneView(view) {
+        const isList = view === 'list';
+        clientListView.style.display = isList ? 'flex' : 'none';
+        clientProfileView.classList.toggle('active', !isList);
+      }
 
-    document.getElementById('clientListBackBtn').addEventListener('click', () => {
-      showView('settings');
-    });
+      async function loadClientsInStrategies() {
+        const loading = document.getElementById('clientListLoading');
+        const countBadge = document.getElementById('clientCountBadge');
+        const scrollArea = document.getElementById('clientScrollArea');
 
-    document.getElementById('profileBackBtn').addEventListener('click', () => {
-      showView('clientList');
-    });
+        loading.style.display = 'block';
+        countBadge.textContent = 'Loading…';
 
-    /* ══════════════════════════════════════════════════════════
-       LOAD CLIENTS IN STRATEGIES
-    ══════════════════════════════════════════════════════════ */
-    let allClients = [];
+        try {
+          const { data: holdings, error: holdingsErr } = await supabaseClient
+            .from('stock_holdings')
+            .select('user_id, strategy_id')
+            .eq('is_active', true)
+            .eq('trade_side', 'BUY');
+          if (holdingsErr) throw holdingsErr;
 
-    async function loadClientsInStrategies() {
-      const loading = document.getElementById('clientListLoading');
-      const scrollArea = document.getElementById('clientScrollArea');
-      const countBadge = document.getElementById('clientCountBadge');
-      loading.style.display = 'block';
-      countBadge.textContent = 'Loading…';
+          const userIds = [...new Set((holdings || []).map(h => h.user_id).filter(Boolean))];
+          if (!userIds.length) {
+            loading.style.display = 'none';
+            countBadge.textContent = '0 clients';
+            scrollArea.innerHTML = '<div class="client-empty">No clients found in any strategy.</div>';
+            return;
+          }
 
-      try {
-        // Get unique user_ids from stock_holdings with active strategies
-        const { data: holdings, error: holdingsErr } = await supabaseClient
-          .from('stock_holdings')
-          .select('user_id, strategy_id')
-          .eq('is_active', true)
-          .eq('trade_side', 'BUY');
+          const strategyIds = [...new Set((holdings || []).map(h => h.strategy_id).filter(Boolean))];
+          const { data: strategies } = await supabaseClient
+            .from('strategies_c')
+            .select('id, name, short_name')
+            .in('id', strategyIds);
+          const stratMap = {};
+          (strategies || []).forEach(s => { stratMap[s.id] = s.name || s.short_name || 'Strategy'; });
 
-        if (holdingsErr) throw holdingsErr;
+          const userStrategies = {};
+          (holdings || []).forEach(h => {
+            if (!userStrategies[h.user_id]) userStrategies[h.user_id] = new Set();
+            userStrategies[h.user_id].add(stratMap[h.strategy_id] || 'Strategy');
+          });
 
-        // Unique user IDs
-        const userIds = [...new Set((holdings || []).map(h => h.user_id).filter(Boolean))];
-        if (userIds.length === 0) {
+          const chunkSize = 50;
+          const profileResults = [];
+          for (let i = 0; i < userIds.length; i += chunkSize) {
+            const chunk = userIds.slice(i, i + chunkSize);
+            const { data: profiles } = await supabaseClient
+              .from('profiles')
+              .select('id, first_name, last_name, email, avatar_url')
+              .in('id', chunk);
+            if (profiles) profileResults.push(...profiles);
+          }
+
+          allClients = profileResults.map(p => {
+            const strats = userStrategies[p.id] ? [...userStrategies[p.id]] : [];
+            const name = [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email || 'Unknown';
+            const initials = name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+            return {
+              id: p.id,
+              name,
+              initials,
+              email: p.email || '',
+              strategyLabel: strats.join(', '),
+            };
+          }).sort((a, b) => a.name.localeCompare(b.name));
+
+          countBadge.textContent = `${allClients.length} client${allClients.length === 1 ? '' : 's'}`;
           loading.style.display = 'none';
-          countBadge.textContent = '0 clients';
-          scrollArea.innerHTML = '<div class="client-empty">No clients found in any strategy.</div>';
+          renderClientList(allClients);
+        } catch (err) {
+          loading.style.display = 'none';
+          countBadge.textContent = 'Error';
+          scrollArea.innerHTML = `<div class="client-empty">Error loading clients: ${escapeHtml(err.message || 'Unknown')}</div>`;
+        }
+      }
+
+      function renderClientList(clients) {
+        const scrollArea = document.getElementById('clientScrollArea');
+        if (!clients.length) {
+          scrollArea.innerHTML = '<div class="client-empty">No clients match your search.</div>';
           return;
         }
-
-        // Get strategy names
-        const strategyIds = [...new Set((holdings || []).map(h => h.strategy_id).filter(Boolean))];
-        const { data: strategies } = await supabaseClient
-          .from('strategies')
-          .select('id, name, short_name')
-          .in('id', strategyIds);
-        const stratMap = {};
-        (strategies || []).forEach(s => { stratMap[s.id] = s.name || s.short_name || 'Strategy'; });
-
-        // Build user → strategies mapping
-        const userStrategies = {};
-        (holdings || []).forEach(h => {
-          if (!userStrategies[h.user_id]) userStrategies[h.user_id] = new Set();
-          userStrategies[h.user_id].add(stratMap[h.strategy_id] || 'Strategy');
-        });
-
-        // Fetch profiles in chunks
-        const chunkSize = 50;
-        const profileResults = [];
-        for (let i = 0; i < userIds.length; i += chunkSize) {
-          const chunk = userIds.slice(i, i + chunkSize);
-          const { data: profiles } = await supabaseClient
-            .from('profiles')
-            .select('id, first_name, last_name, email, avatar_url')
-            .in('id', chunk);
-          if (profiles) profileResults.push(...profiles);
-        }
-
-        allClients = profileResults.map(p => {
-          const strats = userStrategies[p.id] ? [...userStrategies[p.id]] : [];
-          const name = [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email || 'Unknown';
-          const initials = name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
-          return {
-            id: p.id,
-            name,
-            initials,
-            email: p.email || '',
-            avatarUrl: p.avatar_url,
-            strategies: strats,
-            strategyLabel: strats.join(', '),
-          };
-        }).sort((a, b) => a.name.localeCompare(b.name));
-
-        countBadge.textContent = `${allClients.length} client${allClients.length === 1 ? '' : 's'}`;
-        loading.style.display = 'none';
-        renderClientList(allClients);
-
-      } catch (err) {
-        console.error('Failed to load clients:', err);
-        loading.style.display = 'none';
-        countBadge.textContent = 'Error';
-        scrollArea.innerHTML = `<div class="client-empty">Error loading clients: ${err.message || 'Unknown'}</div>`;
-      }
-    }
-
-    function renderClientList(clients) {
-      const scrollArea = document.getElementById('clientScrollArea');
-      if (!clients.length) {
-        scrollArea.innerHTML = '<div class="client-empty">No clients match your search.</div>';
-        return;
-      }
-      scrollArea.innerHTML = clients.map(c => `
-        <div class="client-card" data-client-id="${c.id}">
-          <div class="client-avatar">${escapeHtml(c.initials)}</div>
-          <div class="client-info">
-            <div class="client-name">${escapeHtml(c.name)}</div>
-            <div class="client-strategy">${escapeHtml(c.strategyLabel)}</div>
+        scrollArea.innerHTML = clients.map(c => `
+          <div class="client-card" data-client-id="${c.id}">
+            <div class="client-avatar">${escapeHtml(c.initials)}</div>
+            <div style="flex:1;min-width:0;">
+              <div class="client-name">${escapeHtml(c.name)}</div>
+              <div class="client-strategy">${escapeHtml(c.strategyLabel)}</div>
+            </div>
+            <div style="color:#c7c7cc;font-size:13px;">›</div>
           </div>
-          <div class="client-chevron">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-          </div>
-        </div>
-      `).join('');
-    }
+        `).join('');
+      }
 
-    // Search filter
-    document.getElementById('clientSearch').addEventListener('input', (e) => {
-      const q = (e.target.value || '').toLowerCase().trim();
-      if (!q) { renderClientList(allClients); return; }
-      const filtered = allClients.filter(c =>
-        c.name.toLowerCase().includes(q)
-        || c.email.toLowerCase().includes(q)
-        || c.strategyLabel.toLowerCase().includes(q)
-      );
-      renderClientList(filtered);
-    });
+      document.getElementById('clientSearch').addEventListener('input', (e) => {
+        const q = (e.target.value || '').toLowerCase().trim();
+        if (!q) { renderClientList(allClients); return; }
+        renderClientList(allClients.filter(c =>
+          c.name.toLowerCase().includes(q) ||
+          c.email.toLowerCase().includes(q) ||
+          c.strategyLabel.toLowerCase().includes(q)
+        ));
+      });
 
-    // Client card click
-    document.getElementById('clientScrollArea').addEventListener('click', (e) => {
-      const card = e.target.closest('.client-card');
-      if (!card) return;
-      const clientId = card.dataset.clientId;
-      if (!clientId) return;
-      const client = allClients.find(c => c.id === clientId);
-      if (client) loadClientProfile(client);
-    });
+      document.getElementById('clientScrollArea').addEventListener('click', (e) => {
+        const card = e.target.closest('.client-card');
+        if (!card) return;
+        const client = allClients.find(c => c.id === card.dataset.clientId);
+        if (client) loadClientProfile(client);
+      });
 
-    /* ══════════════════════════════════════════════════════════
-       LOAD CLIENT PROFILE (mobile preview)
-    ══════════════════════════════════════════════════════════ */
-    async function loadClientProfile(client) {
-      showView('clientProfile');
+      async function loadClientProfile(client) {
+        selectedClient = client;
+        showPhoneView('profile');
 
-      // Set header info
-      document.getElementById('cpAvatar').textContent = client.initials;
-      document.getElementById('cpName').textContent = client.name;
-      document.getElementById('cpEmail').textContent = client.email;
-      document.getElementById('cpBalance').textContent = 'Loading…';
-      document.getElementById('cpChange').textContent = '';
-      document.getElementById('cpHoldingsList').innerHTML = '<div class="cp-loading">Loading holdings…</div>';
-      document.getElementById('cpStrategiesList').innerHTML = '<div class="cp-loading">Loading strategies…</div>';
-      document.getElementById('cpTransactionsList').innerHTML = '<div class="cp-loading">Loading activity…</div>';
-      document.getElementById('cpHoldingsCount').textContent = '';
-      document.getElementById('cpStrategiesCount').textContent = '';
+        document.getElementById('cpAvatar').textContent = client.initials;
+        document.getElementById('cpName').textContent = client.name;
+        document.getElementById('cpEmail').textContent = client.email;
+        document.getElementById('cpBalance').textContent = 'Loading…';
+        document.getElementById('cpChange').textContent = '';
+        document.getElementById('cpHoldingsList').innerHTML = '<div class="client-loading">Loading holdings…</div>';
+        document.getElementById('cpStrategiesList').innerHTML = '<div class="client-loading">Loading strategies…</div>';
+        document.getElementById('cpTransactionsList').innerHTML = '<div class="client-loading">Loading activity…</div>';
 
-      try {
-        // ── Load holdings, strategies, transactions in parallel ──
-        const [holdingsResult, transactionsResult] = await Promise.all([
-          supabaseClient
-            .from('stock_holdings')
-            .select('id, security_id, quantity, avg_fill, market_value, unrealized_pnl, strategy_id, Status, trade_side, is_active')
-            .eq('user_id', client.id)
-            .eq('Status', 'active')
-            .eq('is_active', true)
-            .eq('trade_side', 'BUY'),
-          supabaseClient
-            .from('transactions')
-            .select('id, name, description, amount, direction, status, settlement_status, transaction_date, created_at')
-            .eq('user_id', client.id)
-            .order('created_at', { ascending: false })
-            .limit(5),
-        ]);
-
-        const holdings = holdingsResult.data || [];
-        const transactions = transactionsResult.data || [];
-
-        // ── Resolve securities ──
-        const securityIds = [...new Set(holdings.map(h => h.security_id).filter(Boolean))];
-        const securitiesMap = {};
-        const metricsMap = {};
-
-        if (securityIds.length > 0) {
-          const [secResult, metResult] = await Promise.all([
-            supabaseClient.from('securities_c').select('id, symbol, name, logo_url, last_price').in('id', securityIds),
-            supabaseClient.from('security_metrics_c').select('security_id, change_pct').in('security_id', securityIds),
+        try {
+          const [holdingsResult, transactionsResult] = await Promise.all([
+            supabaseClient
+              .from('stock_holdings')
+              .select('id, security_id, quantity, avg_fill, strategy_id, Status, trade_side, is_active')
+              .eq('user_id', client.id)
+              .eq('Status', 'active')
+              .eq('is_active', true)
+              .eq('trade_side', 'BUY'),
+            supabaseClient
+              .from('transactions')
+              .select('id, name, description, amount, direction, status, transaction_date, created_at')
+              .eq('user_id', client.id)
+              .order('created_at', { ascending: false })
+              .limit(6),
           ]);
-          (secResult.data || []).forEach(s => { securitiesMap[s.id] = s; });
-          (metResult.data || []).forEach(m => { metricsMap[m.security_id] = m.change_pct || 0; });
-        }
 
-        // ── Resolve strategies ──
-        const strategyIds = [...new Set(holdings.map(h => h.strategy_id).filter(Boolean))];
-        const strategiesMap = {};
-        if (strategyIds.length > 0) {
-          const { data: strats } = await supabaseClient
-            .from('strategies')
-            .select('id, name, short_name, risk_level, description')
-            .in('id', strategyIds);
-          (strats || []).forEach(s => { strategiesMap[s.id] = s; });
-        }
+          const holdings = holdingsResult.data || [];
+          const transactions = transactionsResult.data || [];
+          const securityIds = [...new Set(holdings.map(h => h.security_id).filter(Boolean))];
+          const strategyIds = [...new Set(holdings.map(h => h.strategy_id).filter(Boolean))];
 
-        // ── Compute holdings ──
-        let totalValue = 0;
-        let totalCost = 0;
-
-        const formattedHoldings = holdings
-          .filter(h => securitiesMap[h.security_id])
-          .map(h => {
-            const sec = securitiesMap[h.security_id];
-            const qty = Number(h.quantity || 0);
-            const avgFill = Number(h.avg_fill || 0);
-            const isPending = !avgFill || avgFill === 0;
-            const livePrice = Number(sec.last_price || avgFill);
-            const marketVal = (livePrice * qty) / 100;
-            const costBasis = (avgFill * qty) / 100;
-            const pnlRands = marketVal - costBasis;
-            const pnlPct = costBasis > 0 ? ((pnlRands / costBasis) * 100) : 0;
-
-            if (!isPending) {
-              totalValue += marketVal;
-              totalCost += costBasis;
-            }
-
-            return {
-              symbol: sec.symbol,
-              name: sec.name,
-              logo: sec.logo_url,
-              value: marketVal,
-              costBasis,
-              pnlRands,
-              pnlPct,
-              isPending,
-              strategyId: h.strategy_id,
-            };
-          })
-          .sort((a, b) => b.value - a.value);
-
-        const totalPnl = totalValue - totalCost;
-        const totalPnlPct = totalCost > 0 ? ((totalPnl / totalCost) * 100) : 0;
-
-        // ── Render balance ──
-        document.getElementById('cpBalance').textContent = `R${totalValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        const changeEl = document.getElementById('cpChange');
-        if (totalCost > 0) {
-          const sign = totalPnl >= 0 ? '+' : '';
-          changeEl.textContent = `${sign}R${Math.abs(totalPnl).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${sign}${totalPnlPct.toFixed(2)}%)`;
-          changeEl.style.color = totalPnl >= 0 ? 'rgba(255,255,255,0.9)' : 'rgba(255,200,200,0.9)';
-        } else {
-          changeEl.textContent = '';
-        }
-
-        // ── Render holdings ──
-        document.getElementById('cpHoldingsCount').textContent = `${formattedHoldings.length} asset${formattedHoldings.length === 1 ? '' : 's'}`;
-
-        if (formattedHoldings.length === 0) {
-          document.getElementById('cpHoldingsList').innerHTML = '<div class="cp-empty-state">No active holdings</div>';
-        } else {
-          document.getElementById('cpHoldingsList').innerHTML = formattedHoldings.map(h => {
-            const logoHtml = h.logo
-              ? `<img src="${escapeHtml(h.logo)}" alt="${escapeHtml(h.symbol)}" onerror="this.parentElement.innerHTML='<span>${escapeHtml(h.symbol.slice(0,3))}</span>'">`
-              : `<span>${escapeHtml(h.symbol ? h.symbol.slice(0, 3) : '?')}</span>`;
-
-            if (h.isPending) {
-              return `
-                <div class="cp-holding-card">
-                  <div class="cp-holding-logo">${logoHtml}</div>
-                  <div class="cp-holding-info">
-                    <div class="cp-holding-symbol">${escapeHtml(h.symbol)} <span class="cp-pending-badge">Pending</span></div>
-                    <div class="cp-holding-name">${escapeHtml(h.name)}</div>
-                  </div>
-                  <div class="cp-holding-values">
-                    <div class="cp-holding-value cp-pnl-neutral">Awaiting fill</div>
-                  </div>
-                </div>`;
-            }
-
-            const pnlClass = h.pnlRands >= 0 ? 'cp-pnl-pos' : 'cp-pnl-neg';
-            const pnlSign = h.pnlRands >= 0 ? '+' : '';
-            return `
-              <div class="cp-holding-card">
-                <div class="cp-holding-logo">${logoHtml}</div>
-                <div class="cp-holding-info">
-                  <div class="cp-holding-symbol">${escapeHtml(h.symbol)}</div>
-                  <div class="cp-holding-name">${escapeHtml(h.name)}</div>
-                </div>
-                <div class="cp-holding-values">
-                  <div class="cp-holding-value">R${h.value.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                  <div class="cp-holding-pnl ${pnlClass}">${pnlSign}R${Math.abs(h.pnlRands).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${pnlSign}${h.pnlPct.toFixed(2)}%)</div>
-                </div>
-              </div>`;
-          }).join('');
-        }
-
-        // ── Render strategies ──
-        const strategyGroups = {};
-        formattedHoldings.forEach(h => {
-          if (!h.strategyId) return;
-          if (!strategyGroups[h.strategyId]) strategyGroups[h.strategyId] = { value: 0, cost: 0 };
-          if (!h.isPending) {
-            strategyGroups[h.strategyId].value += h.value;
-            strategyGroups[h.strategyId].cost += h.costBasis;
+          const securitiesMap = {};
+          if (securityIds.length) {
+            const [secResult] = await Promise.all([
+              supabaseClient.from('securities_c').select('id, symbol, name, logo_url, last_price').in('id', securityIds),
+            ]);
+            (secResult.data || []).forEach(s => { securitiesMap[s.id] = s; });
           }
-        });
 
-        const strategyEntries = Object.entries(strategyGroups)
-          .map(([id, g]) => ({
+          const strategiesMap = {};
+          if (strategyIds.length) {
+            const { data: strats } = await supabaseClient
+              .from('strategies_c')
+              .select('id, name, short_name, risk_level')
+              .in('id', strategyIds);
+            (strats || []).forEach(s => { strategiesMap[s.id] = s; });
+          }
+
+          let totalValue = 0;
+          let totalCost = 0;
+          const formattedHoldings = holdings
+            .filter(h => securitiesMap[h.security_id])
+            .map(h => {
+              const sec = securitiesMap[h.security_id];
+              const qty = Number(h.quantity || 0);
+              const avgFill = Number(h.avg_fill || 0);
+              const isPending = !avgFill || avgFill === 0;
+              const livePrice = Number(sec.last_price || avgFill);
+              const marketVal = (livePrice * qty) / 100;
+              const costBasis = (avgFill * qty) / 100;
+              const pnlRands = marketVal - costBasis;
+              const pnlPct = costBasis > 0 ? ((pnlRands / costBasis) * 100) : 0;
+              if (!isPending) { totalValue += marketVal; totalCost += costBasis; }
+              return {
+                symbol: sec.symbol,
+                name: sec.name,
+                logo: sec.logo_url,
+                value: marketVal,
+                pnlRands,
+                pnlPct,
+                isPending,
+                strategyId: h.strategy_id,
+              };
+            })
+            .sort((a, b) => b.value - a.value);
+
+          const strategyAgg = {};
+          formattedHoldings.forEach(h => {
+            if (!h.strategyId) return;
+            if (!strategyAgg[h.strategyId]) strategyAgg[h.strategyId] = { value: 0, count: 0 };
+            if (!h.isPending) strategyAgg[h.strategyId].value += h.value;
+            strategyAgg[h.strategyId].count += 1;
+          });
+
+          const strategyEntries = Object.entries(strategyAgg).map(([id, v]) => ({
             id,
             strategy: strategiesMap[id],
-            value: g.value,
-            cost: g.cost,
-            pnl: g.value - g.cost,
-            pnlPct: g.cost > 0 ? (((g.value - g.cost) / g.cost) * 100) : 0,
-          }))
-          .filter(s => s.strategy)
-          .sort((a, b) => b.value - a.value);
+            value: v.value,
+            count: v.count,
+          })).filter(s => s.strategy).sort((a, b) => b.value - a.value);
 
-        document.getElementById('cpStrategiesCount').textContent = `${strategyEntries.length} strateg${strategyEntries.length === 1 ? 'y' : 'ies'}`;
+          const totalPnl = totalValue - totalCost;
+          const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
 
-        if (strategyEntries.length === 0) {
-          document.getElementById('cpStrategiesList').innerHTML = '<div class="cp-empty-state">No strategies found</div>';
-        } else {
-          document.getElementById('cpStrategiesList').innerHTML = strategyEntries.map(s => {
-            const pnlClass = s.pnl >= 0 ? 'cp-pnl-pos' : 'cp-pnl-neg';
-            const pnlSign = s.pnl >= 0 ? '+' : '';
+          document.getElementById('cpBalance').textContent = `R${formatMoney(totalValue)}`;
+          document.getElementById('cpChange').textContent = totalCost > 0 ? `${totalPnl >= 0 ? '+' : ''}R${formatMoney(Math.abs(totalPnl))} (${totalPnl >= 0 ? '+' : ''}${totalPnlPct.toFixed(2)}%)` : '';
+
+          document.getElementById('cpHoldingsCount').textContent = `${formattedHoldings.length} asset${formattedHoldings.length === 1 ? '' : 's'}`;
+          document.getElementById('cpStrategiesCount').textContent = `${strategyEntries.length} strateg${strategyEntries.length === 1 ? 'y' : 'ies'}`;
+
+          document.getElementById('cpHoldingsList').innerHTML = formattedHoldings.length ? formattedHoldings.map(h => {
+            const pnlClass = h.pnlRands >= 0 ? 'cp-pnl-pos' : 'cp-pnl-neg';
             return `
-              <div class="cp-strategy-card">
-                <div class="cp-strategy-name">${escapeHtml(s.strategy.name || s.strategy.short_name || 'Strategy')}</div>
-                <div class="cp-strategy-meta">${escapeHtml(s.strategy.risk_level || 'Balanced')}</div>
-                <div class="cp-strategy-row">
+              <div class="cp-card">
+                <div class="cp-row">
                   <div>
-                    <div class="cp-strategy-value-label">Current Value</div>
-                    <div class="cp-strategy-value">R${s.value.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div style="font-size:13px;font-weight:700;color:#1e293b;display:flex;align-items:center;gap:6px;">${escapeHtml(h.symbol)} ${h.isPending ? '<span class="cp-pending">Pending</span>' : ''}</div>
+                    <div class="cp-muted" style="font-size:11px;">${escapeHtml(h.name)}</div>
                   </div>
                   <div style="text-align:right;">
-                    <div class="cp-strategy-value-label">P&L</div>
-                    <div class="cp-holding-pnl ${pnlClass}" style="font-size:14px;">${pnlSign}R${Math.abs(s.pnl).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${pnlSign}${s.pnlPct.toFixed(2)}%)</div>
+                    <div style="font-size:13px;font-weight:700;">R${formatMoney(h.value)}</div>
+                    ${h.isPending ? '<div class="cp-muted" style="font-size:11px;">Awaiting fill</div>' : `<div class="${pnlClass}" style="font-size:11px;font-weight:600;">${h.pnlRands >= 0 ? '+' : ''}R${formatMoney(Math.abs(h.pnlRands))} (${h.pnlRands >= 0 ? '+' : ''}${h.pnlPct.toFixed(2)}%)</div>`}
                   </div>
                 </div>
               </div>`;
-          }).join('');
-        }
+          }).join('') : '<div class="client-empty">No active holdings</div>';
 
-        // ── Render transactions ──
-        if (transactions.length === 0) {
-          document.getElementById('cpTransactionsList').innerHTML = '<div class="cp-empty-state">No recent activity</div>';
-        } else {
-          document.getElementById('cpTransactionsList').innerHTML = transactions.map(t => {
+          document.getElementById('cpStrategiesList').innerHTML = strategyEntries.length ? strategyEntries.map(s => `
+            <div class="cp-card">
+              <div style="font-size:13px;font-weight:700;color:#1e293b;">${escapeHtml(s.strategy.name || s.strategy.short_name || 'Strategy')}</div>
+              <div class="cp-row" style="margin-top:4px;">
+                <span class="cp-muted" style="font-size:11px;">${escapeHtml(s.strategy.risk_level || 'Balanced')} · ${s.count} holding${s.count === 1 ? '' : 's'}</span>
+                <span style="font-size:12px;font-weight:700;">R${formatMoney(s.value)}</span>
+              </div>
+            </div>
+          `).join('') : '<div class="client-empty">No strategies found</div>';
+
+          document.getElementById('cpTransactionsList').innerHTML = transactions.length ? transactions.map(t => {
             const amountR = Math.abs(Number(t.amount || 0) / 100);
-            const title = t.name || t.description || 'Transaction';
-            const dateStr = formatDateCompact(t.transaction_date || t.created_at);
             const isCredit = t.direction === 'credit';
             return `
-              <div class="cp-holding-card">
-                <div class="cp-holding-logo" style="background:${isCredit ? '#f0fdf4' : '#fef2f2'};">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="${isCredit ? '#059669' : '#ef4444'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;">
-                    ${isCredit
-                      ? '<path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/>'
-                      : '<path d="M12 19V5"/><path d="M5 12l7-7 7 7"/>'}
-                  </svg>
+              <div class="cp-card">
+                <div class="cp-row">
+                  <div>
+                    <div style="font-size:12px;font-weight:700;color:#1e293b;">${escapeHtml(t.name || t.description || 'Transaction')}</div>
+                    <div class="cp-muted" style="font-size:11px;">${escapeHtml(formatDateCompact(t.transaction_date || t.created_at))}${t.status ? ' · ' + escapeHtml(t.status) : ''}</div>
+                  </div>
+                  <div style="font-size:12px;font-weight:700;color:${isCredit ? '#059669' : '#1e293b'};">${isCredit ? '+' : ''}R${formatMoney(amountR)}</div>
                 </div>
-                <div class="cp-holding-info">
-                  <div class="cp-holding-symbol" style="font-size:12px;">${escapeHtml(title)}</div>
-                  <div class="cp-holding-name">${dateStr}${t.status ? ' · ' + escapeHtml(t.status) : ''}</div>
-                </div>
-                <div class="cp-holding-values">
-                  <div class="cp-holding-value" style="font-size:12px;color:${isCredit ? '#059669' : '#1e293b'};">${isCredit ? '+' : ''}R${amountR.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                </div>
-              </div>`;
-          }).join('');
+              </div>
+            `;
+          }).join('') : '<div class="client-empty">No recent activity</div>';
+
+          renderInspector({
+            client,
+            totalValue,
+            totalPnl,
+            totalPnlPct,
+            strategyCount: strategyEntries.length,
+            holdings: formattedHoldings.slice(0, 8),
+            transactions,
+          });
+        } catch (err) {
+          document.getElementById('cpBalance').textContent = 'Error';
+          document.getElementById('cpHoldingsList').innerHTML = `<div class="client-empty">${escapeHtml(err.message || 'Failed to load profile')}</div>`;
+          document.getElementById('cpStrategiesList').innerHTML = '';
+          document.getElementById('cpTransactionsList').innerHTML = '';
         }
-
-      } catch (err) {
-        console.error('Failed to load client profile:', err);
-        document.getElementById('cpBalance').textContent = 'Error';
-        document.getElementById('cpHoldingsList').innerHTML = `<div class="cp-empty-state">Error: ${err.message || 'Unknown'}</div>`;
-        document.getElementById('cpStrategiesList').innerHTML = '';
-        document.getElementById('cpTransactionsList').innerHTML = '';
       }
-    }
 
-    /* ══════════════════════════════════════════════════════════
-       HELPERS
-    ══════════════════════════════════════════════════════════ */
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
+      function renderInspector(snapshot) {
+        document.getElementById('inspectorHint').textContent = 'Live client mobile profile and breakdown data.';
+        document.getElementById('mClient').textContent = snapshot.client.name;
+        document.getElementById('mPortfolio').textContent = `R${formatMoney(snapshot.totalValue)}`;
+        document.getElementById('mPnl').textContent = `${snapshot.totalPnl >= 0 ? '+' : ''}R${formatMoney(Math.abs(snapshot.totalPnl))}`;
+        document.getElementById('mPnl').style.color = snapshot.totalPnl >= 0 ? '#059669' : '#ef4444';
+        document.getElementById('mStrategies').textContent = String(snapshot.strategyCount);
 
-    function formatDateCompact(dateStr) {
-      if (!dateStr) return '';
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return '';
-      const now = new Date();
-      const diffDays = Math.floor((now - d) / (1000 * 60 * 60 * 24));
-      if (diffDays === 0) return 'Today';
-      if (diffDays === 1) return 'Yesterday';
-      if (diffDays < 7) return `${diffDays} days ago`;
-      return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
-    }
+        document.getElementById('inspectorHoldings').innerHTML = snapshot.holdings.length
+          ? snapshot.holdings.map(h => `
+              <div class="inspector-item">
+                <span>${escapeHtml(h.symbol)} ${h.isPending ? '· Pending' : ''}</span>
+                <span style="font-weight:700;">R${formatMoney(h.value)}</span>
+              </div>
+            `).join('')
+          : '<div class="placeholder">No holdings</div>';
+
+        document.getElementById('inspectorTransactions').innerHTML = (snapshot.transactions || []).length
+          ? snapshot.transactions.map(t => {
+              const amountR = Math.abs(Number(t.amount || 0) / 100);
+              const isCredit = t.direction === 'credit';
+              return `<div class="inspector-item"><span>${escapeHtml(t.name || t.description || 'Transaction')}</span><span style="font-weight:700;color:${isCredit ? '#059669' : '#1e293b'};">${isCredit ? '+' : ''}R${formatMoney(amountR)}</span></div>`;
+            }).join('')
+          : '<div class="placeholder">No transactions</div>';
+      }
+
+      function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      function formatDateCompact(dateStr) {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return '';
+        const now = new Date();
+        const diffDays = Math.floor((now - d) / (1000 * 60 * 60 * 24));
+        if (diffDays === 0) return 'Today';
+        if (diffDays === 1) return 'Yesterday';
+        if (diffDays < 7) return `${diffDays} days ago`;
+        return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
+      }
+
+      function formatMoney(n) {
+        return Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
     </script>
   </body>
 </html>

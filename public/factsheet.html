@@ -276,7 +276,7 @@
       }
 
       const { data: strategy, error: stratError } = await supabaseClient
-        .from('strategies')
+        .from('strategies_c')
         .select('id, slug, name, short_name, description, risk_level, sector, tags, base_currency, icon_url, image_url, holdings, min_investment, is_public, is_featured, status, created_at')
         .eq('id', strategyId)
         .maybeSingle();

@@ -4105,7 +4105,7 @@
       if (strategyIds.length) {
         parallelQueries.push(
           supabaseClient
-            .from('strategies')
+            .from('strategies_c')
             .select('id, name, short_name, slug')
             .in('id', strategyIds)
             .then(({ data, error }) => {
@@ -5002,7 +5002,7 @@
         // ── Restore strategy holdings from snapshot ──
         if (batch.holdings_snapshot_before && batch.strategy_id) {
           const { error: stratErr } = await supabaseClient
-            .from('strategies')
+            .from('strategies_c')
             .update({
               holdings: batch.holdings_snapshot_before,
             })

@@ -8491,7 +8491,7 @@
 
           if (strategyIds.length) {
             const { data: strategyRows, error: strategiesError } = await supabaseClient
-              .from('strategies')
+              .from('strategies_c')
               .select('id, name, short_name')
               .in('id', strategyIds);
 
