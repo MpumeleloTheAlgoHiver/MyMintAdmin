@@ -9167,172 +9167,106 @@
         const sellFraction = reductionUnits / unitsPerLot;
         const isFullExit = sellFraction >= 1 || Number(rebSelectedStep.reductionPercent || 0) >= 100;
 
-        // Persist SELL order history rows first for broker/audit visibility.
-        const sellEventRows = activeSellRows.map((row) => {
+        // Capture instrument codes now, before rebLoadStrategy resets rebSelectedIsin.
+        const sellCode = String(rebSelectedIsin.code || "").replace(/\.[A-Z]+$/i, "");
+        const buyCode = String(buySelection.instrument.code || "").replace(/\.[A-Z]+$/i, "");
+        const extraBuyCode = extraBuySelection
+          ? String(extraBuySelection.instrument.code || "").replace(/\.[A-Z]+$/i, "")
+          : "";
+
+        // Build internal sell metadata (for the holdings snapshot stored in the batch).
+        const sellPriceAtCommit = Math.round(Number(rebSelectedIsin.currentPrice || 0) * 100);
+        const _sellRowMeta = activeSellRows.map((row) => {
           const totalQty = Math.abs(Number(row.quantity || 0));
           const soldQty = isFullExit ? totalQty : Math.max(0, Math.round(totalQty * sellFraction));
-          return {
-            user_id: row.user_id,
-            security_id: sellSecurityId,
-            quantity: soldQty,
-            strategy_id: strategyId,
-            updated_at: nowIso,
-            trade_side: "SELL",
-            is_active: false,
-            closed_reason: "REBALANCE_EVENT_SELL",
-            closed_at: nowIso,
-            rebalance_batch_id: rebalanceBatchId,
-            strategy_name_snapshot: strategyNameSnapshot,
-            _rowId: row.id,
-            _remaining: totalQty - soldQty,
-            avg_fill: Math.round(Number(rebSelectedIsin.currentPrice || 0) * 100),
-            Status: "inactive",
-          };
+          return { holdingId: row.id, userId: row.user_id, soldQty, remaining: totalQty - soldQty };
         });
-        if (sellEventRows.length) {
-          const insertRows = sellEventRows.map(({ _rowId, _remaining, ...rest }) => rest);
-          const { error: sellEventErr } = await supabaseClient
-            .from("stock_holdings_c")
-            .insert(insertRows);
-          if (sellEventErr) throw new Error(sellEventErr.message || "Failed to insert sell order events.");
-        }
 
-        // For full exits: close the entire active position.
-        // For partial sells: update the active row to reflect remaining quantity.
-        for (const evt of sellEventRows) {
-          if (!evt._rowId) continue;
-          if (isFullExit || evt._remaining <= 0) {
-            const { error: closeErr } = await supabaseClient
-              .from("stock_holdings_c")
-              .update({
-                is_active: false,
-                closed_reason: "POSITION_REPLACED",
-                closed_at: nowIso,
-                updated_at: nowIso,
-                rebalance_batch_id: rebalanceBatchId,
-                avg_exit: Math.round(Number(rebSelectedIsin.currentPrice || 0) * 100),
-                exit_date: nowIso.split("T")[0],
-                Status: "inactive",
-              })
-              .eq("id", evt._rowId);
-            if (closeErr) throw new Error(closeErr.message || "Failed to close replaced position.");
-          } else {
-            const { error: partialErr } = await supabaseClient
-              .from("stock_holdings_c")
-              .update({
-                quantity: evt._remaining,
-                updated_at: nowIso,
-              })
-              .eq("id", evt._rowId);
-            if (partialErr) throw new Error(partialErr.message || "Failed to update remaining position.");
-          }
-        }
+        // Build rebalance_event rows — SELL side.
+        const sellEventRows = _sellRowMeta
+          .filter((m) => m.soldQty > 0)
+          .map((m) => ({
+            batch_id: rebalanceBatchId,
+            user_id: m.userId,
+            security_id: sellSecurityId,
+            trade_side: "SELL",
+            quantity: m.soldQty,
+            price_at_commit: sellPriceAtCommit,
+            closed_reason: "REBALANCE_EVENT_SELL",
+            strategy_name_snapshot: strategyNameSnapshot,
+            created_at: nowIso,
+            updated_at: nowIso,
+          }));
 
-        // Persist BUY order history rows for orderbook audit trail.
+        // Build rebalance_event rows — primary BUY side.
+        const buyPriceAtCommit = Math.round(Number(buySelection.instrument?.currentPrice || 0) * 100);
         const buyEventRows = (buyExec.clientAllocations || [])
           .map((alloc) => ({
+            batch_id: rebalanceBatchId,
             user_id: String(alloc.clientId),
             security_id: buySecurityId,
-            quantity: Number(alloc.shares || 0),
-            strategy_id: strategyId,
-            updated_at: nowIso,
             trade_side: "BUY",
-            is_active: false,
+            quantity: Number(alloc.shares || 0),
+            price_at_commit: buyPriceAtCommit,
             closed_reason: "REBALANCE_EVENT_BUY",
-            closed_at: nowIso,
-            rebalance_batch_id: rebalanceBatchId,
             strategy_name_snapshot: strategyNameSnapshot,
-            Status: "inactive",
+            created_at: nowIso,
+            updated_at: nowIso,
           }))
           .filter((row) => row.quantity > 0);
-        if (buyEventRows.length) {
-          const { error: buyEventErr } = await supabaseClient
-            .from("stock_holdings_c")
-            .insert(buyEventRows);
-          if (buyEventErr) throw new Error(buyEventErr.message || "Failed to insert buy order events.");
-        }
 
+        // Build rebalance_event rows — secondary BUY side (wallet remainder).
         let extraBuyEventRows = [];
         if (extraBuyExec) {
+          const extraPriceAtCommit = Math.round(Number(extraBuySelection?.instrument?.currentPrice || 0) * 100);
           extraBuyEventRows = (extraBuyExec.clientAllocations || [])
             .map((alloc) => ({
+              batch_id: rebalanceBatchId,
               user_id: String(alloc.clientId),
               security_id: extraBuySecurityId,
-              quantity: Number(alloc.shares || 0),
-              strategy_id: strategyId,
-              updated_at: nowIso,
               trade_side: "BUY",
-              is_active: false,
+              quantity: Number(alloc.shares || 0),
+              price_at_commit: extraPriceAtCommit,
               closed_reason: "REBALANCE_EVENT_BUY_WALLET",
-              closed_at: nowIso,
-              rebalance_batch_id: rebalanceBatchId,
               strategy_name_snapshot: strategyNameSnapshot,
-              Status: "inactive",
+              created_at: nowIso,
+              updated_at: nowIso,
             }))
             .filter((row) => row.quantity > 0);
-          if (extraBuyEventRows.length) {
-            const { error: extraBuyEventErr } = await supabaseClient
-              .from("stock_holdings_c")
-              .insert(extraBuyEventRows);
-            if (extraBuyEventErr) throw new Error(extraBuyEventErr.message || "Failed to insert secondary buy order events.");
-          }
         }
 
-        const applyActiveBuyAllocations = async (securityId, allocations) => {
-          const activeBuyRows = (existingRows || []).filter((row) => {
-            return String(row.security_id) === String(securityId)
-              && Number(row.quantity || 0) >= 0;
+        // Snapshot active holding IDs so the orderbook can close/reduce them on settlement.
+        const holdingsSnapshotBefore = _sellRowMeta.map(({ holdingId, userId, remaining }) => ({
+          id: holdingId,
+          user_id: userId,
+          remaining,
+        }));
+
+        // Create the rebalance_batch record (PENDING) — positions settle later via orderbook.
+        const { error: batchErr } = await supabaseClient
+          .from("rebalance_batch")
+          .insert({
+            id: rebalanceBatchId,
+            strategy_id: strategyId,
+            status: "PENDING",
+            sell_isin_code: sellCode,
+            buy_isin_code: buyCode,
+            extra_buy_isin_code: extraBuyCode || null,
+            strategy_name_snapshot: strategyNameSnapshot,
+            net_proceeds: sellEventRows.reduce((sum, r) => sum + r.quantity * r.price_at_commit, 0),
+            created_at: nowIso,
+            holdings_snapshot_before: holdingsSnapshotBefore,
+            wallet_snapshot_before: rebWalletByClient || {},
           });
-          const activeBuyByUserId = activeBuyRows.reduce((acc, row) => {
-            const userId = String(row.user_id || "");
-            if (!userId || acc[userId]) return acc;
-            acc[userId] = row;
-            return acc;
-          }, {});
+        if (batchErr) throw new Error(batchErr.message || "Failed to create rebalance batch.");
 
-          for (const alloc of (allocations || [])) {
-            const userId = String(alloc.clientId || "");
-            const buyQty = Number(alloc.shares || 0);
-            if (!userId || buyQty <= 0) continue;
-
-            const existingBuy = activeBuyByUserId[userId];
-            if (existingBuy) {
-              const nextQty = Math.max(0, Number(existingBuy.quantity || 0) + buyQty);
-              const { error: updateErr } = await supabaseClient
-                .from("stock_holdings_c")
-                .update({
-                  quantity: nextQty,
-                  updated_at: nowIso,
-                  trade_side: "BUY",
-                  is_active: true,
-                  strategy_name_snapshot: strategyNameSnapshot,
-                  Status: "active",
-                })
-                .eq("id", existingBuy.id);
-              if (updateErr) throw new Error(updateErr.message || "Failed to update active buy bucket.");
-            } else {
-              const { error: insertErr } = await supabaseClient
-                .from("stock_holdings_c")
-                .insert({
-                  user_id: userId,
-                  security_id: securityId,
-                  quantity: buyQty,
-                  strategy_id: strategyId,
-                  updated_at: nowIso,
-                  trade_side: "BUY",
-                  is_active: true,
-                  rebalance_batch_id: rebalanceBatchId,
-                  strategy_name_snapshot: strategyNameSnapshot,
-                  Status: "active",
-                });
-              if (insertErr) throw new Error(insertErr.message || "Failed to insert active buy bucket row.");
-            }
-          }
-        };
-
-        await applyActiveBuyAllocations(buySecurityId, buyExec.clientAllocations || []);
-        if (extraBuyExec) {
-          await applyActiveBuyAllocations(extraBuySecurityId, extraBuyExec.clientAllocations || []);
+        // Insert all trade events into rebalance_event.
+        const allEvents = [...sellEventRows, ...buyEventRows, ...extraBuyEventRows];
+        if (allEvents.length) {
+          const { error: eventsErr } = await supabaseClient
+            .from("rebalance_event")
+            .insert(allEvents);
+          if (eventsErr) throw new Error(eventsErr.message || "Failed to insert rebalance events.");
         }
 
         const walletBeforeByClient = buySelection.walletBeforeByClient || {};
@@ -9361,13 +9295,6 @@
         });
         await rebUpsertWalletBalances(strategyId, finalWalletByClient);
         rebWalletByClient = { ...rebWalletByClient, ...finalWalletByClient };
-
-        // Capture instrument codes BEFORE rebLoadStrategy resets rebSelectedIsin to null
-        const sellCode = String(rebSelectedIsin.code || "").replace(/\.[A-Z]+$/i, "");
-        const buyCode = String(buySelection.instrument.code || "").replace(/\.[A-Z]+$/i, "");
-        const extraBuyCode = extraBuySelection
-          ? String(extraBuySelection.instrument.code || "").replace(/\.[A-Z]+$/i, "")
-          : "";
 
         rebSelectedStrategyId = String(strategyId);
         await rebLoadStrategy(strategyId);
