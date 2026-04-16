@@ -329,7 +329,7 @@
       const filledHoldings = holdings.filter(h => !h.pending);
       const pendingHoldings = holdings.filter(h => !!h.pending);
       const totalWeight = filledHoldings.reduce((sum, h) => sum + (Number(h.weight) || 0), 0);
-      const minInvestment = calculateMinInvestment(filledHoldings, securitiesMap) || Number(strategy.min_investment) || null;
+      const minInvestment = calculateMinInvestment(filledHoldings, securitiesMap) || null;
       const cashAmount = minInvestment ? minInvestment * 0.08 : null;
       const pendingCount = pendingHoldings.length;
 

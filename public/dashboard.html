@@ -2943,7 +2943,7 @@
 
         const items = (strategies || []).map((strategy, index) => ({
           name: strategy.short_name || strategy.name || `Strategy ${index + 1}`,
-          value: Math.max(Number(strategy.min_investment) || 0, 0),
+          value: Math.max(Number(strategy.min_investment || 0) / 100, 0),
           currency: strategy.base_currency || "ZAR",
           risk: (strategy.risk_level || "unspecified").toLowerCase(),
           sector: strategy.sector || null,
@@ -4545,9 +4545,7 @@
           0,
         );
         const minInvestment =
-          calculateMinInvestmentFromHoldings(holdings, securitiesMap) ||
-          Number(strategy.min_investment) ||
-          null;
+          calculateMinInvestmentFromHoldings(holdings, securitiesMap) || null;
         const cashAmount = minInvestment ? minInvestment * 0.08 : null;
 
         const holdingsWithMetrics = holdings.map((h) => {
@@ -6952,10 +6950,11 @@
           const secondPart = strategy.objective || strategy.sector || null;
           const subtitle = secondPart ? `${riskPart} • ${secondPart}` : riskPart;
 
-          /* Min investment */
-          const minInv = strategy.min_investment ? Number(strategy.min_investment) : null;
-          const minStr = minInv
-            ? "Min. R " + minInv.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          /* Min investment — live calculation only */
+          const _hld6 = Array.isArray(strategy.holdings) ? strategy.holdings : [];
+          const _liveMin6 = _overviewSecMap && _hld6.length > 0 ? calculateMinInvestmentFromHoldings(_hld6, _overviewSecMap) : null;
+          const minStr = _liveMin6
+            ? "Min. R " + _liveMin6.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
             : null;
 
           /* Tags: strategy.tags array (first 2) exactly like Mint — fallback to risk_level */
