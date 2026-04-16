@@ -1000,6 +1000,25 @@
                 class="px-5 pt-5 pb-4 border-b border-slate-100"
                 style="background: #ffffff"
               >
+                <!-- Strategy card filter pills (hidden in security/edit mode) -->
+                <div id="stratCardFilterBar" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+                  <button onclick="window.setStratCardFilter('all')" data-filter="all"
+                    style="padding:5px 14px;border-radius:9999px;border:1.5px solid #6d28d9;background:#6d28d9;font-size:12px;font-weight:600;color:#fff;cursor:pointer;transition:all 0.15s;white-space:nowrap;">
+                    All
+                  </button>
+                  <button onclick="window.setStratCardFilter('live-users')" data-filter="live-users"
+                    style="padding:5px 14px;border-radius:9999px;border:1.5px solid #e2e8f0;background:#f8fafc;font-size:12px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.15s;white-space:nowrap;">
+                    Live + Users
+                  </button>
+                  <button onclick="window.setStratCardFilter('live-no-users')" data-filter="live-no-users"
+                    style="padding:5px 14px;border-radius:9999px;border:1.5px solid #e2e8f0;background:#f8fafc;font-size:12px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.15s;white-space:nowrap;">
+                    Live, No Users
+                  </button>
+                  <button onclick="window.setStratCardFilter('not-live')" data-filter="not-live"
+                    style="padding:5px 14px;border-radius:9999px;border:1.5px solid #e2e8f0;background:#f8fafc;font-size:12px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.15s;white-space:nowrap;">
+                    Not Live
+                  </button>
+                </div>
                 <div
                   id="topAssetsRow"
                   class="flex gap-3 overflow-x-auto pb-1"
@@ -1728,6 +1747,18 @@
       let strategyInvestedIds = new Set();  // strategy IDs that have ≥1 real investor
       let strategyYtdMap     = new Map();   // strategy_id → ytd_pct (already in % form, e.g. 14.19)
       let strategyReturnsMap = new Map();   // strategy_id → full strategies_returns_c latest row
+      let _stratCardFilter   = 'all';       // 'all' | 'live-users' | 'live-no-users' | 'not-live'
+
+      window.setStratCardFilter = (type) => {
+        _stratCardFilter = type;
+        document.querySelectorAll('#stratCardFilterBar button[data-filter]').forEach(btn => {
+          const active = btn.dataset.filter === type;
+          btn.style.background     = active ? '#6d28d9' : '#f8fafc';
+          btn.style.color          = active ? '#fff'    : '#475569';
+          btn.style.borderColor    = active ? '#6d28d9' : '#e2e8f0';
+        });
+        renderTopAssetsRow();
+      };
       let currentAdminName = null;          // logged-in admin's full name, loaded at init
 
       /* ── View-only mode for invested strategies ──────────────────────── */
@@ -6835,6 +6866,10 @@
         /* If strategies haven't loaded yet, keep skeleton; will be called again on load */
         if (!strategies.length) return;
 
+        /* Show/hide filter bar depending on mode */
+        const filterBar = document.getElementById('stratCardFilterBar');
+        if (filterBar) filterBar.style.display = strategyWorkspaceVisible ? 'none' : 'flex';
+
         /* ── SECURITY CARD MODE (shown while creating / editing a strategy) ── */
         if (strategyWorkspaceVisible) {
           if (!allSecuritiesCache) return; /* wait for securities to load */
@@ -6989,7 +7024,23 @@
           return rank(a) - rank(b);
         });
 
-        const display = sortedStrategies.slice(0, 7);
+        /* Apply filter pill selection */
+        const filteredStrategies = sortedStrategies.filter(s => {
+          const isLive   = !!s.is_public;
+          const hasUsers = strategyInvestedIds.has(String(s.id));
+          if (_stratCardFilter === 'live-users')    return isLive && hasUsers;
+          if (_stratCardFilter === 'live-no-users') return isLive && !hasUsers;
+          if (_stratCardFilter === 'not-live')      return !isLive;
+          return true; // 'all'
+        });
+
+        const display = filteredStrategies.slice(0, 7);
+
+        if (!display.length) {
+          const labels = { 'live-users': 'live strategies with users', 'live-no-users': 'live strategies without users', 'not-live': 'strategies that are not live' };
+          row.innerHTML = `<div style="padding:20px 4px;color:#94a3b8;font-size:13px;font-weight:500;">No ${labels[_stratCardFilter] || 'strategies'} found.</div>`;
+          return;
+        }
 
         /* Mini sparkline — matches Mint StrategyMiniChart: purple line + end dot on slate-50 bg */
         const sparkline = (i) => {
