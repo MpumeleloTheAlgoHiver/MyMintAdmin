@@ -5650,29 +5650,40 @@
           el.innerHTML = '<div style="font-size:12px;color:#94a3b8;padding:12px 0;">No holdings configured for this strategy.</div>';
           return;
         }
-        const totalWeight = holdings.reduce((s, h) => s + (Number(h.weight) || 0), 0);
+        /* Pre-compute qty, live price, and market value per holding */
+        const enriched = holdings.map(h => {
+          const sym   = h.ticker || h.symbol || (typeof h === 'string' ? h : '');
+          const sec   = secMap.get(sym) || secMap.get(normalizeSymbol(sym));
+          const price = sec?.last_price != null ? Number(sec.last_price) / 100 : null;
+          const qty   = Number(h.shares || h.quantity || 0);
+          const mv    = price != null && qty > 0 ? qty * price : null;
+          const change = sec?.change_percent != null ? Number(sec.change_percent) : null;
+          return { h, sym, sec, price, qty, mv, change,
+                   code: sym.replace('.JO', ''),
+                   name: h.name || sec?.name || sym };
+        });
+
+        /* Total market value from live prices (fallback to 0) */
+        const totalMv = enriched.reduce((s, r) => s + (r.mv || 0), 0);
+
+        const fmtR = (v) => v != null
+          ? 'R\u00a0' + v.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : '—';
+
         el.innerHTML = `<table class="ov-table"><thead><tr>
-          <th>Instrument</th><th class="r">Shares</th><th class="r">Price (ZAR)</th><th class="r">Weight</th><th class="r">Day Chg</th>
+          <th>Instrument</th><th class="r">Shares</th><th class="r">Total Value (R)</th><th class="r">Weight</th><th class="r">Day Chg</th>
         </tr></thead><tbody>${
-          holdings.map(h => {
-            const sym = h.ticker || h.symbol || (typeof h === 'string' ? h : '');
-            const sec = secMap.get(sym) || secMap.get(normalizeSymbol(sym));
-            const price = sec?.last_price != null ? Number(sec.last_price) / 100 : null;
-            const change = sec?.change_percent != null ? Number(sec.change_percent) : null;
-            const weight = Number(h.weight) || 0;
-            const weightPct = totalWeight > 0 ? (weight / totalWeight * 100) : weight;
-            const barW = Math.min(weightPct * 2.5, 100);
-            const code = sym.replace('.JO', '');
-            const name = h.name || sec?.name || sym;
-            const cc = change == null ? '' : change >= 0 ? 'ov-pos' : 'ov-neg';
-            const qty = Number(h.shares || h.quantity || 0);
+          enriched.map(({ h, sym, sec, price, qty, mv, change, code, name }) => {
+            const weightPct = totalMv > 0 && mv != null ? (mv / totalMv) * 100 : 0;
+            const barW      = Math.min(weightPct * 2.5, 100);
+            const cc        = change == null ? '' : change >= 0 ? 'ov-pos' : 'ov-neg';
             return `<tr>
               <td>
                 <div style="font-family:ui-monospace,monospace;font-weight:600;font-size:12px;">${code}</div>
                 <div style="font-size:10px;color:#94a3b8;margin-top:1px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</div>
               </td>
               <td class="r ov-mono" style="font-size:12px;font-weight:600;color:#334155;">${qty > 0 ? qty.toLocaleString('en-ZA') : '—'}</td>
-              <td class="r ov-mono">${price != null ? price.toLocaleString('en-ZA', { minimumFractionDigits: 2 }) : '—'}</td>
+              <td class="r ov-mono" style="font-size:12px;font-weight:500;color:#334155;">${fmtR(mv)}</td>
               <td class="r">
                 <div style="display:flex;align-items:center;gap:5px;justify-content:flex-end;">
                   <div style="width:40px;height:4px;border-radius:2px;background:#f1f5f9;"><div style="height:100%;border-radius:2px;background:rgba(37,99,235,0.6);width:${barW}%;"></div></div>
@@ -5682,7 +5693,12 @@
               <td class="r">${change != null ? `<span class="ov-mono ${cc}" style="font-size:11px;font-weight:600;">${change >= 0 ? '+' : ''}${change.toFixed(2)}%</span>` : '<span style="color:#cbd5e1;">—</span>'}</td>
             </tr>`;
           }).join('')
-        }</tbody></table>`;
+        }</tbody><tfoot><tr style="border-top:1.5px solid #e8edf3;background:#f8fafc;">
+          <td colspan="2" style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;">Portfolio Total</td>
+          <td class="r ov-mono" style="padding:8px 10px;font-size:12px;font-weight:700;color:#334155;">${fmtR(totalMv > 0 ? totalMv : null)}</td>
+          <td class="r ov-mono" style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;">100%</td>
+          <td></td>
+        </tr></tfoot></table>`;
       };
 
       const ovRenderInvestors = (investRows, profiles, strat, analytics, txnInceptionMap = {}, secPriceMap = {}) => {
