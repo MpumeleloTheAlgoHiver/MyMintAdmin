@@ -369,6 +369,7 @@
       ];
 
       const calendarData = {};
+      const createdYm = strategy.created_at ? strategy.created_at.slice(0, 7) : null;
       if (stratRetRows && stratRetRows.length > 0) {
         const monthlyLastValue = {};
         stratRetRows.forEach(row => {
@@ -379,7 +380,9 @@
         const sortedMonths = Object.keys(monthlyLastValue).sort();
         for (let i = 1; i < sortedMonths.length; i++) {
           const ym = sortedMonths[i];
+          if (createdYm && ym < createdYm) continue;
           const prevYm = sortedMonths[i - 1];
+          if (createdYm && prevYm < createdYm) continue;
           const [year, month] = ym.split('-');
           const endVal = monthlyLastValue[ym];
           const startVal = monthlyLastValue[prevYm];
