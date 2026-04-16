@@ -3161,11 +3161,11 @@
         const chunks = [];
         for (let i = 0; i < secIds.length; i += 50) chunks.push(secIds.slice(i, i + 50));
 
-        /* Fetch security_metrics (price, vol, daily) + stock_returns_c (period returns) in parallel */
+        /* Fetch security_metrics_c (price, vol, daily) + stock_returns_c (period returns) in parallel */
         const [secMetricsResults, stockRetMap] = await Promise.all([
           Promise.all(
             chunks.map(chunk =>
-              supabaseClient.from('security_metrics')
+              supabaseClient.from('security_metrics_c')
                 .select('*')
                 .in('security_id', chunk)
                 .order('as_of_date', { ascending: false })
