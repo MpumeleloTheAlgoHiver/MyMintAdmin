@@ -5263,11 +5263,20 @@
         }
 
         window.__dbgBreadcrumb('ovSelect:fetch-analytics');
-        const { data: analytics } = await supabaseClient
-          .from('strategy_analytics')
-          .select('strategy_id, as_of_date, latest_value, ytd_return, summary, curves, computed_at')
-          .eq('strategy_id', strat.id)
-          .maybeSingle();
+        const [{ data: analytics }, { data: stratRetRows }] = await Promise.all([
+          supabaseClient
+            .from('strategy_analytics')
+            .select('strategy_id, as_of_date, latest_value, ytd_return, summary, curves, computed_at')
+            .eq('strategy_id', strat.id)
+            .maybeSingle(),
+          supabaseClient
+            .from('strategies_returns_c')
+            .select('strategy_id, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct, basket_value, as_of_date')
+            .eq('strategy_id', strat.id)
+            .order('as_of_date', { ascending: false })
+            .limit(1),
+        ]);
+        const stratRet = (stratRetRows && stratRetRows[0]) || null;
 
         window.__dbgBreadcrumb('ovSelect:fetch-securities');
         const symbols = [...new Set(holdings.map(h => h.ticker || h.symbol || h).filter(s => typeof s === 'string' && s))];
@@ -5348,7 +5357,7 @@
         window.__dbgBreadcrumb('ovSelect:render-titlebar');
         ovRenderTitleBar(strat, analytics, totalAum, investRows.length);
         window.__dbgBreadcrumb('ovSelect:render-kpi');
-        ovRenderKpiStrip(analytics);
+        ovRenderKpiStrip(analytics, stratRet);
         window.__dbgBreadcrumb('ovSelect:render-perfchart');
         ovRenderPerfChart(analytics, strat.name || 'Strategy');
         window.__dbgBreadcrumb('ovSelect:render-sectorchart');
@@ -5544,16 +5553,18 @@
         if (navEl) navEl.textContent = navVal != null ? Number(navVal).toFixed(2) : '—';
       };
 
-      const ovRenderKpiStrip = (analytics) => {
+      const ovRenderKpiStrip = (analytics, stratRet) => {
         const strip = document.getElementById('ovKpiStrip');
         if (!strip) return;
         const summary = analytics?.summary || {};
-        const ytdRaw = analytics?.ytd_return ?? summary.ytd_return;
-        const ytd = ytdRaw != null ? Number(ytdRaw) * 100 : null;
+        /* Return metrics — from strategies_returns_c (already in % form, e.g. 14.19 = 14.19%) */
+        const sr = stratRet || {};
+        const ytd = sr.ytd_pct != null ? Number(sr.ytd_pct) : null;
+        const r1y = sr['1y_pct'] != null ? Number(sr['1y_pct']) : null;
         const kpis = [
-          { label: 'YTD Return', value: ovFmtPct(ytd), positive: ytd > 0,
+          { label: 'YTD Return', value: ovFmtPct(ytd), positive: ytd != null ? ytd > 0 : null,
             icon: '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>' },
-          { label: '1Y Return', value: summary.one_year_return != null ? ovFmtPct(Number(summary.one_year_return)*100) : '—', positive: summary.one_year_return > 0,
+          { label: '1Y Return', value: r1y != null ? ovFmtPct(r1y) : '—', positive: r1y != null ? r1y > 0 : null,
             icon: '<path d="M12 2v20M2 12h20"/>' },
           { label: 'Sharpe Ratio', value: summary.sharpe_ratio != null ? Number(summary.sharpe_ratio).toFixed(2) : '—', positive: summary.sharpe_ratio > 1,
             icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
