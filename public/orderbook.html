@@ -1211,6 +1211,7 @@
             <table class="orderbook-table">
               <thead>
                 <tr>
+                  <th style="width:110px;">Actions</th>
                   <th>Line</th>
                   <th>Instrument Name</th>
                   <th>Ticker</th>
@@ -1226,7 +1227,7 @@
               </thead>
               <tbody id="orderbookTableBody">
                 <tr>
-                  <td class="orderbook-empty-row" colspan="11">Loading orderbook...</td>
+                  <td class="orderbook-empty-row" colspan="12">Loading orderbook...</td>
                 </tr>
               </tbody>
             </table>
@@ -3904,7 +3905,7 @@
       exportOrderbookBtn.disabled = rows.length === 0;
 
       if (!rows.length) {
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="11">No orderbook records found.</td></tr>';
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="12">No orderbook records found.</td></tr>';
         return;
       }
 
@@ -3936,12 +3937,19 @@
 
         // Build the price / action column
         let priceActionHtml = '';
+        let actionsHtml = '';
         if (isPending) {
-          // Pending rebalance: show Fill & Settle + Reverse buttons
-          priceActionHtml = `
-            ${escapeHtml(asRandValue(row.avgFill))}
-            <button class="edit-price-btn" title="Fill &amp; Settle Batch" data-fill-settle-batch data-batch-id="${escapeHtml(row.rebalanceBatchId || '')}" data-line="${lineKey}" style="background:#059669;color:white;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:600;border:none;cursor:pointer;margin-left:4px;">Fill</button>
-            <button class="edit-price-btn" title="Reverse Batch" data-reverse-batch data-batch-id="${escapeHtml(row.rebalanceBatchId || '')}" data-line="${lineKey}" style="background:#dc2626;color:white;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:600;border:none;cursor:pointer;margin-left:2px;">Reverse</button>
+          // Pending rebalance: show Fill & Settle + Reverse in Actions column
+          priceActionHtml = escapeHtml(asRandValue(row.avgFill));
+          actionsHtml = `
+            <div style="display:flex;gap:6px;align-items:center;">
+              <button title="Fill &amp; Settle Batch" data-fill-settle-batch data-batch-id="${escapeHtml(row.rebalanceBatchId || '')}" data-line="${lineKey}"
+                style="background:#059669;color:white;border-radius:8px;padding:5px 14px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;letter-spacing:.02em;box-shadow:0 1px 3px rgba(5,150,105,.25);transition:background .15s;"
+                onmouseover="this.style.background='#047857'" onmouseout="this.style.background='#059669'">Fill &amp; Settle</button>
+              <button title="Reverse Batch" data-reverse-batch data-batch-id="${escapeHtml(row.rebalanceBatchId || '')}" data-line="${lineKey}"
+                style="background:#dc2626;color:white;border-radius:8px;padding:5px 14px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;letter-spacing:.02em;box-shadow:0 1px 3px rgba(220,38,38,.25);transition:background .15s;"
+                onmouseover="this.style.background='#b91c1c'" onmouseout="this.style.background='#dc2626'">Reverse</button>
+            </div>
           `;
         } else if (sideValue === 'SELL') {
           priceActionHtml = `
@@ -3950,12 +3958,15 @@
               <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
             </button>
           `;
+          actionsHtml = '';
         } else {
           priceActionHtml = escapeHtml(asRandValue(row.avgFill));
+          actionsHtml = '';
         }
 
         return `
           <tr class="orderbook-main-row${isPending ? ' orderbook-pending-row' : ''}" data-orderbook-main-row data-line-key="${lineKey}">
+            <td style="white-space:nowrap;">${actionsHtml}</td>
             <td>${escapeHtml(String(row.line ?? '-'))}</td>
             <td>${escapeHtml(row.instrumentName || '-')}${strategyTag}${pendingBadge}</td>
             <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
@@ -3977,7 +3988,7 @@
             <td>${escapeHtml(String(row.unrealizedPnl ?? '-'))}</td>
           </tr>
           <tr class="orderbook-detail-row is-hidden" data-orderbook-detail-row data-line-key="${lineKey}">
-            <td colspan="11">
+            <td colspan="12">
               <div class="orderbook-detail-wrap">
                 ${row.isStrategy ? renderStrategyDetailsTable(row) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderBndDetailsTable(row)}`}
               </div>
