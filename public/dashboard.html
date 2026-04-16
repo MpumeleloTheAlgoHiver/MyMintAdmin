@@ -7678,8 +7678,8 @@
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               </div>
               <div style="min-width:0;">
-                <p style="margin:0;font-size:13px;font-weight:700;line-height:1.3;">Trade sequence committed</p>
-                <p style="margin:3px 0 0;font-size:11px;color:#cbd5e1;line-height:1.35;">${rowCountText}</p>
+                <p style="margin:0;font-size:13px;font-weight:700;line-height:1.3;">Trade sequence committed <span style="font-size:10px;font-weight:600;color:#fbbf24;background:rgba(251,191,36,0.15);padding:1px 6px;border-radius:5px;margin-left:4px;">PENDING</span></p>
+                <p style="margin:3px 0 0;font-size:11px;color:#cbd5e1;line-height:1.35;">${rowCountText} · Go to Orderbook to Fill &amp; Settle</p>
               </div>
             </div>
             <button id="rebCommitToastClose" type="button" style="border:none;background:transparent;color:#cbd5e1;font-size:15px;line-height:1;cursor:pointer;padding:0 2px;">×</button>
@@ -9115,6 +9115,27 @@
           throw new Error("Secondary buy security must be different from the primary buy security.");
         }
 
+        /* ── Guard: block if a PENDING batch already exists for this strategy ── */
+        const { data: pendingBatches, error: pendingErr } = await supabaseClient
+          .from("rebalance_batch")
+          .select("id, status, sell_isin_code, buy_isin_code, created_at")
+          .eq("strategy_id", strategyId)
+          .eq("status", "PENDING");
+        if (pendingErr) throw new Error(pendingErr.message || "Failed to check pending batches.");
+        if (pendingBatches && pendingBatches.length > 0) {
+          const existing = pendingBatches[0];
+          throw new Error(
+            `A pending rebalance already exists for this strategy (batch ${existing.id.slice(0, 8)}… created ${new Date(existing.created_at).toLocaleString()}). Please settle or reverse it before committing a new one.`
+          );
+        }
+
+        /* ── Capture pre-rebalance snapshots (for reversal) ── */
+        const strategyRef = (allStrategiesFullData || []).find((s) => String(s.id) === String(strategyId));
+        const holdingsSnapshotBefore = strategyRef?.holdings
+          ? JSON.parse(JSON.stringify(strategyRef.holdings))
+          : null;
+        const walletSnapshotBefore = { ...rebWalletByClient };
+
         await rebReplaceStrategyHoldingAfterBuy({
           strategyId,
           soldIsin: rebSelectedIsin,
@@ -9123,10 +9144,12 @@
           buyExec,
         });
 
+        /* ── Generate batch ID & metadata ── */
         const rebalanceBatchId = (window.crypto && typeof window.crypto.randomUUID === "function")
           ? window.crypto.randomUUID()
-          : `reb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        const strategyRef = (allStrategiesFullData || []).find((s) => String(s.id) === String(strategyId));
+          : ("10000000-1000-4000-8000-100000000000".replace(/[018]/g, c =>
+              (+c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (+c / 4)))).toString(16)
+            ));
         const strategyNameSnapshot = strategyRef?.short_name || strategyRef?.name || "";
 
         const userIds = [...new Set([
@@ -9140,6 +9163,7 @@
           ...(extraBuySecurityId ? [extraBuySecurityId] : []),
         ])];
 
+        /* ── Read existing active positions (read-only — to compute sell quantities) ── */
         const { data: existingRows, error: existingErr } = await supabaseClient
           .from("stock_holdings_c")
           .select("id, user_id, security_id, quantity, trade_side, is_active")
@@ -9160,29 +9184,24 @@
           throw new Error("No active position found for selected sell instrument.");
         }
 
-        // Compute per-row sell quantity using the divisibility step ratio.
-        // reductionUnits / unitsPerLot gives the fraction of each client's position to sell.
         const reductionUnits = Number(rebSelectedStep.reductionUnits || 0);
         const unitsPerLot = Math.max(1, Number(rebSelectedIsin.unitsPerLot || 1));
         const sellFraction = reductionUnits / unitsPerLot;
         const isFullExit = sellFraction >= 1 || Number(rebSelectedStep.reductionPercent || 0) >= 100;
 
-        // Capture instrument codes now, before rebLoadStrategy resets rebSelectedIsin.
-        const sellCode = String(rebSelectedIsin.code || "").replace(/\.[A-Z]+$/i, "");
-        const buyCode = String(buySelection.instrument.code || "").replace(/\.[A-Z]+$/i, "");
-        const extraBuyCode = extraBuySelection
+        const sellIsinCode = String(rebSelectedIsin.code || "");
+        const buyIsinCode = String(buySelection.instrument.code || "").replace(/\.[A-Z]+$/i, "");
+        const extraBuyIsinCode = extraBuySelection
           ? String(extraBuySelection.instrument.code || "").replace(/\.[A-Z]+$/i, "")
-          : "";
+          : null;
 
-        // Build internal sell metadata (for the holdings snapshot stored in the batch).
-        const sellPriceAtCommit = Math.round(Number(rebSelectedIsin.currentPrice || 0) * 100);
         const _sellRowMeta = activeSellRows.map((row) => {
           const totalQty = Math.abs(Number(row.quantity || 0));
           const soldQty = isFullExit ? totalQty : Math.max(0, Math.round(totalQty * sellFraction));
           return { holdingId: row.id, userId: row.user_id, soldQty, remaining: totalQty - soldQty };
         });
 
-        // Build rebalance_event rows — SELL side.
+        /* ── Build SELL events → rebalance_event ── */
         const sellEventRows = _sellRowMeta
           .filter((m) => m.soldQty > 0)
           .map((m) => ({
@@ -9191,15 +9210,16 @@
             security_id: sellSecurityId,
             trade_side: "SELL",
             quantity: m.soldQty,
-            price_at_commit: sellPriceAtCommit,
+            price_at_commit: Math.round(Number(rebSelectedIsin.currentPrice || 0) * 100),
+            avg_fill: null,
+            fill_date: null,
             closed_reason: "REBALANCE_EVENT_SELL",
             strategy_name_snapshot: strategyNameSnapshot,
             created_at: nowIso,
             updated_at: nowIso,
           }));
 
-        // Build rebalance_event rows — primary BUY side.
-        const buyPriceAtCommit = Math.round(Number(buySelection.instrument?.currentPrice || 0) * 100);
+        /* ── Build primary BUY events → rebalance_event ── */
         const buyEventRows = (buyExec.clientAllocations || [])
           .map((alloc) => ({
             batch_id: rebalanceBatchId,
@@ -9207,7 +9227,9 @@
             security_id: buySecurityId,
             trade_side: "BUY",
             quantity: Number(alloc.shares || 0),
-            price_at_commit: buyPriceAtCommit,
+            price_at_commit: Math.round(Number(buyExec.pricePerShare || 0) * 100),
+            avg_fill: null,
+            fill_date: null,
             closed_reason: "REBALANCE_EVENT_BUY",
             strategy_name_snapshot: strategyNameSnapshot,
             created_at: nowIso,
@@ -9215,10 +9237,9 @@
           }))
           .filter((row) => row.quantity > 0);
 
-        // Build rebalance_event rows — secondary BUY side (wallet remainder).
+        /* ── Build extra BUY events (wallet-funded) → rebalance_event ── */
         let extraBuyEventRows = [];
         if (extraBuyExec) {
-          const extraPriceAtCommit = Math.round(Number(extraBuySelection?.instrument?.currentPrice || 0) * 100);
           extraBuyEventRows = (extraBuyExec.clientAllocations || [])
             .map((alloc) => ({
               batch_id: rebalanceBatchId,
@@ -9226,7 +9247,9 @@
               security_id: extraBuySecurityId,
               trade_side: "BUY",
               quantity: Number(alloc.shares || 0),
-              price_at_commit: extraPriceAtCommit,
+              price_at_commit: Math.round(Number(extraBuyExec.pricePerShare || 0) * 100),
+              avg_fill: null,
+              fill_date: null,
               closed_reason: "REBALANCE_EVENT_BUY_WALLET",
               strategy_name_snapshot: strategyNameSnapshot,
               created_at: nowIso,
@@ -9235,32 +9258,47 @@
             .filter((row) => row.quantity > 0);
         }
 
-        // Snapshot active holding IDs so the orderbook can close/reduce them on settlement.
-        const holdingsSnapshotBefore = _sellRowMeta.map(({ holdingId, userId, remaining }) => ({
-          id: holdingId,
-          user_id: userId,
-          remaining,
-        }));
+        /* ── Compute batch-level totals ── */
+        const totalSellQty = sellEventRows.reduce((s, r) => s + Number(r.quantity || 0), 0);
+        const totalBuyQty = buyEventRows.reduce((s, r) => s + Number(r.quantity || 0), 0);
+        const totalExtraBuyQty = extraBuyEventRows.reduce((s, r) => s + Number(r.quantity || 0), 0);
+        const sellModal = document.getElementById("rebSellModal");
+        const netProceeds = sellModal?._execData?.netProceeds || 0;
 
-        // Create the rebalance_batch record (PENDING) — positions settle later via orderbook.
+        /* ── Get current admin user ID ── */
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        const currentUserId = sessionData?.session?.user?.id || null;
+
+        /* ── Insert rebalance_batch (PENDING) ── */
         const { error: batchErr } = await supabaseClient
           .from("rebalance_batch")
           .insert({
             id: rebalanceBatchId,
             strategy_id: strategyId,
             status: "PENDING",
-            sell_isin_code: sellCode,
-            buy_isin_code: buyCode,
-            extra_buy_isin_code: extraBuyCode || null,
-            strategy_name_snapshot: strategyNameSnapshot,
-            net_proceeds: sellEventRows.reduce((sum, r) => sum + r.quantity * r.price_at_commit, 0),
-            created_at: nowIso,
             holdings_snapshot_before: holdingsSnapshotBefore,
-            wallet_snapshot_before: rebWalletByClient || {},
+            wallet_snapshot_before: walletSnapshotBefore,
+            sell_security_id: sellSecurityId,
+            sell_isin_code: sellIsinCode,
+            total_sell_quantity: totalSellQty,
+            buy_security_id: buySecurityId,
+            buy_isin_code: buyIsinCode,
+            total_buy_quantity: totalBuyQty,
+            extra_buy_security_id: extraBuySecurityId || null,
+            extra_buy_isin_code: extraBuyIsinCode,
+            total_extra_buy_quantity: totalExtraBuyQty,
+            net_proceeds: netProceeds,
+            strategy_name_snapshot: strategyNameSnapshot,
+            created_by: currentUserId,
+            created_at: nowIso,
+            updated_at: nowIso,
           });
         if (batchErr) throw new Error(batchErr.message || "Failed to create rebalance batch.");
 
-        // Insert all trade events into rebalance_event.
+        /* ── Insert all rebalance events ── */
+        /* stock_holdings_c is NOT touched —
+           Positions settle only when the admin fills & settles the batch
+           via the orderbook. This keeps client-facing data clean. */
         const allEvents = [...sellEventRows, ...buyEventRows, ...extraBuyEventRows];
         if (allEvents.length) {
           const { error: eventsErr } = await supabaseClient
