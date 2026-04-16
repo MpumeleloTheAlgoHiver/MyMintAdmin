@@ -467,34 +467,55 @@
 
       document.getElementById('topNavTitle').textContent = strategy.name || 'Factsheet';
 
+      const { data: analyticsRow } = await supabaseClient
+        .from('strategy_analytics')
+        .select('strategy_id, as_of_date, base_currency, latest_value, ytd_return, summary, curves, calendar_returns, computed_at, error')
+        .eq('strategy_id', strategyId)
+        .maybeSingle();
+      const analytics = analyticsRow || null;
+
       const holdings = Array.isArray(strategy.holdings) ? strategy.holdings : [];
       let securitiesMap = new Map();
       if (holdings.length > 0) {
         const symbols = holdings.map(h => h.ticker || h.symbol || h);
         const allSymbols = [...new Set([...symbols, ...symbols.map(normalizeSymbol)])];
-        const { data: secs } = await supabaseClient.from('securities_c').select('id, symbol, name, logo_url').in('symbol', allSymbols);
-        if (secs) {
-          const secIds = secs.map(s => s.id).filter(Boolean);
-          let retMap = {};
-          if (secIds.length > 0) {
-            const { data: rets } = await supabaseClient.from('stock_returns_c')
-              .select('security_id, current_price, 1d_pct, ytd_pct, 1m_pct, 6m_pct, 1y_pct, 5y_pct, all_pct')
-              .in('security_id', secIds).order('as_of_date', { ascending: false });
-            (rets || []).forEach(r => { if (!retMap[r.security_id]) retMap[r.security_id] = r; });
-          }
-          secs.forEach(s => {
-            const r = retMap[s.id] || {};
-            const merged = { ...s, last_price: r.current_price != null ? Math.round(Number(r.current_price)) : null, change_percent: r['1d_pct'] ?? null };
-            securitiesMap.set(s.symbol, merged);
-            const norm = normalizeSymbol(s.symbol);
-            if (norm !== s.symbol) securitiesMap.set(norm, merged);
-          });
-        }
+        const { data: secs } = await supabaseClient.from('securities_c').select('symbol, name, logo_url, last_price, change_percent').in('symbol', allSymbols);
+        if (secs) secs.forEach(s => { securitiesMap.set(s.symbol, s); const norm = normalizeSymbol(s.symbol); if (norm !== s.symbol) securitiesMap.set(norm, s); });
       }
 
       const totalWeight = holdings.reduce((sum, h) => sum + (Number(h.weight) || 0), 0);
       const minInvestment = calculateMinInvestment(holdings, securitiesMap) || Number(strategy.min_investment) || null;
       const cashAmount = minInvestment ? minInvestment * 0.08 : null;
+      const analyticsTimestamp = analytics?.computed_at || analytics?.as_of_date || null;
+      const analyticsUnavailable = !analytics || analytics?.error;
+
+      let allTimeReturn = null;
+      if (analytics?.latest_value != null) {
+        const lv = Number(analytics.latest_value);
+        allTimeReturn = (lv > 50 && lv < 200) ? (lv / 100) - 1 : (lv >= -1 && lv <= 1) ? lv : (lv / 100) - 1;
+      }
+      if (allTimeReturn == null && analytics?.ytd_return != null) allTimeReturn = Number(analytics.ytd_return);
+      const formattedAllTimeReturn = allTimeReturn != null ? `${allTimeReturn >= 0 ? '+' : ''}${(allTimeReturn * 100).toFixed(2)}%` : '-';
+      const allTimeTextClass = allTimeReturn != null ? (allTimeReturn > 0 ? 'text-emerald-600' : allTimeReturn < 0 ? 'text-rose-600' : 'text-slate-500') : 'text-slate-500';
+
+      const summary = analytics?.summary || {};
+      const performanceSummary = [
+        { label: 'Best Day', value: formatPercent(summary.best_day), description: 'The highest daily return this strategy has achieved.' },
+        { label: 'Worst Day', value: formatPercent(summary.worst_day), description: 'The lowest daily return this strategy has experienced.' },
+        { label: 'Avg Daily Return', value: formatPercent(summary.avg_day), description: 'The average daily percentage change across all trading days.' },
+        { label: 'YTD Return', value: formatPercent(summary.ytd_return ?? analytics?.ytd_return), description: 'Year-to-date return for the strategy.' },
+      ];
+
+      const calendarData = {};
+      const calendarReturns = Array.isArray(analytics?.calendar_returns) ? analytics.calendar_returns : [];
+      calendarReturns.forEach(entry => {
+        if (!entry?.month) return;
+        const [year, month] = entry.month.split('-');
+        if (!calendarData[year]) calendarData[year] = {};
+        calendarData[year][month] = entry.return;
+      });
+      const availableCalendarYears = Object.keys(calendarData).sort();
+      const currentCalendarYear = availableCalendarYears.length > 0 ? availableCalendarYears[availableCalendarYears.length - 1] : new Date().getFullYear().toString();
 
       const holdingsWithMetrics = holdings.map(h => {
         const sym = h.ticker || h.symbol || h;
@@ -512,6 +533,9 @@
       const formattedCashAmount = cashAmount ? formatCurrency(cashAmount, strategy.base_currency || 'ZAR') : null;
       nonCashHoldings.push({ symbol: 'CASH', name: formattedCashAmount ? `Cash (${formattedCashAmount})` : 'Cash', weight: 8, weightNorm: 8, logoUrl: null, dailyChange: null, shares: 0, marketValue: cashAmount || 0 });
 
+      const curves = analytics?.curves || {};
+      const availableTimeframes = ['1W','1M','3M','6M','YTD'].filter(key => Array.isArray(curves[key]) && curves[key].length > 0);
+      const hasChartData = availableTimeframes.length > 0;
 
       const cashIconSvg = `<svg class="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="currentColor"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>`;
       const logoOrInitial = (h, size='w-8 h-8') => h.logoUrl ? `<img src="${h.logoUrl}" alt="${h.symbol}" class="w-full h-full object-cover" />` : h.symbol === 'CASH' ? cashIconSvg : `<span class="text-[10px] font-semibold text-slate-500">${(h.symbol || '').slice(0, 2)}</span>`;
@@ -535,10 +559,11 @@
             ${strategy.is_public ? '<span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">Public</span>' : ''}
             ${strategy.is_featured ? '<span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">Featured</span>' : ''}
           </div>
+          ${hasChartData ? `<div class="mt-5 h-48 w-full flex items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50"><p class="text-sm text-slate-400">Chart available on Mint platform</p></div>` : ''}
           <div class="mt-4 grid grid-cols-3 gap-3">
             <div class="bg-slate-50 rounded-xl p-3 text-center"><p class="text-[11px] text-slate-500">Holdings</p><p class="text-xl font-semibold text-slate-900">${holdings.length}</p></div>
             <div class="bg-violet-50 rounded-xl p-3 text-center"><p class="text-[11px] text-violet-600">Min. Investment</p><p class="text-xl font-semibold text-violet-700">${minInvestment ? formatCurrency(minInvestment) : 'N/A'}</p></div>
-            <div class="bg-slate-50 rounded-xl p-3 text-center"><p class="text-[11px] text-slate-500">All-time Return</p><p class="text-xl font-semibold text-slate-400">—</p></div>
+            <div class="bg-slate-50 rounded-xl p-3 text-center"><p class="text-[11px] text-slate-500">All-time Return</p><p class="text-xl font-semibold ${allTimeTextClass}">${formattedAllTimeReturn}</p></div>
           </div>
         </div>`;
 
@@ -547,6 +572,7 @@
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
           <div class="flex items-center justify-between">
             <h2 class="text-base font-semibold text-slate-900">Daily Change</h2>
+            ${analyticsTimestamp ? `<p class="text-xs text-slate-500">Updated ${new Date(analyticsTimestamp).toLocaleDateString()}</p>` : ''}
           </div>
           <div class="marquee-scroll mt-4 flex gap-3 pb-2">
             ${nonCashHoldings.map(h => `
@@ -564,6 +590,23 @@
         </div>`;
       }
 
+      if (!analyticsUnavailable) {
+        html += `
+        <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-900">Performance Summary</h2>
+            ${analyticsTimestamp ? `<p class="text-xs text-slate-500">As of ${new Date(analyticsTimestamp).toLocaleDateString()}</p>` : ''}
+          </div>
+          <div class="mt-4 grid grid-cols-2 gap-3">
+            ${performanceSummary.map(m => `
+              <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <p class="text-xs font-semibold text-slate-500">${m.label}</p>
+                <p class="mt-2 text-lg font-semibold text-slate-900">${m.value}</p>
+                <p class="mt-1 text-[11px] text-slate-400">${m.description}</p>
+              </div>`).join('')}
+          </div>
+        </div>`;
+      }
 
       if (strategy.description) {
         html += `
@@ -598,6 +641,17 @@
           </div>
         </div>`;
 
+      if (availableCalendarYears.length > 0) {
+        html += `
+        <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+          <div class="flex items-center justify-between gap-4 mb-4">
+            <h2 class="text-base font-semibold text-slate-900">Calendar Returns</h2>
+            ${availableCalendarYears.length > 1 ? `<div class="flex flex-wrap gap-2">${availableCalendarYears.map(year => `<button type="button" onclick="switchCalendarYear('${year}')" class="calendar-year-btn rounded-full px-3 py-1 text-xs font-semibold ${year === currentCalendarYear ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600'}" data-year="${year}">${year}</button>`).join('')}</div>` : ''}
+          </div>
+          <div id="calendarGrid">${renderCalendarGrid(calendarData, currentCalendarYear)}</div>
+        </div>`;
+        window._calendarData = calendarData;
+      }
 
       html += `
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
