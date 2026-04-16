@@ -467,24 +467,43 @@
 
       document.getElementById('topNavTitle').textContent = strategy.name || 'Factsheet';
 
-      const { data: analyticsRow } = await supabaseClient
-        .from('strategy_analytics')
-        .select('strategy_id, as_of_date, base_currency, latest_value, ytd_return, summary, curves, calendar_returns, computed_at, error')
-        .eq('strategy_id', strategyId)
-        .maybeSingle();
-      const analytics = analyticsRow || null;
+      const analytics = null; // strategy_analytics is not a _c table — all fields show as unavailable
 
       const holdings = Array.isArray(strategy.holdings) ? strategy.holdings : [];
       let securitiesMap = new Map();
       if (holdings.length > 0) {
         const symbols = holdings.map(h => h.ticker || h.symbol || h);
         const allSymbols = [...new Set([...symbols, ...symbols.map(normalizeSymbol)])];
-        const { data: secs } = await supabaseClient.from('securities_c').select('symbol, name, logo_url, last_price, change_percent').in('symbol', allSymbols);
-        if (secs) secs.forEach(s => { securitiesMap.set(s.symbol, s); const norm = normalizeSymbol(s.symbol); if (norm !== s.symbol) securitiesMap.set(norm, s); });
+        const { data: secs } = await supabaseClient.from('securities_c').select('id, symbol, name, logo_url').in('symbol', allSymbols);
+        if (secs) {
+          const secIds = secs.map(s => s.id).filter(Boolean);
+          let retMap = {};
+          if (secIds.length > 0) {
+            const { data: rets } = await supabaseClient.from('stock_returns_c')
+              .select('security_id, current_price, 1d_pct')
+              .in('security_id', secIds)
+              .order('as_of_date', { ascending: false });
+            (rets || []).forEach(r => { if (!retMap[r.security_id]) retMap[r.security_id] = r; });
+          }
+          secs.forEach(s => {
+            const r = retMap[s.id] || {};
+            const merged = { ...s, last_price: r.current_price != null ? Number(r.current_price) : null, change_percent: r['1d_pct'] ?? null };
+            securitiesMap.set(s.symbol, merged);
+            const norm = normalizeSymbol(s.symbol);
+            if (norm !== s.symbol) securitiesMap.set(norm, merged);
+          });
+        }
       }
 
+      const { data: stratRetRows } = await supabaseClient
+        .from('strategies_returns_c')
+        .select('strategy_id, ytd_pct, 1d_pct, basket_value, as_of_date')
+        .eq('strategy_id', strategyId)
+        .order('as_of_date', { ascending: true });
+      const stratRet = stratRetRows && stratRetRows.length > 0 ? stratRetRows[stratRetRows.length - 1] : null;
+
       const totalWeight = holdings.reduce((sum, h) => sum + (Number(h.weight) || 0), 0);
-      const minInvestment = calculateMinInvestment(holdings, securitiesMap) || Number(strategy.min_investment) || null;
+      const minInvestment = calculateMinInvestment(holdings, securitiesMap) || null;
       const cashAmount = minInvestment ? minInvestment * 0.08 : null;
       const analyticsTimestamp = analytics?.computed_at || analytics?.as_of_date || null;
       const analyticsUnavailable = !analytics || analytics?.error;
@@ -503,17 +522,33 @@
         { label: 'Best Day', value: formatPercent(summary.best_day), description: 'The highest daily return this strategy has achieved.' },
         { label: 'Worst Day', value: formatPercent(summary.worst_day), description: 'The lowest daily return this strategy has experienced.' },
         { label: 'Avg Daily Return', value: formatPercent(summary.avg_day), description: 'The average daily percentage change across all trading days.' },
-        { label: 'YTD Return', value: formatPercent(summary.ytd_return ?? analytics?.ytd_return), description: 'Year-to-date return for the strategy.' },
+        { label: 'YTD Return', value: stratRet?.ytd_pct != null ? `${Number(stratRet.ytd_pct) >= 0 ? '+' : ''}${Number(stratRet.ytd_pct).toFixed(2)}%` : '—', description: 'Year-to-date return for the strategy.' },
       ];
 
       const calendarData = {};
-      const calendarReturns = Array.isArray(analytics?.calendar_returns) ? analytics.calendar_returns : [];
-      calendarReturns.forEach(entry => {
-        if (!entry?.month) return;
-        const [year, month] = entry.month.split('-');
-        if (!calendarData[year]) calendarData[year] = {};
-        calendarData[year][month] = entry.return;
-      });
+      const createdYm = strategy.created_at ? strategy.created_at.slice(0, 7) : null;
+      if (stratRetRows && stratRetRows.length > 0) {
+        const monthlyLastValue = {};
+        stratRetRows.forEach(row => {
+          if (row.basket_value == null || !row.as_of_date) return;
+          const ym = row.as_of_date.slice(0, 7);
+          monthlyLastValue[ym] = Number(row.basket_value);
+        });
+        const sortedMonths = Object.keys(monthlyLastValue).sort();
+        for (let i = 1; i < sortedMonths.length; i++) {
+          const ym = sortedMonths[i];
+          if (createdYm && ym < createdYm) continue;
+          const prevYm = sortedMonths[i - 1];
+          if (createdYm && prevYm < createdYm) continue;
+          const [year, month] = ym.split('-');
+          const endVal = monthlyLastValue[ym];
+          const startVal = monthlyLastValue[prevYm];
+          if (startVal && startVal !== 0) {
+            if (!calendarData[year]) calendarData[year] = {};
+            calendarData[year][month] = (endVal / startVal) - 1;
+          }
+        }
+      }
       const availableCalendarYears = Object.keys(calendarData).sort();
       const currentCalendarYear = availableCalendarYears.length > 0 ? availableCalendarYears[availableCalendarYears.length - 1] : new Date().getFullYear().toString();
 
@@ -590,23 +625,20 @@
         </div>`;
       }
 
-      if (!analyticsUnavailable) {
-        html += `
+      html += `
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
           <div class="flex items-center justify-between">
             <h2 class="text-base font-semibold text-slate-900">Performance Summary</h2>
-            ${analyticsTimestamp ? `<p class="text-xs text-slate-500">As of ${new Date(analyticsTimestamp).toLocaleDateString()}</p>` : ''}
           </div>
           <div class="mt-4 grid grid-cols-2 gap-3">
             ${performanceSummary.map(m => `
               <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                 <p class="text-xs font-semibold text-slate-500">${m.label}</p>
-                <p class="mt-2 text-lg font-semibold text-slate-900">${m.value}</p>
+                <p class="mt-2 text-lg font-semibold text-slate-400">${m.value}</p>
                 <p class="mt-1 text-[11px] text-slate-400">${m.description}</p>
               </div>`).join('')}
           </div>
         </div>`;
-      }
 
       if (strategy.description) {
         html += `
@@ -641,17 +673,16 @@
           </div>
         </div>`;
 
-      if (availableCalendarYears.length > 0) {
-        html += `
+      html += `
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
           <div class="flex items-center justify-between gap-4 mb-4">
             <h2 class="text-base font-semibold text-slate-900">Calendar Returns</h2>
-            ${availableCalendarYears.length > 1 ? `<div class="flex flex-wrap gap-2">${availableCalendarYears.map(year => `<button type="button" onclick="switchCalendarYear('${year}')" class="calendar-year-btn rounded-full px-3 py-1 text-xs font-semibold ${year === currentCalendarYear ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600'}" data-year="${year}">${year}</button>`).join('')}</div>` : ''}
           </div>
-          <div id="calendarGrid">${renderCalendarGrid(calendarData, currentCalendarYear)}</div>
+          ${availableCalendarYears.length > 0 ? `
+            ${availableCalendarYears.length > 1 ? `<div class="flex flex-wrap gap-2 mb-4">${availableCalendarYears.map(year => `<button type="button" onclick="switchCalendarYear('${year}')" class="calendar-year-btn rounded-full px-3 py-1 text-xs font-semibold ${year === currentCalendarYear ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600'}" data-year="${year}">${year}</button>`).join('')}</div>` : ''}
+            <div id="calendarGrid">${renderCalendarGrid(calendarData, currentCalendarYear)}</div>
+          ` : `<p class="text-sm text-slate-400">—</p>`}
         </div>`;
-        window._calendarData = calendarData;
-      }
 
       html += `
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
@@ -665,6 +696,7 @@
         </div>`;
 
       document.getElementById('factsheetContent').innerHTML = html;
+      window._calendarData = calendarData;
     };
 
     window.addEventListener('DOMContentLoaded', async () => {

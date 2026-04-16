@@ -1046,15 +1046,42 @@
                         </div>
                         <span style="font-size:14px;font-weight:700;color:#0f172a;">Return Insights</span>
                       </div>
-                      <span style="font-size:11px;color:#94a3b8;font-weight:500;">Strategy Assets</span>
+                      <!-- View-mode dropdown -->
+                      <div style="position:relative;">
+                        <button id="riViewBtn" onclick="window.toggleRiViewMenu(event)" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;font-size:11px;font-weight:600;color:#475569;cursor:pointer;transition:background 0.15s;">
+                          <span id="riViewLabel">Asset Insights</span>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <div id="riViewMenu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:white;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.10);z-index:200;min-width:160px;overflow:hidden;">
+                          <button onclick="window.setRiView('assets')" style="width:100%;text-align:left;padding:9px 14px;font-size:12px;font-weight:600;color:#334155;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:8px;" onmouseenter="this.style.background='#f5f3ff'" onmouseleave="this.style.background='none'">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.2" stroke-linecap="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                            Asset Insights
+                          </button>
+                          <div style="height:1px;background:#f1f5f9;margin:2px 0;"></div>
+                          <button onclick="window.setRiView('strategy')" style="width:100%;text-align:left;padding:9px 14px;font-size:12px;font-weight:600;color:#334155;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:8px;" onmouseenter="this.style.background='#f5f3ff'" onmouseleave="this.style.background='none'">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+                            Strategy Insights
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- Strategy selector row (Strategy Insights mode only) -->
+                    <div id="riStratRow" style="display:none;padding:10px 14px 0;border-bottom:0;">
+                      <select id="riStratSelect" onchange="window.setRiStrategy(this.value)" style="width:100%;padding:7px 10px;border-radius:8px;border:1.5px solid #e2e8f0;font-size:12px;font-weight:600;color:#334155;background:#f8fafc;outline:none;cursor:pointer;">
+                        <option value="">— Select a strategy —</option>
+                      </select>
                     </div>
                     <!-- Period Tabs -->
-                    <div style="display:flex;border-bottom:1px solid #f1f5f9;padding:0 14px;gap:2px;">
-                      <button id="riTabDaily" onclick="window.switchReturnTab('daily')" style="padding:9px 12px;font-size:11px;font-weight:700;color:#7c3aed;border-bottom:2px solid #7c3aed;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;">Daily</button>
-                      <button id="riTabWtd" onclick="window.switchReturnTab('wtd')" style="padding:9px 12px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;">WTD</button>
-                      <button id="riTabMtd" onclick="window.switchReturnTab('mtd')" style="padding:9px 12px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;">MTD</button>
-                      <button id="riTabYtd" onclick="window.switchReturnTab('ytd')" style="padding:9px 12px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;">YTD</button>
-                      <button id="riTabAlerts" onclick="window.switchReturnTab('alerts')" style="padding:9px 10px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;display:flex;align-items:center;gap:5px;">
+                    <div style="display:flex;border-bottom:1px solid #f1f5f9;padding:0 10px;gap:0px;overflow-x:auto;scrollbar-width:none;">
+                      <button id="riTab1d"  onclick="window.switchReturnTab('1d')"     style="padding:9px 9px;font-size:11px;font-weight:700;color:#7c3aed;border-bottom:2px solid #7c3aed;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">1D</button>
+                      <button id="riTab5d"  onclick="window.switchReturnTab('5d')"     style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">5D</button>
+                      <button id="riTab1m"  onclick="window.switchReturnTab('1m')"     style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">1M</button>
+                      <button id="riTab6m"  onclick="window.switchReturnTab('6m')"     style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">6M</button>
+                      <button id="riTabYtd" onclick="window.switchReturnTab('ytd')"    style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">YTD</button>
+                      <button id="riTab1y"  onclick="window.switchReturnTab('1y')"     style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">1Y</button>
+                      <button id="riTab5y"  onclick="window.switchReturnTab('5y')"     style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">5Y</button>
+                      <button id="riTabAll" onclick="window.switchReturnTab('all')"    style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">All</button>
+                      <button id="riTabAlerts" onclick="window.switchReturnTab('alerts')" style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0;">
                         Alerts
                         <span id="riAlertBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:none;align-items:center;justify-content:center;padding:0 4px;line-height:1;"></span>
                       </button>
@@ -1677,15 +1704,14 @@
         { k:'change_abs',     l:'Day Change (R)',    t:'Source: change_abs',           v:false, isReturn:false },
         { k:'change_pct',     l:'Day Change %',     t:'Source: change_pct × 100',     v:true,  isReturn:true  },
         { k:'mkt_value',      l:'Market Value',     t:'Shares × last_close',          v:true,  isReturn:false, isMv:true },
-        { k:'WTD_Return',     l:'WTD %',            t:'Source: WTD_Return × 100',     v:true,  isReturn:true  },
         { k:'1W_Return',      l:'1 Week %',         t:'Source: 1W_Return × 100',      v:false, isReturn:true  },
         { k:'1M_Return',      l:'1 Month %',        t:'Source: 1M_Return × 100',      v:true,  isReturn:true  },
-        { k:'3M_Return',      l:'3 Month %',        t:'Source: 3M_Return × 100',      v:false, isReturn:true  },
         { k:'r_6m',           l:'6 Month %',        t:'Source: r_6m × 100',           v:false, isReturn:true  },
         { k:'r_1y',           l:'1 Year %',         t:'Source: r_1y × 100',           v:true,  isReturn:true  },
-        { k:'volatility_30d', l:'Volatility (30D)', t:'Source: volatility_30d × 100', v:true,  isReturn:false },
-        { k:'avg_volume_30d', l:'Avg Volume (30D)', t:'Source: avg_volume_30d',        v:false, isReturn:false },
+        { k:'5y_return',      l:'5 Year %',         t:'Source: 5y_pct',               v:true,  isReturn:true  },
+        { k:'all_return',     l:'All Time %',       t:'Source: all_pct',              v:true,  isReturn:true  },
         { k:'r_ytd',          l:'YTD %',            t:'Source: r_ytd × 100',          v:true,  isReturn:true  },
+        { k:'as_of_date',     l:'As of Date',       t:'Source: as_of_date',           v:false, isReturn:false },
         { k:'weight',         l:'Weight',           t:'From strategy holdings',        v:true,  isReturn:false, isWt:true },
       ];
       let _holdingSort   = { key: null, dir: 1 };
@@ -1699,7 +1725,8 @@
       let strategyWorkspaceVisible = false;
       let strategyInvestorFilter = "all";   // "all" | "invested" | "not-invested"
       let strategyInvestedIds = new Set();  // strategy IDs that have ≥1 real investor
-      let strategyYtdMap = new Map();       // strategy_id → YTD return (decimal, e.g. 0.1419)
+      let strategyYtdMap     = new Map();   // strategy_id → ytd_pct (already in % form, e.g. 14.19)
+      let strategyReturnsMap = new Map();   // strategy_id → full strategies_returns_c latest row
       let currentAdminName = null;          // logged-in admin's full name, loaded at init
 
       /* ── View-only mode for invested strategies ──────────────────────── */
@@ -1825,7 +1852,7 @@
 
       let _browsePanelLoaded = false;
       let _returnInsightsData = []; /* cached asset return data */
-      let _activeReturnTab = 'daily';
+      let _activeReturnTab = '1d';
       const ALERT_THRESHOLD = -4; /* alert when daily change <= -4% */
 
       /* Build a map: symbol → [strategy names] from the loaded strategies */
@@ -1861,7 +1888,10 @@
         /* ── Alerts tab ── */
         if (tab === 'alerts') {
           const symStratMap = _getSymbolStrategyMap();
-          const alerts = (_returnInsightsData || [])
+          const _alertBase = (_riViewMode === 'strategy' && _riFilterSymbols)
+            ? (_returnInsightsData || []).filter(a => _riFilterSymbols.has(a.symbol))
+            : (_returnInsightsData || []);
+          const alerts = _alertBase
             .filter(a => a.change_percent != null && Number(a.change_percent) <= ALERT_THRESHOLD)
             .sort((a, b) => Number(a.change_percent) - Number(b.change_percent));
 
@@ -1904,9 +1934,37 @@
           return;
         }
 
-        const fieldMap = { daily: 'change_percent', wtd: 'wtd_performance', mtd: 'mtd_performance', ytd: 'ytd_performance' };
-        const field = fieldMap[tab] || 'change_percent';
-        const all = (_returnInsightsData || [])
+        const fieldMap = {
+          '1d':  'change_percent',
+          '5d':  'w1_performance',
+          '1m':  'mtd_performance',
+          '6m':  'r_6m_performance',
+          ytd:   'ytd_performance',
+          '1y':  'r_1y_performance',
+          '5y':  'sr_5y_pct',
+          all:   'sr_all_pct',
+        };
+        const field = fieldMap[tab] ?? null;
+        if (field === null) {
+          listEl.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No ${tab.toUpperCase()} data available</div>`;
+          return;
+        }
+        /* In strategy mode with no strategy selected yet — prompt user */
+        if (_riViewMode === 'strategy' && !_riFilterSymbols) {
+          listEl.innerHTML = `<div style="text-align:center;padding:28px 16px;">
+            <div style="font-size:24px;margin-bottom:8px;">📊</div>
+            <div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:4px;">Select a strategy</div>
+            <div style="font-size:11px;color:#94a3b8;">Choose a strategy above to see its asset insights.</div>
+          </div>`;
+          return;
+        }
+
+        /* Apply strategy filter when in strategy mode */
+        const _riBase = (_riViewMode === 'strategy' && _riFilterSymbols)
+          ? (_returnInsightsData || []).filter(a => _riFilterSymbols.has(a.symbol))
+          : (_returnInsightsData || []);
+
+        const all = _riBase
           .map(a => ({ ...a, _val: a[field] != null ? Number(a[field]) : null }))
           .filter(a => a._val != null)
           .sort((a, b) => b._val - a._val);
@@ -1971,9 +2029,66 @@
 
       const _fetchedPeriods = new Set(['daily', 'ytd', 'alerts']); /* already loaded via Supabase */
 
+      /* ── Return Insights view-mode state ── */
+      let _riViewMode     = 'assets'; /* 'assets' | 'strategy' */
+      let _riFilterSymbols = null;    /* Set<string> of symbols when mode = strategy */
+
+      window.toggleRiViewMenu = (e) => {
+        e.stopPropagation();
+        const menu = document.getElementById('riViewMenu');
+        if (!menu) return;
+        const open = menu.style.display !== 'none';
+        menu.style.display = open ? 'none' : 'block';
+        if (!open) {
+          const close = (ev) => { if (!ev.target.closest('#riViewMenu') && ev.target.id !== 'riViewBtn') { menu.style.display = 'none'; } document.removeEventListener('click', close); };
+          setTimeout(() => document.addEventListener('click', close), 0);
+        }
+      };
+
+      window.setRiView = (mode) => {
+        _riViewMode = mode;
+        const menu  = document.getElementById('riViewMenu');
+        if (menu)   menu.style.display = 'none';
+        const label = document.getElementById('riViewLabel');
+        if (label)  label.textContent = mode === 'assets' ? 'Asset Insights' : 'Strategy Insights';
+        const btn   = document.getElementById('riViewBtn');
+        if (btn) { btn.style.background = mode === 'strategy' ? '#ede9fe' : '#f8fafc'; btn.style.color = mode === 'strategy' ? '#7c3aed' : '#475569'; btn.style.borderColor = mode === 'strategy' ? '#c4b5fd' : '#e2e8f0'; }
+        const row   = document.getElementById('riStratRow');
+        if (row)    row.style.display = mode === 'strategy' ? 'block' : 'none';
+        if (mode === 'strategy') _populateRiStratSelect();
+        _riFilterSymbols = null;
+        _renderReturnInsights(_activeReturnTab);
+      };
+
+      window.setRiStrategy = (stratId) => {
+        if (!stratId) {
+          _riFilterSymbols = null;
+        } else {
+          const strat = (allStrategiesFullData || []).find(s => String(s.id) === String(stratId));
+          if (strat && Array.isArray(strat.holdings) && strat.holdings.length) {
+            _riFilterSymbols = new Set(strat.holdings.map(h => h.ticker || h.symbol || '').filter(Boolean));
+          } else {
+            _riFilterSymbols = null;
+          }
+        }
+        _renderReturnInsights(_activeReturnTab);
+      };
+
+      const _populateRiStratSelect = () => {
+        const sel = document.getElementById('riStratSelect');
+        if (!sel) return;
+        const strats = allStrategiesFullData || [];
+        sel.innerHTML = '<option value="">— Select a strategy —</option>' +
+          strats.map(s => `<option value="${s.id}">${s.short_name || s.name || 'Strategy'}</option>`).join('');
+      };
+
       window.switchReturnTab = async (tab) => {
         _activeReturnTab = tab;
-        const tabBtns = { daily: 'riTabDaily', wtd: 'riTabWtd', mtd: 'riTabMtd', ytd: 'riTabYtd', alerts: 'riTabAlerts' };
+        const tabBtns = {
+          '1d': 'riTab1d', '5d': 'riTab5d', '1m': 'riTab1m', '6m': 'riTab6m',
+          ytd: 'riTabYtd', '1y': 'riTab1y', '5y': 'riTab5y', all: 'riTabAll',
+          alerts: 'riTabAlerts'
+        };
         Object.entries(tabBtns).forEach(([key, id]) => {
           const btn = document.getElementById(id);
           if (!btn) return;
@@ -1983,45 +2098,6 @@
           btn.style.borderBottomColor = active ? (alertActive ? '#dc2626' : '#7c3aed') : 'transparent';
           btn.style.fontWeight = active ? '700' : '600';
         });
-
-        /* WTD / MTD — fetch from server if not yet loaded */
-        if ((tab === 'wtd' || tab === 'mtd') && !_fetchedPeriods.has(tab)) {
-          const listEl = document.getElementById('returnInsightsList');
-          if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">Loading ${tab.toUpperCase()} data…</div>`;
-
-          /* If the browse panel hasn't loaded securities yet, wait up to 6 s */
-          if (!_returnInsightsData.length) {
-            await new Promise(resolve => {
-              let waited = 0;
-              const check = () => {
-                if (_returnInsightsData.length || waited >= 6000) return resolve();
-                waited += 200; setTimeout(check, 200);
-              };
-              check();
-            });
-          }
-
-          try {
-            const symbols = (_returnInsightsData || []).map(a => a.symbol).filter(Boolean);
-            console.log('[ReturnInsights] WTD/MTD fetch, symbols count:', symbols.length, 'first:', symbols[0]);
-            if (symbols.length) {
-              const resp = await fetch(`/api/security-performance?symbols=${encodeURIComponent(symbols.join(','))}`);
-              console.log('[ReturnInsights] server resp status:', resp.status);
-              if (resp.ok) {
-                const json = await resp.json();
-                console.log('[ReturnInsights] server results count:', Object.keys(json.results || {}).length, 'sample:', Object.values(json.results||{})[0]);
-                const { results } = json;
-                /* Merge wtd/mtd into existing data */
-                _returnInsightsData = (_returnInsightsData || []).map(a => {
-                  const r = results[a.symbol];
-                  return r ? { ...a, wtd_performance: r.wtd_performance, mtd_performance: r.mtd_performance } : a;
-                });
-                _fetchedPeriods.add('wtd');
-                _fetchedPeriods.add('mtd');
-              }
-            }
-          } catch(e) { console.warn('[ReturnInsights] WTD/MTD fetch failed:', e); }
-        }
 
         _renderReturnInsights(tab);
       };
@@ -2040,7 +2116,7 @@
             });
           });
 
-          /* Fetch base security info then merge metrics from security_metrics_c */
+          /* Fetch base security info then merge returns from stock_returns_c only */
           let q = supabaseClient
             .from('securities_c')
             .select('id, symbol, name, logo_url')
@@ -2052,8 +2128,21 @@
           const { data: secData, error: secErr } = await q;
           if (secErr) throw secErr;
           const _riIds = (secData || []).map(s => s.id).filter(Boolean);
-          const _riMetrics = await fetchSecurityMetrics(_riIds);
-          _returnInsightsData = (secData || []).map(s => ({ ...s, ...(_riMetrics[s.id] || {}) }));
+          const _riStockRet = await fetchStockReturnsBySec(_riIds);
+          _returnInsightsData = (secData || []).map(s => {
+            const sr = _riStockRet[s.id] || {};
+            return {
+              ...s,
+              change_percent:   sr['1d_pct']  ?? null,
+              w1_performance:   sr['5d_pct']  ?? null,
+              mtd_performance:  sr['1m_pct']  ?? null,
+              r_6m_performance: sr['6m_pct']  ?? null,
+              ytd_performance:  sr['ytd_pct'] ?? null,
+              r_1y_performance: sr['1y_pct']  ?? null,
+              sr_5y_pct:        sr['5y_pct']  ?? null,
+              sr_all_pct:       sr['all_pct'] ?? null,
+            };
+          });
           /* Sort by daily change descending */
           _returnInsightsData.sort((a, b) => (b.change_percent ?? -Infinity) - (a.change_percent ?? -Infinity));
           /* Compute alert count and update badges */
@@ -2457,12 +2546,9 @@
           _overviewSecMap && _holdings.length > 0
             ? calculateMinInvestmentFromHoldings(_holdings, _overviewSecMap)
             : null;
-        const _minVal =
-          _liveMin ||
-          (strategy.min_investment ? Number(strategy.min_investment) : null);
-        const minInvestment = _minVal
-          ? formatCurrency(_minVal, strategy.base_currency || "ZAR")
-          : "Not calculated";
+        const minInvestment = _liveMin
+          ? formatCurrency(_liveMin, strategy.base_currency || "ZAR")
+          : "—";
 
         wrapper.innerHTML = `
         <div class="strategy-item-copy">
@@ -2628,7 +2714,7 @@
             _overviewSecMap && _h.length > 0
               ? calculateMinInvestmentFromHoldings(_h, _overviewSecMap)
               : null;
-          return { item, score: _live || Number(item.min_investment) || 0 };
+          return { item, score: _live || 0 };
         });
 
         scored.sort((a, b) => b.score - a.score);
@@ -2656,14 +2742,9 @@
               _overviewSecMap && _h5.length > 0
                 ? calculateMinInvestmentFromHoldings(_h5, _overviewSecMap)
                 : null;
-            const _min5 =
-              _live5 ||
-              (strategy.min_investment
-                ? Number(strategy.min_investment)
-                : null);
-            const minInvestment = _min5
-              ? formatCurrency(_min5, currency)
-              : "Not calculated";
+            const minInvestment = _live5
+              ? formatCurrency(_live5, currency)
+              : "—";
 
             row.innerHTML = `
             <div class="flex items-center gap-3 min-w-0">
@@ -2862,7 +2943,7 @@
 
         const items = (strategies || []).map((strategy, index) => ({
           name: strategy.short_name || strategy.name || `Strategy ${index + 1}`,
-          value: Math.max(Number(strategy.min_investment) || 0, 0),
+          value: Math.max(Number(strategy.min_investment || 0) / 100, 0),
           currency: strategy.base_currency || "ZAR",
           risk: (strategy.risk_level || "unspecified").toLowerCase(),
           sector: strategy.sector || null,
@@ -3030,33 +3111,88 @@
            WTD_Return  (decimal) → wtd_performance (percentage ×100)
            1M_Return   (decimal) → mtd_performance (percentage ×100)
       ─────────────────────────────────────────────────────────────────────── */
-      const fetchSecurityMetrics = async (secIds) => {
+      /* Fetch period returns from stock_returns_c (latest row per security_id).
+         Values are already in % form (e.g. 3.225 = 3.225%), no ×100 needed. */
+      const fetchStockReturnsBySec = async (secIds) => {
         if (!secIds || !secIds.length) return {};
-        const metricsMap = {};
+        const map = {};
         const chunks = [];
         for (let i = 0; i < secIds.length; i += 50) chunks.push(secIds.slice(i, i + 50));
         const results = await Promise.all(
           chunks.map(chunk =>
-            supabaseClient.from('security_metrics_c')
-              .select('*')
+            supabaseClient.from('stock_returns_c')
+              .select('security_id, symbol, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct, all_pct, current_price, as_of_date')
               .in('security_id', chunk)
               .order('as_of_date', { ascending: false })
           )
         );
         results.forEach(({ data }) => {
           if (!data) return;
+          data.forEach(r => { if (!map[r.security_id]) map[r.security_id] = r; });
+        });
+        return map;
+      };
+
+      /* Fetch latest strategy returns from strategies_returns_c.
+         Values are already in % form. */
+      const fetchStrategyReturns = async (strategyIds) => {
+        if (!strategyIds || !strategyIds.length) return {};
+        const map = {};
+        const chunks = [];
+        for (let i = 0; i < strategyIds.length; i += 50) chunks.push(strategyIds.slice(i, i + 50));
+        const results = await Promise.all(
+          chunks.map(chunk =>
+            supabaseClient.from('strategies_returns_c')
+              .select('strategy_id, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct, basket_value, as_of_date')
+              .in('strategy_id', chunk)
+              .order('as_of_date', { ascending: false })
+          )
+        );
+        results.forEach(({ data }) => {
+          if (!data) return;
+          data.forEach(r => { if (!map[r.strategy_id]) map[r.strategy_id] = r; });
+        });
+        return map;
+      };
+
+      const fetchSecurityMetrics = async (secIds) => {
+        if (!secIds || !secIds.length) return {};
+        const metricsMap = {};
+        const chunks = [];
+        for (let i = 0; i < secIds.length; i += 50) chunks.push(secIds.slice(i, i + 50));
+
+        /* Fetch security_metrics (price, vol, daily) + stock_returns_c (period returns) in parallel */
+        const [secMetricsResults, stockRetMap] = await Promise.all([
+          Promise.all(
+            chunks.map(chunk =>
+              supabaseClient.from('security_metrics')
+                .select('*')
+                .in('security_id', chunk)
+                .order('as_of_date', { ascending: false })
+            )
+          ),
+          fetchStockReturnsBySec(secIds),
+        ]);
+
+        secMetricsResults.forEach(({ data }) => {
+          if (!data) return;
           data.forEach(m => {
-            if (metricsMap[m.security_id]) return; /* keep latest (first due to desc order) */
+            if (metricsMap[m.security_id]) return; /* keep latest */
+            const sr = stockRetMap[m.security_id] || {};
             metricsMap[m.security_id] = {
-              last_price:       m.last_close   != null ? Math.round(m.last_close * 100)   : null,
-              change_percent:   m.change_pct   != null ? m.change_pct * 100               : null,
-              ytd_performance:  m.r_ytd        != null ? m.r_ytd * 100                    : null,
-              wtd_performance:  m['WTD_Return']!= null ? m['WTD_Return'] * 100            : null,
-              mtd_performance:  m['1M_Return'] != null ? m['1M_Return'] * 100             : null,
-              r_1y_performance: m.r_1y         != null ? m.r_1y * 100                     : null,
-              r_6m_performance: m.r_6m         != null ? m.r_6m * 100                     : null,
-              w1_performance:   m['1W_Return'] != null ? m['1W_Return'] * 100             : null,
-              m3_performance:   m['3M_Return'] != null ? m['3M_Return'] * 100             : null,
+              last_price:       m.last_close        != null ? Math.round(m.last_close * 100) : (sr.current_price != null ? Math.round(Number(sr.current_price)) : null),
+              change_percent:   m.change_pct         != null ? m.change_pct * 100            : (sr['1d_pct'] ?? null),
+              /* Period returns — prefer stock_returns_c when available */
+              ytd_performance:  sr.ytd_pct           != null ? sr.ytd_pct                    : (m.r_ytd        != null ? m.r_ytd * 100        : null),
+              mtd_performance:  sr['1m_pct']         != null ? sr['1m_pct']                  : (m['1M_Return'] != null ? m['1M_Return'] * 100  : null),
+              r_6m_performance: sr['6m_pct']         != null ? sr['6m_pct']                  : (m.r_6m         != null ? m.r_6m * 100          : null),
+              r_1y_performance: sr['1y_pct']         != null ? sr['1y_pct']                  : (m.r_1y         != null ? m.r_1y * 100          : null),
+              w1_performance:   sr['5d_pct']         != null ? sr['5d_pct']                  : (m['1W_Return'] != null ? m['1W_Return'] * 100  : null),
+              sr_5y_pct:        sr['5y_pct']         ?? null,
+              sr_all_pct:       sr['all_pct']        ?? null,
+              /* security_metrics-only fields */
+              wtd_performance:  m['WTD_Return']      != null ? m['WTD_Return'] * 100         : null,
+              m3_performance:   m['3M_Return']       != null ? m['3M_Return'] * 100          : null,
               change_abs:       m.change_abs,
               prev_close:       m.prev_close,
               last_close_rand:  m.last_close,
@@ -3065,6 +3201,30 @@
             };
           });
         });
+
+        /* Also cover securities that exist only in stock_returns_c */
+        Object.entries(stockRetMap).forEach(([secId, sr]) => {
+          if (metricsMap[secId]) return;
+          metricsMap[secId] = {
+            last_price:       sr.current_price != null ? Math.round(Number(sr.current_price)) : null,
+            change_percent:   sr['1d_pct']     ?? null,
+            ytd_performance:  sr.ytd_pct       ?? null,
+            mtd_performance:  sr['1m_pct']     ?? null,
+            r_6m_performance: sr['6m_pct']     ?? null,
+            r_1y_performance: sr['1y_pct']     ?? null,
+            w1_performance:   sr['5d_pct']     ?? null,
+            sr_5y_pct:        sr['5y_pct']     ?? null,
+            sr_all_pct:       sr['all_pct']    ?? null,
+            wtd_performance:  null,
+            m3_performance:   null,
+            change_abs:       null,
+            prev_close:       null,
+            last_close_rand:  sr.current_price ?? null,
+            volatility_30d:   null,
+            avg_volume_30d:   null,
+          };
+        });
+
         return metricsMap;
       };
 
@@ -3101,9 +3261,24 @@
         }
         if (!data) console.error("Failed to load securities from any column variant");
 
-        /* Fetch live metrics from security_metrics_c and merge */
+        /* Fetch price and change from stock_returns_c only */
         const _secIds = (data || []).map(s => s.id).filter(Boolean);
-        const _metricsMap = await fetchSecurityMetrics(_secIds);
+        const _stockRetMap = await fetchStockReturnsBySec(_secIds);
+        const _metricsMap = {};
+        Object.entries(_stockRetMap).forEach(([id, sr]) => {
+          _metricsMap[id] = {
+            last_price:      sr.current_price != null ? Math.round(Number(sr.current_price)) : null,
+            change_percent:  sr['1d_pct']     != null ? Number(sr['1d_pct'])                       : null,
+            ytd_performance: sr['ytd_pct']    != null ? Number(sr['ytd_pct'])                      : null,
+            w1_performance:  sr['5d_pct']     != null ? Number(sr['5d_pct'])                       : null,
+            mtd_performance: sr['1m_pct']     != null ? Number(sr['1m_pct'])                       : null,
+            r_6m_performance:sr['6m_pct']     != null ? Number(sr['6m_pct'])                       : null,
+            r_1y_performance:sr['1y_pct']     != null ? Number(sr['1y_pct'])                       : null,
+            sr_5y_pct:       sr['5y_pct']     != null ? Number(sr['5y_pct'])                       : null,
+            sr_all_pct:      sr['all_pct']    != null ? Number(sr['all_pct'])                      : null,
+            as_of_date:      sr['as_of_date'] ?? null,
+          };
+        });
 
         const symbolHoldingsMap = {};
         if (!strategiesResult.error && strategiesResult.data) {
@@ -3213,6 +3388,9 @@
               avg_volume_30d:   cached.avg_volume_30d   ?? null,
               prev_close:       cached.prev_close       ?? null,
               change_abs:       cached.change_abs       ?? null,
+              sr_5y_pct:        cached.sr_5y_pct        ?? null,
+              sr_all_pct:       cached.sr_all_pct       ?? null,
+              as_of_date:       cached.as_of_date       ?? null,
             });
             securitySearchInput.value = "";
             renderSecuritiesDropdown("");
@@ -3308,9 +3486,12 @@
           case '3M_Return':      return h.m3_performance || 0;
           case 'r_6m':           return h.r_6m_performance || 0;
           case 'r_1y':           return h.r_1y_performance || 0;
+          case '5y_return':      return h.sr_5y_pct || 0;
+          case 'all_return':     return h.sr_all_pct || 0;
           case 'volatility_30d': return h.volatility_30d || 0;
           case 'avg_volume_30d': return h.avg_volume_30d || 0;
           case 'r_ytd':          return h.ytd_performance || 0;
+          case 'as_of_date':     return h.as_of_date || '';
           case 'weight':         return h.weight || 0;
           default: return 0;
         }
@@ -3340,6 +3521,9 @@
           case '3M_Return':      { const p = fp(h.m3_performance);    return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
           case 'r_6m':           { const p = fp(h.r_6m_performance);  return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
           case 'r_1y':           { const p = fp(h.r_1y_performance);  return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
+          case '5y_return':      { const p = fp(h.sr_5y_pct);         return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
+          case 'all_return':     { const p = fp(h.sr_all_pct);        return `<span style="font-size:12px;font-weight:600;color:${p.c};">${p.s}</span>`; }
+          case 'as_of_date':     return `<span style="font-size:12px;color:#64748b;">${h.as_of_date ? new Date(h.as_of_date).toLocaleDateString('en-ZA') : '—'}</span>`;
           case 'volatility_30d':
             return `<span style="font-size:12px;color:#334155;">${h.volatility_30d != null ? (h.volatility_30d * 100).toFixed(2) + '%' : '—'}</span>`;
           case 'avg_volume_30d':
@@ -3657,8 +3841,6 @@
             holdings,
             securitiesMap,
           );
-        if (!minInvestment && strategy.min_investment)
-          minInvestment = Number(strategy.min_investment);
 
         const totalWeight = holdings.reduce(
           (sum, h) => sum + (Number(h.weight) || 0),
@@ -3775,9 +3957,7 @@
           calculateMinInvestmentFromHoldings(
             holdings,
             securitiesMap || new Map(),
-          ) ||
-          Number(strategy.min_investment) ||
-          null;
+          ) || null;
 
         const holdingsRows = holdings
           .map((h) => {
@@ -4324,16 +4504,6 @@
           return;
         }
 
-        let analytics = null;
-        const { data: analyticsRow } = await supabaseClient
-          .from("strategy_analytics")
-          .select(
-            "strategy_id, as_of_date, base_currency, latest_value, ytd_return, summary, curves, calendar_returns, computed_at, error",
-          )
-          .eq("strategy_id", strategyId)
-          .maybeSingle();
-        analytics = analyticsRow || null;
-
         const holdings = Array.isArray(strategy.holdings)
           ? strategy.holdings
           : [];
@@ -4348,9 +4518,21 @@
             .select("id, symbol, name, logo_url")
             .in("symbol", allSymbols);
           if (secs) {
-            const _sm = await fetchSecurityMetrics(secs.map(s => s.id).filter(Boolean));
+            const _sm = await fetchStockReturnsBySec(secs.map(s => s.id).filter(Boolean));
             secs.forEach((s) => {
-              const merged = { ...s, ...(_sm[s.id] || {}) };
+              const sr = _sm[s.id] || {};
+              const merged = {
+                ...s,
+                last_price:      sr.current_price != null ? Math.round(Number(sr.current_price)) : null,
+                change_percent:  sr['1d_pct']     ?? null,
+                ytd_performance: sr['ytd_pct']    ?? null,
+                w1_performance:  sr['5d_pct']     ?? null,
+                mtd_performance: sr['1m_pct']     ?? null,
+                r_6m_performance:sr['6m_pct']     ?? null,
+                r_1y_performance:sr['1y_pct']     ?? null,
+                sr_5y_pct:       sr['5y_pct']     ?? null,
+                sr_all_pct:      sr['all_pct']    ?? null,
+              };
               securitiesMap.set(s.symbol, merged);
               const norm = normalizeSymbol(s.symbol);
               if (norm !== s.symbol) securitiesMap.set(norm, merged);
@@ -4363,78 +4545,8 @@
           0,
         );
         const minInvestment =
-          calculateMinInvestmentFromHoldings(holdings, securitiesMap) ||
-          Number(strategy.min_investment) ||
-          null;
+          calculateMinInvestmentFromHoldings(holdings, securitiesMap) || null;
         const cashAmount = minInvestment ? minInvestment * 0.08 : null;
-        const analyticsTimestamp =
-          analytics?.computed_at || analytics?.as_of_date || null;
-        const analyticsUnavailable = !analytics || analytics?.error;
-
-        let allTimeReturn = null;
-        if (analytics?.latest_value != null) {
-          const latestVal = Number(analytics.latest_value);
-          if (latestVal > 50 && latestVal < 200)
-            allTimeReturn = latestVal / 100 - 1;
-          else if (latestVal >= -1 && latestVal <= 1) allTimeReturn = latestVal;
-          else allTimeReturn = latestVal / 100 - 1;
-        }
-        if (allTimeReturn == null && analytics?.ytd_return != null)
-          allTimeReturn = Number(analytics.ytd_return);
-        const formattedAllTimeReturn =
-          allTimeReturn != null
-            ? `${allTimeReturn >= 0 ? "+" : ""}${(allTimeReturn * 100).toFixed(2)}%`
-            : "-";
-        const allTimeTextClass =
-          allTimeReturn != null
-            ? allTimeReturn > 0
-              ? "text-emerald-600"
-              : allTimeReturn < 0
-                ? "text-rose-600"
-                : "text-slate-500"
-            : "text-slate-500";
-
-        const summary = analytics?.summary || {};
-        const performanceSummary = [
-          {
-            label: "Best Day",
-            value: formatPercent(summary.best_day),
-            description: "The highest daily return this strategy has achieved.",
-          },
-          {
-            label: "Worst Day",
-            value: formatPercent(summary.worst_day),
-            description:
-              "The lowest daily return (most negative) this strategy has experienced.",
-          },
-          {
-            label: "Avg Daily Return",
-            value: formatPercent(summary.avg_day),
-            description:
-              "The average daily percentage change across all trading days.",
-          },
-          {
-            label: "YTD Return",
-            value: formatPercent(summary.ytd_return ?? analytics?.ytd_return),
-            description: "Year-to-date return for the strategy.",
-          },
-        ];
-
-        const calendarData = {};
-        const calendarReturns = Array.isArray(analytics?.calendar_returns)
-          ? analytics.calendar_returns
-          : [];
-        calendarReturns.forEach((entry) => {
-          if (!entry?.month) return;
-          const [year, month] = entry.month.split("-");
-          if (!calendarData[year]) calendarData[year] = {};
-          calendarData[year][month] = entry.return;
-        });
-        const availableCalendarYears = Object.keys(calendarData).sort();
-        const currentCalendarYear =
-          availableCalendarYears.length > 0
-            ? availableCalendarYears[availableCalendarYears.length - 1]
-            : new Date().getFullYear().toString();
 
         const holdingsWithMetrics = holdings.map((h) => {
           const rawSym3 =
@@ -4510,7 +4622,7 @@
             </div>
             <div class="bg-slate-50 rounded-xl p-3 text-center">
               <p class="text-[11px] text-slate-500">All-time Return</p>
-              <p class="text-xl font-semibold ${allTimeTextClass}">${formattedAllTimeReturn}</p>
+              <p class="text-xl font-semibold text-slate-400">—</p>
             </div>
           </div>
         </div>`;
@@ -4520,7 +4632,6 @@
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
           <div class="flex items-center justify-between">
             <h2 class="text-base font-semibold text-slate-900">Daily Change</h2>
-            ${analyticsTimestamp ? `<p class="text-xs text-slate-500">Updated ${new Date(analyticsTimestamp).toLocaleDateString()}</p>` : ""}
           </div>
           <div class="marquee-scroll mt-4 flex gap-3 pb-2">
             ${nonCashHoldings
@@ -4558,28 +4669,6 @@
         </div>`;
         }
 
-        if (!analyticsUnavailable) {
-          html += `
-        <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-          <div class="flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-900">Performance Summary</h2>
-            ${analyticsTimestamp ? `<p class="text-xs text-slate-500">As of ${new Date(analyticsTimestamp).toLocaleDateString()}</p>` : ""}
-          </div>
-          <div class="mt-4 grid grid-cols-2 gap-3">
-            ${performanceSummary
-              .map(
-                (m) => `
-              <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <p class="text-xs font-semibold text-slate-500">${m.label}</p>
-                <p class="mt-2 text-lg font-semibold text-slate-900">${m.value}</p>
-                <p class="mt-1 text-[11px] text-slate-400">${m.description}</p>
-              </div>
-            `,
-              )
-              .join("")}
-          </div>
-        </div>`;
-        }
 
         if (strategy.description) {
           html += `
@@ -4630,65 +4719,6 @@
           </div>
         </div>`;
 
-        if (availableCalendarYears.length > 0) {
-          const renderCalendarGrid = (year) => {
-            const yearData = calendarData[year] || {};
-            return monthNames
-              .map((m, i) => {
-                const monthKey = String(i + 1).padStart(2, "0");
-                const val = yearData[monthKey];
-                return `<div class="rounded-xl p-2 text-center ${getReturnBgColor(val)}">
-              <p class="text-[10px] font-semibold">${m}</p>
-              <p class="text-xs font-semibold mt-1">${val != null ? (val * 100).toFixed(2) + "%" : "-"}</p>
-            </div>`;
-              })
-              .join("");
-          };
-
-          html += `
-        <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-          <div class="flex items-center justify-between gap-4 mb-4">
-            <h2 class="text-base font-semibold text-slate-900">Calendar Returns</h2>
-            ${
-              availableCalendarYears.length > 1
-                ? `
-              <div class="flex flex-wrap gap-2">
-                ${availableCalendarYears
-                  .map(
-                    (year) => `
-                  <button type="button" data-calendar-year="${year}"
-                    class="calendar-year-btn rounded-full px-3 py-1 text-xs font-semibold ${year === currentCalendarYear ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600"}">
-                    ${year}
-                  </button>
-                `,
-                  )
-                  .join("")}
-              </div>`
-                : ""
-            }
-          </div>
-          <div id="factsheetCalendarGrid" class="grid grid-cols-4 sm:grid-cols-6 gap-2">
-            ${renderCalendarGrid(currentCalendarYear)}
-          </div>
-        </div>`;
-
-          setTimeout(() => {
-            document.querySelectorAll(".calendar-year-btn").forEach((btn) => {
-              btn.addEventListener("click", () => {
-                const year = btn.dataset.calendarYear;
-                document.querySelectorAll(".calendar-year-btn").forEach((b) => {
-                  b.className =
-                    "calendar-year-btn rounded-full px-3 py-1 text-xs font-semibold " +
-                    (b.dataset.calendarYear === year
-                      ? "bg-slate-900 text-white"
-                      : "border border-slate-200 bg-white text-slate-600");
-                });
-                const grid = document.getElementById("factsheetCalendarGrid");
-                if (grid) grid.innerHTML = renderCalendarGrid(year);
-              });
-            });
-          }, 100);
-        }
 
         html += `
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
@@ -5094,11 +5124,20 @@
         }
 
         window.__dbgBreadcrumb('ovSelect:fetch-analytics');
-        const { data: analytics } = await supabaseClient
-          .from('strategy_analytics')
-          .select('strategy_id, as_of_date, latest_value, ytd_return, summary, curves, computed_at')
-          .eq('strategy_id', strat.id)
-          .maybeSingle();
+        const [{ data: analytics }, { data: stratRetRows }] = await Promise.all([
+          supabaseClient
+            .from('strategy_analytics')
+            .select('strategy_id, as_of_date, latest_value, ytd_return, summary, curves, computed_at')
+            .eq('strategy_id', strat.id)
+            .maybeSingle(),
+          supabaseClient
+            .from('strategies_returns_c')
+            .select('strategy_id, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct, basket_value, as_of_date')
+            .eq('strategy_id', strat.id)
+            .order('as_of_date', { ascending: false })
+            .limit(1),
+        ]);
+        const stratRet = (stratRetRows && stratRetRows[0]) || null;
 
         window.__dbgBreadcrumb('ovSelect:fetch-securities');
         const symbols = [...new Set(holdings.map(h => h.ticker || h.symbol || h).filter(s => typeof s === 'string' && s))];
@@ -5179,7 +5218,7 @@
         window.__dbgBreadcrumb('ovSelect:render-titlebar');
         ovRenderTitleBar(strat, analytics, totalAum, investRows.length);
         window.__dbgBreadcrumb('ovSelect:render-kpi');
-        ovRenderKpiStrip(analytics);
+        ovRenderKpiStrip(analytics, stratRet);
         window.__dbgBreadcrumb('ovSelect:render-perfchart');
         ovRenderPerfChart(analytics, strat.name || 'Strategy');
         window.__dbgBreadcrumb('ovSelect:render-sectorchart');
@@ -5197,12 +5236,10 @@
             .limit(1);
           if (pendingBatches && pendingBatches.length) {
             const pb = pendingBatches[0];
-            /* Fetch the events for this batch to get per-user allocations */
             const { data: events } = await supabaseClient
               .from('rebalance_event')
               .select('user_id, security_id, trade_side, quantity, closed_reason')
               .eq('batch_id', pb.id);
-            /* Resolve security symbols for matching */
             const rebSecIds = [pb.sell_security_id, pb.buy_security_id, pb.extra_buy_security_id].filter(Boolean);
             let rebSecSymMap = {};
             if (rebSecIds.length) {
@@ -5413,16 +5450,18 @@
         if (navEl) navEl.textContent = navVal != null ? Number(navVal).toFixed(2) : '—';
       };
 
-      const ovRenderKpiStrip = (analytics) => {
+      const ovRenderKpiStrip = (analytics, stratRet) => {
         const strip = document.getElementById('ovKpiStrip');
         if (!strip) return;
         const summary = analytics?.summary || {};
-        const ytdRaw = analytics?.ytd_return ?? summary.ytd_return;
-        const ytd = ytdRaw != null ? Number(ytdRaw) * 100 : null;
+        /* Return metrics — from strategies_returns_c (already in % form, e.g. 14.19 = 14.19%) */
+        const sr = stratRet || {};
+        const ytd = sr.ytd_pct != null ? Number(sr.ytd_pct) : null;
+        const r1y = sr['1y_pct'] != null ? Number(sr['1y_pct']) : null;
         const kpis = [
-          { label: 'YTD Return', value: ovFmtPct(ytd), positive: ytd > 0,
+          { label: 'YTD Return', value: ovFmtPct(ytd), positive: ytd != null ? ytd > 0 : null,
             icon: '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>' },
-          { label: '1Y Return', value: summary.one_year_return != null ? ovFmtPct(Number(summary.one_year_return)*100) : '—', positive: summary.one_year_return > 0,
+          { label: '1Y Return', value: r1y != null ? ovFmtPct(r1y) : '—', positive: r1y != null ? r1y > 0 : null,
             icon: '<path d="M12 2v20M2 12h20"/>' },
           { label: 'Sharpe Ratio', value: summary.sharpe_ratio != null ? Number(summary.sharpe_ratio).toFixed(2) : '—', positive: summary.sharpe_ratio > 1,
             icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
@@ -5522,14 +5561,16 @@
 
           const { data: secs, error } = await query;
           if (error) throw error;
-          const _ovListMetrics = await fetchSecurityMetrics((secs || []).map(s => s.id).filter(Boolean));
-          const secsWithMetrics = (secs || []).map(s => ({ ...s, ...(_ovListMetrics[s.id] || {}) }));
-          const items = secsWithMetrics.map(s => ({
-            sym: (s.symbol || '').replace('.JO', ''),
-            logo: s.logo_url || null,
-            price: s.last_price != null ? Number(s.last_price) / 100 : null,
-            change: s.change_percent != null ? Number(s.change_percent) : null
-          })).filter(item => item.sym);
+          const _ovStockRet = await fetchStockReturnsBySec((secs || []).map(s => s.id).filter(Boolean));
+          const items = (secs || []).map(s => {
+            const sr = _ovStockRet[s.id] || {};
+            return {
+              sym:    (s.symbol || '').replace('.JO', ''),
+              logo:   s.logo_url || null,
+              price:  sr.current_price != null ? Number(sr.current_price) / 100 : null,
+              change: sr['1d_pct']     != null ? Number(sr['1d_pct'])     : null,
+            };
+          }).filter(item => item.sym);
           _ovTickerRenderItems(track, items);
         } catch (e) {
           track.innerHTML = '<span style="font-size:11px;color:#94a3b8;padding:0 20px;font-family:ui-monospace,monospace;">Market data unavailable</span>';
@@ -5807,6 +5848,19 @@
           const [int, dec] = Math.abs(v).toFixed(2).split('.');
           return (neg ? '-' : '') + 'R' + int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + dec;
         };
+
+        /* ── Merge pending buy-side rebalance clients ── */
+        if (pendingRebalance && pendingRebalance.events) {
+          pendingRebalance.events
+            .filter(ev => ev.trade_side === 'BUY' || ev.closed_reason === 'REBALANCE_EVENT_BUY' || ev.closed_reason === 'REBALANCE_EVENT_BUY_WALLET')
+            .forEach(ev => {
+              const uid = ev.user_id;
+              if (!byUser[uid]) {
+                byUser[uid] = { costBasis: 0, currentVal: 0, inception: new Date().toISOString(), pending: true };
+              }
+              byUser[uid].pending = true;
+            });
+        }
 
         const rows = Object.entries(byUser).map(([uid, data]) => {
           const prof = profiles[uid];
@@ -6551,8 +6605,8 @@
             is_featured: overlay.querySelector("#_sdIsFeatured").checked,
           };
 
-            const { error } = await supabaseClient
-              .from("strategies_c")
+          const { error } = await supabaseClient
+            .from("strategies_c")
             .update(payload)
             .eq("id", strategy.id);
 
@@ -6699,22 +6753,19 @@
       };
 
       /* ── Load which strategies have real investors ── */
-      /* Fetch YTD returns from strategy_analytics — same approach as Mint MarketsPage */
+      /* Fetch period returns from strategies_returns_c (latest row per strategy) */
       const loadStrategyYtd = async () => {
         const strategies = allStrategiesFullData || [];
         if (!strategies.length) return;
         try {
           const ids = strategies.map(s => s.id).filter(Boolean);
-          const { data, error } = await supabaseClient
-            .from("strategy_analytics")
-            .select("strategy_id, ytd_return, summary")
-            .in("strategy_id", ids);
-          if (error) throw error;
-          strategyYtdMap = new Map();
-          (data || []).forEach(row => {
-            /* Prefer summary.ytd_return, then ytd_return column — matches Mint source */
-            const val = row?.summary?.ytd_return ?? row?.ytd_return ?? null;
-            if (row.strategy_id != null) strategyYtdMap.set(String(row.strategy_id), val);
+          /* Pull latest returns from strategies_returns_c (values already in % form) */
+          const stratRetMap = await fetchStrategyReturns(ids);
+          strategyYtdMap     = new Map();
+          strategyReturnsMap = new Map();
+          Object.entries(stratRetMap).forEach(([id, row]) => {
+            strategyYtdMap.set(id, row.ytd_pct ?? null);
+            strategyReturnsMap.set(id, row);
           });
           renderTopAssetsRow(); /* re-render with real YTD values */
         } catch (e) {
@@ -6827,8 +6878,11 @@
                 </div>`
               : "";
 
+            /* All period returns from stock_returns_c */
+            const fmtR = v => v != null ? `${v >= 0 ? '+' : ''}${Number(v).toFixed(2)}%` : '—';
+
             return `<button type="button" data-sym="${s.symbol}"
-              style="flex-shrink:0;width:192px;display:flex;flex-direction:column;padding:14px;border-radius:16px;cursor:pointer;text-align:left;background:#ffffff;border:${cardBorder};box-shadow:${cardShadow};transition:all 0.18s;gap:10px;position:relative;overflow:hidden;outline:none;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none;">
+              style="flex-shrink:0;width:240px;display:flex;flex-direction:column;padding:16px;border-radius:16px;cursor:pointer;text-align:left;background:#ffffff;border:${cardBorder};box-shadow:${cardShadow};transition:all 0.18s;gap:8px;position:relative;overflow:hidden;outline:none;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none;">
               <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${barColor};opacity:${isPos ? "0.6" : "0.5"};border-radius:16px 16px 0 0;"></div>
               ${addedBadge}
               <div style="display:flex;align-items:center;gap:8px;">
@@ -6839,9 +6893,9 @@
                 </div>
                 ${dots}
               </div>
-              <div style="font-size:19px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;line-height:1;"><span style="font-size:12px;font-weight:600;color:#64748b;margin-right:1px;">R</span>${price}</div>
-              <div style="display:flex;align-items:center;gap:6px;">
-                <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;background:${pillBg};color:#fff;letter-spacing:0.1px;">${chgStr}</span>
+              <div style="display:flex;align-items:baseline;gap:8px;">
+                <div style="font-size:18px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;line-height:1;"><span style="font-size:11px;font-weight:600;color:#64748b;margin-right:1px;">R</span>${price}</div>
+                <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;white-space:nowrap;background:${pillBg};color:#fff;">${fmtR(chgVal)} 1D</span>
               </div>
             </button>`;
           }).join("");
@@ -6888,6 +6942,9 @@
                     avg_volume_30d:   sec.avg_volume_30d   ?? null,
                     prev_close:       sec.prev_close       ?? null,
                     change_abs:       sec.change_abs       ?? null,
+                    sr_5y_pct:        sec.sr_5y_pct        ?? null,
+                    sr_all_pct:       sec.sr_all_pct       ?? null,
+                    as_of_date:       sec.as_of_date       ?? null,
                   });
                   renderTopAssetsRow();
                 }
@@ -6909,7 +6966,7 @@
           return rank(a) - rank(b);
         });
 
-        const display = sortedStrategies.slice(0, 7);
+        const display = sortedStrategies;
 
         /* Mini sparkline — matches Mint StrategyMiniChart: purple line + end dot on slate-50 bg */
         const sparkline = (i) => {
@@ -6959,10 +7016,11 @@
           const secondPart = strategy.objective || strategy.sector || null;
           const subtitle = secondPart ? `${riskPart} • ${secondPart}` : riskPart;
 
-          /* Min investment */
-          const minInv = strategy.min_investment ? Number(strategy.min_investment) : null;
-          const minStr = minInv
-            ? "Min. R " + minInv.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          /* Min investment — live calculation only */
+          const _hld6 = Array.isArray(strategy.holdings) ? strategy.holdings : [];
+          const _liveMin6 = _overviewSecMap && _hld6.length > 0 ? calculateMinInvestmentFromHoldings(_hld6, _overviewSecMap) : null;
+          const minStr = _liveMin6
+            ? "Min. R " + _liveMin6.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
             : null;
 
           /* Tags: strategy.tags array (first 2) exactly like Mint — fallback to risk_level */
@@ -7009,9 +7067,12 @@
           const ytdDisplay = fmtYtd(ytd);
           const ytdClr = ytdColor(ytd);
 
-          /* Daily return — weighted average of holdings change_percent */
+          /* Daily return — prefer strategies_returns_c.1d_pct; fallback weighted average */
           let dailyReturn = null;
-          if (holdings.length && globalSecuritiesMap) {
+          const stratRet = strategyReturnsMap.get(String(strategy.id));
+          if (stratRet?.['1d_pct'] != null) {
+            dailyReturn = Number(stratRet['1d_pct']);
+          } else if (holdings.length && globalSecuritiesMap) {
             let wSum = 0, wTotal = 0;
             holdings.forEach(h => {
               const sym = h.ticker || h.symbol || (typeof h === "string" ? h : "");
@@ -7188,6 +7249,9 @@
               avg_volume_30d:   sec.avg_volume_30d   ?? null,
               prev_close:       sec.prev_close       ?? null,
               change_abs:       sec.change_abs       ?? null,
+              sr_5y_pct:        sec.sr_5y_pct        ?? null,
+              sr_all_pct:       sec.sr_all_pct       ?? null,
+              as_of_date:       sec.as_of_date       ?? null,
             });
           });
         }
@@ -9224,6 +9288,20 @@
           throw new Error("Secondary buy security must be different from the primary buy security.");
         }
 
+        /* ── Guard: block if a PENDING batch already exists for this strategy ── */
+        const { data: pendingBatches, error: pendingErr } = await supabaseClient
+          .from("rebalance_batch")
+          .select("id, status, sell_isin_code, buy_isin_code, created_at")
+          .eq("strategy_id", strategyId)
+          .eq("status", "PENDING");
+        if (pendingErr) throw new Error(pendingErr.message || "Failed to check pending batches.");
+        if (pendingBatches && pendingBatches.length > 0) {
+          const existing = pendingBatches[0];
+          throw new Error(
+            `A pending rebalance already exists for this strategy (batch ${existing.id.slice(0, 8)}… created ${new Date(existing.created_at).toLocaleString()}). Please settle or reverse it before committing a new one.`
+          );
+        }
+
         /* ── Capture pre-rebalance snapshots (for reversal) ── */
         const strategyRef = (allStrategiesFullData || []).find((s) => String(s.id) === String(strategyId));
         const holdingsSnapshotBefore = strategyRef?.holdings
@@ -9231,7 +9309,6 @@
           : null;
         const walletSnapshotBefore = { ...rebWalletByClient };
 
-        /* ── Update strategy model (target allocation) ── */
         await rebReplaceStrategyHoldingAfterBuy({
           strategyId,
           soldIsin: rebSelectedIsin,
@@ -9260,6 +9337,7 @@
           ...(extraBuySecurityId ? [extraBuySecurityId] : []),
         ])];
 
+        /* ── Read existing active positions (read-only — to compute sell quantities) ── */
         const { data: existingRows, error: existingErr } = await supabaseClient
           .from("stock_holdings_c")
           .select("id, user_id, security_id, quantity, trade_side, is_active")
@@ -9280,22 +9358,32 @@
           throw new Error("No active position found for selected sell instrument.");
         }
 
-        // Compute per-row sell quantity using the divisibility step ratio.
         const reductionUnits = Number(rebSelectedStep.reductionUnits || 0);
         const unitsPerLot = Math.max(1, Number(rebSelectedIsin.unitsPerLot || 1));
         const sellFraction = reductionUnits / unitsPerLot;
         const isFullExit = sellFraction >= 1 || Number(rebSelectedStep.reductionPercent || 0) >= 100;
 
-        /* ── Build SELL events → rebalance_event ── */
-        const sellEventRows = activeSellRows.map((row) => {
+        const sellIsinCode = String(rebSelectedIsin.code || "");
+        const buyIsinCode = String(buySelection.instrument.code || "").replace(/\.[A-Z]+$/i, "");
+        const extraBuyIsinCode = extraBuySelection
+          ? String(extraBuySelection.instrument.code || "").replace(/\.[A-Z]+$/i, "")
+          : null;
+
+        const _sellRowMeta = activeSellRows.map((row) => {
           const totalQty = Math.abs(Number(row.quantity || 0));
           const soldQty = isFullExit ? totalQty : Math.max(0, Math.round(totalQty * sellFraction));
-          return {
+          return { holdingId: row.id, userId: row.user_id, soldQty, remaining: totalQty - soldQty };
+        });
+
+        /* ── Build SELL events → rebalance_event ── */
+        const sellEventRows = _sellRowMeta
+          .filter((m) => m.soldQty > 0)
+          .map((m) => ({
             batch_id: rebalanceBatchId,
-            user_id: row.user_id,
+            user_id: m.userId,
             security_id: sellSecurityId,
             trade_side: "SELL",
-            quantity: soldQty,
+            quantity: m.soldQty,
             price_at_commit: Math.round(Number(rebSelectedIsin.currentPrice || 0) * 100),
             avg_fill: null,
             fill_date: null,
@@ -9303,8 +9391,7 @@
             strategy_name_snapshot: strategyNameSnapshot,
             created_at: nowIso,
             updated_at: nowIso,
-          };
-        });
+          }));
 
         /* ── Build primary BUY events → rebalance_event ── */
         const buyEventRows = (buyExec.clientAllocations || [])
@@ -9349,13 +9436,6 @@
         const totalSellQty = sellEventRows.reduce((s, r) => s + Number(r.quantity || 0), 0);
         const totalBuyQty = buyEventRows.reduce((s, r) => s + Number(r.quantity || 0), 0);
         const totalExtraBuyQty = extraBuyEventRows.reduce((s, r) => s + Number(r.quantity || 0), 0);
-
-        const sellIsinCode = String(rebSelectedIsin.code || "");
-        const buyIsinCode = String(buySelection.instrument.code || "").replace(/\.[A-Z]+$/i, "");
-        const extraBuyIsinCode = extraBuySelection
-          ? String(extraBuySelection.instrument.code || "").replace(/\.[A-Z]+$/i, "")
-          : null;
-
         const sellModal = document.getElementById("rebSellModal");
         const netProceeds = sellModal?._execData?.netProceeds || 0;
 
@@ -9390,6 +9470,9 @@
         if (batchErr) throw new Error(batchErr.message || "Failed to create rebalance batch.");
 
         /* ── Insert all rebalance events ── */
+        /* stock_holdings_c is NOT touched —
+           Positions settle only when the admin fills & settles the batch
+           via the orderbook. This keeps client-facing data clean. */
         const allEvents = [...sellEventRows, ...buyEventRows, ...extraBuyEventRows];
         if (allEvents.length) {
           const { error: eventsErr } = await supabaseClient
@@ -9429,13 +9512,6 @@
         });
         await rebUpsertWalletBalances(strategyId, finalWalletByClient);
         rebWalletByClient = { ...rebWalletByClient, ...finalWalletByClient };
-
-        // Capture instrument codes BEFORE rebLoadStrategy resets rebSelectedIsin to null
-        const sellCode = String(rebSelectedIsin.code || "").replace(/\.[A-Z]+$/i, "");
-        const buyCode = String(buySelection.instrument.code || "").replace(/\.[A-Z]+$/i, "");
-        const extraBuyCode = extraBuySelection
-          ? String(extraBuySelection.instrument.code || "").replace(/\.[A-Z]+$/i, "")
-          : "";
 
         rebSelectedStrategyId = String(strategyId);
         await rebLoadStrategy(strategyId);

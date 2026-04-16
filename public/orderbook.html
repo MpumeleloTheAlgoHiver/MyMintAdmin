@@ -431,6 +431,14 @@
       background: #fafafa;
     }
 
+    .orderbook-pending-row {
+      background: #fffbeb !important;
+      border-left: 3px solid #f59e0b;
+    }
+    .orderbook-pending-row:hover td {
+      background: #fef3c7 !important;
+    }
+
     .orderbook-detail-row.is-hidden {
       display: none;
     }
@@ -1286,6 +1294,7 @@
           </div>
         </div>
       </div>
+
     </section>
   </main>
 
@@ -1308,6 +1317,7 @@
     const activeBooksPanel = document.getElementById('activeBooksPanel');
     const strateBirPanel = document.getElementById('strateBirPanel');
     const closedBooksPanel = document.getElementById('closedBooksPanel');
+    const pendingRebalancesPanel = document.getElementById('pendingRebalancesPanel');
     const closedBooksList = document.getElementById('closedBooksList');
     const strateBirCount = document.getElementById('strateBirCount');
     const exportStrateBirBtn = document.getElementById('exportStrateBirBtn');
@@ -3148,10 +3158,12 @@
     };
 
     const setActiveTab = (tabName) => {
-      const normalizedTab = tabName === 'closed' || tabName === 'strate-bir' ? tabName : 'active';
+      const validTabs = ['closed', 'strate-bir', 'pending-rebalances'];
+      const normalizedTab = validTabs.includes(tabName) ? tabName : 'active';
       const isActiveBooks = normalizedTab === 'active';
       const isClosedBooks = normalizedTab === 'closed';
       const isStrateBir = normalizedTab === 'strate-bir';
+      const isPendingRebalances = normalizedTab === 'pending-rebalances';
 
       if (activeBooksTab) {
         activeBooksTab.classList.toggle('active', isActiveBooks);
@@ -3173,6 +3185,9 @@
       }
       if (strateBirPanel) {
         strateBirPanel.classList.toggle('active', isStrateBir);
+      }
+      if (pendingRebalancesPanel) {
+        pendingRebalancesPanel.classList.toggle('active', isPendingRebalances);
       }
     };
 
@@ -3917,14 +3932,14 @@
             ? 'side-badge-sell'
             : 'side-badge-neutral';
         const isPending = !!row.isPendingRebalance;
-        const pendingBadge = isPending
-          ? ' <span class="side-badge" style="background:#fef3c7;color:#92400e;font-size:9px;padding:1px 6px;border-radius:6px;margin-left:4px;">PENDING</span>'
-          : '';
         const strategyTag = row.isStrategy
           ? '<span class="strategy-badge">Strategy</span>'
           : row.strategyId
             ? `<span class="strategy-name-badge">${escapeHtml(row.strategyShortName || row.strategyName || 'Strategy')}</span>`
             : '';
+        const pendingBadge = isPending
+          ? ' <span class="side-badge" style="background:#fef3c7;color:#92400e;font-size:9px;padding:1px 6px;border-radius:6px;margin-left:4px;">PENDING</span>'
+          : '';
         const settlementOptions = (row.settlementAccountOptions || []).map((option) => {
           const isSelected = option === row.settlementAccount ? ' selected' : '';
           return `<option value="${escapeHtml(option)}"${isSelected}>${escapeHtml(option)}</option>`;
@@ -3935,12 +3950,23 @@
         }).join('');
         const lineKey = escapeHtml(String(row.line));
 
-        // Build the price / action column
+        // Build price / fill column
         let priceActionHtml = '';
+        if (isPending) {
+          priceActionHtml = escapeHtml(asRandValue(row.avgFill));
+        } else if (sideValue === 'SELL') {
+          priceActionHtml = `
+            ${escapeHtml(asRandValue(row.avgFill))}
+            <button class="edit-price-btn" title="Update Actual Exit Price" data-edit-price data-line="${lineKey}">
+              <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            </button>`;
+        } else {
+          priceActionHtml = escapeHtml(asRandValue(row.avgFill));
+        }
+
+        // Build Actions column (first column)
         let actionsHtml = '';
         if (isPending) {
-          // Pending rebalance: show Fill & Settle + Reverse in Actions column
-          priceActionHtml = escapeHtml(asRandValue(row.avgFill));
           actionsHtml = `
             <div style="display:flex;gap:6px;align-items:center;">
               <button title="Fill &amp; Settle Batch" data-fill-settle-batch data-batch-id="${escapeHtml(row.rebalanceBatchId || '')}" data-line="${lineKey}"
@@ -3949,19 +3975,7 @@
               <button title="Reverse Batch" data-reverse-batch data-batch-id="${escapeHtml(row.rebalanceBatchId || '')}" data-line="${lineKey}"
                 style="background:#dc2626;color:white;border-radius:8px;padding:5px 14px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;letter-spacing:.02em;box-shadow:0 1px 3px rgba(220,38,38,.25);transition:background .15s;"
                 onmouseover="this.style.background='#b91c1c'" onmouseout="this.style.background='#dc2626'">Reverse</button>
-            </div>
-          `;
-        } else if (sideValue === 'SELL') {
-          priceActionHtml = `
-            ${escapeHtml(asRandValue(row.avgFill))}
-            <button class="edit-price-btn" title="Update Actual Exit Price" data-edit-price data-line="${lineKey}">
-              <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-            </button>
-          `;
-          actionsHtml = '';
-        } else {
-          priceActionHtml = escapeHtml(asRandValue(row.avgFill));
-          actionsHtml = '';
+            </div>`;
         }
 
         return `
@@ -4044,10 +4058,7 @@
       const holdings = holdingsResult.data || [];
       const rebEvents = rebEventsResult.data || [];
       const rebBatches = rebBatchesResult.data || [];
-
-      // Build batch lookup
-      const batchById = {};
-      rebBatches.forEach((b) => { batchById[b.id] = b; });
+      const batchById = rebBatches.reduce((acc, b) => { acc[b.id] = b; return acc; }, {});
       holdingFillDateById.clear();
       holdings.forEach((h) => {
         if (h.id && h.fill_date) {
@@ -4055,13 +4066,13 @@
         }
       });
       const securityIds = [...new Set([
-        ...holdings.map((row) => row.security_id),
-        ...rebEvents.map((row) => row.security_id),
-      ].filter(Boolean))];
+        ...holdings.map((row) => row.security_id).filter(Boolean),
+        ...rebEvents.map((e) => e.security_id).filter(Boolean),
+      ])];
       const userIds = [...new Set([
-        ...holdings.map((row) => row.user_id),
-        ...rebEvents.map((row) => row.user_id),
-      ].filter(Boolean))];
+        ...holdings.map((row) => row.user_id).filter(Boolean),
+        ...rebEvents.map((e) => e.user_id).filter(Boolean),
+      ])];
 
       const securitiesMap = {};
       const profilesMap = {};
@@ -4364,11 +4375,89 @@
         return false;
       });
 
-      // BIR source uses only stock_holdings_c (settled positions) — exclude pending/unsettled rebalance events
+      /* ── Map rebalance_event rows into orderbook-compatible format ── */
+      const rebEventRows = rebEvents.map((evt, idx) => {
+        const batch = batchById[evt.batch_id] || {};
+        const batchStatus = batch.status || '';
+        const security = securitiesMap[evt.security_id] || {};
+        const profile = profilesMap[evt.user_id] || {};
+        const packDetails = onboardingPackDetailsMap[evt.user_id] || null;
+        const strategy = batch.strategy_id ? (strategiesMap[batch.strategy_id] || null) : null;
+        const isin = security.isin ?? '-';
+        const side = String(evt.trade_side || '').toUpperCase() || 'BUY';
+        const quantityValue = Number(evt.quantity) || 0;
+        const fillCents = evt.avg_fill != null ? Number(evt.avg_fill) : null;
+        const commitCents = evt.price_at_commit != null ? Number(evt.price_at_commit) : null;
+        const displayFillCents = fillCents ?? commitCents;
+        const avgFillValue = displayFillCents != null ? displayFillCents / 100 : null;
+        const profileName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+        const clientName = profileName || extractNameFromPackDetails(packDetails) || 'Unknown Client';
+        const profileMintNumber = String(profile.mint_number || '').trim();
+        const accountSeed = deterministicNumberFromText(evt.user_id || evt.id || `reb-${idx}`);
+        const clientAccountId = profileMintNumber || `MINT-${String(accountSeed % 1000000).padStart(6, '0')}`;
+        return {
+          sourceId: `reb-${evt.id}`,
+          userId: evt.user_id || '',
+          securityId: evt.security_id || '',
+          line: 0,
+          instrumentName: security.name || isin || '-',
+          ticker: security.symbol || '-',
+          clientName,
+          clientAccountId,
+          orderbookSequence: activeOrderbookSequence,
+          bndReference: '-',
+          clientIdRegNo: String(profile.id_number || profile.mint_number || '-'),
+          profileAddress: String(profile.address || ''),
+          packDetails,
+          countryCode: 'ZAF',
+          holdingStatus: batchStatus === 'PENDING' ? 'pending' : (batchStatus === 'REVERSED' ? 'reversed' : ''),
+          isin,
+          side,
+          quantityValue,
+          totalQuantity: quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 }),
+          avgFillNumber: avgFillValue,
+          avgFill: avgFillValue != null ? `R ${avgFillValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-',
+          marketValueNumber: 0,
+          marketValue: '-',
+          unrealizedPnlNumber: 0,
+          unrealizedPnl: '-',
+          orderType: 'Market',
+          settlementAccount: 'ComputerShare Nominees',
+          settlementAccountOptions: ['ComputerShare Nominees'],
+          brokerRef: 'Longmark',
+          brokerRefOptions: ['Longmark'],
+          strategyId: batch.strategy_id || null,
+          strategyName: batch.strategy_name_snapshot || strategy?.name || null,
+          strategyShortName: strategy?.short_name || null,
+          strategySlug: strategy?.slug || null,
+          strategyNameSnapshot: batch.strategy_name_snapshot || null,
+          timestamp: evt.created_at || null,
+          fillDate: evt.fill_date || null,
+          tradeSide: side,
+          isActive: batchStatus === 'PENDING',
+          closedReason: evt.closed_reason || '',
+          closedAt: null,
+          rebalanceBatchId: evt.batch_id || null,
+          isPendingRebalance: true,
+          rebalanceBatchStatus: batchStatus,
+        };
+      }).filter((row) => {
+        // Show only PENDING rebalance events — SETTLED ones are covered by stock_holdings_c audit rows, REVERSED are no longer actionable
+        return row.rebalanceBatchStatus === 'PENDING';
+      });
+
+      // Number pending rows starting after settled rows
+      rebEventRows.forEach((row, i) => { row.line = rawRows.length + i + 1; });
+
+      // Separate pending rows — they must NOT be archived
+      const settledRows = filteredRows.filter(r => !r.isPendingRebalance);
+      const pendingRows = rebEventRows;
+
       allBirSourceRows = rawRows;
-      allOrderbookRawRows = filteredRows;
-      const aggregated = aggregateOrderbookRows(filteredRows);
-      return groupByStrategy(aggregated, filteredRows);
+      allOrderbookRawRows = settledRows;
+      const allDisplayRows = [...pendingRows, ...settledRows];
+      const aggregated = aggregateOrderbookRows(allDisplayRows);
+      return groupByStrategy(aggregated, allDisplayRows);
     };
 
     const loadOrderbook = async () => {
@@ -4438,6 +4527,210 @@
     if (strateBirTab) {
       strateBirTab.addEventListener('click', () => setActiveTab('strate-bir'));
     }
+
+    const fmtRand = (cents) => {
+      if (!cents && cents !== 0) return '—';
+      return 'R ' + (Number(cents) / 100).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+    const fmtDate = (iso) => {
+      if (!iso) return '—';
+      try { return new Date(iso).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return iso; }
+    };
+
+
+      /* ── Fill & Settle Modal (inline, dynamic) ── */
+      const openFillSettleModal = async (batchId) => {
+        try {
+          const [batchResult, eventsResult] = await Promise.all([
+            supabaseClient.from('rebalance_batch').select('*').eq('id', batchId).single(),
+            supabaseClient.from('rebalance_event')
+              .select('id, batch_id, user_id, security_id, trade_side, quantity, price_at_commit, avg_fill, fill_date, closed_reason, strategy_name_snapshot, settled_holding_id')
+              .eq('batch_id', batchId),
+          ]);
+          if (batchResult.error) throw new Error(batchResult.error.message);
+          const batch = batchResult.data;
+          const events = eventsResult.data || [];
+
+          const sellEvts = events.filter((e) => e.trade_side === 'SELL');
+          const buyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY');
+          const walletBuyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY_WALLET');
+
+          const sellCommitR = sellEvts[0]?.price_at_commit ? (Number(sellEvts[0].price_at_commit) / 100).toFixed(2) : '';
+          const buyCommitR = buyEvts[0]?.price_at_commit ? (Number(buyEvts[0].price_at_commit) / 100).toFixed(2) : '';
+          const extraCommitR = walletBuyEvts[0]?.price_at_commit ? (Number(walletBuyEvts[0].price_at_commit) / 100).toFixed(2) : '';
+          const totalSellQty = sellEvts.reduce((s, e) => s + Number(e.quantity || 0), 0);
+          const totalBuyQty = buyEvts.reduce((s, e) => s + Number(e.quantity || 0), 0);
+          const totalExtraQty = walletBuyEvts.reduce((s, e) => s + Number(e.quantity || 0), 0);
+
+          let fillModal = document.getElementById('fillSettleModal');
+          if (!fillModal) {
+            fillModal = document.createElement('div');
+            fillModal.id = 'fillSettleModal';
+            fillModal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;';
+            document.body.appendChild(fillModal);
+          }
+
+          fillModal.innerHTML = `
+            <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:28px 32px;max-width:540px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+              <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;color:#f1f5f9;">Fill &amp; Settle Rebalance</h3>
+              <p style="margin:0 0 20px;font-size:13px;color:#94a3b8;">${batch.strategy_name_snapshot || batch.strategy_id} — ${events.length} events for ${[...new Set(events.map((e)=>e.user_id))].length} clients</p>
+              <div style="display:grid;gap:14px;">
+                <div>
+                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">SELL Fill Price (R) — ${totalSellQty} units · committed ${fmtRand(sellEvts[0]?.price_at_commit)}</label>
+                  <input id="fillSellPrice" type="number" step="0.01" min="0" value="${sellCommitR}" placeholder="e.g. 142.50"
+                    style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
+                </div>
+                <div>
+                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">BUY Fill Price (R) — ${totalBuyQty} units · committed ${fmtRand(buyEvts[0]?.price_at_commit)}</label>
+                  <input id="fillBuyPrice" type="number" step="0.01" min="0" value="${buyCommitR}" placeholder="e.g. 98.20"
+                    style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
+                </div>
+                ${walletBuyEvts.length ? `
+                <div>
+                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">Extra BUY Fill Price (R) — ${totalExtraQty} units · committed ${fmtRand(walletBuyEvts[0]?.price_at_commit)}</label>
+                  <input id="fillExtraBuyPrice" type="number" step="0.01" min="0" value="${extraCommitR}" placeholder="e.g. 98.20"
+                    style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
+                </div>` : ''}
+              </div>
+              <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:24px;">
+                <button id="fillSettleCancelBtn" style="padding:10px 20px;background:transparent;border:1px solid #475569;border-radius:8px;color:#94a3b8;font-size:14px;cursor:pointer;">Cancel</button>
+                <button id="fillSettleConfirmBtn" style="padding:10px 20px;background:#7c3aed;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">Confirm Fill &amp; Settle</button>
+              </div>
+            </div>`;
+
+          fillModal.style.display = 'flex';
+
+          const closeFillModal = () => { fillModal.style.display = 'none'; };
+          document.getElementById('fillSettleCancelBtn').addEventListener('click', closeFillModal);
+          fillModal.addEventListener('click', (e) => { if (e.target === fillModal) closeFillModal(); });
+
+          const confirmBtn = document.getElementById('fillSettleConfirmBtn');
+          confirmBtn.addEventListener('click', async () => {
+            const sellR = parseFloat(document.getElementById('fillSellPrice')?.value || '0');
+            const buyR = parseFloat(document.getElementById('fillBuyPrice')?.value || '0');
+            const extraBuyInput = document.getElementById('fillExtraBuyPrice');
+            const extraBuyR = extraBuyInput ? parseFloat(extraBuyInput.value || '0') : 0;
+            if (!sellR || sellR <= 0) { alert('Enter a valid SELL fill price.'); return; }
+            if (!buyR || buyR <= 0) { alert('Enter a valid BUY fill price.'); return; }
+            if (walletBuyEvts.length && (!extraBuyR || extraBuyR <= 0)) { alert('Enter a valid Extra BUY fill price.'); return; }
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Settling…';
+            try {
+              await executeFillAndSettle(batch, events, Math.round(sellR * 100), Math.round(buyR * 100), walletBuyEvts.length ? Math.round(extraBuyR * 100) : 0);
+              closeFillModal();
+              loadOrderbook().catch(console.error);
+              alert('Batch settled successfully. Holdings updated.');
+            } catch (err) {
+              alert('Settlement failed: ' + err.message);
+              confirmBtn.disabled = false;
+              confirmBtn.textContent = 'Confirm Fill & Settle';
+            }
+          });
+        } catch (err) {
+          alert('Error loading batch: ' + err.message);
+        }
+      };
+
+      const executeFillAndSettle = async (batch, events, sellFillCents, buyFillCents, extraBuyFillCents) => {
+        const nowIso = new Date().toISOString();
+        const fillDateStr = nowIso.split('T')[0];
+        const strategyId = batch.strategy_id;
+        const sellEvts = events.filter((e) => e.trade_side === 'SELL');
+        const buyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY');
+        const walletBuyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY_WALLET');
+
+        // 1. Close/reduce existing SELL positions
+        for (const evt of sellEvts) {
+          const { data: activePositions } = await supabaseClient
+            .from('stock_holdings_c')
+            .select('id, quantity')
+            .eq('strategy_id', strategyId)
+            .eq('user_id', evt.user_id)
+            .eq('security_id', evt.security_id)
+            .eq('is_active', true)
+            .eq('trade_side', 'BUY');
+          const activePos = (activePositions || []).find((p) => Number(p.quantity) > 0);
+          if (activePos) {
+            const soldQty = Number(evt.quantity) || 0;
+            const remaining = Math.max(0, Number(activePos.quantity) - soldQty);
+            if (remaining <= 0) {
+              await supabaseClient.from('stock_holdings_c').update({
+                is_active: false, closed_reason: 'POSITION_REPLACED', closed_at: nowIso,
+                updated_at: nowIso, avg_exit: sellFillCents, exit_date: fillDateStr, Status: 'inactive',
+              }).eq('id', activePos.id);
+            } else {
+              await supabaseClient.from('stock_holdings_c').update({ quantity: remaining, updated_at: nowIso }).eq('id', activePos.id);
+            }
+          }
+          // Insert SELL audit row
+          await supabaseClient.from('stock_holdings_c').insert({
+            user_id: evt.user_id, security_id: evt.security_id, quantity: Number(evt.quantity) || 0,
+            strategy_id: strategyId, trade_side: 'SELL', is_active: false,
+            avg_fill: sellFillCents, fill_date: fillDateStr, Fill_date: fillDateStr,
+            rebalance_batch_id: batch.id, strategy_name_snapshot: batch.strategy_name_snapshot,
+            updated_at: nowIso, Status: 'inactive', closed_reason: 'SELL_SETTLED',
+            closed_at: nowIso, avg_exit: sellFillCents, exit_date: fillDateStr,
+          });
+          await supabaseClient.from('rebalance_event').update({ avg_fill: sellFillCents, fill_date: fillDateStr, updated_at: nowIso }).eq('id', evt.id);
+        }
+
+        // 2. Settle BUY events (primary and wallet)
+        const applyBuySettlement = async (buyEvtList, fillCents) => {
+          for (const evt of buyEvtList) {
+            const qty = Number(evt.quantity) || 0;
+            if (qty <= 0) continue;
+            const { data: insertedBuy } = await supabaseClient.from('stock_holdings_c').insert({
+              user_id: evt.user_id, security_id: evt.security_id, quantity: qty,
+              strategy_id: strategyId, trade_side: 'BUY', is_active: true,
+              avg_fill: fillCents, fill_date: fillDateStr, Fill_date: fillDateStr,
+              rebalance_batch_id: batch.id, strategy_name_snapshot: batch.strategy_name_snapshot,
+              updated_at: nowIso, Status: 'active',
+            }).select('id').single();
+            const settledId = insertedBuy?.id || null;
+            await supabaseClient.from('rebalance_event').update({
+              avg_fill: fillCents, fill_date: fillDateStr, updated_at: nowIso,
+              settled_holding_id: settledId,
+            }).eq('id', evt.id);
+          }
+        };
+
+        await applyBuySettlement(buyEvts, buyFillCents);
+        if (walletBuyEvts.length) await applyBuySettlement(walletBuyEvts, extraBuyFillCents || buyFillCents);
+
+        // 3. Mark batch SETTLED
+        const { error: settleErr } = await supabaseClient.from('rebalance_batch').update({
+          status: 'SETTLED', settled_at: nowIso, updated_at: nowIso,
+        }).eq('id', batch.id);
+        if (settleErr) throw new Error(settleErr.message);
+      };
+
+      /* ── Reverse Rebalance Batch ── */
+      const executeReverseRebalanceBatch = async (batchId) => {
+        const reason = prompt(
+          'Reverse this pending rebalance batch?\n\nThis will mark all events as REVERSED and restore the batch to a non-actionable state.\n\nEnter a reason (optional):',
+          ''
+        );
+        if (reason === null) return;
+        try {
+          const nowIso = new Date().toISOString();
+          const { data: batch, error: bErr } = await supabaseClient
+            .from('rebalance_batch').select('id, holdings_snapshot_before, wallet_snapshot_before').eq('id', batchId).single();
+          if (bErr) throw new Error(bErr.message);
+
+          await supabaseClient.from('rebalance_event').update({ closed_reason: 'REVERSED', updated_at: nowIso }).eq('batch_id', batchId);
+          const { error: rErr } = await supabaseClient.from('rebalance_batch').update({
+            status: 'REVERSED', is_reversed: true, reversed_at: nowIso,
+            reversed_reason: reason.trim() || 'Manual reversal', updated_at: nowIso,
+          }).eq('id', batchId);
+          if (rErr) throw new Error(rErr.message);
+
+          loadOrderbook().catch(console.error);
+          alert('Batch reversed successfully.');
+        } catch (err) {
+          alert('Reversal failed: ' + err.message);
+        }
+      };
+  
 
     if (filledOrderbooksList) {
       filledOrderbooksList.addEventListener('click', async (event) => {
@@ -5122,25 +5415,21 @@
           return;
         }
 
-        /* ── Fill & Settle button handler ── */
-        const fillBtn = event.target.closest('[data-fill-settle-batch]');
-        if (fillBtn) {
-          const batchId = fillBtn.dataset.batchId;
-          if (!batchId) return;
-          openFillSettleModal(batchId);
+        const fillSettleBtn = event.target.closest('[data-fill-settle-batch]');
+        if (fillSettleBtn) {
+          event.stopPropagation();
+          const batchId = fillSettleBtn.dataset.batchId;
+          if (batchId) openFillSettleModal(batchId).catch((err) => alert('Error: ' + err.message));
           return;
         }
 
-        /* ── Reverse button handler ── */
         const reverseBtn = event.target.closest('[data-reverse-batch]');
         if (reverseBtn) {
+          event.stopPropagation();
           const batchId = reverseBtn.dataset.batchId;
-          if (!batchId) return;
-          handleReverseBatch(batchId);
+          if (batchId) executeReverseRebalanceBatch(batchId).catch((err) => alert('Reversal error: ' + err.message));
           return;
         }
-
-        // ... existing detail row toggling handled below
       });
     }
 
