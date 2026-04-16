@@ -5639,7 +5639,7 @@
         }
         const totalWeight = holdings.reduce((s, h) => s + (Number(h.weight) || 0), 0);
         el.innerHTML = `<table class="ov-table"><thead><tr>
-          <th>Instrument</th><th class="r">Price (ZAR)</th><th class="r">Weight</th><th class="r">Day Chg</th>
+          <th>Instrument</th><th class="r">Shares</th><th class="r">Price (ZAR)</th><th class="r">Weight</th><th class="r">Day Chg</th>
         </tr></thead><tbody>${
           holdings.map(h => {
             const sym = h.ticker || h.symbol || (typeof h === 'string' ? h : '');
@@ -5652,11 +5652,13 @@
             const code = sym.replace('.JO', '');
             const name = h.name || sec?.name || sym;
             const cc = change == null ? '' : change >= 0 ? 'ov-pos' : 'ov-neg';
+            const qty = Number(h.shares || h.quantity || 0);
             return `<tr>
               <td>
                 <div style="font-family:ui-monospace,monospace;font-weight:600;font-size:12px;">${code}</div>
                 <div style="font-size:10px;color:#94a3b8;margin-top:1px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</div>
               </td>
+              <td class="r ov-mono" style="font-size:12px;font-weight:600;color:#334155;">${qty > 0 ? qty.toLocaleString('en-ZA') : '—'}</td>
               <td class="r ov-mono">${price != null ? price.toLocaleString('en-ZA', { minimumFractionDigits: 2 }) : '—'}</td>
               <td class="r">
                 <div style="display:flex;align-items:center;gap:5px;justify-content:flex-end;">
