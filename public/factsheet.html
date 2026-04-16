@@ -321,11 +321,10 @@
 
       const { data: stratRetRows } = await supabaseClient
         .from('strategies_returns_c')
-        .select('strategy_id, ytd_pct, 1d_pct, as_of_date')
+        .select('strategy_id, ytd_pct, 1d_pct, basket_value, as_of_date')
         .eq('strategy_id', strategyId)
-        .order('as_of_date', { ascending: false })
-        .limit(1);
-      const stratRet = (stratRetRows && stratRetRows[0]) || null;
+        .order('as_of_date', { ascending: true });
+      const stratRet = stratRetRows && stratRetRows.length > 0 ? stratRetRows[stratRetRows.length - 1] : null;
 
       const filledHoldings = holdings.filter(h => !h.pending);
       const pendingHoldings = holdings.filter(h => !!h.pending);
@@ -370,13 +369,26 @@
       ];
 
       const calendarData = {};
-      const calendarReturns = Array.isArray(analytics?.calendar_returns) ? analytics.calendar_returns : [];
-      calendarReturns.forEach(entry => {
-        if (!entry?.month) return;
-        const [year, month] = entry.month.split('-');
-        if (!calendarData[year]) calendarData[year] = {};
-        calendarData[year][month] = entry.return;
-      });
+      if (stratRetRows && stratRetRows.length > 0) {
+        const monthlyLastValue = {};
+        stratRetRows.forEach(row => {
+          if (row.basket_value == null || !row.as_of_date) return;
+          const ym = row.as_of_date.slice(0, 7);
+          monthlyLastValue[ym] = Number(row.basket_value);
+        });
+        const sortedMonths = Object.keys(monthlyLastValue).sort();
+        for (let i = 1; i < sortedMonths.length; i++) {
+          const ym = sortedMonths[i];
+          const prevYm = sortedMonths[i - 1];
+          const [year, month] = ym.split('-');
+          const endVal = monthlyLastValue[ym];
+          const startVal = monthlyLastValue[prevYm];
+          if (startVal && startVal !== 0) {
+            if (!calendarData[year]) calendarData[year] = {};
+            calendarData[year][month] = (endVal / startVal) - 1;
+          }
+        }
+      }
       const availableCalendarYears = Object.keys(calendarData).sort();
       const currentCalendarYear = availableCalendarYears.length > 0 ? availableCalendarYears[availableCalendarYears.length - 1] : new Date().getFullYear().toString();
 
