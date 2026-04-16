@@ -7929,6 +7929,7 @@
       let rebSelectedStrategyId = null;
       let rebWalletByClient = {};   // userId -> stored credits balance
       let rebImpactChangeView = false;
+      let rebPendingRebalance = null; // {batchId, sellCode, buyCode, extraBuyCode, events[]}
 
       /* ── Helpers ── */
       const rebFmtZAR = n => `R\u00A0${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -8051,6 +8052,7 @@
         rebSelectedStep = null;
         rebRawHoldings = {};
         rebWalletByClient = {};
+        rebPendingRebalance = null;
         rebSelectedStrategyId = strategyId ? String(strategyId) : null;
         const strategy = (allStrategiesFullData || []).find(s => String(s.id) === String(strategyId));
         if (!strategy) { rebIsins = []; rebRenderAll(); return; }
@@ -8199,6 +8201,39 @@
         } catch (e) { console.warn("rebLoadStrategy: holdings fetch failed", e); }
           }
 
+        /* ── Fetch pending rebalance batch for this strategy ── */
+        try {
+          const { data: pendingBatches } = await supabaseClient
+            .from('rebalance_batch')
+            .select('id, sell_security_id, buy_security_id, extra_buy_security_id')
+            .eq('strategy_id', strategyId)
+            .eq('status', 'PENDING')
+            .order('created_at', { ascending: false })
+            .limit(1);
+          if (pendingBatches && pendingBatches.length) {
+            const pb = pendingBatches[0];
+            /* Resolve security IDs → codes for matching rebIsins */
+            const pbSecIds = [pb.sell_security_id, pb.buy_security_id, pb.extra_buy_security_id].filter(Boolean);
+            let pbCodeMap = {};
+            if (pbSecIds.length) {
+              const { data: pbSecs } = await supabaseClient.from('securities_c').select('id, symbol').in('id', pbSecIds);
+              (pbSecs || []).forEach(s => { pbCodeMap[s.id] = (s.symbol || '').replace(/\.[A-Z]+$/, ''); });
+            }
+            /* Fetch per-user events */
+            const { data: pbEvents } = await supabaseClient
+              .from('rebalance_event')
+              .select('user_id, security_id, trade_side, quantity, closed_reason')
+              .eq('batch_id', pb.id);
+            rebPendingRebalance = {
+              batchId: pb.id,
+              sellCode: pbCodeMap[pb.sell_security_id] || '',
+              buyCode: pbCodeMap[pb.buy_security_id] || '',
+              extraBuyCode: pb.extra_buy_security_id ? (pbCodeMap[pb.extra_buy_security_id] || '') : null,
+              events: pbEvents || [],
+            };
+          }
+        } catch (e) { console.warn('rebLoadStrategy: pending rebalance fetch failed', e); }
+
         const metaEl = document.getElementById("rebCompositionMeta");
         const totalClients = new Set(Object.values(rebRawHoldings).flatMap(arr => arr.map(x => x.userId))).size;
         if (metaEl) metaEl.textContent = `${strategy.short_name || strategy.name} · ${totalClients} client${totalClients !== 1 ? "s" : ""} · ${rebIsins.length} instruments`;
@@ -8232,13 +8267,25 @@
           const holderCount = holders.filter(r => r.quantity > 0).length;
           const positionValue = isin.currentPrice > 0 && totalQty > 0 ? isin.currentPrice * totalQty : 0;
           const displayPrice = rebShowUnitPrice ? isin.currentPrice : positionValue;
-          return `<tr data-isin="${isin.code}" class="cursor-pointer transition-colors ${isSelected ? "bg-violet-50" : "hover:bg-slate-50"}">
-            <td class="px-4 py-2.5 font-mono font-semibold ${isSelected ? "text-violet-700" : "text-slate-800"}">${isin.code}</td>
+          /* Pending rebalance detection */
+          const isPendSell = rebPendingRebalance && isin.code === rebPendingRebalance.sellCode;
+          const isPendBuy  = rebPendingRebalance && (isin.code === rebPendingRebalance.buyCode || isin.code === rebPendingRebalance.extraBuyCode);
+          const isPending  = isPendSell || isPendBuy;
+          const pendBg = isPending ? (isSelected ? 'bg-amber-100' : 'bg-amber-50 hover:bg-amber-100') : (isSelected ? 'bg-violet-50' : 'hover:bg-slate-50');
+          const pendBadge = isPendBuy
+            ? '<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;margin-left:5px;">Pending Buy</span>'
+            : isPendSell
+              ? '<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;margin-left:5px;">Pending Sell</span>'
+              : '';
+          const priceColor = isPending ? 'text-amber-700' : 'text-slate-700';
+          const qtyColor   = isPending ? 'text-amber-800' : 'text-slate-800';
+          return `<tr data-isin="${isin.code}" class="cursor-pointer transition-colors ${pendBg}" ${isPending ? 'style="border-left:3px solid #f59e0b;"' : ''}>
+            <td class="px-4 py-2.5 font-mono font-semibold ${isSelected ? 'text-violet-700' : (isPending ? 'text-amber-800' : 'text-slate-800')}">${isin.code}${pendBadge}</td>
             <td class="px-4 py-2.5 text-slate-700 max-w-[120px] truncate">${isin.description}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-600">${isin.unitsPerLot}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-400">${isin.weightPercent.toFixed(1)}%</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">${displayPrice > 0 ? `R ${displayPrice.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}<div class="text-[10px] font-normal text-violet-600">${rebShowUnitPrice ? "Unit" : "Total"}</div></td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-medium text-slate-800">${totalQty > 0 ? totalQty.toLocaleString() : "—"}<span class="text-slate-400 font-normal text-[10px] ml-1">${holderCount > 0 ? `${holderCount}c` : ""}</span></td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums ${priceColor}">${displayPrice > 0 ? `R ${displayPrice.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}<div class="text-[10px] font-normal ${isPending ? 'text-amber-600' : 'text-violet-600'}">${rebShowUnitPrice ? "Unit" : "Total"}</div></td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-medium ${qtyColor}">${totalQty > 0 ? totalQty.toLocaleString() : "—"}<span class="text-slate-400 font-normal text-[10px] ml-1">${holderCount > 0 ? `${holderCount}c` : ""}</span></td>
           </tr>`;
         }).join("");
 
@@ -8401,18 +8448,30 @@
             return;
           }
 
-          if (metaEl) metaEl.textContent = `Strategy-level preview · ${strategyClients.length} clients · select instrument + step for impact`;
-          tbody.innerHTML = strategyClients.map(client => `
-          <tr class="hover:bg-slate-50">
+          /* Build set of user IDs affected by pending rebalance */
+          const pendingUserIds = new Set();
+          if (rebPendingRebalance && rebPendingRebalance.events) {
+            rebPendingRebalance.events.forEach(ev => pendingUserIds.add(String(ev.user_id)));
+          }
+          const pendingLabel = pendingUserIds.size > 0 ? ` · ${pendingUserIds.size} pending` : '';
+          if (metaEl) metaEl.textContent = `Strategy-level preview · ${strategyClients.length} clients${pendingLabel} · select instrument + step for impact`;
+          tbody.innerHTML = strategyClients.map(client => {
+            const isPendingClient = pendingUserIds.has(String(client.id));
+            const rowBg = isPendingClient ? 'bg-amber-50' : 'hover:bg-slate-50';
+            const rowStyle = isPendingClient ? 'style="border-left:3px solid #f59e0b;"' : '';
+            const nameBadge = isPendingClient ? ' <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;">Pending</span>' : '';
+            return `
+          <tr class="${rowBg}" ${rowStyle}>
             <td class="px-4 py-2.5">
-              <p class="font-medium text-slate-800">${client.name}</p>
+              <p class="font-medium text-slate-800">${client.name}${nameBadge}</p>
               <p class="text-[10px] text-slate-400 font-mono">${client.id}</p>
             </td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-500">${client.instrumentCount}</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">${client.totalCurrentHolding.toLocaleString()}</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-700">${client.totalCurrentHolding.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums ${isPendingClient ? 'text-amber-700' : 'text-slate-700'}">${client.totalCurrentHolding.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold ${isPendingClient ? 'text-amber-700' : 'text-slate-700'}">${client.totalCurrentHolding.toLocaleString()}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-400">0</td>
-          </tr>`).join("");
+          </tr>`;
+          }).join("");
           return;
         }
 
@@ -8426,18 +8485,24 @@
 
         if (!rebSelectedStep) {
           if (metaEl) metaEl.textContent = `${rebSelectedIsin.code} · ${clients.length} clients · select reduction step`;
+          const pendingUids = new Set();
+          if (rebPendingRebalance) rebPendingRebalance.events.forEach(ev => pendingUids.add(String(ev.user_id)));
           tbody.innerHTML = clients.map(client => {
             const lots = Number(client.lots) || 0;
             const currentHolding = lots * rebSelectedIsin.unitsPerLot;
+            const isPend = pendingUids.has(String(client.id));
+            const rowCls = isPend ? 'bg-amber-50' : 'hover:bg-slate-50';
+            const rowSty = isPend ? 'style="border-left:3px solid #f59e0b;"' : '';
+            const badge = isPend ? ' <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;">Pending</span>' : '';
             return `
-          <tr class="hover:bg-slate-50">
+          <tr class="${rowCls}" ${rowSty}>
             <td class="px-4 py-2.5">
-              <p class="font-medium text-slate-800">${client.name}</p>
+              <p class="font-medium text-slate-800">${client.name}${badge}</p>
               <p class="text-[10px] text-slate-400 font-mono">${client.id}</p>
             </td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-400">${lots}</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">${currentHolding.toLocaleString()}</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-700">${currentHolding.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums ${isPend ? 'text-amber-700' : 'text-slate-700'}">${currentHolding.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold ${isPend ? 'text-amber-700' : 'text-slate-700'}">${currentHolding.toLocaleString()}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-400">0</td>
           </tr>`;
           }).join("");
@@ -8488,21 +8553,29 @@
 
         const impacts = rebComputeClientImpacts(clients, rebSelectedIsin.unitsPerLot, rebSelectedStep.newUnitsPerLot);
         const hasErrors = impacts.some(i => i.hasNegative);
+        const pendingUids2 = new Set();
+        if (rebPendingRebalance) rebPendingRebalance.events.forEach(ev => pendingUids2.add(String(ev.user_id)));
         if (metaEl) metaEl.textContent = `${rebSelectedIsin.code} · ${impacts.length} clients${hasErrors ? " · ⚠ Negative holdings" : ""}`;
 
-        tbody.innerHTML = impacts.map(imp => `
-          <tr class="${imp.hasNegative ? "bg-red-50" : "hover:bg-slate-50"}">
+        tbody.innerHTML = impacts.map(imp => {
+          const isPend = pendingUids2.has(String(imp.clientId));
+          const rowCls = imp.hasNegative ? "bg-red-50" : isPend ? "bg-amber-50" : "hover:bg-slate-50";
+          const rowSty = isPend ? 'style="border-left:3px solid #f59e0b;"' : '';
+          const badge = isPend ? ' <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;">Pending</span>' : '';
+          return `
+          <tr class="${rowCls}" ${rowSty}>
             <td class="px-4 py-2.5">
-              <p class="font-medium text-slate-800">${imp.clientName}</p>
+              <p class="font-medium text-slate-800">${imp.clientName}${badge}</p>
               <p class="text-[10px] text-slate-400 font-mono">${imp.clientId}</p>
             </td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-400">${imp.currentLots}</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">${imp.currentHolding.toLocaleString()}</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-800">${imp.newHolding.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums ${isPend ? 'text-amber-700' : 'text-slate-700'}">${imp.currentHolding.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold ${isPend ? 'text-amber-800' : 'text-slate-800'}">${imp.newHolding.toLocaleString()}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold ${imp.delta < 0 ? "text-red-600" : imp.delta > 0 ? "text-green-600" : "text-slate-400"}">
               ${imp.delta > 0 ? "+" : ""}${imp.delta.toLocaleString()}
             </td>
-          </tr>`).join("");
+          </tr>`;
+        }).join("");
       }
 
       /* ── Header state (commit btn + negative badge) ── */
