@@ -5691,7 +5691,7 @@
           events.push({
             at: getLatestTimestamp(boughtRows) || profile?.updated_at || profile?.created_at,
             title: `Bought shares (${boughtRows.length})`,
-            meta: 'stock_holdings table',
+            meta: 'stock_holdings_c table',
             details: buildBoughtHistoryTableHtml(userHoldings),
             blue: true
           });
@@ -5701,7 +5701,7 @@
           events.push({
             at: getLatestTimestamp(currentByShareRows) || profile?.updated_at || profile?.created_at,
             title: `Current share holdings (${currentByShareRows.length})`,
-            meta: 'stock_holdings table',
+            meta: 'stock_holdings_c table',
             details: buildCurrentHoldingsByShareTableHtml(userHoldings),
             blue: true
           });
@@ -5710,7 +5710,7 @@
         events.push({
           at: getLatestTimestamp(userHoldings) || profile?.updated_at || profile?.created_at,
           title: `Holdings snapshot (${userHoldings.length})`,
-          meta: 'stock_holdings table',
+          meta: 'stock_holdings_c table',
           details: buildHoldingsTableHtml(userHoldings),
           blue: true
         });
@@ -8380,7 +8380,7 @@
             supabaseClient.from('user_onboarding').select('*').in('user_id', userIds),
             supabaseClient.from('user_onboarding_pack_details').select('*').in('user_id', userIds),
             supabaseClient.from('allocations').select('user_id, asset_class, weight, value, return_1d, return_1w, return_1m, return_ytd, return_1y, as_of_date, security_id, created_at, updated_at').in('user_id', userIds).order('updated_at', { ascending: false }),
-            supabaseClient.from('stock_holdings').select('user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", as_of_date, strategy_id, strategy_name_snapshot, trade_side, is_active, created_at, updated_at').eq('is_active', true).eq('trade_side', 'BUY').in('user_id', userIds).order('updated_at', { ascending: false })
+            supabaseClient.from('stock_holdings_c').select('user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", as_of_date, strategy_id, strategy_name_snapshot, trade_side, is_active, created_at, updated_at').eq('is_active', true).eq('trade_side', 'BUY').in('user_id', userIds).order('updated_at', { ascending: false })
           ]);
 
           // Fetch ALL family_members + transactions (not filtered by userIds) — RLS policy controls access

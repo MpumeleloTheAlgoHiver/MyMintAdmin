@@ -406,7 +406,7 @@
         countBadge.textContent = '…';
         try {
           const { data: holdings, error: holdingsErr } = await supabaseClient
-            .from('stock_holdings').select('user_id,strategy_id').eq('is_active',true).eq('trade_side','BUY');
+            .from('stock_holdings_c').select('user_id,strategy_id').eq('is_active',true).eq('trade_side','BUY');
           if (holdingsErr) throw holdingsErr;
           const userIds     = [...new Set((holdings||[]).map(h=>h.user_id).filter(Boolean))];
           const strategyIds = [...new Set((holdings||[]).map(h=>h.strategy_id).filter(Boolean))];
@@ -470,7 +470,7 @@
         document.getElementById('cpTransactionsList').innerHTML='<div class="client-loading">Loading…</div>';
         try {
           const [hr, tr] = await Promise.all([
-            supabaseClient.from('stock_holdings').select('id,security_id,quantity,avg_fill,strategy_id,Status,trade_side,is_active').eq('user_id',client.id).eq('Status','active').eq('is_active',true).eq('trade_side','BUY'),
+            supabaseClient.from('stock_holdings_c').select('id,security_id,quantity,avg_fill,strategy_id,Status,trade_side,is_active').eq('user_id',client.id).eq('Status','active').eq('is_active',true).eq('trade_side','BUY'),
             supabaseClient.from('transactions').select('id,name,description,amount,direction,status,transaction_date,created_at').eq('user_id',client.id).order('created_at',{ascending:false}).limit(6),
           ]);
           const holdings=hr.data||[], transactions=tr.data||[];

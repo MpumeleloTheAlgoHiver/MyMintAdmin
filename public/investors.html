@@ -473,7 +473,7 @@
 
       /* Fetch active buy holdings with created_at for inception date */
       const { data: holdings } = await supabaseClient
-        .from('stock_holdings')
+        .from('stock_holdings_c')
         .select('user_id, strategy_id, security_id, quantity, avg_fill, market_value, created_at, as_of_date')
         .eq('is_active', true)
         .eq('trade_side', 'BUY');
@@ -772,7 +772,7 @@
           .eq('user_id', investor.userId)
           .order('created_at', { ascending: false }),
         supabaseClient
-          .from('stock_holdings')
+          .from('stock_holdings_c')
           .select('*, securities(code, description)')
           .eq('user_id', investor.userId)
           .eq('Status', 'inactive')
@@ -809,7 +809,7 @@
         });
       });
 
-      // Add records from stock_holdings (Rebalance Trades)
+      // Add records from stock_holdings_c (Rebalance Trades)
       (tradeRows || []).forEach(row => {
         const isBuy = String(row.trade_side).toUpperCase() === 'BUY';
         const qty = Number(row.quantity || 0);
@@ -1371,7 +1371,7 @@
       /* Subscribe to the three tables that drive all investor data */
       supabaseClient
         .channel('investors-live')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_holdings' },      scheduleRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_holdings_c' },      scheduleRefresh)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' },         scheduleRefresh)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_analytics' },  scheduleRefresh)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' },             scheduleRefresh)

@@ -4021,10 +4021,10 @@
     };
 
     const loadOrderbookClientSideFallback = async () => {
-      /* ── Load stock_holdings + pending rebalance events in parallel ── */
+      /* ── Load stock_holdings_c + pending rebalance events in parallel ── */
       const [holdingsResult, rebEventsResult, rebBatchesResult] = await Promise.all([
         supabaseClient
-          .from('stock_holdings')
+          .from('stock_holdings_c')
           .select('id, user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, as_of_date, created_at, updated_at, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", avg_exit, strategy_id, trade_side, is_active, closed_reason, closed_at, rebalance_batch_id, strategy_name_snapshot')
           .order('updated_at', { ascending: false }),
         supabaseClient
@@ -4038,7 +4038,7 @@
       ]);
 
       if (holdingsResult.error) {
-        throw new Error(holdingsResult.error.message || 'Could not load stock_holdings');
+        throw new Error(holdingsResult.error.message || 'Could not load stock_holdings_c');
       }
 
       const holdings = holdingsResult.data || [];
@@ -4335,7 +4335,7 @@
         };
       });
 
-      // Merge stock_holdings rows with rebalance_event rows
+      // Merge stock_holdings_c rows with rebalance_event rows
       const allRawRows = [...rawRows, ...rebEventRows];
 
       const filteredRows = allRawRows.filter((row) => {
@@ -4346,7 +4346,7 @@
         // Always show pending rebalance events
         if (row.isPendingRebalance) return true;
 
-        // Hide SETTLED rebalance_event rows — stock_holdings audit rows cover them
+        // Hide SETTLED rebalance_event rows — stock_holdings_c audit rows cover them
         if (row.rebalanceEventId && row.rebalanceBatchStatus === 'SETTLED') return false;
 
         // Hide REVERSED rebalance events (they are no longer actionable).
@@ -4364,7 +4364,7 @@
         return false;
       });
 
-      // BIR source uses only stock_holdings (settled positions) — exclude pending/unsettled rebalance events
+      // BIR source uses only stock_holdings_c (settled positions) — exclude pending/unsettled rebalance events
       allBirSourceRows = rawRows;
       allOrderbookRawRows = filteredRows;
       const aggregated = aggregateOrderbookRows(filteredRows);
@@ -4760,7 +4760,7 @@
       });
     };
 
-    /* ── Execute Fill & Settle: writes to stock_holdings + updates batch/events ── */
+    /* ── Execute Fill & Settle: writes to stock_holdings_c + updates batch/events ── */
     const executeFillAndSettle = async (batch, events, sellFillCents, buyFillCents, extraBuyFillCents) => {
       const nowIso = new Date().toISOString();
       const { data: sessionData } = await supabaseClient.auth.getSession();
@@ -4781,7 +4781,7 @@
 
       // Load current active positions for sell side
       const { data: activePositions, error: posErr } = await supabaseClient
-        .from('stock_holdings')
+        .from('stock_holdings_c')
         .select('id, user_id, security_id, quantity, trade_side, is_active')
         .eq('strategy_id', strategyId)
         .eq('is_active', true)
@@ -4803,9 +4803,9 @@
         const soldQty = Math.min(Number(evt.quantity || 0), totalQty);
         const remaining = totalQty - soldQty;
 
-        // Insert SELL audit row in stock_holdings
+        // Insert SELL audit row in stock_holdings_c
         const { data: insertedSell, error: sellInsertErr } = await supabaseClient
-          .from('stock_holdings')
+          .from('stock_holdings_c')
           .insert({
             user_id: evt.user_id,
             security_id: evt.security_id,
@@ -4828,7 +4828,7 @@
         // Close or reduce active position
         if (remaining <= 0) {
           const { error: closeErr } = await supabaseClient
-            .from('stock_holdings')
+            .from('stock_holdings_c')
             .update({
               is_active: false,
               closed_reason: 'POSITION_REPLACED',
@@ -4843,7 +4843,7 @@
           if (closeErr) throw new Error(closeErr.message || 'Failed to close replaced position.');
         } else {
           const { error: partialErr } = await supabaseClient
-            .from('stock_holdings')
+            .from('stock_holdings_c')
             .update({
               quantity: remaining,
               updated_at: nowIso,
@@ -4868,7 +4868,7 @@
       const applyBuySettlement = async (buyEvts, fillCents, closedReason) => {
         // Re-load active positions after sell mutations
         const { data: currentActive } = await supabaseClient
-          .from('stock_holdings')
+          .from('stock_holdings_c')
           .select('id, user_id, security_id, quantity')
           .eq('strategy_id', strategyId)
           .eq('is_active', true)
@@ -4889,7 +4889,7 @@
 
           // Insert BUY audit row
           const { data: insertedBuy, error: buyInsertErr } = await supabaseClient
-            .from('stock_holdings')
+            .from('stock_holdings_c')
             .insert({
               user_id: evt.user_id,
               security_id: evt.security_id,
@@ -4913,7 +4913,7 @@
           if (existingActive) {
             const nextQty = Math.max(0, Number(existingActive.quantity || 0) + buyQty);
             const { error: updateErr } = await supabaseClient
-              .from('stock_holdings')
+              .from('stock_holdings_c')
               .update({
                 quantity: nextQty,
                 updated_at: nowIso,
@@ -4928,7 +4928,7 @@
             existingActive.quantity = nextQty; // update local cache
           } else {
             const { data: newActive, error: insertActiveErr } = await supabaseClient
-              .from('stock_holdings')
+              .from('stock_holdings_c')
               .insert({
                 user_id: evt.user_id,
                 security_id: evt.security_id,
@@ -5175,7 +5175,7 @@
           // Note: We update both avg_fill and avg_exit to be safe, 
           // though usually one applies per row type.
           const { error } = await supabaseClient
-            .from('stock_holdings')
+            .from('stock_holdings_c')
             .update({ 
               avg_fill: newPriceCents,
               avg_exit: newPriceCents

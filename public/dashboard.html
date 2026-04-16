@@ -5120,7 +5120,7 @@
 
         window.__dbgBreadcrumb('ovSelect:fetch-investors');
         const { data: investorRows } = await supabaseClient
-          .from('stock_holdings')
+          .from('stock_holdings_c')
           .select('user_id, quantity, avg_fill, market_value, strategy_id, trade_side, is_active, created_at, security_id')
           .eq('is_active', true)
           .eq('trade_side', 'BUY')
@@ -5977,7 +5977,7 @@
       const loadTopHoldings = async () => {
         const { data: holdingsRows, error: holdingsError } =
           await supabaseClient
-            .from("stock_holdings")
+            .from("stock_holdings_c")
             .select("security_id, user_id, quantity")
             .eq("is_active", true)
             .eq("trade_side", "BUY");
@@ -6728,9 +6728,9 @@
         if (!strategies.length) return;
 
         try {
-          /* stock_holdings has a strategy_id column — query it directly */
+          /* stock_holdings_c has a strategy_id column — query it directly */
           const { data: holdRows } = await supabaseClient
-            .from("stock_holdings")
+            .from("stock_holdings_c")
             .select("strategy_id")
             .eq("is_active", true)
             .gt("quantity", 0);
@@ -8097,7 +8097,7 @@
             const secIds = Object.keys(codeBySecId);
             if (secIds.length) {
               let holdingsQuery = supabaseClient
-                .from("stock_holdings")
+                .from("stock_holdings_c")
                 .select("security_id, user_id, quantity, strategy_id")
                 .eq("is_active", true)
                 .eq("trade_side", "BUY")
@@ -9188,7 +9188,7 @@
         ])];
 
         const { data: existingRows, error: existingErr } = await supabaseClient
-          .from("stock_holdings")
+          .from("stock_holdings_c")
           .select("id, user_id, security_id, quantity, trade_side, is_active")
           .eq("strategy_id", strategyId)
           .eq("is_active", true)
@@ -9325,7 +9325,7 @@
           if (eventsErr) throw new Error(eventsErr.message || "Failed to insert rebalance events.");
         }
 
-        /* ── stock_holdings is NOT touched ──
+        /* ── stock_holdings_c is NOT touched ──
            Positions settle only when the admin fills & settles the batch
            via the orderbook. This keeps client-facing data clean. */
 
