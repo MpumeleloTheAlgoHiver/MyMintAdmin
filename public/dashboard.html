@@ -1049,12 +1049,16 @@
                       <span style="font-size:11px;color:#94a3b8;font-weight:500;">Strategy Assets</span>
                     </div>
                     <!-- Period Tabs -->
-                    <div style="display:flex;border-bottom:1px solid #f1f5f9;padding:0 14px;gap:2px;">
-                      <button id="riTabDaily" onclick="window.switchReturnTab('daily')" style="padding:9px 12px;font-size:11px;font-weight:700;color:#7c3aed;border-bottom:2px solid #7c3aed;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;">Daily</button>
-                      <button id="riTabWtd" onclick="window.switchReturnTab('wtd')" style="padding:9px 12px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;">WTD</button>
-                      <button id="riTabMtd" onclick="window.switchReturnTab('mtd')" style="padding:9px 12px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;">MTD</button>
-                      <button id="riTabYtd" onclick="window.switchReturnTab('ytd')" style="padding:9px 12px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;">YTD</button>
-                      <button id="riTabAlerts" onclick="window.switchReturnTab('alerts')" style="padding:9px 10px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;display:flex;align-items:center;gap:5px;">
+                    <div style="display:flex;border-bottom:1px solid #f1f5f9;padding:0 10px;gap:0px;overflow-x:auto;scrollbar-width:none;">
+                      <button id="riTab1d"  onclick="window.switchReturnTab('1d')"     style="padding:9px 9px;font-size:11px;font-weight:700;color:#7c3aed;border-bottom:2px solid #7c3aed;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">1D</button>
+                      <button id="riTab5d"  onclick="window.switchReturnTab('5d')"     style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">5D</button>
+                      <button id="riTab1m"  onclick="window.switchReturnTab('1m')"     style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">1M</button>
+                      <button id="riTab6m"  onclick="window.switchReturnTab('6m')"     style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">6M</button>
+                      <button id="riTabYtd" onclick="window.switchReturnTab('ytd')"    style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">YTD</button>
+                      <button id="riTab1y"  onclick="window.switchReturnTab('1y')"     style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">1Y</button>
+                      <button id="riTab5y"  onclick="window.switchReturnTab('5y')"     style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">5Y</button>
+                      <button id="riTabAll" onclick="window.switchReturnTab('all')"    style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">All</button>
+                      <button id="riTabAlerts" onclick="window.switchReturnTab('alerts')" style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0;">
                         Alerts
                         <span id="riAlertBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:none;align-items:center;justify-content:center;padding:0 4px;line-height:1;"></span>
                       </button>
@@ -1825,7 +1829,7 @@
 
       let _browsePanelLoaded = false;
       let _returnInsightsData = []; /* cached asset return data */
-      let _activeReturnTab = 'daily';
+      let _activeReturnTab = '1d';
       const ALERT_THRESHOLD = -4; /* alert when daily change <= -4% */
 
       /* Build a map: symbol → [strategy names] from the loaded strategies */
@@ -1904,8 +1908,21 @@
           return;
         }
 
-        const fieldMap = { daily: 'change_percent', wtd: 'wtd_performance', mtd: 'mtd_performance', ytd: 'ytd_performance' };
-        const field = fieldMap[tab] || 'change_percent';
+        const fieldMap = {
+          '1d':  'change_percent',
+          '5d':  'w1_performance',
+          '1m':  'mtd_performance',
+          '6m':  'r_6m_performance',
+          ytd:   'ytd_performance',
+          '1y':  'r_1y_performance',
+          '5y':  null,
+          all:   null
+        };
+        const field = fieldMap[tab] ?? null;
+        if (field === null) {
+          listEl.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No ${tab.toUpperCase()} data available</div>`;
+          return;
+        }
         const all = (_returnInsightsData || [])
           .map(a => ({ ...a, _val: a[field] != null ? Number(a[field]) : null }))
           .filter(a => a._val != null)
@@ -1973,7 +1990,11 @@
 
       window.switchReturnTab = async (tab) => {
         _activeReturnTab = tab;
-        const tabBtns = { daily: 'riTabDaily', wtd: 'riTabWtd', mtd: 'riTabMtd', ytd: 'riTabYtd', alerts: 'riTabAlerts' };
+        const tabBtns = {
+          '1d': 'riTab1d', '5d': 'riTab5d', '1m': 'riTab1m', '6m': 'riTab6m',
+          ytd: 'riTabYtd', '1y': 'riTab1y', '5y': 'riTab5y', all: 'riTabAll',
+          alerts: 'riTabAlerts'
+        };
         Object.entries(tabBtns).forEach(([key, id]) => {
           const btn = document.getElementById(id);
           if (!btn) return;
@@ -1983,45 +2004,6 @@
           btn.style.borderBottomColor = active ? (alertActive ? '#dc2626' : '#7c3aed') : 'transparent';
           btn.style.fontWeight = active ? '700' : '600';
         });
-
-        /* WTD / MTD — fetch from server if not yet loaded */
-        if ((tab === 'wtd' || tab === 'mtd') && !_fetchedPeriods.has(tab)) {
-          const listEl = document.getElementById('returnInsightsList');
-          if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">Loading ${tab.toUpperCase()} data…</div>`;
-
-          /* If the browse panel hasn't loaded securities yet, wait up to 6 s */
-          if (!_returnInsightsData.length) {
-            await new Promise(resolve => {
-              let waited = 0;
-              const check = () => {
-                if (_returnInsightsData.length || waited >= 6000) return resolve();
-                waited += 200; setTimeout(check, 200);
-              };
-              check();
-            });
-          }
-
-          try {
-            const symbols = (_returnInsightsData || []).map(a => a.symbol).filter(Boolean);
-            console.log('[ReturnInsights] WTD/MTD fetch, symbols count:', symbols.length, 'first:', symbols[0]);
-            if (symbols.length) {
-              const resp = await fetch(`/api/security-performance?symbols=${encodeURIComponent(symbols.join(','))}`);
-              console.log('[ReturnInsights] server resp status:', resp.status);
-              if (resp.ok) {
-                const json = await resp.json();
-                console.log('[ReturnInsights] server results count:', Object.keys(json.results || {}).length, 'sample:', Object.values(json.results||{})[0]);
-                const { results } = json;
-                /* Merge wtd/mtd into existing data */
-                _returnInsightsData = (_returnInsightsData || []).map(a => {
-                  const r = results[a.symbol];
-                  return r ? { ...a, wtd_performance: r.wtd_performance, mtd_performance: r.mtd_performance } : a;
-                });
-                _fetchedPeriods.add('wtd');
-                _fetchedPeriods.add('mtd');
-              }
-            }
-          } catch(e) { console.warn('[ReturnInsights] WTD/MTD fetch failed:', e); }
-        }
 
         _renderReturnInsights(tab);
       };
