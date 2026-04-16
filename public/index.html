@@ -441,6 +441,196 @@
       border-radius: 10px;
     }
     .cert-btn-download:hover:not(:disabled) { background: #cffafe; border-color: #7dd3fc; }
+    .cert-btn-reevaluate {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      box-shadow: 0 2px 6px rgba(217,119,6,0.28);
+      transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+    }
+    .cert-btn-reevaluate:hover:not(:disabled) {
+      background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+      box-shadow: 0 4px 10px rgba(180,83,9,0.32);
+      transform: translateY(-1px);
+    }
+    .cert-btn-reevaluate:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
+    .cert-status-note {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #b45309;
+      background: none;
+      border: none;
+      padding: 0;
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+      opacity: 0.85;
+    }
+    .cert-status-note::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #f87171;
+      flex-shrink: 0;
+    }
+
+    /* ── Child documents modal ── */
+    .child-docs-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      background: rgba(0,0,0,0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .child-docs-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .child-docs-modal {
+      background: #fff;
+      border-radius: 16px;
+      width: 94%;
+      max-width: 860px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+    }
+    .child-docs-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      background: #fafbff;
+    }
+    .child-docs-title-wrap h3 {
+      margin: 0;
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: #111827;
+    }
+    .child-docs-title-wrap p {
+      margin: 4px 0 0;
+      font-size: 0.78rem;
+      color: #6b7280;
+    }
+    .child-docs-close {
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      color: #6b7280;
+      padding: 4px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .child-docs-close:hover { background: #f3f4f6; }
+    .child-docs-body {
+      padding: 14px 16px;
+      overflow: auto;
+      background: #fff;
+    }
+    .child-docs-list {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .child-docs-list th {
+      text-align: left;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #64748b;
+      padding: 8px 10px;
+      border-bottom: 2px solid #e8e8f0;
+      background: #fafbff;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .child-docs-list td {
+      padding: 10px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #1f2937;
+      vertical-align: middle;
+    }
+    .child-docs-row:hover { background: #f8fafc; }
+    .child-doc-bucket {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #4338ca;
+      font-weight: 600;
+      font-size: 10.5px;
+    }
+    .child-doc-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .child-doc-action-btn {
+      border: 1px solid #dbe3ef;
+      background: #fff;
+      color: #334155;
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .child-doc-action-btn:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+    }
+    .child-docs-empty {
+      text-align: center;
+      color: #6b7280;
+      padding: 30px 14px;
+      font-size: 0.88rem;
+    }
+    .child-docs-footer {
+      border-top: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      justify-content: flex-end;
+      background: #fafbff;
+    }
+    @media screen and (max-width: 768px) {
+      .child-docs-modal {
+        width: 97%;
+        max-height: 94vh;
+      }
+      .child-docs-list {
+        font-size: 11px;
+      }
+      .child-docs-list th,
+      .child-docs-list td {
+        padding: 8px 6px;
+      }
+      .child-docs-header {
+        padding: 12px;
+      }
+      .child-docs-body {
+        padding: 10px;
+      }
+    }
 
     /* ── Child KYC badge variants ── */
     .child-kyc-badge {
@@ -455,6 +645,8 @@
     }
     .child-kyc-badge.pending { background: #fef3c7; color: #92400e; }
     .child-kyc-badge.completed { background: #d1fae5; color: #065f46; }
+    .child-kyc-badge.verified { background: #d1fae5; color: #065f46; }
+    .child-kyc-badge.accepted { background: #d1fae5; color: #065f46; }
     .child-kyc-badge.rejected { background: #fee2e2; color: #991b1b; }
 
     /* ── Certificate link button in child card ── */
@@ -3092,7 +3284,9 @@
       margin-bottom: 14px;
     }
 
-    /* Responsive */
+    /* ═══ Responsive ═══ */
+
+    /* ── Large tablets / narrow desktops ── */
     @media screen and (max-width: 1200px) {
       .content-area {
         flex-direction: column;
@@ -3102,8 +3296,64 @@
         flex: 1;
         width: 100%;
       }
+
+      /* Let top-nav wrap into two rows */
+      .top-nav {
+        flex-wrap: wrap;
+        height: auto;
+        min-height: unset;
+        padding: 12px 20px;
+        gap: 8px 16px;
+      }
+
+      /* Title takes full width on first row */
+      .tnav-title { flex-shrink: 1; min-width: 0; }
+
+      /* Hide vertical dividers when wrapping */
+      .tnav-divider { display: none; }
+
+      /* Pills row wraps to second line */
+      .tnav-pills {
+        order: 3;
+        flex: 1 1 100%;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      /* Search + toggles stay beside title */
+      .tnav-actions {
+        order: 2;
+        flex-shrink: 0;
+        margin-left: auto;
+      }
+
+      /* Stat cards: 2-col */
+      .client-stats-strip { grid-template-columns: repeat(2, 1fr); }
     }
 
+    /* ── Small tablets ── */
+    @media screen and (max-width: 900px) {
+      .tnav-actions {
+        order: 3;
+        flex: 1 1 100%;
+      }
+
+      .tnav-actions .top-search { flex: 1; max-width: none; min-width: 0; }
+
+      .tnav-pills {
+        order: 2;
+        flex: 1 1 100%;
+      }
+
+      /* Bank/Parent-Child dropdowns stack better */
+      .bank-filter-wrap { margin-left: 0; padding-left: 0; }
+      .bank-filter-wrap::before { display: none; }
+
+      /* Subtitle under title smaller */
+      .clients-page-sub { font-size: 10.5px; }
+    }
+
+    /* ── Mobile ── */
     @media screen and (max-width: 768px) {
       .sidebar {
         display: none;
@@ -3114,11 +3364,11 @@
       }
 
       .content-area {
-        padding: 20px;
+        padding: 16px;
       }
 
       .simple-view {
-        padding: 18px 20px 24px;
+        padding: 14px 14px 20px !important;
       }
 
       .simple-view-header {
@@ -3130,17 +3380,60 @@
         width: 100%;
       }
 
-      .quick-filter-row {
-        width: 100%;
-      }
-
+      .quick-filter-row,
       .quick-filter-stack {
         width: 100%;
       }
 
       .top-nav {
-        padding: 15px 20px;
+        padding: 10px 14px;
+        gap: 8px 10px;
       }
+
+      /* Stack: title row → pills row → actions row */
+      .tnav-title { flex: 1 1 auto; min-width: 0; }
+
+      .tnav-pills {
+        order: 2;
+        flex: 1 1 100%;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+
+      .tnav-actions {
+        order: 3;
+        flex: 1 1 100%;
+      }
+
+      .tnav-actions .top-search { flex: 1; max-width: none; min-width: 0; }
+
+      /* Smaller pills on mobile */
+      .quick-filter-pill {
+        font-size: 11px !important;
+        padding: 5px 9px !important;
+        height: 28px;
+      }
+
+      /* Bank/Parent-Child dropdown menus: full width on mobile */
+      .bank-filter-menu {
+        min-width: 140px;
+        right: auto;
+        left: 0;
+      }
+
+      /* Stat cards: 2-col */
+      .client-stats-strip { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .csc-value { font-size: 22px; }
+      .csc-label { font-size: 9.5px; }
+
+      /* Client list header: hide on mobile, info visible in rows */
+      .clients-list-hd { display: none; }
+
+      /* Row layout: tighter */
+      .simple-row { padding: 10px 10px !important; min-height: 54px; }
+      .simple-left { gap: 10px !important; }
+      .simple-avatar { width: 34px !important; height: 34px !important; font-size: 12px !important; }
+      .simple-mid { flex: 0 0 auto; }
 
       .company-info {
         flex-direction: column;
@@ -3155,6 +3448,39 @@
         flex: 1;
         justify-content: center;
       }
+
+      /* Title sizing */
+      .clients-page-title { font-size: 17px; }
+      .clients-page-sub { font-size: 10px; }
+
+      /* User count badge: smaller */
+      .user-count-badge { height: 26px; padding: 0 8px; font-size: 11px; }
+    }
+
+    /* ── Very small phones ── */
+    @media screen and (max-width: 480px) {
+      .top-nav { padding: 8px 10px; gap: 6px 8px; }
+      .tnav-title-row { flex-wrap: wrap; gap: 6px; }
+      .clients-page-title { font-size: 15px; }
+      .clients-page-sub { font-size: 9.5px; }
+
+      /* Stats stay 2-col but tighter */
+      .client-stats-strip { grid-template-columns: 1fr 1fr; gap: 6px; }
+      .csc-value { font-size: 20px; }
+
+      /* Compact pills */
+      .quick-filter-pill { font-size: 10.5px !important; padding: 4px 7px !important; height: 26px; }
+
+      /* Bank/Parent-Child pills: hide icon text, keep compact */
+      .bank-filter-wrap .fpill-icon { width: 12px; height: 12px; }
+      .bank-filter-wrap .fpill-chevron { width: 10px; height: 10px; }
+
+      /* Table/Email view toggles: full width */
+      .table-view-toggle-btn { flex: 1; text-align: center; justify-content: center; }
+
+      /* Search input smaller */
+      .filter-bar .top-search input,
+      .tnav-actions .top-search input { height: 30px; font-size: 12px; }
     }
   </style>
   <style>
@@ -3796,7 +4122,7 @@
 
       <span class="sidebar-section-label">System</span>
 
-      <a class="nav-icon" href="#" aria-label="Settings">
+      <a class="nav-icon" href="/settings.html" aria-label="Settings">
         <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
         Settings
       </a>
@@ -4444,8 +4770,28 @@
     <div class="cert-modal-footer" id="certModalFooter">
       <button class="cert-btn cert-btn-cancel" id="certModalCancelBtn" type="button">Cancel</button>
       <button class="cert-btn cert-btn-download" id="certModalDownloadBtn" type="button">Download</button>
+      <span class="cert-status-note" id="certModalDecisionNote">Rejected by admin</span>
+      <button class="cert-btn cert-btn-reevaluate" id="certModalReevaluateBtn" type="button">Re-evaluate</button>
       <button class="cert-btn cert-btn-reject" id="certModalRejectBtn" type="button">Reject</button>
       <button class="cert-btn cert-btn-accept" id="certModalAcceptBtn" type="button">Accept</button>
+    </div>
+  </div>
+</div>
+
+<div class="child-docs-overlay" id="childDocsOverlay">
+  <div class="child-docs-modal">
+    <div class="child-docs-header">
+      <div class="child-docs-title-wrap">
+        <h3 id="childDocsTitle">Child Documents</h3>
+        <p>Files from birth-certificates and signed-agreements buckets.</p>
+      </div>
+      <button class="child-docs-close" id="childDocsClose" type="button" aria-label="Close">&times;</button>
+    </div>
+    <div class="child-docs-body" id="childDocsBody">
+      <div class="child-docs-empty">Loading documents...</div>
+    </div>
+    <div class="child-docs-footer">
+      <button class="cert-btn cert-btn-cancel" id="childDocsCancel" type="button">Close</button>
     </div>
   </div>
 </div>
@@ -4497,6 +4843,7 @@
     const strategiesByIdMap = {};
     const familyRoleFlagsByUserId = {};
     let allFamilyMembers = [];
+    let allFamilyTransactions = [];
     const PACK_SECTIONS_PAGE_SIZE = 4;
     let completedTableOpen = false;
     let completedTableEntries = [];
@@ -5344,7 +5691,7 @@
           events.push({
             at: getLatestTimestamp(boughtRows) || profile?.updated_at || profile?.created_at,
             title: `Bought shares (${boughtRows.length})`,
-            meta: 'stock_holdings table',
+            meta: 'stock_holdings_c table',
             details: buildBoughtHistoryTableHtml(userHoldings),
             blue: true
           });
@@ -5354,7 +5701,7 @@
           events.push({
             at: getLatestTimestamp(currentByShareRows) || profile?.updated_at || profile?.created_at,
             title: `Current share holdings (${currentByShareRows.length})`,
-            meta: 'stock_holdings table',
+            meta: 'stock_holdings_c table',
             details: buildCurrentHoldingsByShareTableHtml(userHoldings),
             blue: true
           });
@@ -5363,7 +5710,7 @@
         events.push({
           at: getLatestTimestamp(userHoldings) || profile?.updated_at || profile?.created_at,
           title: `Holdings snapshot (${userHoldings.length})`,
-          meta: 'stock_holdings table',
+          meta: 'stock_holdings_c table',
           details: buildHoldingsTableHtml(userHoldings),
           blue: true
         });
@@ -5478,6 +5825,28 @@
     };
 
     const normalizeKycStatusText = (value) => String(value || '').trim().toLowerCase();
+
+    const normalizeChildCertificateStatus = (value) => {
+      const normalized = normalizeKycStatusText(value);
+      if (!normalized) return 'pending';
+      if (normalized.includes('reject') || normalized.includes('declin')) return 'rejected';
+      if (
+        normalized.includes('verif')
+        || normalized.includes('accept')
+        || normalized.includes('approv')
+        || normalized.includes('complet')
+      ) {
+        return 'verified';
+      }
+      return 'pending';
+    };
+
+    const getChildCertificateStatusLabel = (status) => {
+      const normalized = normalizeChildCertificateStatus(status);
+      if (normalized === 'verified') return 'Accepted';
+      if (normalized === 'rejected') return 'Rejected';
+      return 'Pending';
+    };
 
     const isKycCompletedValue = (status) => {
       const normalized = normalizeKycStatusText(status);
@@ -6249,6 +6618,30 @@
       return age >= 0 ? age : null;
     };
 
+    const inferGenderFromIdNumber = (idNumber) => {
+      const digits = String(idNumber || '').replace(/\D/g, '');
+      // SA ID format: YYMMDDSSSSCAZ where SSSS encodes gender (<5000 female, >=5000 male)
+      if (digits.length < 10) return '';
+      const seq = Number.parseInt(digits.slice(6, 10), 10);
+      if (Number.isNaN(seq)) return '';
+      return seq >= 5000 ? 'Boy' : 'Girl';
+    };
+
+    const normalizeChildGenderDisplay = (rawGender, idNumber) => {
+      const value = String(rawGender || '').trim().toLowerCase();
+      const map = {
+        boy: 'Boy',
+        girl: 'Girl',
+        son: 'Boy',
+        daughter: 'Girl',
+        baby: 'Baby',
+        infant: 'Infant',
+        other: 'Other'
+      };
+      if (value && map[value]) return map[value];
+      return inferGenderFromIdNumber(idNumber);
+    };
+
     const getLinkedParentsForFamilyMember = (familyMember) => {
       const parentIds = [familyMember.primary_user_id, familyMember.parent_id]
         .map((id) => String(id || '').trim())
@@ -6258,12 +6651,16 @@
       return uniqueParentIds.map((parentId) => {
         const parentProfile = allProfiles.find((p) => String(p.id) === parentId);
         if (!parentProfile) {
-          return { id: parentId, name: parentId };
+          return { id: parentId, name: parentId, mintNumber: '-' };
         }
         const parentName = [parentProfile.first_name, parentProfile.last_name].filter(Boolean).join(' ')
           || parentProfile.email
           || parentId;
-        return { id: parentId, name: parentName };
+        return {
+          id: parentId,
+          name: parentName,
+          mintNumber: String(parentProfile.mint_number || '').trim() || '-'
+        };
       });
     };
 
@@ -6275,8 +6672,9 @@
         .filter(row => normalizeKycStatusText(row.relationship || '') === 'child')
         .filter(row => {
           if (kycStatusFilter === 'all') return true;
-          const status = normalizeKycStatusText(row.kyc_status || 'pending');
-          if (kycStatusFilter === 'not-completed') return status !== 'completed';
+          const status = normalizeChildCertificateStatus(row.certificate_verification_status || row.kyc_status || 'pending');
+          if (kycStatusFilter === 'not-completed') return status !== 'verified';
+          if (kycStatusFilter === 'completed') return status === 'verified';
           return status === kycStatusFilter;
         })
         .filter(row => {
@@ -6299,6 +6697,7 @@
       childRows.forEach(child => {
         const clone = profileTemplate.content.firstElementChild.cloneNode(true);
         const fullName = [child.first_name, child.last_name].filter(Boolean).join(' ') || 'Unknown Child';
+        const childGender = normalizeChildGenderDisplay(child.gender, child.id_number);
         const uid = child.id || '-';
         const currentAge = calculateAgeFromDate(child.date_of_birth);
         const parentLinks = getLinkedParentsForFamilyMember(child);
@@ -6320,7 +6719,7 @@
         // Row subtitle for child card
         clone.querySelectorAll('[data-row-email]').forEach(el => {
           const parts = [];
-          if (child.gender) parts.push(child.gender);
+          if (childGender) parts.push(childGender);
           if (currentAge !== null) parts.push(`Age: ${currentAge}`);
           if (parentLinks.length) parts.push(`Parent: ${parentSummary}`);
           el.textContent = parts.join(' · ') || '';
@@ -6331,10 +6730,10 @@
         });
 
         // KYC badge → show child KYC status
-        const childKycStatus = normalizeKycStatusText(child.kyc_status || 'pending');
+        const childCertStatus = normalizeChildCertificateStatus(child.certificate_verification_status || 'pending');
         clone.querySelectorAll('[data-row-kyc]').forEach(el => {
-          el.textContent = childKycStatus === 'completed' ? 'Verified' : childKycStatus === 'rejected' ? 'Rejected' : 'Pending';
-          el.className = 'child-kyc-badge ' + childKycStatus;
+          el.textContent = getChildCertificateStatusLabel(childCertStatus);
+          el.className = 'child-kyc-badge ' + childCertStatus;
         });
 
         // Signed in today badge → hide
@@ -6384,17 +6783,21 @@
             const linkedParentIds = parentLinks.length
               ? parentLinks.map((p) => p.id).join(', ')
               : '-';
-            const kycLabel = childKycStatus === 'completed' ? 'Verified' : childKycStatus === 'rejected' ? 'Rejected' : 'Pending';
+            const linkedParentMintNumbers = parentLinks.length
+              ? parentLinks.map((p) => p.mintNumber || '-').join(', ')
+              : '-';
+            const certificateLabel = getChildCertificateStatusLabel(childCertStatus);
             const detailData = [
               { label: 'Linked Parent(s)', value: linkedParentNames },
               { label: 'Parent UID(s)', value: linkedParentIds },
+              { label: 'Parent Mint Number(s)', value: linkedParentMintNumbers },
               { label: 'Relationship', value: child.relationship || '-' },
-              { label: 'Gender', value: child.gender || '-' },
+              { label: 'Gender', value: childGender || '-' },
               { label: 'Current Age', value: currentAge !== null ? String(currentAge) : '-' },
               { label: 'ID Number', value: child.id_number || '-' },
               { label: 'Mint Number', value: child.mint_number || '-' },
               { label: 'Balance', value: child.available_balance != null ? `R ${Number(child.available_balance).toFixed(2)}` : 'R 0.00' },
-              { label: 'KYC Status', value: kycLabel },
+              { label: 'Certificate Status', value: certificateLabel },
               { label: 'Created', value: child.created_at || '-' },
             ];
             // Clear existing rows and rebuild
@@ -6412,19 +6815,25 @@
             certRow.className = 'detail-row';
             const certUrl = child.certificate_url || '';
             if (certUrl) {
-              certRow.innerHTML = `<div class="detail-label">Certificate</div><div class="detail-value"><button class="cert-view-btn" type="button" data-cert-review data-child-id="${escapeHtml(String(child.id))}" data-cert-url="${escapeHtml(certUrl)}" data-child-name="${escapeHtml(fullName)}" data-child-kyc="${escapeHtml(childKycStatus)}"><i class="fa-solid fa-file-certificate" aria-hidden="true"></i> View Certificate</button></div>`;
+              certRow.innerHTML = `<div class="detail-label">Certificate</div><div class="detail-value"><button class="cert-view-btn" type="button" data-cert-review data-child-id="${escapeHtml(String(child.id))}" data-cert-url="${escapeHtml(certUrl)}" data-child-name="${escapeHtml(fullName)}" data-child-kyc="${escapeHtml(childCertStatus)}"><i class="fa-solid fa-file-certificate" aria-hidden="true"></i> View Certificate</button></div>`;
             } else {
               certRow.innerHTML = `<div class="detail-label">Certificate</div><div class="detail-value" style="color:#9ca3af;">No certificate uploaded</div>`;
             }
             fragment.appendChild(certRow);
 
-            // Accept/Reject action row (only for pending children with certificate)
-            if (childKycStatus === 'pending' && certUrl) {
+            // Action row follows certificate decision state
+            if (childCertStatus === 'pending' && certUrl) {
               const actionRow = document.createElement('div');
               actionRow.className = 'detail-row';
               actionRow.style.cssText = 'padding-top:8px;';
               actionRow.innerHTML = `<div class="detail-label">Actions</div><div class="detail-value" style="display:flex;gap:8px;"><button class="cert-btn cert-btn-accept" type="button" style="padding:5px 14px;font-size:0.78rem;" data-child-accept="${escapeHtml(String(child.id))}">Accept</button><button class="cert-btn cert-btn-reject" type="button" style="padding:5px 14px;font-size:0.78rem;" data-child-reject="${escapeHtml(String(child.id))}">Reject</button></div>`;
               fragment.appendChild(actionRow);
+            } else if (childCertStatus === 'rejected' && certUrl) {
+              const reevaluateRow = document.createElement('div');
+              reevaluateRow.className = 'detail-row';
+              reevaluateRow.style.cssText = 'padding-top:8px;';
+              reevaluateRow.innerHTML = `<div class="detail-label">Actions</div><div class="detail-value" style="display:flex;flex-direction:column;gap:8px;"><span class="cert-status-note">Rejected by admin</span><button class="cert-btn cert-btn-reevaluate" type="button" style="padding:6px 16px;align-self:flex-start;" data-child-reevaluate="${escapeHtml(String(child.id))}">Re-evaluate</button></div>`;
+              fragment.appendChild(reevaluateRow);
             }
 
             detailCards[0].appendChild(fragment);
@@ -6435,6 +6844,153 @@
           if (mandateCard) mandateCard.style.display = 'none';
           const csCard = leftColumn.querySelector('[data-computershare-actions]');
           if (csCard) csCard.style.display = 'none';
+        }
+
+        // ── Right column: hydrate history, hide irrelevant tabs, add download pack ──
+        const rightColumn = clone.querySelector('.right-column');
+        if (rightColumn) {
+          // Hide KYC tab, Pack tab, Documents tab — not relevant for children
+          const kycTab = rightColumn.querySelector('[data-kyc]');
+          if (kycTab) kycTab.style.display = 'none';
+          const packTab = rightColumn.querySelector('[data-pack]');
+          if (packTab) packTab.style.display = 'none';
+          const docsBtn = rightColumn.querySelector('[data-images]');
+          if (docsBtn) {
+            docsBtn.style.display = '';
+            docsBtn.dataset.childDocs = 'true';
+            docsBtn.dataset.childId = String(child.id || '');
+            docsBtn.dataset.childName = fullName;
+            docsBtn.dataset.childIdNumber = String(child.id_number || '');
+            docsBtn.dataset.childLinkedUserId = String(child.linked_user_id || '');
+            docsBtn.dataset.childCertUrl = String(child.certificate_url || '');
+          }
+          const reviewPulse = rightColumn.querySelector('.tabs-header-status');
+          if (reviewPulse) reviewPulse.style.display = 'none';
+
+          // Show holdings tab (children can have strategy/stock holdings via linked_user_id)
+          const holdingsTab = rightColumn.querySelector('[data-view="holdings"]');
+          if (holdingsTab) holdingsTab.style.display = '';
+          const packDetailsTab = rightColumn.querySelector('[data-view="pack-details"]');
+          if (packDetailsTab) {
+            packDetailsTab.textContent = '↓ Download Pack';
+            packDetailsTab.dataset.childDownloadPack = String(child.id);
+            packDetailsTab.removeAttribute('data-view');
+          }
+
+          // ── Hydrate history timeline with real family_transactions ──
+          const historyView = rightColumn.querySelector('.history-view');
+          if (historyView) {
+            const childParentIds = [child.primary_user_id, child.parent_id]
+              .map((id) => String(id || '').trim())
+              .filter(Boolean);
+
+            // Primary link: member_id references family_members.id (expected schema)
+            // Fallback link: parent-level rows that may not have member_id populated yet.
+            const childTxs = allFamilyTransactions.filter((tx) => {
+              const txMemberId = String(tx.member_id || '').trim();
+              const txParentId = String(tx.parent_id || '').trim();
+              if (txMemberId && txMemberId === String(child.id)) return true;
+              return !txMemberId && childParentIds.includes(txParentId);
+            });
+
+            if (!childTxs.length) {
+              historyView.innerHTML = `
+                <h2 class="timeline-header">Transaction History</h2>
+                <div style="text-align:center;padding:40px 20px;color:#94a3b8;">
+                  <svg viewBox="0 0 24 24" width="40" height="40" fill="#d1d5db" style="margin-bottom:10px;"><path d="M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 117 7c-1.93 0-3.68-.78-4.95-2.05l-1.41 1.41A8.96 8.96 0 0013 21a9 9 0 000-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+                  <div style="font-size:13px;font-weight:500;">No transactions yet</div>
+                  <div style="font-size:11.5px;margin-top:4px;color:#b0b7c5;">Transactions will appear here once activity begins.</div>
+                  <div style="font-size:10.5px;margin-top:8px;color:#c0c7d4;">Loaded transactions: ${allFamilyTransactions.length}</div>
+                </div>`;
+            } else {
+              const txTypeConfig = {
+                allowance: { icon: '💰', color: '#22c55e', label: 'Allowance' },
+                investment: { icon: '📈', color: '#7c3aed', label: 'Investment' },
+                member_joined: { icon: '👤', color: '#3b82f6', label: 'Member Joined' },
+                goal_funding: { icon: '🎯', color: '#f59e0b', label: 'Goal Funding' },
+              };
+
+              let txRows = '';
+              childTxs.forEach(tx => {
+                const cfg = txTypeConfig[tx.type] || { icon: '📋', color: '#6b7280', label: tx.type || 'Transaction' };
+                const amt = Number(tx.amount || 0);
+                const amtStr = amt >= 0 ? `+R ${amt.toFixed(2)}` : `-R ${Math.abs(amt).toFixed(2)}`;
+                const amtColor = amt >= 0 ? '#22c55e' : '#ef4444';
+                const dateStr = tx.created_at ? new Date(tx.created_at).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+                const statusBadge = tx.status === 'completed'
+                  ? '<span style="background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:600;">Completed</span>'
+                  : `<span style="background:#fef3c7;color:#b45309;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:600;">${escapeHtml(tx.status || 'unknown')}</span>`;
+
+                txRows += `<tr>
+                  <td style="white-space:nowrap;">${cfg.icon} ${escapeHtml(cfg.label)}</td>
+                  <td style="font-weight:600;color:${amtColor};white-space:nowrap;">${amtStr}</td>
+                  <td>${escapeHtml(tx.description || '-')}</td>
+                  <td>${escapeHtml(tx.strategy || '-')}</td>
+                  <td>${statusBadge}</td>
+                  <td style="color:#94a3b8;white-space:nowrap;">${dateStr}</td>
+                </tr>`;
+              });
+
+              historyView.innerHTML = `
+                <h2 class="timeline-header">Transaction History</h2>
+                <div style="overflow-x:auto;">
+                  <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+                    <thead>
+                      <tr style="text-align:left;border-bottom:2px solid #e8e8f0;">
+                        <th style="padding:8px 10px;color:#64748b;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Type</th>
+                        <th style="padding:8px 10px;color:#64748b;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Amount</th>
+                        <th style="padding:8px 10px;color:#64748b;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Description</th>
+                        <th style="padding:8px 10px;color:#64748b;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Strategy</th>
+                        <th style="padding:8px 10px;color:#64748b;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Status</th>
+                        <th style="padding:8px 10px;color:#64748b;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>${txRows}</tbody>
+                  </table>
+                </div>`;
+            }
+
+            // Add table row styling
+            const tbody = historyView.querySelector('tbody');
+            if (tbody) {
+              tbody.querySelectorAll('tr').forEach(tr => {
+                tr.style.borderBottom = '1px solid #f1f5f9';
+                tr.querySelectorAll('td').forEach(td => {
+                  td.style.padding = '10px 10px';
+                  td.style.verticalAlign = 'middle';
+                });
+                tr.addEventListener('mouseenter', () => tr.style.background = '#f8fafc');
+                tr.addEventListener('mouseleave', () => tr.style.background = 'transparent');
+              });
+            }
+          }
+
+          // ── Hydrate holdings view using the child's linked auth user ID ──
+          if (child.linked_user_id) {
+            renderHoldingsForItem(clone, child.linked_user_id);
+          } else {
+            // No linked auth account — clear placeholder cards and show empty state
+            const hv = clone.querySelector('.holdings-view');
+            if (hv) {
+              const strategyContainer = hv.querySelector('[data-holdings-strategy]');
+              const stocksContainer = hv.querySelector('[data-holdings-stocks]');
+              const emptyStateEl = hv.querySelector('[data-holdings-empty]');
+              const summaryEl = hv.querySelector('[data-holdings-summary]');
+              const sections = Array.from(hv.querySelectorAll('.holdings-section'));
+              if (strategyContainer) strategyContainer.innerHTML = '';
+              if (stocksContainer) stocksContainer.innerHTML = '';
+              if (summaryEl) summaryEl.textContent = 'No holdings';
+              if (emptyStateEl) emptyStateEl.classList.add('active');
+              sections.forEach(s => { s.style.display = 'none'; });
+            }
+          }
+        }
+
+        if (expandedProfileIds.has(String(child.id))) {
+          const detailsEl = clone.querySelector('.detailed-view');
+          const btnEl = clone.querySelector('.show-details-btn');
+          if (detailsEl) detailsEl.classList.add('active');
+          if (btnEl) btnEl.classList.add('is-open');
         }
 
         profilesList.appendChild(clone);
@@ -6448,11 +7004,19 @@
     const certModalClose = document.getElementById('certModalClose');
     const certModalCancelBtn = document.getElementById('certModalCancelBtn');
     const certModalDownloadBtn = document.getElementById('certModalDownloadBtn');
+    const certModalDecisionNote = document.getElementById('certModalDecisionNote');
+    const certModalReevaluateBtn = document.getElementById('certModalReevaluateBtn');
     const certModalAcceptBtn = document.getElementById('certModalAcceptBtn');
     const certModalRejectBtn = document.getElementById('certModalRejectBtn');
+    const childDocsOverlay = document.getElementById('childDocsOverlay');
+    const childDocsTitle = document.getElementById('childDocsTitle');
+    const childDocsBody = document.getElementById('childDocsBody');
+    const childDocsClose = document.getElementById('childDocsClose');
+    const childDocsCancel = document.getElementById('childDocsCancel');
     let certModalChildId = null;
     let certModalResolvedUrl = null;
     let certModalBlobUrl = null;
+    const CHILD_DOC_BUCKETS = ['birth-certificates', 'signed-agreements'];
 
     const filenameFromUrl = (url, fallback = 'certificate') => {
       try {
@@ -6462,6 +7026,229 @@
       } catch {
         return fallback;
       }
+    };
+
+    const parseStoragePointerFromUrl = (rawUrl) => {
+      if (!rawUrl) return null;
+      const value = String(rawUrl).trim();
+      if (!value) return null;
+
+      if (value.startsWith('storage://')) {
+        const withoutScheme = value.slice('storage://'.length);
+        const slashIdx = withoutScheme.indexOf('/');
+        if (slashIdx <= 0) return null;
+        return {
+          bucket: withoutScheme.slice(0, slashIdx),
+          path: withoutScheme.slice(slashIdx + 1)
+        };
+      }
+
+      if (value.startsWith('http://') || value.startsWith('https://')) {
+        try {
+          const parsed = new URL(value);
+          const marker = '/storage/v1/object/';
+          const markerIdx = parsed.pathname.indexOf(marker);
+          if (markerIdx !== -1) {
+            const rest = parsed.pathname.slice(markerIdx + marker.length);
+            const parts = rest.split('/').filter(Boolean);
+            if (parts[0] === 'public' && parts.length >= 3) {
+              const bucket = parts[1];
+              const path = parts.slice(2).join('/');
+              return { bucket, path: decodeURIComponent(path) };
+            }
+            if (parts[0] === 'sign' && parts.length >= 4) {
+              const bucket = parts[2];
+              const path = parts.slice(3).join('/');
+              return { bucket, path: decodeURIComponent(path) };
+            }
+          }
+        } catch {
+          return null;
+        }
+      }
+
+      const slashIdx = value.indexOf('/');
+      if (slashIdx > 0) {
+        return { bucket: value.slice(0, slashIdx), path: value.slice(slashIdx + 1) };
+      }
+
+      return null;
+    };
+
+    const resolveBucketObjectUrl = async (bucket, filePath) => {
+      if (!bucket || !filePath) return null;
+      const { data, error } = await supabaseClient.storage
+        .from(bucket)
+        .createSignedUrl(filePath, 60 * 60);
+
+      if (!error && data?.signedUrl) return data.signedUrl;
+
+      const { data: publicData } = supabaseClient.storage
+        .from(bucket)
+        .getPublicUrl(filePath);
+      return publicData?.publicUrl || null;
+    };
+
+    const listBucketFilesRecursive = async (bucket, rootPath = '', maxDepth = 3) => {
+      const files = [];
+      const queue = [{ path: rootPath, depth: 0 }];
+      let visited = 0;
+      const VISIT_LIMIT = 900;
+
+      while (queue.length) {
+        const current = queue.shift();
+        if (!current || current.depth > maxDepth || visited >= VISIT_LIMIT) continue;
+        visited += 1;
+
+        const { data, error } = await supabaseClient.storage
+          .from(bucket)
+          .list(current.path, {
+            limit: 200,
+            offset: 0,
+            sortBy: { column: 'updated_at', order: 'desc' }
+          });
+
+        if (error || !Array.isArray(data)) continue;
+
+        data.forEach((entry) => {
+          if (!entry?.name) return;
+          const nextPath = current.path ? `${current.path}/${entry.name}` : entry.name;
+          const isFile = Boolean(entry.id) || Boolean(entry.metadata);
+          if (isFile) {
+            files.push({
+              bucket,
+              path: nextPath,
+              name: entry.name,
+              created_at: entry.created_at || '',
+              updated_at: entry.updated_at || ''
+            });
+          } else if (current.depth < maxDepth) {
+            queue.push({ path: nextPath, depth: current.depth + 1 });
+          }
+        });
+      }
+
+      return files;
+    };
+
+    const buildChildDocTokens = (child) => {
+      const tokens = new Set();
+      const addToken = (value) => {
+        const token = String(value || '').trim().toLowerCase();
+        if (!token) return;
+        if (token.length < 3) return;
+        tokens.add(token);
+        tokens.add(token.replace(/\s+/g, ''));
+      };
+
+      addToken(child.id);
+      addToken(child.linked_user_id);
+      addToken(child.id_number);
+      addToken(child.first_name);
+      addToken(child.last_name);
+      addToken([child.first_name, child.last_name].filter(Boolean).join(' '));
+
+      return Array.from(tokens);
+    };
+
+    const getChildDocuments = async (child) => {
+      const results = [];
+      const seen = new Set();
+      const tokens = buildChildDocTokens(child);
+
+      const addDoc = (doc) => {
+        if (!doc?.bucket || !doc?.path) return;
+        const key = `${doc.bucket}::${doc.path}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        results.push(doc);
+      };
+
+      const certPointer = parseStoragePointerFromUrl(child.certificate_url || '');
+      if (certPointer?.bucket && certPointer?.path) {
+        addDoc({
+          bucket: certPointer.bucket,
+          path: certPointer.path,
+          name: certPointer.path.split('/').pop() || 'certificate',
+          created_at: '',
+          updated_at: '',
+          source: 'certificate_url'
+        });
+      }
+
+      const bucketFiles = await Promise.all(CHILD_DOC_BUCKETS.map((bucket) => listBucketFilesRecursive(bucket, '', 3)));
+      bucketFiles.flat().forEach((doc) => {
+        const haystack = `${doc.path} ${doc.name}`.toLowerCase();
+        const matched = tokens.some((token) => haystack.includes(token));
+        if (matched) addDoc(doc);
+      });
+
+      results.sort((a, b) => new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime());
+      return results;
+    };
+
+    const renderChildDocsBody = (docs) => {
+      if (!childDocsBody) return;
+      if (!docs.length) {
+        childDocsBody.innerHTML = '<div class="child-docs-empty">No child-specific documents found in birth-certificates or signed-agreements.</div>';
+        return;
+      }
+
+      const rows = docs.map((doc, idx) => {
+        const updated = doc.updated_at || doc.created_at;
+        const updatedLabel = updated
+          ? new Date(updated).toLocaleString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+          : '-';
+        return `<tr class="child-docs-row">
+          <td><span class="child-doc-bucket">${escapeHtml(doc.bucket)}</span></td>
+          <td>${escapeHtml(doc.name || '-')}</td>
+          <td style="color:#64748b;">${escapeHtml(doc.path)}</td>
+          <td style="white-space:nowrap;color:#94a3b8;">${escapeHtml(updatedLabel)}</td>
+          <td>
+            <span class="child-doc-actions">
+              <button type="button" class="child-doc-action-btn" data-child-doc-open="${idx}">Open</button>
+              <button type="button" class="child-doc-action-btn" data-child-doc-download="${idx}">Download</button>
+            </span>
+          </td>
+        </tr>`;
+      }).join('');
+
+      childDocsBody.innerHTML = `<table class="child-docs-list">
+        <thead>
+          <tr>
+            <th>Bucket</th>
+            <th>File</th>
+            <th>Path</th>
+            <th>Updated</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    };
+
+    let childDocsEntries = [];
+
+    const openChildDocsModal = async (child) => {
+      if (!childDocsOverlay || !childDocsBody) return;
+      if (childDocsTitle) {
+        const childName = [child.first_name, child.last_name].filter(Boolean).join(' ') || 'Unknown Child';
+        childDocsTitle.textContent = `Documents — ${childName}`;
+      }
+      childDocsOverlay.classList.add('active');
+      childDocsBody.innerHTML = '<div class="child-docs-empty">Loading child documents...</div>';
+      try {
+        childDocsEntries = await getChildDocuments(child);
+        renderChildDocsBody(childDocsEntries);
+      } catch (error) {
+        console.error('Failed to load child documents:', error);
+        childDocsBody.innerHTML = '<div class="child-docs-empty">Could not load documents for this child.</div>';
+      }
+    };
+
+    const closeChildDocsModal = () => {
+      childDocsEntries = [];
+      if (childDocsOverlay) childDocsOverlay.classList.remove('active');
     };
 
     // Resolve a storage:// URI or Supabase public/signed URL to a fetchable HTTPS URL
@@ -6534,9 +7321,13 @@
       if (certModalDownloadBtn) certModalDownloadBtn.style.display = 'none';
 
       // Show/hide accept/reject based on current KYC status
-      const isPending = childKyc === 'pending';
+      const certDecisionStatus = normalizeChildCertificateStatus(childKyc);
+      const isPending = certDecisionStatus === 'pending';
+      const isRejected = certDecisionStatus === 'rejected';
       if (certModalAcceptBtn) certModalAcceptBtn.style.display = isPending ? '' : 'none';
       if (certModalRejectBtn) certModalRejectBtn.style.display = isPending ? '' : 'none';
+      if (certModalDecisionNote) certModalDecisionNote.style.display = isRejected ? '' : 'none';
+      if (certModalReevaluateBtn) certModalReevaluateBtn.style.display = isRejected ? '' : 'none';
 
       // Resolve storage:// URIs to a signed HTTPS URL
       const resolvedUrl = await resolveStorageUrl(certUrl);
@@ -6592,6 +7383,13 @@
         if (e.target === certModalOverlay) closeCertModal();
       });
     }
+    if (childDocsClose) childDocsClose.addEventListener('click', closeChildDocsModal);
+    if (childDocsCancel) childDocsCancel.addEventListener('click', closeChildDocsModal);
+    if (childDocsOverlay) {
+      childDocsOverlay.addEventListener('click', (e) => {
+        if (e.target === childDocsOverlay) closeChildDocsModal();
+      });
+    }
     if (certModalDownloadBtn) {
       certModalDownloadBtn.addEventListener('click', async () => {
         if (!certModalResolvedUrl) return;
@@ -6614,6 +7412,27 @@
       });
     }
 
+
+    // Update certificate_verification_status without mutating KYC review status
+    const updateChildCertificateStatus = async (childId, nextStatus = 'verified') => {
+      const normalizedStatus = normalizeChildCertificateStatus(nextStatus);
+      const { error } = await supabaseClient
+        .from('family_members')
+        .update({
+          certificate_verification_status: normalizedStatus
+        })
+        .eq('id', childId);
+
+      if (error) throw error;
+
+      // Update local state
+      const member = allFamilyMembers.find(m => String(m.id) === String(childId));
+      if (member) {
+        member.certificate_verification_status = normalizedStatus;
+      }
+    };
+
+    // (Keep the original updateChildKycStatus for KYC changes)
     const updateChildKycStatus = async (childId, newStatus) => {
       const { data: sessionData } = await supabaseClient.auth.getSession();
       const userId = sessionData?.session?.user?.id;
@@ -6638,36 +7457,66 @@
       }
     };
 
-    const handleChildKycAction = async (childId, action) => {
-      const newStatus = action === 'accept' ? 'completed' : 'rejected';
-      const actionLabel = action === 'accept' ? 'Accepting' : 'Rejecting';
-      const btn = action === 'accept' ? certModalAcceptBtn : certModalRejectBtn;
-      const otherBtn = action === 'accept' ? certModalRejectBtn : certModalAcceptBtn;
+    const handleChildCertificateAction = async (childId, action) => {
+      const statusByAction = {
+        accept: 'verified',
+        reject: 'rejected',
+        reevaluate: 'pending'
+      };
+      const actionLabelByAction = {
+        accept: 'Accepting',
+        reject: 'Rejecting',
+        reevaluate: 'Re-evaluating'
+      };
+      const buttonByAction = {
+        accept: certModalAcceptBtn,
+        reject: certModalRejectBtn,
+        reevaluate: certModalReevaluateBtn
+      };
+
+      const newStatus = statusByAction[action] || 'pending';
+      const actionLabel = actionLabelByAction[action] || 'Updating';
+      const btn = buttonByAction[action] || null;
+      const otherBtns = [certModalAcceptBtn, certModalRejectBtn, certModalReevaluateBtn].filter(Boolean).filter((candidate) => candidate !== btn);
 
       if (btn) { btn.disabled = true; btn.textContent = `${actionLabel}...`; }
-      if (otherBtn) otherBtn.disabled = true;
+      otherBtns.forEach((otherBtn) => { otherBtn.disabled = true; });
 
       try {
-        await updateChildKycStatus(childId, newStatus);
+        await updateChildCertificateStatus(childId, newStatus);
         closeCertModal();
+        expandedProfileIds.add(String(childId));
         applySearchFilter();
       } catch (err) {
-        console.error(`Child KYC ${action} failed:`, err);
-        alert(`Failed to ${action} child: ${err.message || 'Unknown error'}`);
+        console.error(`Child certificate ${action} failed:`, err);
+        alert(`Failed to ${action} certificate: ${err.message || 'Unknown error'}`);
       } finally {
-        if (btn) { btn.disabled = false; btn.textContent = action === 'accept' ? 'Accept' : 'Reject'; }
-        if (otherBtn) otherBtn.disabled = false;
+        const labelByAction = {
+          accept: 'Accept',
+          reject: 'Reject',
+          reevaluate: 'Re-evaluate'
+        };
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = labelByAction[action] || 'Update';
+        }
+        otherBtns.forEach((otherBtn) => { otherBtn.disabled = false; });
       }
     };
 
     if (certModalAcceptBtn) {
       certModalAcceptBtn.addEventListener('click', () => {
-        if (certModalChildId) handleChildKycAction(certModalChildId, 'accept');
+        if (certModalChildId) handleChildCertificateAction(certModalChildId, 'accept');
       });
     }
     if (certModalRejectBtn) {
       certModalRejectBtn.addEventListener('click', () => {
-        if (certModalChildId) handleChildKycAction(certModalChildId, 'reject');
+        if (certModalChildId) handleChildCertificateAction(certModalChildId, 'reject');
+      });
+    }
+    if (certModalReevaluateBtn) {
+      certModalReevaluateBtn.addEventListener('click', () => {
+        if (certModalChildId) handleChildCertificateAction(certModalChildId, 'reevaluate');
       });
     }
 
@@ -6685,14 +7534,71 @@
         return;
       }
 
+      const childDocOpenBtn = e.target.closest('[data-child-doc-open]');
+      if (childDocOpenBtn) {
+        e.preventDefault();
+        const index = Number(childDocOpenBtn.dataset.childDocOpen || '-1');
+        const doc = childDocsEntries[index];
+        if (!doc) return;
+        resolveBucketObjectUrl(doc.bucket, doc.path)
+          .then((url) => {
+            if (!url) throw new Error('Could not resolve document URL');
+            window.open(url, '_blank', 'noopener,noreferrer');
+          })
+          .catch((error) => {
+            console.error('Open child document failed:', error);
+            alert('Could not open this document. Please check storage permissions.');
+          });
+        return;
+      }
+
+      const childDocDownloadBtn = e.target.closest('[data-child-doc-download]');
+      if (childDocDownloadBtn) {
+        e.preventDefault();
+        const index = Number(childDocDownloadBtn.dataset.childDocDownload || '-1');
+        const doc = childDocsEntries[index];
+        if (!doc) return;
+        const original = childDocDownloadBtn.textContent;
+        childDocDownloadBtn.disabled = true;
+        childDocDownloadBtn.textContent = 'Downloading...';
+
+        resolveBucketObjectUrl(doc.bucket, doc.path)
+          .then(async (url) => {
+            if (!url) throw new Error('Could not resolve document URL');
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = doc.name || 'document';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(blobUrl);
+          })
+          .catch((error) => {
+            console.error('Download child document failed:', error);
+            alert('Could not download this document. Please check storage permissions.');
+          })
+          .finally(() => {
+            childDocDownloadBtn.disabled = false;
+            childDocDownloadBtn.textContent = original;
+          });
+        return;
+      }
+
       const acceptBtn = e.target.closest('[data-child-accept]');
       if (acceptBtn) {
         e.preventDefault();
         const childId = acceptBtn.dataset.childAccept;
         acceptBtn.disabled = true;
         acceptBtn.textContent = 'Accepting...';
-        updateChildKycStatus(childId, 'completed')
-          .then(() => applySearchFilter())
+        updateChildCertificateStatus(childId, 'verified')
+          .then(() => {
+            expandedProfileIds.add(String(childId));
+            applySearchFilter();
+          })
           .catch((err) => {
             console.error('Accept failed:', err);
             alert('Failed to accept: ' + (err.message || 'Unknown error'));
@@ -6708,14 +7614,251 @@
         const childId = rejectBtn.dataset.childReject;
         rejectBtn.disabled = true;
         rejectBtn.textContent = 'Rejecting...';
-        updateChildKycStatus(childId, 'rejected')
-          .then(() => applySearchFilter())
+        updateChildCertificateStatus(childId, 'rejected')
+          .then(() => {
+            expandedProfileIds.add(String(childId));
+            applySearchFilter();
+          })
           .catch((err) => {
             console.error('Reject failed:', err);
             alert('Failed to reject: ' + (err.message || 'Unknown error'));
             rejectBtn.disabled = false;
             rejectBtn.textContent = 'Reject';
           });
+        return;
+      }
+
+      const reevaluateBtn = e.target.closest('[data-child-reevaluate]');
+      if (reevaluateBtn) {
+        e.preventDefault();
+        const childId = reevaluateBtn.dataset.childReevaluate;
+        reevaluateBtn.disabled = true;
+        reevaluateBtn.textContent = 'Re-evaluating...';
+        updateChildCertificateStatus(childId, 'pending')
+          .then(() => {
+            expandedProfileIds.add(String(childId));
+            applySearchFilter();
+          })
+          .catch((err) => {
+            console.error('Re-evaluate failed:', err);
+            alert('Failed to re-evaluate: ' + (err.message || 'Unknown error'));
+            reevaluateBtn.disabled = false;
+            reevaluateBtn.textContent = 'Re-evaluate';
+          });
+        return;
+      }
+
+      // ── Download Pack for child: certificate + formatted PDF ──
+      const downloadPackBtn = e.target.closest('[data-child-download-pack]');
+      if (downloadPackBtn) {
+        e.preventDefault();
+        const childId = downloadPackBtn.dataset.childDownloadPack;
+        const child = allFamilyMembers.find(m => String(m.id) === String(childId));
+        if (!child) return;
+
+        const originalText = downloadPackBtn.textContent;
+        downloadPackBtn.disabled = true;
+        downloadPackBtn.textContent = 'Preparing…';
+
+        (async () => {
+          try {
+            const JsPdfCtor = await ensureJsPdfLoaded();
+            const JsZip = window.JSZip;
+            if (!JsPdfCtor) throw new Error('Could not load jsPDF');
+            if (!JsZip) throw new Error('Could not load JSZip');
+
+            const zip = new JsZip();
+            const fullName = [child.first_name, child.last_name].filter(Boolean).join(' ') || 'Unknown Child';
+            const childGender = normalizeChildGenderDisplay(child.gender, child.id_number);
+            const safeFileName = fullName.replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
+            const parentLinks = getLinkedParentsForFamilyMember(child);
+            const currentAge = calculateAgeFromDate(child.date_of_birth);
+            const childKyc = normalizeKycStatusText(child.kyc_status || 'pending');
+            const kycLabel = childKyc === 'completed' ? 'Verified' : childKyc === 'rejected' ? 'Rejected' : 'Pending';
+
+            // ── Build PDF with child details ──
+            const doc = new JsPdfCtor({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const pageW = doc.internal.pageSize.getWidth();
+            let y = 20;
+
+            // Header bar
+            doc.setFillColor(124, 58, 237);
+            doc.rect(0, 0, pageW, 35, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(20);
+            doc.setFont(undefined, 'bold');
+            doc.text('MyMint — Child Profile', 15, 23);
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Generated: ${new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })}`, pageW - 15, 23, { align: 'right' });
+
+            y = 48;
+            doc.setTextColor(15, 23, 42);
+            doc.setFontSize(16);
+            doc.setFont(undefined, 'bold');
+            doc.text(fullName, 15, y);
+            y += 10;
+
+            // Child details table
+            const details = [
+              ['Full Name', fullName],
+              ['Date of Birth', child.date_of_birth || '-'],
+              ['Current Age', currentAge !== null ? `${currentAge} years` : '-'],
+              ['Gender', childGender || '-'],
+              ['ID Number', child.id_number || '-'],
+              ['Mint Number', child.mint_number || '-'],
+              ['Relationship', child.relationship || '-'],
+              ['Available Balance', child.available_balance != null ? `R ${Number(child.available_balance).toFixed(2)}` : 'R 0.00'],
+              ['KYC Status', kycLabel],
+              ['Linked Parent(s)', parentLinks.length ? parentLinks.map(p => p.name).join(', ') : 'Unknown'],
+              ['Parent UID(s)', parentLinks.length ? parentLinks.map(p => p.id).join(', ') : '-'],
+              ['Certificate', child.certificate_url ? 'Uploaded' : 'Not uploaded'],
+              ['Created', child.created_at ? new Date(child.created_at).toLocaleDateString('en-ZA') : '-'],
+              ['Last Updated', child.updated_at ? new Date(child.updated_at).toLocaleDateString('en-ZA') : '-'],
+            ];
+
+            doc.setFontSize(10);
+            const colLabelX = 15;
+            const colValueX = 70;
+            const rowH = 8;
+
+            // Table header
+            doc.setFillColor(248, 249, 252);
+            doc.rect(10, y - 1, pageW - 20, rowH, 'F');
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(100, 116, 139);
+            doc.text('Field', colLabelX, y + 5);
+            doc.text('Value', colValueX, y + 5);
+            y += rowH + 2;
+
+            doc.setFont(undefined, 'normal');
+            doc.setTextColor(15, 23, 42);
+            details.forEach(([label, value], idx) => {
+              if (y > 270) {
+                doc.addPage();
+                y = 20;
+              }
+              if (idx % 2 === 0) {
+                doc.setFillColor(248, 250, 252);
+                doc.rect(10, y - 1, pageW - 20, rowH, 'F');
+              }
+              doc.setFont(undefined, 'bold');
+              doc.setTextColor(71, 85, 105);
+              doc.text(String(label), colLabelX, y + 5);
+              doc.setFont(undefined, 'normal');
+              doc.setTextColor(15, 23, 42);
+              // Truncate long values
+              const valStr = String(value);
+              const maxW = pageW - colValueX - 15;
+              const truncated = doc.getTextWidth(valStr) > maxW
+                ? doc.splitTextToSize(valStr, maxW)[0]
+                : valStr;
+              doc.text(truncated, colValueX, y + 5);
+              y += rowH;
+            });
+
+            // Transaction history section
+            const childTxs = allFamilyTransactions.filter(tx => String(tx.member_id) === String(childId));
+            if (childTxs.length) {
+              y += 10;
+              if (y > 250) { doc.addPage(); y = 20; }
+              doc.setFontSize(14);
+              doc.setFont(undefined, 'bold');
+              doc.setTextColor(15, 23, 42);
+              doc.text('Transaction History', 15, y);
+              y += 8;
+
+              doc.setFontSize(9);
+              // Table header
+              doc.setFillColor(248, 249, 252);
+              doc.rect(10, y - 1, pageW - 20, 7, 'F');
+              doc.setFont(undefined, 'bold');
+              doc.setTextColor(100, 116, 139);
+              const txCols = [15, 45, 75, 115, 145, 170];
+              doc.text('Type', txCols[0], y + 4);
+              doc.text('Amount', txCols[1], y + 4);
+              doc.text('Description', txCols[2], y + 4);
+              doc.text('Strategy', txCols[3], y + 4);
+              doc.text('Status', txCols[4], y + 4);
+              doc.text('Date', txCols[5], y + 4);
+              y += 8;
+
+              doc.setFont(undefined, 'normal');
+              doc.setTextColor(15, 23, 42);
+              childTxs.forEach((tx, idx) => {
+                if (y > 275) { doc.addPage(); y = 20; }
+                if (idx % 2 === 0) {
+                  doc.setFillColor(248, 250, 252);
+                  doc.rect(10, y - 1, pageW - 20, 7, 'F');
+                }
+                const amt = Number(tx.amount || 0);
+                doc.text(tx.type || '-', txCols[0], y + 4);
+                doc.text(`R ${amt.toFixed(2)}`, txCols[1], y + 4);
+                doc.text(String(tx.description || '-').slice(0, 25), txCols[2], y + 4);
+                doc.text(String(tx.strategy || '-').slice(0, 18), txCols[3], y + 4);
+                doc.text(tx.status || '-', txCols[4], y + 4);
+                doc.text(tx.created_at ? new Date(tx.created_at).toLocaleDateString('en-ZA') : '-', txCols[5], y + 4);
+                y += 7;
+              });
+            }
+
+            // Footer
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+              doc.setPage(i);
+              doc.setFontSize(8);
+              doc.setTextColor(148, 163, 184);
+              doc.text(`MyMint Admin — Confidential`, 15, 290);
+              doc.text(`Page ${i} of ${pageCount}`, pageW - 15, 290, { align: 'right' });
+            }
+
+            const pdfBlob = doc.output('blob');
+            zip.file(`${safeFileName}_Details.pdf`, pdfBlob);
+
+            // ── Download certificate if available ──
+            if (child.certificate_url) {
+              try {
+                const certResolvedUrl = await resolveStorageUrl(child.certificate_url);
+                if (certResolvedUrl) {
+                  const certResponse = await fetch(certResolvedUrl);
+                  if (certResponse.ok) {
+                    const certBlob = await certResponse.blob();
+                    const mime = String(certBlob.type || '');
+                    let ext = 'bin';
+                    if (mime.includes('pdf')) ext = 'pdf';
+                    else if (mime.includes('png')) ext = 'png';
+                    else if (mime.includes('jpeg') || mime.includes('jpg')) ext = 'jpg';
+                    else if (mime.includes('gif')) ext = 'gif';
+                    else if (mime.includes('webp')) ext = 'webp';
+                    else {
+                      const urlExt = child.certificate_url.split('.').pop()?.split('?')[0]?.toLowerCase();
+                      if (['pdf','png','jpg','jpeg','gif','webp'].includes(urlExt)) ext = urlExt;
+                    }
+                    zip.file(`${safeFileName}_Certificate.${ext}`, certBlob);
+                  }
+                }
+              } catch (certErr) {
+                console.warn('Could not download certificate for pack:', certErr);
+              }
+            }
+
+            // ── Generate and download ZIP ──
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(zipBlob);
+            link.download = `${safeFileName}_Pack.zip`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(link.href);
+          } catch (err) {
+            console.error('Download Pack error:', err);
+            alert('Failed to generate pack: ' + (err.message || 'Unknown error'));
+          } finally {
+            downloadPackBtn.disabled = false;
+            downloadPackBtn.textContent = originalText;
+          }
+        })();
         return;
       }
     });
@@ -7240,11 +8383,17 @@
             supabaseClient.from('stock_holdings_c').select('user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", as_of_date, strategy_id, strategy_name_snapshot, trade_side, is_active, created_at, updated_at').eq('is_active', true).eq('trade_side', 'BUY').in('user_id', userIds).order('updated_at', { ascending: false })
           ]);
 
-          // Fetch ALL family_members (not filtered by userIds) — RLS policy controls access
-          const familyRes = await supabaseClient
-            .from('family_members')
-            .select('id, primary_user_id, parent_id, linked_user_id, relationship, first_name, last_name, gender, date_of_birth, id_number, available_balance, avatar_url, avatar_color, mint_number, spouse_email, certificate_url, kyc_status, kyc_reviewed_by, kyc_reviewed_at, created_at, updated_at')
-            .order('created_at', { ascending: false });
+          // Fetch ALL family_members + transactions (not filtered by userIds) — RLS policy controls access
+          const [familyRes, familyTxRes] = await Promise.all([
+            supabaseClient
+              .from('family_members')
+              .select('id, primary_user_id, parent_id, linked_user_id, relationship, first_name, last_name, gender, date_of_birth, id_number, available_balance, avatar_url, avatar_color, mint_number, spouse_email, certificate_url, kyc_status, kyc_reviewed_by, kyc_reviewed_at, created_at, updated_at')
+              .order('created_at', { ascending: false }),
+            supabaseClient
+              .from('family_transactions')
+              .select('id, parent_id, member_id, type, amount, description, strategy, status, created_at')
+              .order('created_at', { ascending: false })
+          ]);
 
           if (!onboardingRes.error && onboardingRes.data) {
             kycMap = onboardingRes.data.reduce((acc, row) => {
@@ -7284,6 +8433,13 @@
           }
 
           allFamilyMembers = Object.values(familyRowsById);
+
+          if (!familyTxRes.error && Array.isArray(familyTxRes.data)) {
+            allFamilyTransactions = familyTxRes.data;
+          } else {
+            allFamilyTransactions = [];
+            if (familyTxRes.error) console.warn('family_transactions query error:', familyTxRes.error.message);
+          }
 
           allFamilyMembers.forEach((row) => {
             const relationship = normalizeKycStatusText(row.relationship || '');
@@ -8838,6 +9994,17 @@
 
         if (tab.dataset.images === 'true') {
           const item = tab.closest('.simple-item');
+
+          if (item?.dataset?.familyChild === 'true') {
+            const child = allFamilyMembers.find((row) => String(row.id) === String(item.dataset.profileId));
+            if (!child) {
+              console.warn('Child record not found for documents modal.');
+              return;
+            }
+            openChildDocsModal(child);
+            return;
+          }
+
           const externalUserId = item?.dataset?.externalUserId;
           if (!externalUserId) {
             console.warn('No Sumsub external user id found for this profile.');

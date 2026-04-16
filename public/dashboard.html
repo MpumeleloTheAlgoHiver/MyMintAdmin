@@ -748,7 +748,7 @@
 
         <span class="sidebar-section-label">System</span>
 
-        <a class="nav-icon" href="#" aria-label="Settings">
+        <a class="nav-icon" href="/settings.html" aria-label="Settings">
           <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
           Settings
         </a>
@@ -3101,7 +3101,7 @@
       let holdingsQuantityMap = {};
 
       /* ── Security Metrics Helper ──────────────────────────────────────────
-         Fetches the latest row from security_metrics for each given security ID
+         Fetches the latest row from security_metrics_c for each given security ID
          and returns an object keyed by security_id with columns mapped to the
          names the rest of the codebase expects.
          Column mapping:
@@ -3244,7 +3244,7 @@
             .limit(200),
         ]);
 
-        /* Load base security info (metrics now live in security_metrics table) */
+        /* Load base security info (metrics now live in security_metrics_c table) */
         const _secSelectVariants = [
           "id, symbol, name, logo_url",
           "id, symbol, name",
@@ -4145,7 +4145,7 @@
                 if (norm !== s.symbol) securitiesMap.set(norm, s);
               });
           });
-          /* Merge live metrics from security_metrics */
+          /* Merge live metrics from security_metrics_c */
           const _mapIds = [...new Set([...securitiesMap.values()].map(s => s.id).filter(Boolean))];
           const _mapMetrics = await fetchSecurityMetrics(_mapIds);
           for (const [sym, s] of securitiesMap.entries()) {
@@ -5182,7 +5182,7 @@
               .eq('status', 'posted')
               .gte('amount', 10000),
             sids.length
-              ? supabaseClient.from('security_metrics').select('security_id, last_close').in('security_id', sids).order('as_of_date', { ascending: false })
+              ? supabaseClient.from('security_metrics_c').select('security_id, last_close').in('security_id', sids).order('as_of_date', { ascending: false })
               : Promise.resolve({ data: [] })
           ];
           const [{ data: profs }, { data: txnRows }, { data: secRows }] = await Promise.all(fetches);
@@ -5827,6 +5827,20 @@
           if (r.created_at && new Date(r.created_at) < new Date(byUser[uid].inception))
             byUser[uid].inception = r.created_at;
         });
+
+        /* ── Merge pending buy-side rebalance clients ── */
+        if (pendingRebalance && pendingRebalance.events) {
+          pendingRebalance.events
+            .filter(ev => ev.trade_side === 'BUY' || ev.closed_reason === 'REBALANCE_EVENT_BUY' || ev.closed_reason === 'REBALANCE_EVENT_BUY_WALLET')
+            .forEach(ev => {
+              const uid = ev.user_id;
+              if (!byUser[uid]) {
+                byUser[uid] = { costBasis: 0, currentVal: 0, inception: new Date().toISOString(), pending: true };
+              }
+              /* Mark user as having pending allocations */
+              byUser[uid].pending = true;
+            });
+        }
 
         /* ── Full-amount formatter (no K/m abbreviation) ── */
         const fmtR = (v) => {
@@ -6765,7 +6779,7 @@
         if (!strategies.length) return;
 
         try {
-          /* stock_holdings has a strategy_id column — query it directly */
+          /* stock_holdings_c has a strategy_id column — query it directly */
           const { data: holdRows } = await supabaseClient
             .from("stock_holdings_c")
             .select("strategy_id")
@@ -7979,6 +7993,7 @@
       let rebSelectedStrategyId = null;
       let rebWalletByClient = {};   // userId -> stored credits balance
       let rebImpactChangeView = false;
+      let rebPendingRebalance = null; // {batchId, sellCode, buyCode, extraBuyCode, events[]}
 
       /* ── Helpers ── */
       const rebFmtZAR = n => `R\u00A0${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -8101,6 +8116,7 @@
         rebSelectedStep = null;
         rebRawHoldings = {};
         rebWalletByClient = {};
+        rebPendingRebalance = null;
         rebSelectedStrategyId = strategyId ? String(strategyId) : null;
         const strategy = (allStrategiesFullData || []).find(s => String(s.id) === String(strategyId));
         if (!strategy) { rebIsins = []; rebRenderAll(); return; }
@@ -8249,6 +8265,39 @@
         } catch (e) { console.warn("rebLoadStrategy: holdings fetch failed", e); }
           }
 
+        /* ── Fetch pending rebalance batch for this strategy ── */
+        try {
+          const { data: pendingBatches } = await supabaseClient
+            .from('rebalance_batch')
+            .select('id, sell_security_id, buy_security_id, extra_buy_security_id')
+            .eq('strategy_id', strategyId)
+            .eq('status', 'PENDING')
+            .order('created_at', { ascending: false })
+            .limit(1);
+          if (pendingBatches && pendingBatches.length) {
+            const pb = pendingBatches[0];
+            /* Resolve security IDs → codes for matching rebIsins */
+            const pbSecIds = [pb.sell_security_id, pb.buy_security_id, pb.extra_buy_security_id].filter(Boolean);
+            let pbCodeMap = {};
+            if (pbSecIds.length) {
+              const { data: pbSecs } = await supabaseClient.from('securities_c').select('id, symbol').in('id', pbSecIds);
+              (pbSecs || []).forEach(s => { pbCodeMap[s.id] = (s.symbol || '').replace(/\.[A-Z]+$/, ''); });
+            }
+            /* Fetch per-user events */
+            const { data: pbEvents } = await supabaseClient
+              .from('rebalance_event')
+              .select('user_id, security_id, trade_side, quantity, closed_reason')
+              .eq('batch_id', pb.id);
+            rebPendingRebalance = {
+              batchId: pb.id,
+              sellCode: pbCodeMap[pb.sell_security_id] || '',
+              buyCode: pbCodeMap[pb.buy_security_id] || '',
+              extraBuyCode: pb.extra_buy_security_id ? (pbCodeMap[pb.extra_buy_security_id] || '') : null,
+              events: pbEvents || [],
+            };
+          }
+        } catch (e) { console.warn('rebLoadStrategy: pending rebalance fetch failed', e); }
+
         const metaEl = document.getElementById("rebCompositionMeta");
         const totalClients = new Set(Object.values(rebRawHoldings).flatMap(arr => arr.map(x => x.userId))).size;
         if (metaEl) metaEl.textContent = `${strategy.short_name || strategy.name} · ${totalClients} client${totalClients !== 1 ? "s" : ""} · ${rebIsins.length} instruments`;
@@ -8282,13 +8331,25 @@
           const holderCount = holders.filter(r => r.quantity > 0).length;
           const positionValue = isin.currentPrice > 0 && totalQty > 0 ? isin.currentPrice * totalQty : 0;
           const displayPrice = rebShowUnitPrice ? isin.currentPrice : positionValue;
-          return `<tr data-isin="${isin.code}" class="cursor-pointer transition-colors ${isSelected ? "bg-violet-50" : "hover:bg-slate-50"}">
-            <td class="px-4 py-2.5 font-mono font-semibold ${isSelected ? "text-violet-700" : "text-slate-800"}">${isin.code}</td>
+          /* Pending rebalance detection */
+          const isPendSell = rebPendingRebalance && isin.code === rebPendingRebalance.sellCode;
+          const isPendBuy  = rebPendingRebalance && (isin.code === rebPendingRebalance.buyCode || isin.code === rebPendingRebalance.extraBuyCode);
+          const isPending  = isPendSell || isPendBuy;
+          const pendBg = isPending ? (isSelected ? 'bg-amber-100' : 'bg-amber-50 hover:bg-amber-100') : (isSelected ? 'bg-violet-50' : 'hover:bg-slate-50');
+          const pendBadge = isPendBuy
+            ? '<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;margin-left:5px;">Pending Buy</span>'
+            : isPendSell
+              ? '<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;margin-left:5px;">Pending Sell</span>'
+              : '';
+          const priceColor = isPending ? 'text-amber-700' : 'text-slate-700';
+          const qtyColor   = isPending ? 'text-amber-800' : 'text-slate-800';
+          return `<tr data-isin="${isin.code}" class="cursor-pointer transition-colors ${pendBg}" ${isPending ? 'style="border-left:3px solid #f59e0b;"' : ''}>
+            <td class="px-4 py-2.5 font-mono font-semibold ${isSelected ? 'text-violet-700' : (isPending ? 'text-amber-800' : 'text-slate-800')}">${isin.code}${pendBadge}</td>
             <td class="px-4 py-2.5 text-slate-700 max-w-[120px] truncate">${isin.description}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-600">${isin.unitsPerLot}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-400">${isin.weightPercent.toFixed(1)}%</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">${displayPrice > 0 ? `R ${displayPrice.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}<div class="text-[10px] font-normal text-violet-600">${rebShowUnitPrice ? "Unit" : "Total"}</div></td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-medium text-slate-800">${totalQty > 0 ? totalQty.toLocaleString() : "—"}<span class="text-slate-400 font-normal text-[10px] ml-1">${holderCount > 0 ? `${holderCount}c` : ""}</span></td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums ${priceColor}">${displayPrice > 0 ? `R ${displayPrice.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}<div class="text-[10px] font-normal ${isPending ? 'text-amber-600' : 'text-violet-600'}">${rebShowUnitPrice ? "Unit" : "Total"}</div></td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-medium ${qtyColor}">${totalQty > 0 ? totalQty.toLocaleString() : "—"}<span class="text-slate-400 font-normal text-[10px] ml-1">${holderCount > 0 ? `${holderCount}c` : ""}</span></td>
           </tr>`;
         }).join("");
 
@@ -8451,18 +8512,30 @@
             return;
           }
 
-          if (metaEl) metaEl.textContent = `Strategy-level preview · ${strategyClients.length} clients · select instrument + step for impact`;
-          tbody.innerHTML = strategyClients.map(client => `
-          <tr class="hover:bg-slate-50">
+          /* Build set of user IDs affected by pending rebalance */
+          const pendingUserIds = new Set();
+          if (rebPendingRebalance && rebPendingRebalance.events) {
+            rebPendingRebalance.events.forEach(ev => pendingUserIds.add(String(ev.user_id)));
+          }
+          const pendingLabel = pendingUserIds.size > 0 ? ` · ${pendingUserIds.size} pending` : '';
+          if (metaEl) metaEl.textContent = `Strategy-level preview · ${strategyClients.length} clients${pendingLabel} · select instrument + step for impact`;
+          tbody.innerHTML = strategyClients.map(client => {
+            const isPendingClient = pendingUserIds.has(String(client.id));
+            const rowBg = isPendingClient ? 'bg-amber-50' : 'hover:bg-slate-50';
+            const rowStyle = isPendingClient ? 'style="border-left:3px solid #f59e0b;"' : '';
+            const nameBadge = isPendingClient ? ' <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;">Pending</span>' : '';
+            return `
+          <tr class="${rowBg}" ${rowStyle}>
             <td class="px-4 py-2.5">
-              <p class="font-medium text-slate-800">${client.name}</p>
+              <p class="font-medium text-slate-800">${client.name}${nameBadge}</p>
               <p class="text-[10px] text-slate-400 font-mono">${client.id}</p>
             </td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-500">${client.instrumentCount}</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">${client.totalCurrentHolding.toLocaleString()}</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-700">${client.totalCurrentHolding.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums ${isPendingClient ? 'text-amber-700' : 'text-slate-700'}">${client.totalCurrentHolding.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold ${isPendingClient ? 'text-amber-700' : 'text-slate-700'}">${client.totalCurrentHolding.toLocaleString()}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-400">0</td>
-          </tr>`).join("");
+          </tr>`;
+          }).join("");
           return;
         }
 
@@ -8476,18 +8549,24 @@
 
         if (!rebSelectedStep) {
           if (metaEl) metaEl.textContent = `${rebSelectedIsin.code} · ${clients.length} clients · select reduction step`;
+          const pendingUids = new Set();
+          if (rebPendingRebalance) rebPendingRebalance.events.forEach(ev => pendingUids.add(String(ev.user_id)));
           tbody.innerHTML = clients.map(client => {
             const lots = Number(client.lots) || 0;
             const currentHolding = lots * rebSelectedIsin.unitsPerLot;
+            const isPend = pendingUids.has(String(client.id));
+            const rowCls = isPend ? 'bg-amber-50' : 'hover:bg-slate-50';
+            const rowSty = isPend ? 'style="border-left:3px solid #f59e0b;"' : '';
+            const badge = isPend ? ' <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;">Pending</span>' : '';
             return `
-          <tr class="hover:bg-slate-50">
+          <tr class="${rowCls}" ${rowSty}>
             <td class="px-4 py-2.5">
-              <p class="font-medium text-slate-800">${client.name}</p>
+              <p class="font-medium text-slate-800">${client.name}${badge}</p>
               <p class="text-[10px] text-slate-400 font-mono">${client.id}</p>
             </td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-400">${lots}</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">${currentHolding.toLocaleString()}</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-700">${currentHolding.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums ${isPend ? 'text-amber-700' : 'text-slate-700'}">${currentHolding.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold ${isPend ? 'text-amber-700' : 'text-slate-700'}">${currentHolding.toLocaleString()}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-400">0</td>
           </tr>`;
           }).join("");
@@ -8538,21 +8617,29 @@
 
         const impacts = rebComputeClientImpacts(clients, rebSelectedIsin.unitsPerLot, rebSelectedStep.newUnitsPerLot);
         const hasErrors = impacts.some(i => i.hasNegative);
+        const pendingUids2 = new Set();
+        if (rebPendingRebalance) rebPendingRebalance.events.forEach(ev => pendingUids2.add(String(ev.user_id)));
         if (metaEl) metaEl.textContent = `${rebSelectedIsin.code} · ${impacts.length} clients${hasErrors ? " · ⚠ Negative holdings" : ""}`;
 
-        tbody.innerHTML = impacts.map(imp => `
-          <tr class="${imp.hasNegative ? "bg-red-50" : "hover:bg-slate-50"}">
+        tbody.innerHTML = impacts.map(imp => {
+          const isPend = pendingUids2.has(String(imp.clientId));
+          const rowCls = imp.hasNegative ? "bg-red-50" : isPend ? "bg-amber-50" : "hover:bg-slate-50";
+          const rowSty = isPend ? 'style="border-left:3px solid #f59e0b;"' : '';
+          const badge = isPend ? ' <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;">Pending</span>' : '';
+          return `
+          <tr class="${rowCls}" ${rowSty}>
             <td class="px-4 py-2.5">
-              <p class="font-medium text-slate-800">${imp.clientName}</p>
+              <p class="font-medium text-slate-800">${imp.clientName}${badge}</p>
               <p class="text-[10px] text-slate-400 font-mono">${imp.clientId}</p>
             </td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-400">${imp.currentLots}</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">${imp.currentHolding.toLocaleString()}</td>
-            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-800">${imp.newHolding.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums ${isPend ? 'text-amber-700' : 'text-slate-700'}">${imp.currentHolding.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold ${isPend ? 'text-amber-800' : 'text-slate-800'}">${imp.newHolding.toLocaleString()}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold ${imp.delta < 0 ? "text-red-600" : imp.delta > 0 ? "text-green-600" : "text-slate-400"}">
               ${imp.delta > 0 ? "+" : ""}${imp.delta.toLocaleString()}
             </td>
-          </tr>`).join("");
+          </tr>`;
+        }).join("");
       }
 
       /* ── Header state (commit btn + negative badge) ── */
@@ -9126,6 +9213,7 @@
       }
 
       async function rebPersistCommittedTradeSequence() {
+        /* ── Validation ── */
         const buyModal = document.getElementById("rebBuyModal");
         const buySelection = buyModal?._buySelection;
         if (!buySelection?.exec || !buySelection?.instrument) {
@@ -9154,6 +9242,21 @@
         const extraBuySelection = buySelection.extraBuy || null;
         const extraBuyExec = extraBuySelection?.exec || null;
 
+        /* ── Guard: block if a PENDING batch already exists for this strategy ── */
+        const { data: pendingBatches, error: pendingErr } = await supabaseClient
+          .from("rebalance_batch")
+          .select("id, status, sell_isin_code, buy_isin_code, created_at")
+          .eq("strategy_id", strategyId)
+          .eq("status", "PENDING");
+        if (pendingErr) throw new Error(pendingErr.message || "Failed to check pending batches.");
+        if (pendingBatches && pendingBatches.length > 0) {
+          const existing = pendingBatches[0];
+          throw new Error(
+            `A pending rebalance already exists for this strategy (batch ${existing.id.slice(0, 8)}… created ${new Date(existing.created_at).toLocaleString()}). Please settle or reverse it before committing a new one.`
+          );
+        }
+
+        /* ── Resolve security IDs ── */
         const symbolsToResolve = [
           rebSelectedIsin.fullSymbol,
           buySelection.instrument.fullSymbol,
@@ -9222,6 +9325,7 @@
             ));
         const strategyNameSnapshot = strategyRef?.short_name || strategyRef?.name || "";
 
+        /* ── Read existing active positions (read-only — to compute sell quantities) ── */
         const userIds = [...new Set([
           ...clients.map((c) => String(c.id)),
           ...(buyExec.clientAllocations || []).map((a) => String(a.clientId)),
@@ -9377,6 +9481,11 @@
           if (eventsErr) throw new Error(eventsErr.message || "Failed to insert rebalance events.");
         }
 
+        /* ── stock_holdings_c is NOT touched ──
+           Positions settle only when the admin fills & settles the batch
+           via the orderbook. This keeps client-facing data clean. */
+
+        /* ── Update wallet credits (admin-internal bookkeeping) ── */
         const walletBeforeByClient = buySelection.walletBeforeByClient || {};
         const walletAfterMainByClient = buySelection.walletAfterMainByClient || {};
         const finalWalletByClient = {};
@@ -9408,9 +9517,9 @@
         await rebLoadStrategy(strategyId);
 
         const tradeCsvRows = [];
-        const sellNominal = sellEventRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
-        const buyNominal = buyEventRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
-        const extraBuyNominal = extraBuyEventRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
+        const sellNominal = totalSellQty;
+        const buyNominal = totalBuyQty;
+        const extraBuyNominal = totalExtraBuyQty;
         if (sellNominal > 0) {
           tradeCsvRows.push({ side: "SELL", code: sellCode, nominal: sellNominal });
         }

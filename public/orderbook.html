@@ -945,6 +945,13 @@
       border: 1px solid #f1f5f9;
       cursor: pointer;
     }
+    .orderbook-pending-row {
+      background: #fffbeb !important;
+      border-left: 3px solid #f59e0b;
+    }
+    .orderbook-pending-row:hover {
+      background: #fef3c7 !important;
+    }
     .batch-toggle-input {
       width: 18px;
       height: 18px;
@@ -1156,7 +1163,7 @@
 
       <span class="sidebar-section-label">System</span>
 
-      <a class="nav-icon" href="#" aria-label="Settings">
+      <a class="nav-icon" href="/settings.html" aria-label="Settings">
         <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
         Settings
       </a>
@@ -1817,6 +1824,11 @@
           u.holdingsCount += 1;
         });
 
+        const hasPendingRebalance = holdings.some((h) => !!h.isPendingRebalance);
+        const pendingBatchId = hasPendingRebalance
+          ? (holdings.find((h) => h.isPendingRebalance && h.rebalanceBatchId) || {}).rebalanceBatchId || null
+          : null;
+
         return {
           isStrategy: true,
           strategyId,
@@ -1830,6 +1842,9 @@
           ticker: first.strategyShortName || first.strategySlug || '-',
           isin: '-',
           side: totalQty < 0 ? 'SELL' : 'BUY',
+          isPendingRebalance: hasPendingRebalance,
+          rebalanceBatchId: pendingBatchId,
+          rebalanceBatchStatus: hasPendingRebalance ? 'PENDING' : null,
           quantityValue: totalQty,
           totalQuantity: totalQty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 }),
           avgFillNumber: wTot > 0 ? (wSum / wTot) : null,
@@ -1944,7 +1959,8 @@
           String(row.securityId || row.instrumentName || ''),
           String(row.side || '').toUpperCase(),
           String(row.orderType || '').toUpperCase(),
-          String(row.strategyId || '')
+          String(row.strategyId || ''),
+          row.isPendingRebalance ? 'PENDING' : 'SETTLED'
         ].join('|');
 
         if (!groups.has(key)) {
@@ -3798,6 +3814,11 @@
     const captureFilledOrderbook = async () => {
       if (!allOrderbookRows.length) return;
 
+      // Separate pending rebalance rows – they must NOT be archived
+      const settledRows = allOrderbookRows.filter(r => !r.isPendingRebalance);
+      const pendingRows = allOrderbookRows.filter(r => r.isPendingRebalance);
+      if (!settledRows.length) return;
+
       const now = new Date();
       const dateKey = getArchiveDateKey(now);
       const sequence = getNextFilledOrderbookSequence();
@@ -3809,7 +3830,7 @@
         title: `Order Book ${sequence}: ${now.toLocaleString()}`,
         dateLabel: now.toLocaleString(),
         createdAt: now.toISOString(),
-        rows: allOrderbookRows.map((row, index) => ({
+        rows: settledRows.map((row, index) => ({
           ...row,
           orderbookSequence: sequence,
           line: index + 1
@@ -3834,12 +3855,15 @@
       persistFilledArchive();
       renderFilledOrderbooks();
       updateOrderbookHeaderSequence();
-      allOrderbookRows = [];
+      // Keep pending rows alive in the active orderbook
+      allOrderbookRows = pendingRows;
       applySearchFilter();
     };
 
     const maybeCaptureFilledOrderbook = async () => {
-      if (!allOrderbookRows.length) return;
+      // Exclude pending rebalance rows from capture consideration
+      const settledRows = (allOrderbookRows || []).filter(r => !r.isPendingRebalance);
+      if (!settledRows.length) return;
       if (isCapturingFilledOrderbook) return;
 
       const now = new Date();
@@ -3851,7 +3875,7 @@
       // Only capture once a new day has started and there are rows from
       // before today. This lets records pile up visibly on the active
       // orderbook throughout the day before being archived.
-      const hasOlderRows = allOrderbookRows.some((row) => {
+      const hasOlderRows = settledRows.some((row) => {
         if (!row.timestamp) return true;
         return getArchiveDateKey(new Date(row.timestamp)) < todayKey;
       });
@@ -4054,7 +4078,10 @@
       const profilesMap = {};
       const onboardingPackDetailsMap = {};
       const strategiesMap = {};
-      const strategyIds = [...new Set(holdings.map((row) => row.strategy_id).filter(Boolean))];
+      const strategyIds = [...new Set([
+        ...holdings.map((row) => row.strategy_id),
+        ...rebBatches.map((b) => b.strategy_id),
+      ].filter(Boolean))];
 
       const parallelQueries = [];
 
@@ -4216,14 +4243,125 @@
           isActive: row.is_active,
           closedReason: String(row.closed_reason || ''),
           closedAt: row.closed_at || null,
-          rebalanceBatchId: row.rebalance_batch_id || null
+          rebalanceBatchId: row.rebalance_batch_id || null,
+          isPendingRebalance: false,
+          rebalanceBatchStatus: null
         };
       });
 
-      const filteredRows = rawRows.filter((row) => {
+      /* ── Map rebalance_event rows into orderbook-compatible format ── */
+      const rebEventRows = rebEvents.map((evt, idx) => {
+        const batch = batchById[evt.batch_id] || {};
+        const batchStatus = String(batch.status || '').toUpperCase();
+        const security = securitiesMap[evt.security_id] || {};
+        const profile = profilesMap[evt.user_id] || {};
+        const packDetails = onboardingPackDetailsMap[evt.user_id] || null;
+        const strategy = batch.strategy_id ? (strategiesMap[batch.strategy_id] || null) : null;
+        const instrumentName = security.name || '-';
+        const ticker = security.symbol ?? '-';
+        const isin = security.isin ?? '-';
+        const timestamp = evt.updated_at || evt.created_at || null;
+        const profileName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+        const clientName = profileName || extractNameFromPackDetails(packDetails) || 'Unknown Client';
+        const accountSeed = deterministicNumberFromText(evt.user_id || evt.id || `re-${idx + 1}`);
+        const profileMintNumber = String(profile.mint_number || '').trim();
+        const clientAccountId = profileMintNumber || `MINT-${String(accountSeed % 1000000).padStart(6, '0')}`;
+        const bndReference = buildBndReference({
+          timestamp,
+          orderbookSequence: activeOrderbookSequence,
+          lineNumber: rawRows.length + idx + 1
+        });
+        const clientIdFromPack = extractIdFromPackDetails(packDetails);
+        const mintNumber = String(profile.mint_number || '').trim();
+        const profileIdNumber = String(profile.id_number || '').trim();
+        const clientIdRegNoValue = profileIdNumber || mintNumber || clientIdFromPack || '-';
+        const quantityValue = Number(evt.quantity);
+        const isQuantityNumeric = Number.isFinite(quantityValue);
+        const avgFillRaw = (evt.avg_fill != null && evt.avg_fill !== '') ? Number(evt.avg_fill) : NaN;
+        const avgFillValue = Number.isFinite(avgFillRaw) ? (avgFillRaw / 100) : NaN;
+        const hasAvgFill = Number.isFinite(avgFillValue);
+        const priceAtCommit = (evt.price_at_commit != null) ? Number(evt.price_at_commit) : NaN;
+        const commitPrice = Number.isFinite(priceAtCommit) ? (priceAtCommit / 100) : NaN;
+        const lastPrice = Number(security.last_price);
+        const hasLastPrice = Number.isFinite(lastPrice);
+        const displayPrice = hasAvgFill ? avgFillValue : (Number.isFinite(commitPrice) ? commitPrice : NaN);
+        const computedMarketValueNumber = (isQuantityNumeric && hasLastPrice)
+          ? ((quantityValue / 100) * lastPrice)
+          : 0;
+        const side = String(evt.trade_side || '').toUpperCase();
+
+        return {
+          sourceId: evt.id || '',
+          userId: evt.user_id || '',
+          securityId: evt.security_id || '',
+          line: rawRows.length + idx + 1,
+          instrumentName,
+          ticker,
+          clientName,
+          clientAccountId,
+          orderbookSequence: activeOrderbookSequence,
+          bndReference,
+          clientIdRegNo: clientIdRegNoValue,
+          profileAddress: String(profile.address || ''),
+          packDetails,
+          countryCode: 'ZAF',
+          holdingStatus: batchStatus === 'PENDING' ? 'pending' : (batchStatus === 'REVERSED' ? 'reversed' : ''),
+          isin,
+          side,
+          quantityValue: isQuantityNumeric ? quantityValue : 0,
+          totalQuantity: isQuantityNumeric
+            ? quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 })
+            : (evt.quantity ?? '-'),
+          avgFillNumber: Number.isFinite(displayPrice) ? displayPrice : null,
+          avgFill: Number.isFinite(displayPrice)
+            ? `R ${displayPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : '-',
+          marketValueNumber: computedMarketValueNumber,
+          marketValue: (isQuantityNumeric && hasLastPrice)
+            ? `R ${computedMarketValueNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : '-',
+          unrealizedPnlNumber: 0,
+          unrealizedPnl: '-',
+          orderType: 'Market',
+          settlementAccount: 'ComputerShare Nominees',
+          settlementAccountOptions: ['ComputerShare Nominees'],
+          brokerRef: 'Longmark',
+          brokerRefOptions: ['Longmark'],
+          strategyId: batch.strategy_id || null,
+          strategyName: evt.strategy_name_snapshot || batch.strategy_name_snapshot || strategy?.name || null,
+          strategyShortName: strategy?.short_name || null,
+          strategySlug: strategy?.slug || null,
+          strategyNameSnapshot: evt.strategy_name_snapshot || null,
+          timestamp,
+          fillDate: evt.fill_date || null,
+          tradeSide: side,
+          isActive: false,
+          closedReason: String(evt.closed_reason || ''),
+          closedAt: null,
+          rebalanceBatchId: evt.batch_id || null,
+          isPendingRebalance: batchStatus === 'PENDING',
+          rebalanceBatchStatus: batchStatus || null,
+          rebalanceEventId: evt.id || null,
+          settledHoldingId: evt.settled_holding_id || null,
+        };
+      });
+
+      // Merge stock_holdings_c rows with rebalance_event rows
+      const allRawRows = [...rawRows, ...rebEventRows];
+
+      const filteredRows = allRawRows.filter((row) => {
         if (row.sourceId && archivedSourceIds.has(String(row.sourceId))) {
           return false;
         }
+
+        // Always show pending rebalance events
+        if (row.isPendingRebalance) return true;
+
+        // Hide SETTLED rebalance_event rows — stock_holdings_c audit rows cover them
+        if (row.rebalanceEventId && row.rebalanceBatchStatus === 'SETTLED') return false;
+
+        // Hide REVERSED rebalance events (they are no longer actionable).
+        if (row.rebalanceBatchStatus === 'REVERSED') return false;
 
         // Keep active holdings and explicit rebalance event rows.
         // Hide inactive BUY rows that are old replaced bucket positions.
@@ -4233,6 +4371,7 @@
         if (isActive) return true;
         if (side === 'SELL') return true;
         if (side === 'BUY' && reason === 'REBALANCE_EVENT_BUY') return true;
+        if (side === 'BUY' && reason === 'REBALANCE_EVENT_BUY_WALLET') return true;
         return false;
       });
 
@@ -4796,6 +4935,424 @@
         renderStrateBirPreview();
       });
     }
+
+    /* ── Fill & Settle Logic ── */
+    const openFillSettleModal = async (batchId) => {
+      if (!batchId) return;
+
+      // Load the batch + its events
+      const [batchRes, eventsRes] = await Promise.all([
+        supabaseClient.from('rebalance_batch').select('*').eq('id', batchId).single(),
+        supabaseClient.from('rebalance_event').select('*').eq('batch_id', batchId),
+      ]);
+
+      if (batchRes.error || !batchRes.data) {
+        alert('Could not load batch: ' + (batchRes.error?.message || 'Not found'));
+        return;
+      }
+
+      const batch = batchRes.data;
+      if (batch.status !== 'PENDING') {
+        alert(`This batch is already ${batch.status}. Cannot fill.`);
+        return;
+      }
+
+      const events = eventsRes.data || [];
+      const sellEvents = events.filter(e => e.trade_side === 'SELL');
+      const buyEvents = events.filter(e => e.trade_side === 'BUY');
+      const totalSellQty = sellEvents.reduce((s, e) => s + Number(e.quantity || 0), 0);
+      const totalBuyQty = buyEvents.reduce((s, e) => s + Number(e.quantity || 0), 0);
+
+      // Use existing price modal with custom behavior for fill+settle
+      const modal = priceModal;
+      if (!modal) return;
+
+      // Create a custom confirmation flow
+      const sellPriceCents = sellEvents[0]?.price_at_commit || 0;
+      const buyPriceCents = buyEvents[0]?.price_at_commit || 0;
+
+      const promptHtml = `
+        <div style="margin-bottom:16px;">
+          <div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:12px;">Fill & Settle Batch</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:8px;">Batch: ${batchId.slice(0,8)}… · Strategy: ${escapeHtml(batch.strategy_name_snapshot || '-')}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+            <div style="background:#fef2f2;border-radius:8px;padding:8px 12px;">
+              <div style="font-size:10px;color:#991b1b;font-weight:500;">SELL</div>
+              <div style="font-size:13px;font-weight:600;color:#991b1b;">${totalSellQty.toLocaleString()} shares</div>
+              <div style="font-size:10px;color:#64748b;">${batch.sell_isin_code || '-'}</div>
+            </div>
+            <div style="background:#f0fdf4;border-radius:8px;padding:8px 12px;">
+              <div style="font-size:10px;color:#166534;font-weight:500;">BUY</div>
+              <div style="font-size:13px;font-weight:600;color:#166534;">${totalBuyQty.toLocaleString()} shares</div>
+              <div style="font-size:10px;color:#64748b;">${batch.buy_isin_code || '-'}</div>
+            </div>
+          </div>
+          <div style="margin-bottom:8px;">
+            <label style="font-size:11px;font-weight:500;color:#475569;display:block;margin-bottom:4px;">Sell Fill Price (R)</label>
+            <input id="fillSellPrice" type="number" step="0.01" min="0" value="${(sellPriceCents / 100).toFixed(2)}" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:monospace;" />
+          </div>
+          <div style="margin-bottom:8px;">
+            <label style="font-size:11px;font-weight:500;color:#475569;display:block;margin-bottom:4px;">Buy Fill Price (R) — ${escapeHtml(batch.buy_isin_code || '-')}</label>
+            <input id="fillBuyPrice" type="number" step="0.01" min="0" value="${(buyPriceCents / 100).toFixed(2)}" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:monospace;" />
+          </div>
+          ${batch.extra_buy_isin_code ? `
+          <div style="margin-bottom:8px;">
+            <label style="font-size:11px;font-weight:500;color:#475569;display:block;margin-bottom:4px;">Extra Buy Fill Price (R) — ${escapeHtml(batch.extra_buy_isin_code)}</label>
+            <input id="fillExtraBuyPrice" type="number" step="0.01" min="0" value="${(buyPriceCents / 100).toFixed(2)}" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:monospace;" />
+          </div>` : ''}
+          <div style="display:flex;gap:8px;margin-top:16px;">
+            <button id="fillSettleConfirmBtn" style="flex:1;padding:10px;border-radius:10px;border:none;background:#059669;color:white;font-size:13px;font-weight:600;cursor:pointer;">Confirm Fill & Settle</button>
+            <button id="fillSettleCancelBtn" style="flex:1;padding:10px;border-radius:10px;border:none;background:#f1f5f9;color:#64748b;font-size:13px;font-weight:500;cursor:pointer;">Cancel</button>
+          </div>
+        </div>
+      `;
+
+      // Create a custom overlay modal
+      let fillModal = document.getElementById('fillSettleModal');
+      if (!fillModal) {
+        fillModal = document.createElement('div');
+        fillModal.id = 'fillSettleModal';
+        fillModal.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);';
+        document.body.appendChild(fillModal);
+      }
+      fillModal.innerHTML = `<div style="background:white;border-radius:16px;padding:24px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.2);">${promptHtml}</div>`;
+      fillModal.style.display = 'flex';
+
+      const confirmBtn = document.getElementById('fillSettleConfirmBtn');
+      const cancelBtn = document.getElementById('fillSettleCancelBtn');
+
+      const closeFillModal = () => { fillModal.style.display = 'none'; };
+
+      cancelBtn.addEventListener('click', closeFillModal);
+
+      confirmBtn.addEventListener('click', async () => {
+        const sellPriceR = parseFloat(document.getElementById('fillSellPrice').value);
+        const buyPriceR = parseFloat(document.getElementById('fillBuyPrice').value);
+
+        if (isNaN(sellPriceR) || sellPriceR < 0) { alert('Invalid sell price.'); return; }
+        if (isNaN(buyPriceR) || buyPriceR < 0) { alert('Invalid buy price.'); return; }
+
+        const extraBuyPriceEl = document.getElementById('fillExtraBuyPrice');
+        const extraBuyPriceR = extraBuyPriceEl ? parseFloat(extraBuyPriceEl.value) : buyPriceR;
+        if (extraBuyPriceEl && (isNaN(extraBuyPriceR) || extraBuyPriceR < 0)) { alert('Invalid extra buy price.'); return; }
+
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Settling...';
+
+        try {
+          await executeFillAndSettle(batch, events, Math.round(sellPriceR * 100), Math.round(buyPriceR * 100), Math.round(extraBuyPriceR * 100));
+          closeFillModal();
+          await loadOrderbook();
+        } catch (err) {
+          console.error('Fill & Settle failed:', err);
+          alert('Fill & Settle failed: ' + (err.message || 'Unknown error'));
+        } finally {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = 'Confirm Fill & Settle';
+        }
+      });
+    };
+
+    /* ── Execute Fill & Settle: writes to stock_holdings_c + updates batch/events ── */
+    const executeFillAndSettle = async (batch, events, sellFillCents, buyFillCents, extraBuyFillCents) => {
+      const nowIso = new Date().toISOString();
+      const { data: sessionData } = await supabaseClient.auth.getSession();
+      const currentUserId = sessionData?.session?.user?.id || null;
+
+      const sellEvents = events.filter(e => e.trade_side === 'SELL');
+      const buyEvents = events.filter(e => e.trade_side === 'BUY' && e.closed_reason === 'REBALANCE_EVENT_BUY');
+      const walletBuyEvents = events.filter(e => e.trade_side === 'BUY' && e.closed_reason === 'REBALANCE_EVENT_BUY_WALLET');
+
+      const strategyId = batch.strategy_id;
+      const rebalanceBatchId = batch.id;
+      const strategyNameSnapshot = batch.strategy_name_snapshot || '';
+
+      // Collect unique user/security IDs
+      const allUserIds = [...new Set(events.map(e => e.user_id).filter(Boolean))];
+      const allSecurityIds = [...new Set(events.map(e => e.security_id).filter(Boolean))];
+      const sellSecurityId = batch.sell_security_id;
+
+      // Load current active positions for sell side
+      const { data: activePositions, error: posErr } = await supabaseClient
+        .from('stock_holdings_c')
+        .select('id, user_id, security_id, quantity, trade_side, is_active')
+        .eq('strategy_id', strategyId)
+        .eq('is_active', true)
+        .eq('trade_side', 'BUY')
+        .in('user_id', allUserIds)
+        .in('security_id', allSecurityIds);
+      if (posErr) throw new Error(posErr.message || 'Failed to load active positions.');
+
+      // ── SELL settlement: close/reduce positions + insert audit rows ──
+      for (const evt of sellEvents) {
+        const activeRow = (activePositions || []).find(
+          r => String(r.user_id) === String(evt.user_id) &&
+               String(r.security_id) === String(evt.security_id) &&
+               Number(r.quantity || 0) > 0
+        );
+        if (!activeRow) continue; // position may already be closed
+
+        const totalQty = Math.abs(Number(activeRow.quantity || 0));
+        const soldQty = Math.min(Number(evt.quantity || 0), totalQty);
+        const remaining = totalQty - soldQty;
+
+        // Insert SELL audit row in stock_holdings_c
+        const { data: insertedSell, error: sellInsertErr } = await supabaseClient
+          .from('stock_holdings_c')
+          .insert({
+            user_id: evt.user_id,
+            security_id: evt.security_id,
+            quantity: soldQty,
+            strategy_id: strategyId,
+            updated_at: nowIso,
+            trade_side: 'SELL',
+            is_active: false,
+            closed_reason: 'REBALANCE_EVENT_SELL',
+            closed_at: nowIso,
+            rebalance_batch_id: rebalanceBatchId,
+            strategy_name_snapshot: strategyNameSnapshot,
+            avg_fill: sellFillCents,
+            Status: 'inactive',
+          })
+          .select('id')
+          .single();
+        if (sellInsertErr) throw new Error(sellInsertErr.message || 'Failed to insert sell settlement row.');
+
+        // Close or reduce active position
+        if (remaining <= 0) {
+          const { error: closeErr } = await supabaseClient
+            .from('stock_holdings_c')
+            .update({
+              is_active: false,
+              closed_reason: 'POSITION_REPLACED',
+              closed_at: nowIso,
+              updated_at: nowIso,
+              rebalance_batch_id: rebalanceBatchId,
+              avg_exit: sellFillCents,
+              exit_date: nowIso.split('T')[0],
+              Status: 'inactive',
+            })
+            .eq('id', activeRow.id);
+          if (closeErr) throw new Error(closeErr.message || 'Failed to close replaced position.');
+        } else {
+          const { error: partialErr } = await supabaseClient
+            .from('stock_holdings_c')
+            .update({
+              quantity: remaining,
+              updated_at: nowIso,
+            })
+            .eq('id', activeRow.id);
+          if (partialErr) throw new Error(partialErr.message || 'Failed to update remaining position.');
+        }
+
+        // Update the rebalance_event row
+        await supabaseClient
+          .from('rebalance_event')
+          .update({
+            avg_fill: sellFillCents,
+            fill_date: nowIso.split('T')[0],
+            settled_holding_id: insertedSell?.id || null,
+            updated_at: nowIso,
+          })
+          .eq('id', evt.id);
+      }
+
+      // ── BUY settlement: upsert active positions + insert audit rows ──
+      const applyBuySettlement = async (buyEvts, fillCents, closedReason) => {
+        // Re-load active positions after sell mutations
+        const { data: currentActive } = await supabaseClient
+          .from('stock_holdings_c')
+          .select('id, user_id, security_id, quantity')
+          .eq('strategy_id', strategyId)
+          .eq('is_active', true)
+          .eq('trade_side', 'BUY')
+          .in('user_id', allUserIds)
+          .in('security_id', allSecurityIds);
+
+        const activeByKey = {};
+        (currentActive || []).forEach(r => {
+          const key = `${r.user_id}|${r.security_id}`;
+          if (!activeByKey[key]) activeByKey[key] = r;
+        });
+
+        for (const evt of buyEvts) {
+          const buyQty = Number(evt.quantity || 0);
+          if (buyQty <= 0) continue;
+          const key = `${evt.user_id}|${evt.security_id}`;
+
+          // Insert BUY audit row
+          const { data: insertedBuy, error: buyInsertErr } = await supabaseClient
+            .from('stock_holdings_c')
+            .insert({
+              user_id: evt.user_id,
+              security_id: evt.security_id,
+              quantity: buyQty,
+              strategy_id: strategyId,
+              updated_at: nowIso,
+              trade_side: 'BUY',
+              is_active: false,
+              closed_reason: closedReason,
+              closed_at: nowIso,
+              rebalance_batch_id: rebalanceBatchId,
+              strategy_name_snapshot: strategyNameSnapshot,
+              Status: 'inactive',
+            })
+            .select('id')
+            .single();
+          if (buyInsertErr) throw new Error(buyInsertErr.message || 'Failed to insert buy settlement row.');
+
+          // Upsert active buy position
+          const existingActive = activeByKey[key];
+          if (existingActive) {
+            const nextQty = Math.max(0, Number(existingActive.quantity || 0) + buyQty);
+            const { error: updateErr } = await supabaseClient
+              .from('stock_holdings_c')
+              .update({
+                quantity: nextQty,
+                updated_at: nowIso,
+                trade_side: 'BUY',
+                is_active: true,
+                strategy_name_snapshot: strategyNameSnapshot,
+                avg_fill: fillCents,
+                Status: 'active',
+              })
+              .eq('id', existingActive.id);
+            if (updateErr) throw new Error(updateErr.message || 'Failed to update active buy position.');
+            existingActive.quantity = nextQty; // update local cache
+          } else {
+            const { data: newActive, error: insertActiveErr } = await supabaseClient
+              .from('stock_holdings_c')
+              .insert({
+                user_id: evt.user_id,
+                security_id: evt.security_id,
+                quantity: buyQty,
+                strategy_id: strategyId,
+                updated_at: nowIso,
+                trade_side: 'BUY',
+                is_active: true,
+                rebalance_batch_id: rebalanceBatchId,
+                strategy_name_snapshot: strategyNameSnapshot,
+                avg_fill: fillCents,
+                Status: 'active',
+              })
+              .select('id, user_id, security_id, quantity')
+              .single();
+            if (insertActiveErr) throw new Error(insertActiveErr.message || 'Failed to insert active buy position.');
+            if (newActive) activeByKey[key] = newActive;
+          }
+
+          // Update rebalance_event row
+          await supabaseClient
+            .from('rebalance_event')
+            .update({
+              avg_fill: fillCents,
+              fill_date: nowIso.split('T')[0],
+              settled_holding_id: insertedBuy?.id || null,
+              updated_at: nowIso,
+            })
+            .eq('id', evt.id);
+        }
+      };
+
+      await applyBuySettlement(buyEvents, buyFillCents, 'REBALANCE_EVENT_BUY');
+      if (walletBuyEvents.length) {
+        const walletFillPrice = extraBuyFillCents || buyFillCents;
+        await applyBuySettlement(walletBuyEvents, walletFillPrice, 'REBALANCE_EVENT_BUY_WALLET');
+      }
+
+      // ── Update batch status to SETTLED ──
+      const { error: batchUpdateErr } = await supabaseClient
+        .from('rebalance_batch')
+        .update({
+          status: 'SETTLED',
+          settled_at: nowIso,
+          settled_by: currentUserId,
+          updated_at: nowIso,
+        })
+        .eq('id', batch.id);
+      if (batchUpdateErr) throw new Error(batchUpdateErr.message || 'Failed to update batch status.');
+    };
+
+    /* ── Reverse Batch Logic ── */
+    const handleReverseBatch = async (batchId) => {
+      if (!batchId) return;
+
+      // Load batch
+      const { data: batch, error: batchErr } = await supabaseClient
+        .from('rebalance_batch')
+        .select('*')
+        .eq('id', batchId)
+        .single();
+      if (batchErr || !batch) {
+        alert('Could not load batch: ' + (batchErr?.message || 'Not found'));
+        return;
+      }
+      if (batch.status !== 'PENDING') {
+        alert(`This batch is ${batch.status}. Only PENDING batches can be reversed.`);
+        return;
+      }
+
+      const reason = prompt(
+        `Reverse batch ${batchId.slice(0, 8)}…?\n\nThis will:\n• Restore strategy holdings to pre-rebalance state\n• Restore wallet credits to pre-rebalance balances\n• Mark all events as REVERSED\n\nEnter reason (optional):`,
+        ''
+      );
+      if (reason === null) return; // user cancelled
+
+      try {
+        const nowIso = new Date().toISOString();
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        const currentUserId = sessionData?.session?.user?.id || null;
+
+        // ── Restore strategy holdings from snapshot ──
+        if (batch.holdings_snapshot_before && batch.strategy_id) {
+          const { error: stratErr } = await supabaseClient
+            .from('strategies_c')
+            .update({
+              holdings: batch.holdings_snapshot_before,
+            })
+            .eq('id', batch.strategy_id);
+          if (stratErr) throw new Error(stratErr.message || 'Failed to restore strategy holdings.');
+        }
+
+        // ── Restore wallet credits from snapshot ──
+        if (batch.wallet_snapshot_before && batch.strategy_id) {
+          const walletEntries = Object.entries(batch.wallet_snapshot_before || {});
+          if (walletEntries.length) {
+            const walletRows = walletEntries.map(([userId, balance]) => ({
+              strategy_id: batch.strategy_id,
+              user_id: userId,
+              balance: Number(Number(balance || 0).toFixed(2)),
+              updated_at: nowIso,
+            }));
+            const { error: walletErr } = await supabaseClient
+              .from('strategy_client_wallet_credits')
+              .upsert(walletRows, { onConflict: 'strategy_id,user_id' });
+            if (walletErr) throw new Error(walletErr.message || 'Failed to restore wallet credits.');
+          }
+        }
+
+        // ── Update batch status to REVERSED ──
+        const { error: batchUpdateErr } = await supabaseClient
+          .from('rebalance_batch')
+          .update({
+            status: 'REVERSED',
+            is_reversed: true,
+            reversed_at: nowIso,
+            reversed_by: currentUserId,
+            reversed_reason: reason || 'Manual reversal',
+            updated_at: nowIso,
+          })
+          .eq('id', batchId);
+        if (batchUpdateErr) throw new Error(batchUpdateErr.message || 'Failed to update batch status.');
+
+        // Refresh orderbook
+        await loadOrderbook();
+
+      } catch (err) {
+        console.error('Reverse failed:', err);
+        alert('Reverse failed: ' + (err.message || 'Unknown error'));
+      }
+    };
 
     /* ── Price Update Logic ── */
     const priceModal = document.getElementById('orderbookPriceModal');
