@@ -474,9 +474,34 @@
       if (holdings.length > 0) {
         const symbols = holdings.map(h => h.ticker || h.symbol || h);
         const allSymbols = [...new Set([...symbols, ...symbols.map(normalizeSymbol)])];
-        const { data: secs } = await supabaseClient.from('securities_c').select('symbol, name, logo_url').in('symbol', allSymbols);
-        if (secs) secs.forEach(s => { securitiesMap.set(s.symbol, s); const norm = normalizeSymbol(s.symbol); if (norm !== s.symbol) securitiesMap.set(norm, s); });
+        const { data: secs } = await supabaseClient.from('securities_c').select('id, symbol, name, logo_url').in('symbol', allSymbols);
+        if (secs) {
+          const secIds = secs.map(s => s.id).filter(Boolean);
+          let retMap = {};
+          if (secIds.length > 0) {
+            const { data: rets } = await supabaseClient.from('stock_returns_c')
+              .select('security_id, current_price, 1d_pct')
+              .in('security_id', secIds)
+              .order('as_of_date', { ascending: false });
+            (rets || []).forEach(r => { if (!retMap[r.security_id]) retMap[r.security_id] = r; });
+          }
+          secs.forEach(s => {
+            const r = retMap[s.id] || {};
+            const merged = { ...s, last_price: r.current_price != null ? Number(r.current_price) : null, change_percent: r['1d_pct'] ?? null };
+            securitiesMap.set(s.symbol, merged);
+            const norm = normalizeSymbol(s.symbol);
+            if (norm !== s.symbol) securitiesMap.set(norm, merged);
+          });
+        }
       }
+
+      const { data: stratRetRows } = await supabaseClient
+        .from('strategies_returns_c')
+        .select('strategy_id, ytd_pct, 1d_pct, as_of_date')
+        .eq('strategy_id', strategyId)
+        .order('as_of_date', { ascending: false })
+        .limit(1);
+      const stratRet = (stratRetRows && stratRetRows[0]) || null;
 
       const totalWeight = holdings.reduce((sum, h) => sum + (Number(h.weight) || 0), 0);
       const minInvestment = calculateMinInvestment(holdings, securitiesMap) || Number(strategy.min_investment) || null;
@@ -498,7 +523,7 @@
         { label: 'Best Day', value: formatPercent(summary.best_day), description: 'The highest daily return this strategy has achieved.' },
         { label: 'Worst Day', value: formatPercent(summary.worst_day), description: 'The lowest daily return this strategy has experienced.' },
         { label: 'Avg Daily Return', value: formatPercent(summary.avg_day), description: 'The average daily percentage change across all trading days.' },
-        { label: 'YTD Return', value: formatPercent(summary.ytd_return ?? analytics?.ytd_return), description: 'Year-to-date return for the strategy.' },
+        { label: 'YTD Return', value: stratRet?.ytd_pct != null ? `${Number(stratRet.ytd_pct) >= 0 ? '+' : ''}${Number(stratRet.ytd_pct).toFixed(2)}%` : '—', description: 'Year-to-date return for the strategy.' },
       ];
 
       const calendarData = {};
