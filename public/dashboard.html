@@ -5223,10 +5223,46 @@
         ovRenderPerfChart(analytics, strat.name || 'Strategy');
         window.__dbgBreadcrumb('ovSelect:render-sectorchart');
         ovRenderSectorChart(holdings, secMap);
+        /* ── Fetch pending rebalance batches for this strategy ── */
+        window.__dbgBreadcrumb('ovSelect:fetch-pending-rebalance');
+        let pendingRebalance = null;
+        try {
+          const { data: pendingBatches } = await supabaseClient
+            .from('rebalance_batch')
+            .select('id, sell_security_id, buy_security_id, extra_buy_security_id, sell_isin_code, buy_isin_code, extra_buy_isin_code')
+            .eq('strategy_id', strat.id)
+            .eq('status', 'PENDING')
+            .order('created_at', { ascending: false })
+            .limit(1);
+          if (pendingBatches && pendingBatches.length) {
+            const pb = pendingBatches[0];
+            const { data: events } = await supabaseClient
+              .from('rebalance_event')
+              .select('user_id, security_id, trade_side, quantity, closed_reason')
+              .eq('batch_id', pb.id);
+            const rebSecIds = [pb.sell_security_id, pb.buy_security_id, pb.extra_buy_security_id].filter(Boolean);
+            let rebSecSymMap = {};
+            if (rebSecIds.length) {
+              const { data: rebSecs } = await supabaseClient.from('securities_c').select('id, symbol').in('id', rebSecIds);
+              (rebSecs || []).forEach(s => { rebSecSymMap[s.id] = s.symbol; });
+            }
+            pendingRebalance = {
+              batchId: pb.id,
+              sellSecurityId: pb.sell_security_id,
+              buySecurityId: pb.buy_security_id,
+              extraBuySecurityId: pb.extra_buy_security_id,
+              sellSymbol: rebSecSymMap[pb.sell_security_id] || pb.sell_isin_code || '',
+              buySymbol: rebSecSymMap[pb.buy_security_id] || pb.buy_isin_code || '',
+              extraBuySymbol: pb.extra_buy_security_id ? (rebSecSymMap[pb.extra_buy_security_id] || pb.extra_buy_isin_code || '') : null,
+              events: events || [],
+            };
+          }
+        } catch (e) { console.warn('[Overview] pending rebalance fetch failed:', e); }
+
         window.__dbgBreadcrumb('ovSelect:render-holdings');
-        ovRenderHoldings(holdings, secMap);
+        ovRenderHoldings(holdings, secMap, pendingRebalance);
         window.__dbgBreadcrumb('ovSelect:render-investors');
-        ovRenderInvestors(investRows, profiles, strat, analytics, txnInceptionMap, secPriceMap);
+        ovRenderInvestors(investRows, profiles, strat, analytics, txnInceptionMap, secPriceMap, pendingRebalance);
         fetchNewsInsights();
         window.__dbgBreadcrumb('ovSelect:done');
         } catch (err) {
@@ -5686,13 +5722,19 @@
         el.__sectorResizeObs.observe(el);
       };
 
-      const ovRenderHoldings = (holdings, secMap) => {
+      const ovRenderHoldings = (holdings, secMap, pendingRebalance) => {
         const el = document.getElementById('ovHoldingsTable');
         if (!el) return;
         if (!holdings.length) {
           el.innerHTML = '<div style="font-size:12px;color:#94a3b8;padding:12px 0;">No holdings configured for this strategy.</div>';
           return;
         }
+
+        /* Build set of symbols affected by pending rebalance */
+        const pendingSellSym = pendingRebalance ? normalizeSymbol(pendingRebalance.sellSymbol) : null;
+        const pendingBuySym  = pendingRebalance ? normalizeSymbol(pendingRebalance.buySymbol) : null;
+        const pendingExtraSym = pendingRebalance?.extraBuySymbol ? normalizeSymbol(pendingRebalance.extraBuySymbol) : null;
+
         /* Pre-compute qty, live price, and market value per holding */
         const enriched = holdings.map(h => {
           const sym   = h.ticker || h.symbol || (typeof h === 'string' ? h : '');
@@ -5701,7 +5743,10 @@
           const qty   = Number(h.shares || h.quantity || 0);
           const mv    = price != null && qty > 0 ? qty * price : null;
           const change = sec?.change_percent != null ? Number(sec.change_percent) : null;
-          return { h, sym, sec, price, qty, mv, change,
+          const norm  = normalizeSymbol(sym);
+          const isPendingSell = pendingSellSym && norm === pendingSellSym;
+          const isPendingBuy  = (pendingBuySym && norm === pendingBuySym) || (pendingExtraSym && norm === pendingExtraSym);
+          return { h, sym, sec, price, qty, mv, change, isPendingSell, isPendingBuy,
                    code: sym.replace('.JO', ''),
                    name: h.name || sec?.name || sym };
         });
@@ -5714,13 +5759,21 @@
           : '—';
 
         el.innerHTML = `<table class="ov-table"><thead><tr>
-          <th>Instrument</th><th class="r">Shares</th><th class="r">Total Value (R)</th><th class="r">Weight</th><th class="r">Day Chg</th>
+          <th>Instrument</th><th class="r">Shares</th><th class="r">Total Value (R)</th><th class="r">Weight</th><th class="r">Day Chg</th><th></th>
         </tr></thead><tbody>${
-          enriched.map(({ h, sym, sec, price, qty, mv, change, code, name }) => {
+          enriched.map(({ h, sym, sec, price, qty, mv, change, code, name, isPendingSell, isPendingBuy }) => {
             const weightPct = totalMv > 0 && mv != null ? (mv / totalMv) * 100 : 0;
             const barW      = Math.min(weightPct * 2.5, 100);
             const cc        = change == null ? '' : change >= 0 ? 'ov-pos' : 'ov-neg';
-            return `<tr>
+            /* Pending rebalance highlighting */
+            const isPending = isPendingSell || isPendingBuy;
+            const rowBg = isPending ? 'background:#fffbeb;' : '';
+            const pendingBadge = isPendingBuy
+              ? '<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:2px 7px;border-radius:6px;text-transform:uppercase;letter-spacing:.04em;">Pending Buy</span>'
+              : isPendingSell
+                ? '<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:2px 7px;border-radius:6px;text-transform:uppercase;letter-spacing:.04em;">Pending Sell</span>'
+                : '';
+            return `<tr style="${rowBg}">
               <td>
                 <div style="font-family:ui-monospace,monospace;font-weight:600;font-size:12px;">${code}</div>
                 <div style="font-size:10px;color:#94a3b8;margin-top:1px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</div>
@@ -5734,17 +5787,18 @@
                 </div>
               </td>
               <td class="r">${change != null ? `<span class="ov-mono ${cc}" style="font-size:11px;font-weight:600;">${change >= 0 ? '+' : ''}${change.toFixed(2)}%</span>` : '<span style="color:#cbd5e1;">—</span>'}</td>
+              <td>${pendingBadge}</td>
             </tr>`;
           }).join('')
         }</tbody><tfoot><tr style="border-top:1.5px solid #e8edf3;background:#f8fafc;">
           <td colspan="2" style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;">Portfolio Total</td>
           <td class="r ov-mono" style="padding:8px 10px;font-size:12px;font-weight:700;color:#334155;">${fmtR(totalMv > 0 ? totalMv : null)}</td>
           <td class="r ov-mono" style="padding:8px 10px;font-size:11px;font-weight:600;color:#64748b;">100%</td>
-          <td></td>
+          <td></td><td></td>
         </tr></tfoot></table>`;
       };
 
-      const ovRenderInvestors = (investRows, profiles, strat, analytics, txnInceptionMap = {}, secPriceMap = {}) => {
+      const ovRenderInvestors = (investRows, profiles, strat, analytics, txnInceptionMap = {}, secPriceMap = {}, pendingRebalance = null) => {
         const el = document.getElementById('ovInvestorsTable');
         const badge = document.getElementById('ovInvestorCountBadge');
         const aumLabel = document.getElementById('ovInvestorsTotalAUM');
@@ -5760,7 +5814,7 @@
         const byUser = {};
         investRows.forEach(r => {
           const uid = r.user_id;
-          if (!byUser[uid]) byUser[uid] = { costBasis: 0, currentVal: 0, inception: r.created_at };
+          if (!byUser[uid]) byUser[uid] = { costBasis: 0, currentVal: 0, inception: r.created_at, pending: false };
           const qty = Number(r.quantity) || 0;
           /* Cost basis: avg_fill × qty (cents → rands) */
           let fill = Number(r.avg_fill) || 0;
@@ -5781,6 +5835,19 @@
           return (neg ? '-' : '') + 'R' + int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + dec;
         };
 
+        /* ── Merge pending buy-side rebalance clients ── */
+        if (pendingRebalance && pendingRebalance.events) {
+          pendingRebalance.events
+            .filter(ev => ev.trade_side === 'BUY' || ev.closed_reason === 'REBALANCE_EVENT_BUY' || ev.closed_reason === 'REBALANCE_EVENT_BUY_WALLET')
+            .forEach(ev => {
+              const uid = ev.user_id;
+              if (!byUser[uid]) {
+                byUser[uid] = { costBasis: 0, currentVal: 0, inception: new Date().toISOString(), pending: true };
+              }
+              byUser[uid].pending = true;
+            });
+        }
+
         const rows = Object.entries(byUser).map(([uid, data]) => {
           const prof = profiles[uid];
           const name = prof ? ([prof.first_name, prof.last_name].filter(Boolean).join(' ').trim() || prof.email || uid) : uid;
@@ -5791,8 +5858,9 @@
           const currentVal = data.currentVal > 0 ? data.currentVal : data.costBasis;
           const returnPct  = data.costBasis > 0 ? (currentVal - data.costBasis) / data.costBasis * 100 : 0;
           const pnl        = currentVal - data.costBasis;
+          const pending    = !!data.pending;
 
-          return { uid, name, invested: data.costBasis, currentVal, pnl, returnPct, days, inceptionDate };
+          return { uid, name, invested: data.costBasis, currentVal, pnl, returnPct, days, inceptionDate, pending };
         }).sort((a, b) => b.currentVal - a.currentVal);
 
         if (badge) badge.textContent = rows.length;
@@ -5807,12 +5875,14 @@
           const inceStr = r.inceptionDate
             ? new Date(r.inceptionDate).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'2-digit' })
             : '—';
+          const pendingRowBg = r.pending ? 'background:#fffbeb;border-left:3px solid #f59e0b;' : '';
+          const pendingBadge = r.pending ? '<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:2px 7px;border-radius:6px;text-transform:uppercase;letter-spacing:.04em;margin-left:6px;">Pending</span>' : '';
           return `
-            <div data-inv-idx="${idx}" style="padding:11px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;" class="investor-row-hover"
+            <div data-inv-idx="${idx}" style="padding:11px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;${pendingRowBg}" class="investor-row-hover"
               onclick="ovShowInvestorPreview(${idx})">
               <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:7px;">
                 <div style="min-width:0;flex:1;overflow:hidden;">
-                  <div style="font-size:12px;font-weight:600;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.name}</div>
+                  <div style="font-size:12px;font-weight:600;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.name}${pendingBadge}</div>
                   <div style="font-size:10px;color:#94a3b8;margin-top:1px;">Since ${inceStr} · ${r.days}d</div>
                 </div>
                 <div style="flex-shrink:0;padding-left:10px;padding-top:1px;">
