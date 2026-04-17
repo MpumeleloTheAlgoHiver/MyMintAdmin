@@ -9508,13 +9508,13 @@
         const buyNominal = totalBuyQty;
         const extraBuyNominal = totalExtraBuyQty;
         if (sellNominal > 0) {
-          tradeCsvRows.push({ side: "SELL", code: sellCode, nominal: sellNominal });
+          tradeCsvRows.push({ side: "SELL", code: sellIsinCode, nominal: sellNominal });
         }
         if (buyNominal > 0) {
-          tradeCsvRows.push({ side: "BUY", code: buyCode, nominal: buyNominal });
+          tradeCsvRows.push({ side: "BUY", code: buyIsinCode, nominal: buyNominal });
         }
         if (extraBuyNominal > 0) {
-          tradeCsvRows.push({ side: "BUY", code: extraBuyCode, nominal: extraBuyNominal });
+          tradeCsvRows.push({ side: "BUY", code: extraBuyIsinCode || "", nominal: extraBuyNominal });
         }
 
         return {
