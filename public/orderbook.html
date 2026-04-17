@@ -1348,6 +1348,7 @@
     let strategyFillStateById = new Map();
     let showActiveBooksFilledColumn = false;
     let isArchiveBooksLoading = true;
+    let settledBatchesForClosedBooks = [];
 
     const requireSession = async () => {
       const { data } = await supabaseClient.auth.getSession();
@@ -3696,7 +3697,60 @@
     const renderClosedBooks = (closedBooks) => {
       if (!closedBooksList) return;
 
-      if (!closedBooks.length) {
+      // ── Render settled rebalance batches ──
+      const settledHtml = (settledBatchesForClosedBooks || []).map((sb) => {
+        const isReversed = sb.batchStatus === 'REVERSED';
+        const statusPill = isReversed
+          ? '<span style="background:#fef2f2;color:#991b1b;border:1px solid #fca5a5;border-radius:999px;padding:3px 8px;font-size:0.72rem;font-weight:700;">Reversed</span>'
+          : '<span style="background:#ecfdf3;color:#166534;border:1px solid #86efac;border-radius:999px;padding:3px 8px;font-size:0.72rem;font-weight:700;">Settled</span>';
+        const dateLabel = sb.settledAt ? new Date(sb.settledAt).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+        const evtBody = sb.events.length
+          ? sb.events.map((r) => `
+            <tr>
+              <td>${escapeHtml(String(r.line))}</td>
+              <td>${escapeHtml(r.instrumentName)}</td>
+              <td class="orderbook-cell-muted">${escapeHtml(r.ticker)}</td>
+              <td>${escapeHtml(r.side)}</td>
+              <td>${escapeHtml(String(r.totalQuantity))}</td>
+              <td>${escapeHtml(r.avgFill)}</td>
+              <td>${escapeHtml(r.clientName)}</td>
+              <td>${escapeHtml(r.closedReason)}</td>
+            </tr>`).join('')
+          : '<tr><td class="orderbook-empty-row" colspan="8">No events.</td></tr>';
+
+        return `
+          <details class="filled-orderbook-item">
+            <summary class="filled-orderbook-summary">
+              <span>Rebalance — ${escapeHtml(sb.strategyName)} (${escapeHtml(sb.sellIsin)} → ${escapeHtml(sb.buyIsin)}${sb.extraBuyIsin ? ' + ' + escapeHtml(sb.extraBuyIsin) : ''})</span>
+              <span class="filled-orderbook-meta">
+                ${statusPill}
+                <span>${sb.clientCount} client${sb.clientCount !== 1 ? 's' : ''}</span>
+                <span>${escapeHtml(dateLabel)}</span>
+              </span>
+            </summary>
+            <div class="filled-orderbook-details">
+              <div class="orderbook-table-wrap">
+                <table class="orderbook-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Instrument</th>
+                      <th>Ticker</th>
+                      <th>Side</th>
+                      <th>Qty</th>
+                      <th>Fill Price</th>
+                      <th>Client</th>
+                      <th>Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>${evtBody}</tbody>
+                </table>
+              </div>
+            </div>
+          </details>`;
+      }).join('');
+
+      if (!closedBooks.length && !settledBatchesForClosedBooks.length) {
         closedBooksList.innerHTML = '<div class="filled-orderbook-empty">No closed books yet.</div>';
         return;
       }
@@ -3772,7 +3826,7 @@
             </div>
           </details>
         `;
-      }).join('');
+      }).join('') + settledHtml;
     };
 
     const sendFilledOrderbookEmail = async (snapshot) => {
@@ -4358,6 +4412,43 @@
 
       allBirSourceRows = rawRows;
       allOrderbookRawRows = settledRows;
+
+      // ── Build settled/reversed batches for Closed Books tab ──
+      settledBatchesForClosedBooks = rebBatches
+        .filter((b) => b.status === 'SETTLED' || b.status === 'REVERSED')
+        .map((b) => {
+          const batchEvents = rebEvents.filter((e) => e.batch_id === b.id);
+          const strategy = b.strategy_id ? (strategiesMap[b.strategy_id] || null) : null;
+          const evtRows = batchEvents.map((evt, idx) => {
+            const sec = securitiesMap[evt.security_id] || {};
+            const prof = profilesMap[evt.user_id] || {};
+            const profName = [prof.first_name, prof.last_name].filter(Boolean).join(' ').trim() || 'Unknown';
+            const fillCents = evt.avg_fill != null ? Number(evt.avg_fill) : (evt.price_at_commit != null ? Number(evt.price_at_commit) : null);
+            return {
+              line: idx + 1,
+              instrumentName: sec.name || sec.isin || '-',
+              ticker: sec.symbol || '-',
+              side: String(evt.trade_side || '').toUpperCase(),
+              totalQuantity: Number(evt.quantity || 0),
+              avgFill: fillCents != null ? `R ${(fillCents / 100).toFixed(2)}` : '-',
+              clientName: profName,
+              closedReason: evt.closed_reason || '',
+            };
+          });
+          return {
+            id: b.id,
+            batchStatus: b.status,
+            strategyName: b.strategy_name_snapshot || strategy?.name || 'Unknown Strategy',
+            settledAt: b.settled_at || b.reversed_at || b.updated_at || b.created_at,
+            sellIsin: b.sell_isin_code || '-',
+            buyIsin: b.buy_isin_code || '-',
+            extraBuyIsin: b.extra_buy_isin_code || null,
+            events: evtRows,
+            clientCount: [...new Set(batchEvents.map((e) => e.user_id))].length,
+          };
+        })
+        .sort((a, b) => new Date(b.settledAt).getTime() - new Date(a.settledAt).getTime());
+
       const allDisplayRows = [...pendingRows, ...settledRows];
       const aggregated = aggregateOrderbookRows(allDisplayRows);
       return groupByStrategy(aggregated, allDisplayRows);
@@ -4542,9 +4633,11 @@
         const buyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY');
         const walletBuyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY_WALLET');
 
-        // 1. Close/reduce existing SELL positions
+        const errors = [];
+
+        // ── 1. Close / reduce existing SELL positions for every user ──
         for (const evt of sellEvts) {
-          const { data: activePositions } = await supabaseClient
+          const { data: activePositions, error: fetchErr } = await supabaseClient
             .from('stock_holdings_c')
             .select('id, quantity')
             .eq('strategy_id', strategyId)
@@ -4552,59 +4645,129 @@
             .eq('security_id', evt.security_id)
             .eq('is_active', true)
             .eq('trade_side', 'BUY');
+
+          if (fetchErr) { errors.push(`SELL lookup: ${fetchErr.message}`); continue; }
+
           const activePos = (activePositions || []).find((p) => Number(p.quantity) > 0);
           if (activePos) {
             const soldQty = Number(evt.quantity) || 0;
             const remaining = Math.max(0, Number(activePos.quantity) - soldQty);
             if (remaining <= 0) {
-              await supabaseClient.from('stock_holdings_c').update({
-                is_active: false, closed_reason: 'POSITION_REPLACED', closed_at: nowIso,
-                updated_at: nowIso, avg_exit: sellFillCents, exit_date: fillDateStr, Status: 'inactive',
+              // Full close — mark position inactive
+              const { error: closeErr } = await supabaseClient.from('stock_holdings_c').update({
+                is_active: false,
+                closed_reason: 'REBALANCE_SELL',
+                closed_at: nowIso,
+                updated_at: nowIso,
+                avg_exit: sellFillCents,
+                "Exit_date": fillDateStr,
+                Status: 'inactive',
               }).eq('id', activePos.id);
+              if (closeErr) errors.push(`SELL close ${evt.user_id}: ${closeErr.message}`);
             } else {
-              await supabaseClient.from('stock_holdings_c').update({ quantity: remaining, updated_at: nowIso }).eq('id', activePos.id);
+              // Partial reduce — keep position active with reduced qty
+              const { error: reduceErr } = await supabaseClient.from('stock_holdings_c').update({
+                quantity: remaining,
+                updated_at: nowIso,
+              }).eq('id', activePos.id);
+              if (reduceErr) errors.push(`SELL reduce ${evt.user_id}: ${reduceErr.message}`);
             }
           }
-          // Insert SELL audit row
-          await supabaseClient.from('stock_holdings_c').insert({
-            user_id: evt.user_id, security_id: evt.security_id, quantity: Number(evt.quantity) || 0,
-            strategy_id: strategyId, trade_side: 'SELL', is_active: false,
-            avg_fill: sellFillCents, fill_date: fillDateStr, Fill_date: fillDateStr,
-            rebalance_batch_id: batch.id, strategy_name_snapshot: batch.strategy_name_snapshot,
-            updated_at: nowIso, Status: 'inactive', closed_reason: 'SELL_SETTLED',
-            closed_at: nowIso, avg_exit: sellFillCents, exit_date: fillDateStr,
+
+          // Insert SELL audit row into stock_holdings_c
+          const { error: sellInsertErr } = await supabaseClient.from('stock_holdings_c').insert({
+            user_id: evt.user_id,
+            security_id: evt.security_id,
+            quantity: Number(evt.quantity) || 0,
+            strategy_id: strategyId,
+            trade_side: 'SELL',
+            is_active: false,
+            avg_fill: sellFillCents,
+            "Fill_date": fillDateStr,
+            rebalance_batch_id: batch.id,
+            strategy_name_snapshot: batch.strategy_name_snapshot,
+            created_at: nowIso,
+            updated_at: nowIso,
+            Status: 'inactive',
+            closed_reason: 'REBALANCE_SELL',
+            closed_at: nowIso,
+            avg_exit: sellFillCents,
+            "Exit_date": fillDateStr,
+            as_of_date: fillDateStr,
           });
-          await supabaseClient.from('rebalance_event').update({ avg_fill: sellFillCents, fill_date: fillDateStr, updated_at: nowIso }).eq('id', evt.id);
+          if (sellInsertErr) errors.push(`SELL audit ${evt.user_id}: ${sellInsertErr.message}`);
+
+          // Update rebalance_event with fill info
+          const { error: evtUpErr } = await supabaseClient
+            .from('rebalance_event')
+            .update({ avg_fill: sellFillCents, fill_date: fillDateStr, updated_at: nowIso })
+            .eq('id', evt.id);
+          if (evtUpErr) errors.push(`SELL event update: ${evtUpErr.message}`);
         }
 
-        // 2. Settle BUY events (primary and wallet)
-        const applyBuySettlement = async (buyEvtList, fillCents) => {
+        // ── 2. Create new BUY holdings for every user (primary + wallet) ──
+        const applyBuySettlement = async (buyEvtList, fillCents, label) => {
           for (const evt of buyEvtList) {
             const qty = Number(evt.quantity) || 0;
             if (qty <= 0) continue;
-            const { data: insertedBuy } = await supabaseClient.from('stock_holdings_c').insert({
-              user_id: evt.user_id, security_id: evt.security_id, quantity: qty,
-              strategy_id: strategyId, trade_side: 'BUY', is_active: true,
-              avg_fill: fillCents, fill_date: fillDateStr, Fill_date: fillDateStr,
-              rebalance_batch_id: batch.id, strategy_name_snapshot: batch.strategy_name_snapshot,
-              updated_at: nowIso, Status: 'active',
-            }).select('id').single();
+
+            const { data: insertedBuy, error: buyInsertErr } = await supabaseClient
+              .from('stock_holdings_c')
+              .insert({
+                user_id: evt.user_id,
+                security_id: evt.security_id,
+                quantity: qty,
+                strategy_id: strategyId,
+                trade_side: 'BUY',
+                is_active: true,
+                avg_fill: fillCents,
+                "Fill_date": fillDateStr,
+                rebalance_batch_id: batch.id,
+                strategy_name_snapshot: batch.strategy_name_snapshot,
+                created_at: nowIso,
+                updated_at: nowIso,
+                Status: 'active',
+                closed_reason: evt.closed_reason || 'REBALANCE_EVENT_BUY',
+                as_of_date: fillDateStr,
+              })
+              .select('id')
+              .single();
+
+            if (buyInsertErr) {
+              errors.push(`${label} insert ${evt.user_id}: ${buyInsertErr.message}`);
+              continue;
+            }
+
             const settledId = insertedBuy?.id || null;
-            await supabaseClient.from('rebalance_event').update({
-              avg_fill: fillCents, fill_date: fillDateStr, updated_at: nowIso,
-              settled_holding_id: settledId,
-            }).eq('id', evt.id);
+            const { error: evtUpErr } = await supabaseClient
+              .from('rebalance_event')
+              .update({
+                avg_fill: fillCents,
+                fill_date: fillDateStr,
+                updated_at: nowIso,
+                settled_holding_id: settledId,
+              })
+              .eq('id', evt.id);
+            if (evtUpErr) errors.push(`${label} event update: ${evtUpErr.message}`);
           }
         };
 
-        await applyBuySettlement(buyEvts, buyFillCents);
-        if (walletBuyEvts.length) await applyBuySettlement(walletBuyEvts, extraBuyFillCents || buyFillCents);
+        await applyBuySettlement(buyEvts, buyFillCents, 'BUY');
+        if (walletBuyEvts.length) {
+          await applyBuySettlement(walletBuyEvts, extraBuyFillCents || buyFillCents, 'WALLET_BUY');
+        }
 
-        // 3. Mark batch SETTLED
+        // ── 3. Mark batch SETTLED ──
         const { error: settleErr } = await supabaseClient.from('rebalance_batch').update({
           status: 'SETTLED', settled_at: nowIso, updated_at: nowIso,
         }).eq('id', batch.id);
         if (settleErr) throw new Error(settleErr.message);
+
+        // Report any non-fatal errors that occurred during settlement
+        if (errors.length) {
+          console.error('Settlement completed with warnings:', errors);
+          throw new Error(`Batch settled but ${errors.length} holding update(s) had issues:\n${errors.join('\n')}`);
+        }
       };
 
       /* ── Reverse Rebalance Batch ── */
