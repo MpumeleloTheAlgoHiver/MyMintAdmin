@@ -4773,25 +4773,75 @@
       /* ── Reverse Rebalance Batch ── */
       const executeReverseRebalanceBatch = async (batchId) => {
         const reason = prompt(
-          'Reverse this pending rebalance batch?\n\nThis will mark all events as REVERSED and restore the batch to a non-actionable state.\n\nEnter a reason (optional):',
+          'Reverse this pending rebalance batch?\n\nThis will:\n• Mark all events as REVERSED\n• Restore the strategy composition to its pre-rebalance state\n• Restore wallet balances to their pre-rebalance values\n\nEnter a reason (optional):',
           ''
         );
         if (reason === null) return;
         try {
           const nowIso = new Date().toISOString();
           const { data: batch, error: bErr } = await supabaseClient
-            .from('rebalance_batch').select('id, holdings_snapshot_before, wallet_snapshot_before').eq('id', batchId).single();
+            .from('rebalance_batch')
+            .select('id, strategy_id, holdings_snapshot_before, wallet_snapshot_before')
+            .eq('id', batchId).single();
           if (bErr) throw new Error(bErr.message);
 
-          await supabaseClient.from('rebalance_event').update({ closed_reason: 'REVERSED', updated_at: nowIso }).eq('batch_id', batchId);
+          const errors = [];
+
+          // 1. Mark all events as REVERSED
+          const { error: evtErr } = await supabaseClient.from('rebalance_event')
+            .update({ closed_reason: 'REVERSED', updated_at: nowIso })
+            .eq('batch_id', batchId);
+          if (evtErr) errors.push('Events: ' + evtErr.message);
+
+          // 2. Mark batch as REVERSED
           const { error: rErr } = await supabaseClient.from('rebalance_batch').update({
             status: 'REVERSED', is_reversed: true, reversed_at: nowIso,
             reversed_reason: reason.trim() || 'Manual reversal', updated_at: nowIso,
           }).eq('id', batchId);
-          if (rErr) throw new Error(rErr.message);
+          if (rErr) errors.push('Batch: ' + rErr.message);
+
+          // 3. Restore strategy composition from snapshot
+          if (batch.strategy_id && batch.holdings_snapshot_before) {
+            const { error: stratErr } = await supabaseClient
+              .from('strategies_c')
+              .update({ holdings: batch.holdings_snapshot_before, updated_at: nowIso })
+              .eq('id', batch.strategy_id);
+            if (stratErr) errors.push('Strategy restore: ' + stratErr.message);
+          }
+
+          // 4. Restore wallet balances from snapshot
+          if (batch.strategy_id && batch.wallet_snapshot_before && typeof batch.wallet_snapshot_before === 'object') {
+            const walletRows = Object.entries(batch.wallet_snapshot_before)
+              .map(([userId, balance]) => ({
+                strategy_id: batch.strategy_id,
+                user_id: userId,
+                balance: Number(balance) || 0,
+                updated_at: nowIso,
+              }))
+              .filter((r) => r.user_id);
+            if (walletRows.length) {
+              const { error: walletErr } = await supabaseClient
+                .from('strategy_client_wallet_credits')
+                .upsert(walletRows, { onConflict: 'strategy_id,user_id' });
+              if (walletErr) errors.push('Wallet restore: ' + walletErr.message);
+            }
+          }
+
+          // 5. Delete any stock_holdings_c rows that were created by this batch's settlement
+          //    (in case the batch was settled before reversal — safety net)
+          const { error: holdingsDelErr } = await supabaseClient
+            .from('stock_holdings_c')
+            .delete()
+            .eq('rebalance_batch_id', batchId);
+          if (holdingsDelErr) errors.push('Holdings cleanup: ' + holdingsDelErr.message);
 
           loadOrderbook().catch(console.error);
-          alert('Batch reversed successfully.');
+
+          if (errors.length) {
+            alert('Batch reversed with warnings:\n' + errors.join('\n'));
+          } else {
+            alert('Batch reversed successfully. Strategy composition and wallets restored.');
+          }
         } catch (err) {
           alert('Reversal failed: ' + err.message);
         }
