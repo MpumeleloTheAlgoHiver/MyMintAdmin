@@ -1022,6 +1022,131 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.url.startsWith('/api/invite-admin') && req.method === 'POST') {
+    const token = parseBearerToken(req.headers.authorization);
+    if (!token) {
+      sendJson(res, 401, { error: 'Missing Authorization bearer token' });
+      return;
+    }
+
+    (async () => {
+      try {
+        const body = await readJsonBody(req);
+        const { email, full_name, role, page_permissions } = body;
+
+        if (!email) {
+          sendJson(res, 400, { error: 'Missing email' });
+          return;
+        }
+
+        // Verify requester is an admin
+        const adminProfile = await fetchSupabaseJson(
+          `/rest/v1/admin_profiles?select=role&user_id=eq.${encodeURIComponent((await fetchSupabaseJson('/auth/v1/user', token, false)).id)}`,
+          token,
+          false
+        );
+        const profile = Array.isArray(adminProfile) ? adminProfile[0] : null;
+        if (!profile || profile.role !== 'admin') {
+          sendJson(res, 403, { error: 'Only admins can invite team members' });
+          return;
+        }
+
+        // Create auth user via Supabase Admin API
+        const inviteUrl = `${supabaseUrl}/auth/v1/admin/users`;
+        const inviteRes = await fetch(inviteUrl, {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseServiceRoleKey,
+            'Authorization': `Bearer ${supabaseServiceRoleKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email,
+            password: crypto.randomBytes(16).toString('hex'),
+            email_confirm: false,
+            user_metadata: {}
+          })
+        });
+
+        let invitePayload = null;
+        try {
+          invitePayload = await inviteRes.json();
+        } catch { }
+
+        if (!inviteRes.ok) {
+          const msg = invitePayload?.message || invitePayload?.error_description || `Failed to create user`;
+          sendJson(res, inviteRes.status, { error: msg });
+          return;
+        }
+
+        const userId = invitePayload?.id;
+        if (!userId) {
+          sendJson(res, 500, { error: 'User created but no ID returned' });
+          return;
+        }
+
+        // Insert into admin_profiles
+        const profileInsertUrl = `${supabaseUrl}/rest/v1/admin_profiles`;
+        const insertRes = await fetch(profileInsertUrl, {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseServiceRoleKey,
+            'Authorization': `Bearer ${supabaseServiceRoleKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            email,
+            full_name: full_name || null,
+            role: role || 'staff',
+            page_permissions: page_permissions || [],
+            invited_by: (await fetchSupabaseJson('/auth/v1/user', token, false)).id
+          })
+        });
+
+        let insertPayload = null;
+        try {
+          insertPayload = await insertRes.json();
+        } catch { }
+
+        if (!insertRes.ok) {
+          const msg = insertPayload?.message || insertPayload?.error || `Failed to save profile`;
+          sendJson(res, insertRes.status, { error: msg });
+          return;
+        }
+
+        // Send invite email via Supabase (they'll get a magic link)
+        const inviteEmailUrl = `${supabaseUrl}/auth/v1/admin/users/${userId}/send_invite_email`;
+        const emailRes = await fetch(inviteEmailUrl, {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseServiceRoleKey,
+            'Authorization': `Bearer ${supabaseServiceRoleKey}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!emailRes.ok) {
+          console.warn(`[Invite] Email send failed for ${email}, but user was created`);
+        }
+
+        sendJson(res, 200, {
+          ok: true,
+          message: `Invite sent to ${email}`,
+          user_id: userId
+        });
+      } catch (err) {
+        sendJson(res, 500, {
+          error: 'Failed to invite team member',
+          details: err?.message || 'Unknown error'
+        });
+      }
+    })();
+
+    return;
+  }
+
   const urlWithoutQuery = req.url.split('?')[0];
   const requestPath = urlWithoutQuery === '/' ? '/index.html' : urlWithoutQuery;
   const safePath = path.normalize(requestPath).replace(/^([/\\])+/, '');

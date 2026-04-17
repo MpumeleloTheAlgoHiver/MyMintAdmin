@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRM — Team</title>
+  <style>html{opacity:0}</style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #f5f6fa;
+      --surface: #ffffff;
+      --border: #e8defa;
+      --text: #22163a;
+      --text-muted: #756a90;
+      --primary: #7c3aed;
+      --primary-strong: #5b21b6;
+      --primary-soft: #ede9fe;
+    }
+    body { font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); min-height: 100vh; color: var(--text); }
+    /* Sidebar */
+    .sidebar { position: fixed; left: 0; top: 0; width: 220px; height: 100vh; background: #fff; border-right: 1px solid #ede9fe; display: flex; flex-direction: column; z-index: 1000; overflow: hidden; }
+    .sidebar-header { display: flex; align-items: center; gap: 10px; padding: 20px 20px 16px; border-bottom: 1px solid #f3f0ff; }
+    .sidebar-logo { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .sidebar-brand { display: flex; flex-direction: column; }
+    .sidebar-brand-name { font-size: 14px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em; line-height: 1.2; }
+    .sidebar-brand-sub { font-size: 10px; color: #94a3b8; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+    .sidebar-nav { flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 16px 12px; overflow-y: auto; }
+    .sidebar-section-label { font-size: 10px; font-weight: 600; color: #94a3b8; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 8px 4px; margin-top: 8px; }
+    .sidebar-section-label:first-child { margin-top: 0; }
+    .nav-icon { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: pointer; transition: all 0.15s ease; text-decoration: none; color: #64748b; font-size: 13px; font-weight: 500; white-space: nowrap; }
+    .nav-icon svg { width: 18px; height: 18px; fill: #94a3b8; transition: fill 0.15s ease; flex-shrink: 0; }
+    .nav-icon:hover { background: #f5f3ff; color: #5b21b6; }
+    .nav-icon:hover svg { fill: #7c3aed; }
+    .nav-icon.active { background: #ede9fe; color: #5b21b6; font-weight: 600; }
+    .nav-icon.active svg { fill: #7c3aed; }
+    .sidebar-footer { border-top: 1px solid #f1f5f9; padding: 12px; }
+    .sidebar-user { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; margin-bottom: 4px; }
+    .sidebar-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0; }
+    .sidebar-user-info { flex: 1; min-width: 0; }
+    .sidebar-user-name { font-size: 12px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sidebar-user-role { font-size: 10px; color: #94a3b8; font-weight: 500; }
+    .sidebar-signout { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: pointer; color: #ef4444; font-size: 13px; font-weight: 500; transition: all 0.15s ease; border: none; background: none; width: 100%; text-align: left; }
+    .sidebar-signout svg { width: 18px; height: 18px; fill: #ef4444; flex-shrink: 0; }
+    .sidebar-signout:hover { background: #fef2f2; }
+    /* Main */
+    .main-content { margin-left: 220px; min-height: 100vh; padding: 32px 40px; }
+    .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+    .page-title { font-size: 1.4rem; font-weight: 700; color: var(--text); }
+    .page-sub { font-size: 0.85rem; color: var(--text-muted); margin-top: 2px; }
+    /* Invite button */
+    .btn-primary { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; background: var(--primary); color: #fff; border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .btn-primary:hover { background: var(--primary-strong); }
+    .btn-primary svg { width: 16px; height: 16px; fill: #fff; }
+    /* Team table */
+    .team-card { background: #fff; border: 1px solid #ede9fe; border-radius: 16px; overflow: hidden; }
+    .team-table { width: 100%; border-collapse: collapse; }
+    .team-table th { padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid #f1f0ff; background: #faf9ff; }
+    .team-table td { padding: 14px 16px; font-size: 13px; color: var(--text); border-bottom: 1px solid #f5f3ff; vertical-align: middle; }
+    .team-table tr:last-child td { border-bottom: none; }
+    .team-table tr:hover td { background: #faf9ff; }
+    .member-info { display: flex; align-items: center; gap: 10px; }
+    .member-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0; }
+    .member-name { font-weight: 600; font-size: 13px; }
+    .member-email { font-size: 11px; color: var(--text-muted); }
+    .role-badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    .role-badge.admin { background: #ede9fe; color: #5b21b6; }
+    .role-badge.staff { background: #f1f5f9; color: #475569; }
+    .perms-wrap { display: flex; flex-wrap: wrap; gap: 4px; }
+    .perm-tag { display: inline-block; padding: 2px 8px; background: #f5f3ff; border: 1px solid #ede9fe; border-radius: 6px; font-size: 11px; color: #6d28d9; font-weight: 500; }
+    .action-btn { padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid; transition: all 0.15s; }
+    .action-btn.edit { color: var(--primary); border-color: #ede9fe; background: #fff; }
+    .action-btn.edit:hover { background: var(--primary-soft); }
+    .action-btn.remove { color: #ef4444; border-color: #fee2e2; background: #fff; }
+    .action-btn.remove:hover { background: #fef2f2; }
+    .actions-cell { display: flex; gap: 6px; }
+    /* Empty state */
+    .empty-state { text-align: center; padding: 48px 24px; color: var(--text-muted); }
+    .empty-state svg { width: 40px; height: 40px; fill: #c4b5fd; margin-bottom: 12px; }
+    /* Modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(15,10,30,0.45); z-index: 2000; display: none; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 20px; padding: 28px; width: 100%; max-width: 480px; box-shadow: 0 24px 60px rgba(80,38,157,0.2); }
+    .modal-title { font-size: 1.1rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .modal-sub { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 20px; }
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+    .form-input { width: 100%; padding: 10px 12px; border: 1px solid #e2d9f3; border-radius: 10px; font-size: 13px; color: var(--text); outline: none; transition: border-color 0.15s; }
+    .form-input:focus { border-color: var(--primary); }
+    .form-select { width: 100%; padding: 10px 12px; border: 1px solid #e2d9f3; border-radius: 10px; font-size: 13px; color: var(--text); outline: none; background: #fff; cursor: pointer; }
+    .perms-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .perm-checkbox { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #ede9fe; border-radius: 8px; cursor: pointer; transition: background 0.12s; }
+    .perm-checkbox:hover { background: #faf7ff; }
+    .perm-checkbox input { accent-color: var(--primary); width: 14px; height: 14px; cursor: pointer; }
+    .perm-checkbox label { font-size: 12px; font-weight: 500; color: var(--text); cursor: pointer; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+    .btn-secondary { padding: 10px 18px; background: #fff; color: var(--text-muted); border: 1px solid #e2d9f3; border-radius: 10px; font-size: 13px; font-weight: 500; cursor: pointer; }
+    .btn-secondary:hover { background: #faf7ff; }
+    .modal-error { font-size: 12px; color: #dc2626; margin-top: 12px; display: none; }
+    .modal-success { font-size: 12px; color: #16a34a; margin-top: 12px; display: none; }
+    .perms-note { font-size: 11px; color: #94a3b8; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <img src="/icon.png" alt="Mint logo" style="width:34px;height:34px;border-radius:8px;" />
+      </div>
+      <div class="sidebar-brand">
+        <span class="sidebar-brand-name">Mint</span>
+        <span class="sidebar-brand-sub">Admin Panel</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="sidebar-section-label">Main</span>
+      <a class="nav-icon" href="/index.html" aria-label="Clients">
+        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        Clients
+      </a>
+
+      <span class="sidebar-section-label">Investments</span>
+      <a class="nav-icon" href="/dashboard.html" aria-label="Dashboard">
+        <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+        Dashboard
+      </a>
+      <a class="nav-icon" href="/factsheets.html" aria-label="Factsheets">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+        Factsheets
+      </a>
+      <a class="nav-icon" href="/investors.html" aria-label="Investors">
+        <svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
+        Investors
+      </a>
+
+      <span class="sidebar-section-label">Banking</span>
+      <a class="nav-icon" href="/eft.html" aria-label="EFT Payments">
+        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
+        EFT Payments
+      </a>
+      <a class="nav-icon" href="/orderbook.html" aria-label="Order Book">
+        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
+        Order Book
+      </a>
+
+      <span class="sidebar-section-label">System</span>
+      <a class="nav-icon" href="/settings.html" aria-label="Settings">
+        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        Settings
+      </a>
+      <a class="nav-icon active" href="/team.html" aria-label="Team">
+        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        Team
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar" id="sidebarAvatarInitials">A</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name" id="sidebarUserEmail">Admin</div>
+          <div class="sidebar-user-role">Administrator</div>
+        </div>
+      </div>
+      <button class="sidebar-signout" id="signOutBtn">
+        <svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+        Sign out
+      </button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Team</div>
+        <div class="page-sub">Manage admin access and page permissions</div>
+      </div>
+      <button class="btn-primary" id="inviteBtn">
+        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        Invite member
+      </button>
+    </div>
+
+    <div class="team-card">
+      <table class="team-table">
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Role</th>
+            <th>Page access</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="teamTableBody">
+          <tr>
+            <td colspan="4">
+              <div class="empty-state">
+                <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                <div>Loading team...</div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- Invite / Edit Modal -->
+  <div class="modal-overlay" id="memberModal">
+    <div class="modal">
+      <div class="modal-title" id="modalTitle">Invite team member</div>
+      <div class="modal-sub" id="modalSub">They'll receive an invite email from Supabase to set their password.</div>
+
+      <div class="form-group" id="emailGroup">
+        <label class="form-label" for="inviteEmail">Email address</label>
+        <input class="form-input" type="email" id="inviteEmail" placeholder="name@company.com" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="inviteFullName">Full name (optional)</label>
+        <input class="form-input" type="text" id="inviteFullName" placeholder="Jane Smith" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="inviteRole">Role</label>
+        <select class="form-select" id="inviteRole">
+          <option value="staff">Staff — restricted to selected pages</option>
+          <option value="admin">Admin — full access + can manage team</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="permissionsGroup">
+        <label class="form-label">Page access</label>
+        <div class="perms-grid" id="permsGrid"></div>
+        <div class="perms-note">Admins always have full access — permissions only apply to Staff.</div>
+      </div>
+
+      <div class="modal-error" id="modalError"></div>
+      <div class="modal-success" id="modalSuccess"></div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" id="modalCancelBtn">Cancel</button>
+        <button class="btn-primary" id="modalSaveBtn">Send invite</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>const PAGE_KEY = 'team';</script>
+  <script src="/auth-guard.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const ALL_PAGES = [
+      { key: 'profiles',   label: 'Clients' },
+      { key: 'dashboard',  label: 'Dashboard' },
+      { key: 'strategies', label: 'Strategies' },
+      { key: 'factsheets', label: 'Factsheets' },
+      { key: 'investors',  label: 'Investors' },
+      { key: 'eft',        label: 'EFT Payments' },
+      { key: 'orderbook',  label: 'Order Book' },
+      { key: 'settings',   label: 'Settings' },
+      { key: 'team',       label: 'Team' },
+    ];
+
+    let editingUserId = null;
+
+    // ── Load team ──────────────────────────────────────────────────────────────
+
+    async function loadTeam() {
+      const { data, error } = await supabaseClient
+        .from('admin_profiles')
+        .select('user_id, email, full_name, role, page_permissions, created_at')
+        .order('created_at', { ascending: true });
+
+      const tbody = document.getElementById('teamTableBody');
+
+      if (error || !data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">
+          <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+          <div>No team members found</div></div></td></tr>`;
+        return;
+      }
+
+      const currentUserId = window.__adminProfile?.user_id;
+
+      tbody.innerHTML = data.map(member => {
+        const initials = (member.full_name || member.email || '?').charAt(0).toUpperCase();
+        const display = member.full_name || member.email;
+        const isMe = member.user_id === currentUserId;
+
+        const permsHtml = member.role === 'admin'
+          ? '<span style="font-size:12px;color:#94a3b8;">All pages</span>'
+          : (member.page_permissions.length === 0
+              ? '<span style="font-size:12px;color:#ef4444;">No access</span>'
+              : member.page_permissions.map(p => {
+                  const pg = ALL_PAGES.find(x => x.key === p);
+                  return `<span class="perm-tag">${pg ? pg.label : p}</span>`;
+                }).join(''));
+
+        const actionsHtml = isMe ? '' : `
+          <button class="action-btn edit" onclick="openEdit('${member.user_id}')">Edit</button>
+          <button class="action-btn remove" onclick="removeMember('${member.user_id}')">Remove</button>
+        `;
+
+        return `<tr>
+          <td>
+            <div class="member-info">
+              <div class="member-avatar">${initials}</div>
+              <div>
+                <div class="member-name">${display}${isMe ? ' <span style="font-size:10px;color:#94a3b8;">(you)</span>' : ''}</div>
+                <div class="member-email">${member.email}</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="role-badge ${member.role}">${member.role === 'admin' ? 'Admin' : 'Staff'}</span></td>
+          <td><div class="perms-wrap">${permsHtml}</div></td>
+          <td><div class="actions-cell">${actionsHtml}</div></td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ── Modal helpers ──────────────────────────────────────────────────────────
+
+    function buildPermsGrid(selected = []) {
+      const grid = document.getElementById('permsGrid');
+      grid.innerHTML = ALL_PAGES.map(pg => `
+        <div class="perm-checkbox">
+          <input type="checkbox" id="perm_${pg.key}" value="${pg.key}" ${selected.includes(pg.key) ? 'checked' : ''}>
+          <label for="perm_${pg.key}">${pg.label}</label>
+        </div>
+      `).join('');
+    }
+
+    function getSelectedPerms() {
+      return ALL_PAGES
+        .filter(pg => document.getElementById(`perm_${pg.key}`)?.checked)
+        .map(pg => pg.key);
+    }
+
+    function setModalError(msg) {
+      const el = document.getElementById('modalError');
+      el.textContent = msg;
+      el.style.display = msg ? 'block' : 'none';
+      document.getElementById('modalSuccess').style.display = 'none';
+    }
+
+    function setModalSuccess(msg) {
+      const el = document.getElementById('modalSuccess');
+      el.textContent = msg;
+      el.style.display = msg ? 'block' : 'none';
+      document.getElementById('modalError').style.display = 'none';
+    }
+
+    function openInvite() {
+      editingUserId = null;
+      document.getElementById('modalTitle').textContent = 'Invite team member';
+      document.getElementById('modalSub').textContent = "They'll receive an invite email from Supabase to set their password.";
+      document.getElementById('modalSaveBtn').textContent = 'Send invite';
+      document.getElementById('emailGroup').style.display = 'block';
+      document.getElementById('inviteEmail').value = '';
+      document.getElementById('inviteFullName').value = '';
+      document.getElementById('inviteRole').value = 'staff';
+      buildPermsGrid([]);
+      setModalError('');
+      setModalSuccess('');
+      document.getElementById('memberModal').classList.add('open');
+    }
+
+    async function openEdit(userId) {
+      const { data: member } = await supabaseClient
+        .from('admin_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (!member) return;
+
+      editingUserId = userId;
+      document.getElementById('modalTitle').textContent = 'Edit member';
+      document.getElementById('modalSub').textContent = member.email;
+      document.getElementById('modalSaveBtn').textContent = 'Save changes';
+      document.getElementById('emailGroup').style.display = 'none';
+      document.getElementById('inviteFullName').value = member.full_name || '';
+      document.getElementById('inviteRole').value = member.role;
+      buildPermsGrid(member.page_permissions || []);
+      setModalError('');
+      setModalSuccess('');
+      document.getElementById('memberModal').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('memberModal').classList.remove('open');
+      editingUserId = null;
+    }
+
+    // ── Save (invite or update) ────────────────────────────────────────────────
+
+    document.getElementById('modalSaveBtn').addEventListener('click', async () => {
+      const role = document.getElementById('inviteRole').value;
+      const fullName = document.getElementById('inviteFullName').value.trim();
+      const perms = role === 'admin'
+        ? ALL_PAGES.map(p => p.key)
+        : getSelectedPerms();
+
+      if (editingUserId) {
+        // Update existing member
+        const { error } = await supabaseClient
+          .from('admin_profiles')
+          .update({ role, full_name: fullName || null, page_permissions: perms })
+          .eq('user_id', editingUserId);
+
+        if (error) { setModalError(error.message); return; }
+        setModalSuccess('Changes saved.');
+        await loadTeam();
+        setTimeout(closeModal, 800);
+      } else {
+        // Invite new member via Supabase Auth invite
+        const email = document.getElementById('inviteEmail').value.trim();
+        if (!email) { setModalError('Please enter an email address.'); return; }
+
+        // Create the auth user via admin invite (requires service role — done server-side)
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        const token = sessionData?.session?.access_token;
+
+        const res = await fetch('/api/invite-admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ email, full_name: fullName || null, role, page_permissions: perms }),
+        });
+
+        const json = await res.json();
+        if (!res.ok) { setModalError(json.error || 'Failed to send invite.'); return; }
+
+        setModalSuccess("Invite sent! They'll receive an email to set their password.");
+        await loadTeam();
+        setTimeout(closeModal, 1200);
+      }
+    });
+
+    // ── Remove member ─────────────────────────────────────────────────────────
+
+    async function removeMember(userId) {
+      if (!confirm('Remove this member from the team? They will no longer be able to sign in.')) return;
+
+      const { error } = await supabaseClient
+        .from('admin_profiles')
+        .delete()
+        .eq('user_id', userId);
+
+      if (error) { alert(error.message); return; }
+      await loadTeam();
+    }
+
+    // ── Event bindings ────────────────────────────────────────────────────────
+
+    document.getElementById('inviteBtn').addEventListener('click', openInvite);
+    document.getElementById('modalCancelBtn').addEventListener('click', closeModal);
+    document.getElementById('memberModal').addEventListener('click', e => {
+      if (e.target === document.getElementById('memberModal')) closeModal();
+    });
+
+    document.getElementById('signOutBtn').addEventListener('click', async () => {
+      await supabaseClient.auth.signOut();
+      window.location.replace('/signin.html');
+    });
+
+    // Hide permissions group when admin role is selected
+    document.getElementById('inviteRole').addEventListener('change', e => {
+      document.getElementById('permissionsGroup').style.opacity = e.target.value === 'admin' ? '0.4' : '1';
+    });
+
+    loadTeam();
+  </script>
+</body>
+</html>
