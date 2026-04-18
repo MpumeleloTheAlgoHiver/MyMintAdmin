@@ -258,7 +258,7 @@
         const sec = securitiesMap.get(sym) || securitiesMap.get(normalizeSymbol(sym));
         if (sec?.last_price != null) {
           const shares = Number(h.shares || h.quantity || 1);
-          total += shares * (Number(sec.last_price) / 100);
+          total += shares * Number(sec.last_price);
           matched++;
         }
       }
@@ -369,7 +369,7 @@
         const sec = securitiesMap.get(sym) || securitiesMap.get(normalizeSymbol(sym));
         const rawWeight = Number(h.weight) || 0;
         const weightNorm = totalWeight > 0 ? (rawWeight / totalWeight) * 100 : rawWeight;
-        const price = sec?.last_price ? Number(sec.last_price) / 100 : 0;
+        const price = sec?.last_price ? Number(sec.last_price) : 0;
         const shares = Number(h.shares || h.quantity || 1);
         const mv = shares * price;
         const dailyChange = sec?.change_percent != null ? Number(sec.change_percent) : null;

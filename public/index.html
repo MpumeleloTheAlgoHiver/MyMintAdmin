@@ -4059,7 +4059,7 @@
         const security = securitiesByIdMap[row.security_id] || {};
         const label = security.symbol || security.name || row.security_id || '-';
         const status = row.status || row.Status || '-';
-        const currentPrice = security.last_price ? Number(security.last_price) / 100 : 0;
+        const currentPrice = security.last_price ? Number(security.last_price) : 0;
         const qty = Number(row.quantity) || 0;
         const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
         const mv = currentPrice ? qty * currentPrice : (Number(row.market_value) || 0);
@@ -4216,7 +4216,7 @@
         const security = securitiesByIdMap[row.security_id] || {};
         const label = security.name || security.symbol || row.security_id || '-';
         const status = row.status || row.Status || '-';
-        const currentPrice = security.last_price ? Number(security.last_price) / 100 : 0;
+        const currentPrice = security.last_price ? Number(security.last_price) : 0;
         const qty = Number(row.quantity) || 0;
         const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
         const mv = currentPrice ? qty * currentPrice : (Number(row.market_value) || 0);
@@ -5379,7 +5379,7 @@
       const qty = row.quantity === null || row.quantity === undefined ? 0 : Number(row.quantity);
       const quantityStr = qty ? formatNumber(qty, 2) : '-';
 
-      const currentPrice = security.last_price ? Number(security.last_price) / 100 : 0;
+      const currentPrice = security.last_price ? Number(security.last_price) : 0;
       const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
 
       let liveMarketValue = qty * currentPrice;
@@ -5442,7 +5442,7 @@
       let totalBottomValue = 0;
       holdings.forEach(row => {
         const security = securitiesByIdMap[row.security_id] || {};
-        const currentPrice = security.last_price ? Number(security.last_price) / 100 : 0;
+        const currentPrice = security.last_price ? Number(security.last_price) : 0;
         const qty = Number(row.quantity) || 0;
         const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
         const mv = currentPrice ? qty * currentPrice : (Number(row.market_value) || 0);

@@ -2486,7 +2486,7 @@
           const security =
             securitiesMap.get(symbol) || securitiesMap.get(normalizedSym);
           if (security && security.last_price != null) {
-            const price = Number(security.last_price) / 100;
+            const price = Number(security.last_price);
             if (!price || price <= 0 || !isFinite(price)) continue;
             const shares = Number(holding.shares || holding.quantity || 1);
             total += shares * price;
@@ -2608,7 +2608,7 @@
             <p class="text-xs text-slate-400">${s._sym}</p>
           </div>
           <div class="text-right flex-shrink-0">
-            <p class="text-xs font-medium text-slate-700">${s.last_price ? "R " + (Number(s.last_price) / 100).toFixed(2) : "N/A"}</p>
+            <p class="text-xs font-medium text-slate-700">${s.last_price ? "R " + (Number(s.last_price)).toFixed(2) : "N/A"}</p>
             <p class="text-[10px] ${s._hasHoldings ? "text-violet-600" : "text-slate-400"}">${s._hasHoldings ? s._totalShares.toLocaleString() + " shares" : "No data"}</p>
           </div>
         </button>
@@ -2659,7 +2659,7 @@
       const recalculate = () => {
         let totalMarketValue = 0;
         formHoldings.forEach((h) => {
-          const price = h.last_price ? Number(h.last_price) / 100 : 0;
+          const price = h.last_price ? Number(h.last_price) : 0;
           h.market_value = h.shares * price;
           totalMarketValue += h.market_value;
         });
@@ -2744,7 +2744,7 @@
             const ytdStr = ytd != null ? (ytd >= 0 ? "+" : "") + ytd.toFixed(2) + "%" : "—";
             const ytdColor = ytd == null ? "#94a3b8" : ytd >= 0 ? "#16a34a" : "#dc2626";
 
-            const priceFmt = h.last_price ? "R " + (Number(h.last_price) / 100).toFixed(2) : "—";
+            const priceFmt = h.last_price ? "R " + Number(h.last_price).toFixed(2) : "—";
             const mcFmt = fmtCompact(h.market_cap);
             const peFmt = h.pe_ratio != null ? Number(h.pe_ratio).toFixed(1) : "—";
             const divShareFmt = h.dividend_per_share != null ? "R " + Number(h.dividend_per_share).toFixed(2) : "—";
@@ -3063,7 +3063,7 @@
               ? securitiesMap.get(sym) ||
                 securitiesMap.get(normalizeSymbol(sym))
               : null;
-            const price = sec?.last_price ? Number(sec.last_price) / 100 : 0;
+            const price = sec?.last_price ? Number(sec.last_price) : 0;
             const shares = Number(h.shares || h.quantity || 1);
             const mv = shares * price;
             const weightNorm =
@@ -3593,7 +3593,7 @@
           const rawWeight = Number(h.weight) || 0;
           const weightNorm =
             totalWeight > 0 ? (rawWeight / totalWeight) * 100 : rawWeight;
-          const price = sec?.last_price ? Number(sec.last_price) / 100 : 0;
+          const price = sec?.last_price ? Number(sec.last_price) : 0;
           const shares = Number(h.shares || h.quantity || 1);
           const mv = shares * price;
           const dailyChange =
@@ -5299,7 +5299,7 @@
         row.innerHTML = display
           .map((s) => {
             const ticker = (s.symbol || "").replace(".JO", "");
-            const rawPrice = s.last_price ? s.last_price / 100 : null;
+            const rawPrice = s.last_price ? s.last_price : null;
             const price =
               rawPrice !== null
                 ? rawPrice.toLocaleString("en-ZA", {
@@ -6171,7 +6171,7 @@
           rebBuySecuritiesCache = (rows || []).map((s) => {
             const rawSymbol = String(s.symbol || "");
             const code = rawSymbol.replace(/\.[A-Z]+$/, "") || rawSymbol || "-";
-            const currentPrice = Number(s.last_price || 0) / 100;
+            const currentPrice = Number(s.last_price || 0);
             return {
               id: String(s.id || code),
               code,
@@ -6222,7 +6222,7 @@
           .filter(h => h.symbol || h.ticker)
           .map(h => {
             const sym = h.symbol || h.ticker || "";
-            const price = h.last_price ? h.last_price / 100 : 0;
+            const price = h.last_price ? h.last_price : 0;
             const units = Math.max(1, Math.round(Number(h.shares) || 1));
             const code = sym.replace(/\.[A-Z]+$/, "");
             return { code, fullSymbol: sym, description: h.name || sym, unitsPerLot: units, currentPrice: price, weightPercent: Number(h.weight) || 0 };
@@ -6244,7 +6244,7 @@
 
             rebIsins = rebIsins.map((isin) => {
               const sec = secBySymbol.get(isin.fullSymbol);
-              const secPrice = Number(sec?.last_price || 0) / 100;
+              const secPrice = Number(sec?.last_price || 0);
               const resolvedPrice = isin.currentPrice > 0
                 ? isin.currentPrice
                 : (Number.isFinite(secPrice) && secPrice > 0 ? secPrice : 0);
@@ -7053,7 +7053,7 @@
           (secRows || []).forEach((row) => {
             const symbol = String(row.symbol || "");
             const norm = normalizeSymbol(symbol);
-            const price = Number(row.last_price || 0) / 100;
+            const price = Number(row.last_price || 0);
             if (symbol) {
               priceBySymbol.set(symbol, Number.isFinite(price) ? price : 0);
               if (row.name) nameBySymbol.set(symbol, String(row.name));
