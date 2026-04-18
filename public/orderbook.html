@@ -1,9 +1,12 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mint Orderbook</title>
+  <style>html{opacity:0}</style>
+  <link rel="prefetch" href="/dashboard.html">
+  <link rel="prefetch" href="/index.html">
   <style>
     * {
       margin: 0;
@@ -32,63 +35,42 @@
       position: fixed;
       left: 0;
       top: 0;
-      width: 75px;
+      width: 220px;
       height: 100vh;
-      background: rgba(255, 255, 255, 0.86);
-      backdrop-filter: blur(8px);
-      border-right: 1px solid var(--border);
+      background: #ffffff;
+      border-right: 1px solid #ede9fe;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      padding: 20px 0;
+      padding: 0;
       z-index: 1000;
+      overflow: hidden;
     }
-
-    .sidebar-logo {
-      width: 45px;
-      height: 45px;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 40px;
-    }
-
-    .sidebar-nav {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-      width: 100%;
-      padding: 0 15px;
-    }
-
-    .nav-icon {
-      width: 45px;
-      height: 45px;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-decoration: none;
-      color: inherit;
-      transition: all 0.25s ease;
-    }
-
-    .nav-icon svg {
-      width: 22px;
-      height: 22px;
-      fill: #9ca3af;
-      transition: fill 0.25s ease;
-    }
-
-    .nav-icon:hover svg,
-    .nav-icon.active svg {
-      fill: #374151;
-    }
+    .sidebar-header { display: flex; align-items: center; gap: 10px; padding: 20px 20px 16px; border-bottom: 1px solid #f3f0ff; }
+    .sidebar-logo { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
+    .sidebar-brand { display: flex; flex-direction: column; }
+    .sidebar-brand-name { font-size: 14px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em; line-height: 1.2; }
+    .sidebar-brand-sub { font-size: 10px; color: #94a3b8; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+    .sidebar-nav { flex: 1; display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 16px 12px; overflow-y: auto; }
+    .sidebar-section-label { font-size: 10px; font-weight: 600; color: #94a3b8; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 8px 4px; margin-top: 8px; }
+    .sidebar-section-label:first-child { margin-top: 0; }
+    .nav-icon { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: pointer; transition: all 0.15s ease; text-decoration: none; color: #64748b; font-size: 13px; font-weight: 500; white-space: nowrap; }
+    .nav-icon svg { width: 18px; height: 18px; fill: #94a3b8; transition: fill 0.15s ease; flex-shrink: 0; }
+    .nav-icon:hover { background: #f5f3ff; color: #5b21b6; }
+    .nav-icon:hover svg { fill: #7c3aed; }
+    .nav-icon.active { background: #ede9fe; color: #5b21b6; font-weight: 600; }
+    .nav-icon.active svg { fill: #7c3aed; }
+    .sidebar-footer { border-top: 1px solid #f1f5f9; padding: 12px; }
+    .sidebar-user { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; margin-bottom: 4px; }
+    .sidebar-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0; }
+    .sidebar-user-info { flex: 1; min-width: 0; }
+    .sidebar-user-name { font-size: 12px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sidebar-user-role { font-size: 10px; color: #94a3b8; font-weight: 500; }
+    .sidebar-signout { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: pointer; color: #ef4444; font-size: 13px; font-weight: 500; transition: all 0.15s ease; border: none; background: none; width: 100%; text-align: left; }
+    .sidebar-signout svg { width: 18px; height: 18px; fill: #ef4444; flex-shrink: 0; }
+    .sidebar-signout:hover { background: #fef2f2; }
 
     .main-content {
-      margin-left: 75px;
+      margin-left: 220px;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -98,36 +80,56 @@
       background: rgba(255, 255, 255, 0.82);
       backdrop-filter: blur(8px);
       border-bottom: 1px solid var(--border);
-      padding: 16px 32px;
+      padding: 0 32px;
+      min-height: 70px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
     }
 
-    .top-search {
-      flex: 1;
-      max-width: 520px;
+    .orderbook-tab-search {
+      position: relative;
+      width: 220px;
+      flex-shrink: 0;
     }
-
-    .top-search input {
+    .orderbook-tab-search svg {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 13px;
+      height: 13px;
+      fill: #8b93a7;
+      pointer-events: none;
+      transition: fill 0.15s ease;
+    }
+    .orderbook-tab-search:focus-within svg { fill: #7c3aed; }
+    .orderbook-tab-search input {
+      -webkit-appearance: none;
+      appearance: none;
       width: 100%;
-      height: 42px;
-      border-radius: 12px;
-      border: 1px solid #e5e7eb;
-      background: #f9fafb;
-      padding: 0 14px;
-      font-size: 0.9rem;
-      color: #111827;
-      outline: none;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .top-search input:focus {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+      height: 32px;
+      border-radius: 10px;
+      border: 1px solid #dde1ea;
       background: #ffffff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      padding: 0 12px 0 30px;
+      font-size: 0.79rem;
+      font-weight: 400;
+      color: #111827;
+      letter-spacing: -0.01em;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
+    .orderbook-tab-search input::placeholder { color: #a0a9bb; font-weight: 400; }
+    .orderbook-tab-search input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(124,58,237,0.12), 0 1px 2px rgba(0,0,0,0.05);
+      background: #fff;
+    }
+    .orderbook-tab-search input::-webkit-search-cancel-button,
+    .orderbook-tab-search input::-webkit-search-decoration { display: none; }
 
     .signout-btn {
       padding: 8px 14px;
@@ -427,6 +429,14 @@
 
     .orderbook-main-row:hover td {
       background: #fafafa;
+    }
+
+    .orderbook-pending-row {
+      background: #fffbeb !important;
+      border-left: 3px solid #f59e0b;
+    }
+    .orderbook-pending-row:hover td {
+      background: #fef3c7 !important;
     }
 
     .orderbook-detail-row.is-hidden {
@@ -820,54 +830,378 @@
         padding: 16px;
       }
     }
+
+    /* Price Edit Improvements */
+    .edit-price-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: #94a3b8;
+      cursor: pointer;
+      margin-left: 4px;
+      transition: all 0.15s ease;
+      vertical-align: middle;
+    }
+    .edit-price-btn:hover {
+      background: #f1f5f9;
+      color: #7c3aed;
+      border-color: #e2e8f0;
+    }
+    .edit-price-btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
+    /* Modal Styles */
+    .price-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(4px);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.22s ease;
+    }
+    .price-modal-backdrop.is-active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .price-modal-content {
+      background: white;
+      width: 100%;
+      max-width: 400px;
+      border-radius: 16px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      overflow: hidden;
+      transform: translateY(20px);
+      transition: transform 0.22s ease;
+    }
+    .price-modal-backdrop.is-active .price-modal-content {
+      transform: translateY(0);
+    }
+    .price-modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .price-modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .price-modal-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .price-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .price-input-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .price-input {
+      width: 100%;
+      height: 44px;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      padding: 0 12px;
+      font-size: 14px;
+      font-family: inherit;
+      color: #0f172a;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .price-input:focus {
+      border-color: #7c3aed;
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+    }
+    .batch-toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #f8fafc;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid #f1f5f9;
+      cursor: pointer;
+    }
+    .orderbook-pending-row {
+      background: #fffbeb !important;
+      border-left: 3px solid #f59e0b;
+    }
+    .orderbook-pending-row:hover {
+      background: #fef3c7 !important;
+    }
+    .batch-toggle-input {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: #7c3aed;
+    }
+    .batch-toggle-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #475569;
+      cursor: pointer;
+    }
+    .price-modal-footer {
+      padding: 16px 24px;
+      background: #f8fafc;
+      border-top: 1px solid #f1f5f9;
+      display: flex;
+      gap: 12px;
+    }
+    .price-modal-btn {
+      flex: 1;
+      height: 40px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .price-btn-cancel {
+      background: white;
+      border: 1px solid #e2e8f0;
+      color: #64748b;
+    }
+    .price-btn-cancel:hover {
+      background: #f1f5f9;
+      color: #475569;
+    }
+    .price-btn-confirm {
+      background: #0f172a;
+      border: 1px solid #0f172a;
+      color: white;
+    }
+    .price-btn-confirm:hover {
+      background: #334155;
+    }
+    .price-btn-confirm:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
   <aside class="sidebar">
-    <div class="sidebar-logo">
-      <img src="/icon.png" alt="App logo" style="width: 32px; height: 32px;" />
+    <div class="sidebar-header" style="cursor:pointer;position:relative;user-select:none;" onclick="mintHubDropdownToggle(event)">
+      <div class="sidebar-logo">
+        <img src="/icon.png" alt="Mint logo" style="width:34px;height:34px;border-radius:8px;" />
+      </div>
+      <div class="sidebar-brand" style="flex:1;min-width:0;">
+        <span class="sidebar-brand-name">Mint</span>
+        <span class="sidebar-brand-sub">Mint Hub</span>
+      </div>
+      <svg id="mintHubChevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0;transition:transform 0.2s;margin-right:-2px;"><polyline points="6 9 12 15 18 9"/></svg>
+      <div id="mintHubDropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:8px;right:8px;background:white;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.14),0 0 0 1px rgba(139,92,246,0.12);z-index:9999;overflow:hidden;" onclick="event.stopPropagation()">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f5f3ff;border-bottom:1px solid #ede9fe;">
+          <img src="/icon.png" style="width:26px;height:26px;border-radius:7px;flex-shrink:0;" />
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:700;color:#0f172a;line-height:1.3;">Mint Hub</div>
+            <div style="font-size:10px;color:#7c3aed;font-weight:500;">Admin Portal · Active</div>
+          </div>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+                <div onclick="mintAppLaunch()" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-top:1px solid #f1f5f9;" onmouseover="this.style.background='#f5f3ff'" onmouseout="this.style.background=''">
+          <div style="width:26px;height:26px;border-radius:7px;background:#f0fdf4;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <img src="/icon.png" style="width:18px;height:18px;border-radius:4px;" />
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:11px;font-weight:600;color:#0f172a;line-height:1.3;">Mint App</div>
+            <div style="font-size:10px;color:#059669;font-weight:500;">Investor-facing portal</div>
+          </div>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
     </div>
+    <script>
+    function mintHubDropdownToggle(e) {
+      e.stopPropagation();
+      const dd = document.getElementById('mintHubDropdown');
+      const ch = document.getElementById('mintHubChevron');
+      const open = dd.style.display !== 'block';
+      dd.style.display = open ? 'block' : 'none';
+      if (ch) ch.style.transform = open ? 'rotate(180deg)' : '';
+      if (open) {
+        setTimeout(() => {
+          const close = (ev) => {
+            if (!ev.target.closest('.sidebar-header')) {
+              dd.style.display = 'none';
+              if (ch) ch.style.transform = '';
+              document.removeEventListener('click', close);
+            }
+          };
+          document.addEventListener('click', close);
+        }, 0);
+      }
+    }
+    function mintAppLaunch() {
+      const dd = document.getElementById('mintHubDropdown');
+      const ch = document.getElementById('mintHubChevron');
+      if (dd) dd.style.display = 'none';
+      if (ch) ch.style.transform = '';
+      const ov = document.getElementById('mintAppOverlay');
+      const fr = document.getElementById('mintAppFrame');
+      if (ov && fr) { fr.src = 'https://mint-henna.vercel.app/'; ov.style.display = 'block'; }
+    }
+    function mintAppClose() {
+      const ov = document.getElementById('mintAppOverlay');
+      const fr = document.getElementById('mintAppFrame');
+      if (ov) ov.style.display = 'none';
+      if (fr) fr.src = '';
+    }
+    </script>
+
+    <!-- View Switcher -->
+    <style>
+      #viewSwitcherDropdown { display:grid; grid-template-rows:0fr; transition:grid-template-rows 0.2s ease; }
+      #viewSwitcherDropdown.vs-open { grid-template-rows:1fr; }
+      #viewSwitcherDropdown > div { overflow:hidden; }
+    </style>
+    <div style="padding:0 12px 2px;">
+      <button id="viewSwitcherBtn" onclick="viewSwitcherToggle(event)"
+        style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:10px;background:#ede9fe;border:none;cursor:pointer;text-align:left;box-sizing:border-box;transition:background 0.15s;outline:none;" onmouseover="this.style.background='#ddd6fe'" onmouseout="this.style.background='#ede9fe'">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#7c3aed;flex-shrink:0;"><path d="M3 3h7v7H3zm0 11h7v7H3zm11-11h7v7h-7zm0 11h7v7h-7z"/></svg>
+        <span style="flex:1;font-size:13px;font-weight:600;color:#5b21b6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Investments</span>
+        <svg id="viewSwitcherChevron" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" style="width:12px;height:12px;flex-shrink:0;transition:transform 0.2s;"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div id="viewSwitcherDropdown">
+        <div>
+          <div style="padding:3px 0 2px 10px;">
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;background:#f5f3ff;">
+              <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#7c3aed;flex-shrink:0;"><path d="M3 3h7v7H3zm0 11h7v7H3zm11-11h7v7h-7zm0 11h7v7h-7z"/></svg>
+              <span style="flex:1;font-size:12px;font-weight:600;color:#5b21b6;">Investments</span>
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#7c3aed" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+    function viewSwitcherToggle(e) {
+      e.stopPropagation();
+      const dd = document.getElementById('viewSwitcherDropdown');
+      const ch = document.getElementById('viewSwitcherChevron');
+      const open = !dd.classList.contains('vs-open');
+      dd.classList.toggle('vs-open', open);
+      if (ch) ch.style.transform = open ? 'rotate(180deg)' : '';
+      if (open) {
+        setTimeout(() => {
+          const close = (ev) => {
+            if (!ev.target.closest('#viewSwitcherBtn') && !ev.target.closest('#viewSwitcherDropdown')) {
+              dd.classList.remove('vs-open');
+              if (ch) ch.style.transform = '';
+              document.removeEventListener('click', close);
+            }
+          };
+          document.addEventListener('click', close);
+        }, 0);
+      }
+    }
+    </script>
 
     <nav class="sidebar-nav">
+      <span class="sidebar-section-label">Main</span>
+
+      <a class="nav-icon" href="/index.html" aria-label="Clients">
+        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        Clients
+      </a>
+
+      <span class="sidebar-section-label">Investments</span>
+
       <a class="nav-icon" href="/dashboard.html" aria-label="Dashboard">
-        <svg viewBox="0 0 24 24">
-          <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
-        </svg>
+        <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+        Dashboard
       </a>
 
-      <a class="nav-icon" href="/index.html" aria-label="Profiles">
-        <svg viewBox="0 0 24 24">
-          <path d="M12 12c1.66 0 3-1.34 3-3S13.66 6 12 6 9 7.34 9 9s1.34 3 3 3zm0 2c-2.22 0-6 1.11-6 3.33V19h12v-1.67C18 15.11 14.22 14 12 14z"/>
-        </svg>
+      <a class="nav-icon" href="/factsheets.html" aria-label="Factsheets">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+        Factsheets
       </a>
 
-      <a class="nav-icon active" href="/orderbook.html" aria-label="Orderbook">
-        <svg viewBox="0 0 24 24">
-          <path d="M4 5h16v2H4V5zm0 6h16v2H4v-2zm0 6h10v2H4v-2z"/>
-        </svg>
+      <a class="nav-icon" href="/investors.html" aria-label="Investors">
+        <svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
+        Investors
       </a>
 
-      <a class="nav-icon" href="#" aria-label="Settings">
-        <svg viewBox="0 0 24 24">
-          <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.11-.2-.36-.28-.58-.2l-2.39.96c-.5-.38-1.05-.7-1.66-.94l-.36-2.54A.488.488 0 0 0 14.9 2h-3.8c-.24 0-.44.17-.48.4l-.36 2.54c-.61.24-1.16.56-1.66.94l-2.39-.96a.5.5 0 0 0-.58.2L3.7 8.44c-.11.21-.06.48.12.62l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.62l1.92 3.32c.11.2.36.28.58.2l2.39-.96c.5.38 1.05.7 1.66.94l.36 2.54c.04.23.24.4.48.4h3.8c.24 0 .44-.17.48-.4l.36-2.54c.61-.24 1.16-.56 1.66-.94l2.39.96c.22.08.47 0 .58-.2l1.92-3.32a.5.5 0 0 0-.12-.62l-2.03-1.58zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5S10.07 8.5 12 8.5s3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/>
-        </svg>
+      <span class="sidebar-section-label">Banking</span>
+
+      <a class="nav-icon" href="/eft.html" aria-label="EFT Payments">
+        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
+        EFT Payments
+      </a>
+
+      <a class="nav-icon active" href="/orderbook.html" aria-label="Order Book">
+        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
+        Order Book
+      </a>
+
+      <span class="sidebar-section-label">System</span>
+
+      <a class="nav-icon" href="/settings.html" aria-label="Settings">
+        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        Settings
       </a>
     </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar" id="sidebarAvatarInitials">A</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name" id="sidebarUserEmail">Admin</div>
+          <div class="sidebar-user-role">Administrator</div>
+        </div>
+      </div>
+      <button class="sidebar-signout" id="signOutBtn">
+        <svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+        Sign out
+      </button>
+    </div>
   </aside>
 
   <main class="main-content">
-    <div class="top-nav">
-      <div class="top-search">
-        <input id="orderbookSearch" type="search" placeholder="Search instrument, ticker, side, account, or broker ref..." aria-label="Search orderbook">
-      </div>
-      <button class="signout-btn" id="signOutBtn">Sign out</button>
+    <div id="pageSkeleton">
+      <div class="sk-hd"><div class="sk-p sk-w220"></div><div class="sk-p sk-w100 sk-ml-auto"></div></div>
+      <div class="sk-stat-row"><div class="sk-card"></div><div class="sk-card"></div><div class="sk-card"></div><div class="sk-card"></div></div>
+      <div class="sk-panel" style="height:260px"></div>
+      <div class="sk-rows"><div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div><div class="sk-row" style="width:58%"></div></div>
     </div>
+    <div class="top-nav"></div>
 
     <section class="orderbook-wrap">
       <div class="orderbook-tabs" role="tablist" aria-label="Orderbook tabs">
         <button class="orderbook-tab-btn active" id="activeBooksTab" type="button" role="tab" aria-selected="true" aria-controls="activeBooksPanel">Active Books</button>
         <button class="orderbook-tab-btn" id="closedBooksTab" type="button" role="tab" aria-selected="false" aria-controls="closedBooksPanel">Closed Books</button>
         <button class="orderbook-tab-btn" id="strateBirTab" type="button" role="tab" aria-selected="false" aria-controls="strateBirPanel">Strate BIR</button>
+        <div class="orderbook-tab-search">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13 11a5 5 0 10-1.41 1.41l3.54 3.55 1.41-1.42L13 11zm-5 1a4 4 0 110-8 4 4 0 010 8z"/></svg>
+          <input id="orderbookSearch" type="search" placeholder="Search instrument, ticker, side…" aria-label="Search orderbook">
+        </div>
       </div>
 
       <div class="orderbook-tab-panel active" id="activeBooksPanel" role="tabpanel" aria-labelledby="activeBooksTab">
@@ -885,6 +1219,7 @@
             <table class="orderbook-table">
               <thead>
                 <tr>
+                  <th style="width:110px;">Actions</th>
                   <th>Line</th>
                   <th>Instrument Name</th>
                   <th>Ticker</th>
@@ -900,7 +1235,7 @@
               </thead>
               <tbody id="orderbookTableBody">
                 <tr>
-                  <td class="orderbook-empty-row" colspan="11">Loading orderbook...</td>
+                  <td class="orderbook-empty-row" colspan="12">Loading orderbook...</td>
                 </tr>
               </tbody>
             </table>
@@ -959,6 +1294,7 @@
           </div>
         </div>
       </div>
+
     </section>
   </main>
 
@@ -981,6 +1317,7 @@
     const activeBooksPanel = document.getElementById('activeBooksPanel');
     const strateBirPanel = document.getElementById('strateBirPanel');
     const closedBooksPanel = document.getElementById('closedBooksPanel');
+    const pendingRebalancesPanel = document.getElementById('pendingRebalancesPanel');
     const closedBooksList = document.getElementById('closedBooksList');
     const strateBirCount = document.getElementById('strateBirCount');
     const exportStrateBirBtn = document.getElementById('exportStrateBirBtn');
@@ -1011,6 +1348,7 @@
     let strategyFillStateById = new Map();
     let showActiveBooksFilledColumn = false;
     let isArchiveBooksLoading = true;
+    let settledBatchesForClosedBooks = [];
 
     const requireSession = async () => {
       const { data } = await supabaseClient.auth.getSession();
@@ -1028,6 +1366,15 @@
         window.location.href = '/signin.html';
       });
     }
+
+    (async () => {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      const email = session?.user?.email || '';
+      const nameEl = document.getElementById('sidebarUserEmail');
+      const avatarEl = document.getElementById('sidebarAvatarInitials');
+      if (nameEl && email) nameEl.textContent = email;
+      if (avatarEl && email) avatarEl.textContent = email.charAt(0).toUpperCase();
+    })();
 
     const escapeHtml = (value) => String(value ?? '')
       .replace(/&/g, '&amp;')
@@ -1478,6 +1825,11 @@
           u.holdingsCount += 1;
         });
 
+        const hasPendingRebalance = holdings.some((h) => !!h.isPendingRebalance);
+        const pendingBatchId = hasPendingRebalance
+          ? (holdings.find((h) => h.isPendingRebalance && h.rebalanceBatchId) || {}).rebalanceBatchId || null
+          : null;
+
         return {
           isStrategy: true,
           strategyId,
@@ -1491,6 +1843,9 @@
           ticker: first.strategyShortName || first.strategySlug || '-',
           isin: '-',
           side: totalQty < 0 ? 'SELL' : 'BUY',
+          isPendingRebalance: hasPendingRebalance,
+          rebalanceBatchId: pendingBatchId,
+          rebalanceBatchStatus: hasPendingRebalance ? 'PENDING' : null,
           quantityValue: totalQty,
           totalQuantity: totalQty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 }),
           avgFillNumber: wTot > 0 ? (wSum / wTot) : null,
@@ -1605,7 +1960,8 @@
           String(row.securityId || row.instrumentName || ''),
           String(row.side || '').toUpperCase(),
           String(row.orderType || '').toUpperCase(),
-          String(row.strategyId || '')
+          String(row.strategyId || ''),
+          row.isPendingRebalance ? 'PENDING' : 'SETTLED'
         ].join('|');
 
         if (!groups.has(key)) {
@@ -2803,10 +3159,12 @@
     };
 
     const setActiveTab = (tabName) => {
-      const normalizedTab = tabName === 'closed' || tabName === 'strate-bir' ? tabName : 'active';
+      const validTabs = ['closed', 'strate-bir', 'pending-rebalances'];
+      const normalizedTab = validTabs.includes(tabName) ? tabName : 'active';
       const isActiveBooks = normalizedTab === 'active';
       const isClosedBooks = normalizedTab === 'closed';
       const isStrateBir = normalizedTab === 'strate-bir';
+      const isPendingRebalances = normalizedTab === 'pending-rebalances';
 
       if (activeBooksTab) {
         activeBooksTab.classList.toggle('active', isActiveBooks);
@@ -2828,6 +3186,9 @@
       }
       if (strateBirPanel) {
         strateBirPanel.classList.toggle('active', isStrateBir);
+      }
+      if (pendingRebalancesPanel) {
+        pendingRebalancesPanel.classList.toggle('active', isPendingRebalances);
       }
     };
 
@@ -3336,7 +3697,60 @@
     const renderClosedBooks = (closedBooks) => {
       if (!closedBooksList) return;
 
-      if (!closedBooks.length) {
+      // ── Render settled rebalance batches ──
+      const settledHtml = (settledBatchesForClosedBooks || []).map((sb) => {
+        const isReversed = sb.batchStatus === 'REVERSED';
+        const statusPill = isReversed
+          ? '<span style="background:#fef2f2;color:#991b1b;border:1px solid #fca5a5;border-radius:999px;padding:3px 8px;font-size:0.72rem;font-weight:700;">Reversed</span>'
+          : '<span style="background:#ecfdf3;color:#166534;border:1px solid #86efac;border-radius:999px;padding:3px 8px;font-size:0.72rem;font-weight:700;">Settled</span>';
+        const dateLabel = sb.settledAt ? new Date(sb.settledAt).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+        const evtBody = sb.events.length
+          ? sb.events.map((r) => `
+            <tr>
+              <td>${escapeHtml(String(r.line))}</td>
+              <td>${escapeHtml(r.instrumentName)}</td>
+              <td class="orderbook-cell-muted">${escapeHtml(r.ticker)}</td>
+              <td>${escapeHtml(r.side)}</td>
+              <td>${escapeHtml(String(r.totalQuantity))}</td>
+              <td>${escapeHtml(r.avgFill)}</td>
+              <td>${escapeHtml(r.clientName)}</td>
+              <td>${escapeHtml(r.closedReason)}</td>
+            </tr>`).join('')
+          : '<tr><td class="orderbook-empty-row" colspan="8">No events.</td></tr>';
+
+        return `
+          <details class="filled-orderbook-item">
+            <summary class="filled-orderbook-summary">
+              <span>Rebalance — ${escapeHtml(sb.strategyName)} (${escapeHtml(sb.sellIsin)} → ${escapeHtml(sb.buyIsin)}${sb.extraBuyIsin ? ' + ' + escapeHtml(sb.extraBuyIsin) : ''})</span>
+              <span class="filled-orderbook-meta">
+                ${statusPill}
+                <span>${sb.clientCount} client${sb.clientCount !== 1 ? 's' : ''}</span>
+                <span>${escapeHtml(dateLabel)}</span>
+              </span>
+            </summary>
+            <div class="filled-orderbook-details">
+              <div class="orderbook-table-wrap">
+                <table class="orderbook-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Instrument</th>
+                      <th>Ticker</th>
+                      <th>Side</th>
+                      <th>Qty</th>
+                      <th>Fill Price</th>
+                      <th>Client</th>
+                      <th>Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>${evtBody}</tbody>
+                </table>
+              </div>
+            </div>
+          </details>`;
+      }).join('');
+
+      if (!closedBooks.length && !settledBatchesForClosedBooks.length) {
         closedBooksList.innerHTML = '<div class="filled-orderbook-empty">No closed books yet.</div>';
         return;
       }
@@ -3412,7 +3826,7 @@
             </div>
           </details>
         `;
-      }).join('');
+      }).join('') + settledHtml;
     };
 
     const sendFilledOrderbookEmail = async (snapshot) => {
@@ -3454,6 +3868,11 @@
     const captureFilledOrderbook = async () => {
       if (!allOrderbookRows.length) return;
 
+      // Separate pending rebalance rows – they must NOT be archived
+      const settledRows = allOrderbookRows.filter(r => !r.isPendingRebalance);
+      const pendingRows = allOrderbookRows.filter(r => r.isPendingRebalance);
+      if (!settledRows.length) return;
+
       const now = new Date();
       const dateKey = getArchiveDateKey(now);
       const sequence = getNextFilledOrderbookSequence();
@@ -3465,7 +3884,7 @@
         title: `Order Book ${sequence}: ${now.toLocaleString()}`,
         dateLabel: now.toLocaleString(),
         createdAt: now.toISOString(),
-        rows: allOrderbookRows.map((row, index) => ({
+        rows: settledRows.map((row, index) => ({
           ...row,
           orderbookSequence: sequence,
           line: index + 1
@@ -3490,12 +3909,15 @@
       persistFilledArchive();
       renderFilledOrderbooks();
       updateOrderbookHeaderSequence();
-      allOrderbookRows = [];
+      // Keep pending rows alive in the active orderbook
+      allOrderbookRows = pendingRows;
       applySearchFilter();
     };
 
     const maybeCaptureFilledOrderbook = async () => {
-      if (!allOrderbookRows.length) return;
+      // Exclude pending rebalance rows from capture consideration
+      const settledRows = (allOrderbookRows || []).filter(r => !r.isPendingRebalance);
+      if (!settledRows.length) return;
       if (isCapturingFilledOrderbook) return;
 
       const now = new Date();
@@ -3507,7 +3929,7 @@
       // Only capture once a new day has started and there are rows from
       // before today. This lets records pile up visibly on the active
       // orderbook throughout the day before being archived.
-      const hasOlderRows = allOrderbookRows.some((row) => {
+      const hasOlderRows = settledRows.some((row) => {
         if (!row.timestamp) return true;
         return getArchiveDateKey(new Date(row.timestamp)) < todayKey;
       });
@@ -3552,7 +3974,7 @@
       exportOrderbookBtn.disabled = rows.length === 0;
 
       if (!rows.length) {
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="11">No orderbook records found.</td></tr>';
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="12">No orderbook records found.</td></tr>';
         return;
       }
 
@@ -3563,11 +3985,15 @@
           : sideValue === 'SELL'
             ? 'side-badge-sell'
             : 'side-badge-neutral';
+        const isPending = !!row.isPendingRebalance;
         const strategyTag = row.isStrategy
           ? '<span class="strategy-badge">Strategy</span>'
           : row.strategyId
             ? `<span class="strategy-name-badge">${escapeHtml(row.strategyShortName || row.strategyName || 'Strategy')}</span>`
             : '';
+        const pendingBadge = isPending
+          ? ' <span class="side-badge" style="background:#fef3c7;color:#92400e;font-size:9px;padding:1px 6px;border-radius:6px;margin-left:4px;">PENDING</span>'
+          : '';
         const settlementOptions = (row.settlementAccountOptions || []).map((option) => {
           const isSelected = option === row.settlementAccount ? ' selected' : '';
           return `<option value="${escapeHtml(option)}"${isSelected}>${escapeHtml(option)}</option>`;
@@ -3578,14 +4004,43 @@
         }).join('');
         const lineKey = escapeHtml(String(row.line));
 
+        // Build price / fill column
+        let priceActionHtml = '';
+        if (isPending) {
+          priceActionHtml = escapeHtml(asRandValue(row.avgFill));
+        } else if (sideValue === 'SELL') {
+          priceActionHtml = `
+            ${escapeHtml(asRandValue(row.avgFill))}
+            <button class="edit-price-btn" title="Update Actual Exit Price" data-edit-price data-line="${lineKey}">
+              <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            </button>`;
+        } else {
+          priceActionHtml = escapeHtml(asRandValue(row.avgFill));
+        }
+
+        // Build Actions column (first column)
+        let actionsHtml = '';
+        if (isPending) {
+          actionsHtml = `
+            <div style="display:flex;gap:6px;align-items:center;">
+              <button title="Fill &amp; Settle Batch" data-fill-settle-batch data-batch-id="${escapeHtml(row.rebalanceBatchId || '')}" data-line="${lineKey}"
+                style="background:#059669;color:white;border-radius:8px;padding:5px 14px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;letter-spacing:.02em;box-shadow:0 1px 3px rgba(5,150,105,.25);transition:background .15s;"
+                onmouseover="this.style.background='#047857'" onmouseout="this.style.background='#059669'">Fill &amp; Settle</button>
+              <button title="Reverse Batch" data-reverse-batch data-batch-id="${escapeHtml(row.rebalanceBatchId || '')}" data-line="${lineKey}"
+                style="background:#dc2626;color:white;border-radius:8px;padding:5px 14px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;letter-spacing:.02em;box-shadow:0 1px 3px rgba(220,38,38,.25);transition:background .15s;"
+                onmouseover="this.style.background='#b91c1c'" onmouseout="this.style.background='#dc2626'">Reverse</button>
+            </div>`;
+        }
+
         return `
-          <tr class="orderbook-main-row" data-orderbook-main-row data-line-key="${lineKey}">
+          <tr class="orderbook-main-row${isPending ? ' orderbook-pending-row' : ''}" data-orderbook-main-row data-line-key="${lineKey}">
+            <td style="white-space:nowrap;">${actionsHtml}</td>
             <td>${escapeHtml(String(row.line ?? '-'))}</td>
-            <td>${escapeHtml(row.instrumentName || '-')}${strategyTag}</td>
+            <td>${escapeHtml(row.instrumentName || '-')}${strategyTag}${pendingBadge}</td>
             <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
             <td><span class="side-badge ${sideClass}">${escapeHtml(sideValue || '-')}</span></td>
             <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
-            <td>${escapeHtml(asRandValue(row.avgFill))}</td>
+            <td>${priceActionHtml}</td>
             <td>${escapeHtml(asRandValue(row.marketValue))}</td>
             <td>${escapeHtml(row.orderType || '-')}</td>
             <td>
@@ -3601,7 +4056,7 @@
             <td>${escapeHtml(String(row.unrealizedPnl ?? '-'))}</td>
           </tr>
           <tr class="orderbook-detail-row is-hidden" data-orderbook-detail-row data-line-key="${lineKey}">
-            <td colspan="11">
+            <td colspan="12">
               <div class="orderbook-detail-wrap">
                 ${row.isStrategy ? renderStrategyDetailsTable(row) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderBndDetailsTable(row)}`}
               </div>
@@ -3634,89 +4089,109 @@
     };
 
     const loadOrderbookClientSideFallback = async () => {
-      const { data: holdingsRows, error: holdingsError } = await supabaseClient
-        .from('stock_holdings')
-        .select('id, user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, as_of_date, created_at, updated_at, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", avg_exit, strategy_id, trade_side, is_active, closed_reason, closed_at, rebalance_batch_id, strategy_name_snapshot')
-        .order('updated_at', { ascending: false });
+      /* ── Load stock_holdings_c + pending rebalance events in parallel ── */
+      const [holdingsResult, rebEventsResult, rebBatchesResult] = await Promise.all([
+        supabaseClient
+          .from('stock_holdings_c')
+          .select('id, user_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, as_of_date, created_at, updated_at, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", avg_exit, strategy_id, trade_side, is_active, closed_reason, closed_at, rebalance_batch_id, strategy_name_snapshot')
+          .order('updated_at', { ascending: false }),
+        supabaseClient
+          .from('rebalance_event')
+          .select('id, batch_id, user_id, security_id, trade_side, quantity, price_at_commit, avg_fill, fill_date, closed_reason, strategy_name_snapshot, settled_holding_id, created_at, updated_at')
+          .order('created_at', { ascending: false }),
+        supabaseClient
+          .from('rebalance_batch')
+          .select('id, strategy_id, status, sell_isin_code, buy_isin_code, extra_buy_isin_code, net_proceeds, strategy_name_snapshot, created_at, created_by, settled_at, is_reversed, reversed_at, reversed_reason, holdings_snapshot_before, wallet_snapshot_before')
+          .order('created_at', { ascending: false }),
+      ]);
 
-      if (holdingsError) {
-        throw new Error(holdingsError.message || 'Could not load stock_holdings');
+      if (holdingsResult.error) {
+        throw new Error(holdingsResult.error.message || 'Could not load stock_holdings_c');
       }
 
-      const holdings = holdingsRows || [];
+      const holdings = holdingsResult.data || [];
+      const rebEvents = rebEventsResult.data || [];
+      const rebBatches = rebBatchesResult.data || [];
+      const batchById = rebBatches.reduce((acc, b) => { acc[b.id] = b; return acc; }, {});
       holdingFillDateById.clear();
       holdings.forEach((h) => {
         if (h.id && h.fill_date) {
           holdingFillDateById.set(String(h.id), String(h.fill_date));
         }
       });
-      const securityIds = [...new Set(holdings.map((row) => row.security_id).filter(Boolean))];
-      const userIds = [...new Set(holdings.map((row) => row.user_id).filter(Boolean))];
+      const securityIds = [...new Set([
+        ...holdings.map((row) => row.security_id).filter(Boolean),
+        ...rebEvents.map((e) => e.security_id).filter(Boolean),
+      ])];
+      const userIds = [...new Set([
+        ...holdings.map((row) => row.user_id).filter(Boolean),
+        ...rebEvents.map((e) => e.user_id).filter(Boolean),
+      ])];
 
       const securitiesMap = {};
       const profilesMap = {};
       const onboardingPackDetailsMap = {};
       const strategiesMap = {};
-      if (securityIds.length) {
-        const { data: securityRows, error: securityError } = await supabaseClient
-          .from('securities')
-          .select('id, name, symbol, last_price, isin')
-          .in('id', securityIds);
+      const strategyIds = [...new Set([
+        ...holdings.map((row) => row.strategy_id),
+        ...rebBatches.map((b) => b.strategy_id),
+      ].filter(Boolean))];
 
-        if (securityError) {
-          console.error('Securities load error:', securityError);
-        } else {
-          (securityRows || []).forEach((security) => {
-            securitiesMap[security.id] = security;
-          });
-        }
+      const parallelQueries = [];
+
+      if (securityIds.length) {
+        parallelQueries.push(
+          supabaseClient
+            .from('securities_c')
+            .select('id, name, symbol, last_price, isin')
+            .in('id', securityIds)
+            .then(({ data, error }) => {
+              if (error) { console.error('Securities load error:', error); return; }
+              (data || []).forEach((s) => { securitiesMap[s.id] = s; });
+            })
+        );
       }
 
       if (userIds.length) {
-        const { data: profileRows, error: profileError } = await supabaseClient
-          .from('profiles')
-          .select('id, first_name, last_name, mint_number, id_number, address')
-          .in('id', userIds);
+        parallelQueries.push(
+          supabaseClient
+            .from('profiles')
+            .select('id, first_name, last_name, mint_number, id_number, address')
+            .in('id', userIds)
+            .then(({ data, error }) => {
+              if (error) { console.error('Profiles load error:', error); return; }
+              (data || []).forEach((p) => { profilesMap[p.id] = p; });
+            })
+        );
 
-        if (profileError) {
-          console.error('Profiles load error:', profileError);
-        } else {
-          (profileRows || []).forEach((profile) => {
-            profilesMap[profile.id] = profile;
-          });
-        }
-
-        const { data: packRows, error: packError } = await supabaseClient
-          .from('user_onboarding_pack_details')
-          .select('user_id, pack_details')
-          .in('user_id', userIds);
-
-        if (packError) {
-          console.error('Pack details load error:', packError);
-        } else {
-          (packRows || []).forEach((row) => {
-            if (row?.user_id) {
-              onboardingPackDetailsMap[row.user_id] = row.pack_details;
-            }
-          });
-        }
+        parallelQueries.push(
+          supabaseClient
+            .from('user_onboarding_pack_details')
+            .select('user_id, pack_details')
+            .in('user_id', userIds)
+            .then(({ data, error }) => {
+              if (error) { console.error('Pack details load error:', error); return; }
+              (data || []).forEach((row) => {
+                if (row?.user_id) onboardingPackDetailsMap[row.user_id] = row.pack_details;
+              });
+            })
+        );
       }
 
-      const strategyIds = [...new Set(holdings.map((row) => row.strategy_id).filter(Boolean))];
       if (strategyIds.length) {
-        const { data: strategyRows, error: strategyError } = await supabaseClient
-          .from('strategies')
-          .select('id, name, short_name, slug')
-          .in('id', strategyIds);
-
-        if (strategyError) {
-          console.error('Strategies load error:', strategyError);
-        } else {
-          (strategyRows || []).forEach((s) => {
-            strategiesMap[s.id] = s;
-          });
-        }
+        parallelQueries.push(
+          supabaseClient
+            .from('strategies_c')
+            .select('id, name, short_name, slug')
+            .in('id', strategyIds)
+            .then(({ data, error }) => {
+              if (error) { console.error('Strategies load error:', error); return; }
+              (data || []).forEach((s) => { strategiesMap[s.id] = s; });
+            })
+        );
       }
+
+      await Promise.all(parallelQueries);
 
       const archivedSourceIds = getArchivedSourceIds();
       updateOrderbookHeaderSequence();
@@ -3822,14 +4297,28 @@
           isActive: row.is_active,
           closedReason: String(row.closed_reason || ''),
           closedAt: row.closed_at || null,
-          rebalanceBatchId: row.rebalance_batch_id || null
+          rebalanceBatchId: row.rebalance_batch_id || null,
+          isPendingRebalance: false,
+          rebalanceBatchStatus: null
         };
       });
 
-      const filteredRows = rawRows.filter((row) => {
+      // Merge stock_holdings_c rows (rebalance events handled separately below)
+      const allRawRows = rawRows;
+
+      const filteredRows = allRawRows.filter((row) => {
         if (row.sourceId && archivedSourceIds.has(String(row.sourceId))) {
           return false;
         }
+
+        // Always show pending rebalance events
+        if (row.isPendingRebalance) return true;
+
+        // Hide SETTLED rebalance_event rows — stock_holdings_c audit rows cover them
+        if (row.rebalanceEventId && row.rebalanceBatchStatus === 'SETTLED') return false;
+
+        // Hide REVERSED rebalance events (they are no longer actionable).
+        if (row.rebalanceBatchStatus === 'REVERSED') return false;
 
         // Keep active holdings and explicit rebalance event rows.
         // Hide inactive BUY rows that are old replaced bucket positions.
@@ -3839,13 +4328,130 @@
         if (isActive) return true;
         if (side === 'SELL') return true;
         if (side === 'BUY' && reason === 'REBALANCE_EVENT_BUY') return true;
+        if (side === 'BUY' && reason === 'REBALANCE_EVENT_BUY_WALLET') return true;
         return false;
       });
 
+      /* ── Map rebalance_event rows into orderbook-compatible format ── */
+      const rebEventRows = rebEvents.map((evt, idx) => {
+        const batch = batchById[evt.batch_id] || {};
+        const batchStatus = batch.status || '';
+        const security = securitiesMap[evt.security_id] || {};
+        const profile = profilesMap[evt.user_id] || {};
+        const packDetails = onboardingPackDetailsMap[evt.user_id] || null;
+        const strategy = batch.strategy_id ? (strategiesMap[batch.strategy_id] || null) : null;
+        const isin = security.isin ?? '-';
+        const side = String(evt.trade_side || '').toUpperCase() || 'BUY';
+        const quantityValue = Number(evt.quantity) || 0;
+        const fillCents = evt.avg_fill != null ? Number(evt.avg_fill) : null;
+        const commitCents = evt.price_at_commit != null ? Number(evt.price_at_commit) : null;
+        const displayFillCents = fillCents ?? commitCents;
+        const avgFillValue = displayFillCents != null ? displayFillCents / 100 : null;
+        const profileName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+        const clientName = profileName || extractNameFromPackDetails(packDetails) || 'Unknown Client';
+        const profileMintNumber = String(profile.mint_number || '').trim();
+        const accountSeed = deterministicNumberFromText(evt.user_id || evt.id || `reb-${idx}`);
+        const clientAccountId = profileMintNumber || `MINT-${String(accountSeed % 1000000).padStart(6, '0')}`;
+        return {
+          sourceId: `reb-${evt.id}`,
+          userId: evt.user_id || '',
+          securityId: evt.security_id || '',
+          line: 0,
+          instrumentName: security.name || isin || '-',
+          ticker: security.symbol || '-',
+          clientName,
+          clientAccountId,
+          orderbookSequence: activeOrderbookSequence,
+          bndReference: '-',
+          clientIdRegNo: String(profile.id_number || profile.mint_number || '-'),
+          profileAddress: String(profile.address || ''),
+          packDetails,
+          countryCode: 'ZAF',
+          holdingStatus: batchStatus === 'PENDING' ? 'pending' : (batchStatus === 'REVERSED' ? 'reversed' : ''),
+          isin,
+          side,
+          quantityValue,
+          totalQuantity: quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 }),
+          avgFillNumber: avgFillValue,
+          avgFill: avgFillValue != null ? `R ${avgFillValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-',
+          marketValueNumber: 0,
+          marketValue: '-',
+          unrealizedPnlNumber: 0,
+          unrealizedPnl: '-',
+          orderType: 'Market',
+          settlementAccount: 'ComputerShare Nominees',
+          settlementAccountOptions: ['ComputerShare Nominees'],
+          brokerRef: 'Longmark',
+          brokerRefOptions: ['Longmark'],
+          strategyId: batch.strategy_id || null,
+          strategyName: batch.strategy_name_snapshot || strategy?.name || null,
+          strategyShortName: strategy?.short_name || null,
+          strategySlug: strategy?.slug || null,
+          strategyNameSnapshot: batch.strategy_name_snapshot || null,
+          timestamp: evt.created_at || null,
+          fillDate: evt.fill_date || null,
+          tradeSide: side,
+          isActive: batchStatus === 'PENDING',
+          closedReason: evt.closed_reason || '',
+          closedAt: null,
+          rebalanceBatchId: evt.batch_id || null,
+          isPendingRebalance: true,
+          rebalanceBatchStatus: batchStatus,
+        };
+      }).filter((row) => {
+        // Show only PENDING rebalance events — SETTLED ones are covered by stock_holdings_c audit rows, REVERSED are no longer actionable
+        return row.rebalanceBatchStatus === 'PENDING';
+      });
+
+      // Number pending rows starting after settled rows
+      rebEventRows.forEach((row, i) => { row.line = rawRows.length + i + 1; });
+
+      // Separate pending rows — they must NOT be archived
+      const settledRows = filteredRows.filter(r => !r.isPendingRebalance);
+      const pendingRows = rebEventRows;
+
       allBirSourceRows = rawRows;
-      allOrderbookRawRows = filteredRows;
-      const aggregated = aggregateOrderbookRows(filteredRows);
-      return groupByStrategy(aggregated, filteredRows);
+      allOrderbookRawRows = settledRows;
+
+      // ── Build settled/reversed batches for Closed Books tab ──
+      settledBatchesForClosedBooks = rebBatches
+        .filter((b) => b.status === 'SETTLED' || b.status === 'REVERSED')
+        .map((b) => {
+          const batchEvents = rebEvents.filter((e) => e.batch_id === b.id);
+          const strategy = b.strategy_id ? (strategiesMap[b.strategy_id] || null) : null;
+          const evtRows = batchEvents.map((evt, idx) => {
+            const sec = securitiesMap[evt.security_id] || {};
+            const prof = profilesMap[evt.user_id] || {};
+            const profName = [prof.first_name, prof.last_name].filter(Boolean).join(' ').trim() || 'Unknown';
+            const fillCents = evt.avg_fill != null ? Number(evt.avg_fill) : (evt.price_at_commit != null ? Number(evt.price_at_commit) : null);
+            return {
+              line: idx + 1,
+              instrumentName: sec.name || sec.isin || '-',
+              ticker: sec.symbol || '-',
+              side: String(evt.trade_side || '').toUpperCase(),
+              totalQuantity: Number(evt.quantity || 0),
+              avgFill: fillCents != null ? `R ${(fillCents / 100).toFixed(2)}` : '-',
+              clientName: profName,
+              closedReason: evt.closed_reason || '',
+            };
+          });
+          return {
+            id: b.id,
+            batchStatus: b.status,
+            strategyName: b.strategy_name_snapshot || strategy?.name || 'Unknown Strategy',
+            settledAt: b.settled_at || b.reversed_at || b.updated_at || b.created_at,
+            sellIsin: b.sell_isin_code || '-',
+            buyIsin: b.buy_isin_code || '-',
+            extraBuyIsin: b.extra_buy_isin_code || null,
+            events: evtRows,
+            clientCount: [...new Set(batchEvents.map((e) => e.user_id))].length,
+          };
+        })
+        .sort((a, b) => new Date(b.settledAt).getTime() - new Date(a.settledAt).getTime());
+
+      const allDisplayRows = [...pendingRows, ...settledRows];
+      const aggregated = aggregateOrderbookRows(allDisplayRows);
+      return groupByStrategy(aggregated, allDisplayRows);
     };
 
     const loadOrderbook = async () => {
@@ -3862,11 +4468,14 @@
 
       try {
         allOrderbookRows = await loadOrderbookClientSideFallback();
-        await reconcileArchivedBooksWithLiveHoldings();
-        await maybeBackfillLegacyArchiveSnapshots();
         applySearchFilter();
         renderStrateBirPreview();
         maybeCaptureFilledOrderbook();
+
+        // Run reconciliation tasks after initial render (non-blocking)
+        reconcileArchivedBooksWithLiveHoldings()
+          .then(() => maybeBackfillLegacyArchiveSnapshots())
+          .catch((err) => console.error('Post-render reconciliation error:', err?.message || err));
       } catch (error) {
         console.error('Orderbook load error:', error);
         orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">Could not load orderbook data.</td></tr>';
@@ -3912,6 +4521,332 @@
     if (strateBirTab) {
       strateBirTab.addEventListener('click', () => setActiveTab('strate-bir'));
     }
+
+    const fmtRand = (cents) => {
+      if (!cents && cents !== 0) return '—';
+      return 'R ' + (Number(cents) / 100).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+    const fmtDate = (iso) => {
+      if (!iso) return '—';
+      try { return new Date(iso).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return iso; }
+    };
+
+
+      /* ── Fill & Settle Modal (inline, dynamic) ── */
+      const openFillSettleModal = async (batchId) => {
+        try {
+          const [batchResult, eventsResult] = await Promise.all([
+            supabaseClient.from('rebalance_batch').select('*').eq('id', batchId).single(),
+            supabaseClient.from('rebalance_event')
+              .select('id, batch_id, user_id, security_id, trade_side, quantity, price_at_commit, avg_fill, fill_date, closed_reason, strategy_name_snapshot, settled_holding_id')
+              .eq('batch_id', batchId),
+          ]);
+          if (batchResult.error) throw new Error(batchResult.error.message);
+          const batch = batchResult.data;
+          const events = eventsResult.data || [];
+
+          const sellEvts = events.filter((e) => e.trade_side === 'SELL');
+          const buyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY');
+          const walletBuyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY_WALLET');
+
+          const sellCommitR = sellEvts[0]?.price_at_commit ? (Number(sellEvts[0].price_at_commit) / 100).toFixed(2) : '';
+          const buyCommitR = buyEvts[0]?.price_at_commit ? (Number(buyEvts[0].price_at_commit) / 100).toFixed(2) : '';
+          const extraCommitR = walletBuyEvts[0]?.price_at_commit ? (Number(walletBuyEvts[0].price_at_commit) / 100).toFixed(2) : '';
+          const totalSellQty = sellEvts.reduce((s, e) => s + Number(e.quantity || 0), 0);
+          const totalBuyQty = buyEvts.reduce((s, e) => s + Number(e.quantity || 0), 0);
+          const totalExtraQty = walletBuyEvts.reduce((s, e) => s + Number(e.quantity || 0), 0);
+
+          let fillModal = document.getElementById('fillSettleModal');
+          if (!fillModal) {
+            fillModal = document.createElement('div');
+            fillModal.id = 'fillSettleModal';
+            fillModal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;';
+            document.body.appendChild(fillModal);
+          }
+
+          fillModal.innerHTML = `
+            <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:28px 32px;max-width:540px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+              <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;color:#f1f5f9;">Fill &amp; Settle Rebalance</h3>
+              <p style="margin:0 0 20px;font-size:13px;color:#94a3b8;">${batch.strategy_name_snapshot || batch.strategy_id} — ${events.length} events for ${[...new Set(events.map((e)=>e.user_id))].length} clients</p>
+              <div style="display:grid;gap:14px;">
+                <div>
+                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">SELL Fill Price (R) — ${totalSellQty} units · committed ${fmtRand(sellEvts[0]?.price_at_commit)}</label>
+                  <input id="fillSellPrice" type="number" step="0.01" min="0" value="${sellCommitR}" placeholder="e.g. 142.50"
+                    style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
+                </div>
+                <div>
+                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">BUY Fill Price (R) — ${totalBuyQty} units · committed ${fmtRand(buyEvts[0]?.price_at_commit)}</label>
+                  <input id="fillBuyPrice" type="number" step="0.01" min="0" value="${buyCommitR}" placeholder="e.g. 98.20"
+                    style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
+                </div>
+                ${walletBuyEvts.length ? `
+                <div>
+                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">Extra BUY Fill Price (R) — ${totalExtraQty} units · committed ${fmtRand(walletBuyEvts[0]?.price_at_commit)}</label>
+                  <input id="fillExtraBuyPrice" type="number" step="0.01" min="0" value="${extraCommitR}" placeholder="e.g. 98.20"
+                    style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
+                </div>` : ''}
+              </div>
+              <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:24px;">
+                <button id="fillSettleCancelBtn" style="padding:10px 20px;background:transparent;border:1px solid #475569;border-radius:8px;color:#94a3b8;font-size:14px;cursor:pointer;">Cancel</button>
+                <button id="fillSettleConfirmBtn" style="padding:10px 20px;background:#7c3aed;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">Confirm Fill &amp; Settle</button>
+              </div>
+            </div>`;
+
+          fillModal.style.display = 'flex';
+
+          const closeFillModal = () => { fillModal.style.display = 'none'; };
+          document.getElementById('fillSettleCancelBtn').addEventListener('click', closeFillModal);
+          fillModal.addEventListener('click', (e) => { if (e.target === fillModal) closeFillModal(); });
+
+          const confirmBtn = document.getElementById('fillSettleConfirmBtn');
+          confirmBtn.addEventListener('click', async () => {
+            const sellR = parseFloat(document.getElementById('fillSellPrice')?.value || '0');
+            const buyR = parseFloat(document.getElementById('fillBuyPrice')?.value || '0');
+            const extraBuyInput = document.getElementById('fillExtraBuyPrice');
+            const extraBuyR = extraBuyInput ? parseFloat(extraBuyInput.value || '0') : 0;
+            if (!sellR || sellR <= 0) { alert('Enter a valid SELL fill price.'); return; }
+            if (!buyR || buyR <= 0) { alert('Enter a valid BUY fill price.'); return; }
+            if (walletBuyEvts.length && (!extraBuyR || extraBuyR <= 0)) { alert('Enter a valid Extra BUY fill price.'); return; }
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Settling…';
+            try {
+              await executeFillAndSettle(batch, events, Math.round(sellR * 100), Math.round(buyR * 100), walletBuyEvts.length ? Math.round(extraBuyR * 100) : 0);
+              closeFillModal();
+              loadOrderbook().catch(console.error);
+              alert('Batch settled successfully. Holdings updated.');
+            } catch (err) {
+              alert('Settlement failed: ' + err.message);
+              confirmBtn.disabled = false;
+              confirmBtn.textContent = 'Confirm Fill & Settle';
+            }
+          });
+        } catch (err) {
+          alert('Error loading batch: ' + err.message);
+        }
+      };
+
+      const executeFillAndSettle = async (batch, events, sellFillCents, buyFillCents, extraBuyFillCents) => {
+        const nowIso = new Date().toISOString();
+        const fillDateStr = nowIso.split('T')[0];
+        const strategyId = batch.strategy_id;
+        const sellEvts = events.filter((e) => e.trade_side === 'SELL');
+        const buyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY');
+        const walletBuyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY_WALLET');
+
+        const errors = [];
+
+        // ── 1. Close / reduce existing SELL positions for every user ──
+        for (const evt of sellEvts) {
+          const { data: activePositions, error: fetchErr } = await supabaseClient
+            .from('stock_holdings_c')
+            .select('id, quantity')
+            .eq('strategy_id', strategyId)
+            .eq('user_id', evt.user_id)
+            .eq('security_id', evt.security_id)
+            .eq('is_active', true)
+            .eq('trade_side', 'BUY');
+
+          if (fetchErr) { errors.push(`SELL lookup: ${fetchErr.message}`); continue; }
+
+          const activePos = (activePositions || []).find((p) => Number(p.quantity) > 0);
+          if (activePos) {
+            const soldQty = Number(evt.quantity) || 0;
+            const remaining = Math.max(0, Number(activePos.quantity) - soldQty);
+            if (remaining <= 0) {
+              // Full close — mark position inactive
+              const { error: closeErr } = await supabaseClient.from('stock_holdings_c').update({
+                is_active: false,
+                closed_reason: 'REBALANCE_SELL',
+                closed_at: nowIso,
+                updated_at: nowIso,
+                avg_exit: sellFillCents,
+                "Exit_date": fillDateStr,
+                Status: 'inactive',
+              }).eq('id', activePos.id);
+              if (closeErr) errors.push(`SELL close ${evt.user_id}: ${closeErr.message}`);
+            } else {
+              // Partial reduce — keep position active with reduced qty
+              const { error: reduceErr } = await supabaseClient.from('stock_holdings_c').update({
+                quantity: remaining,
+                updated_at: nowIso,
+              }).eq('id', activePos.id);
+              if (reduceErr) errors.push(`SELL reduce ${evt.user_id}: ${reduceErr.message}`);
+            }
+          }
+
+          // Insert SELL audit row into stock_holdings_c
+          const { error: sellInsertErr } = await supabaseClient.from('stock_holdings_c').insert({
+            user_id: evt.user_id,
+            security_id: evt.security_id,
+            quantity: Number(evt.quantity) || 0,
+            strategy_id: strategyId,
+            trade_side: 'SELL',
+            is_active: false,
+            avg_fill: sellFillCents,
+            "Fill_date": fillDateStr,
+            rebalance_batch_id: batch.id,
+            strategy_name_snapshot: batch.strategy_name_snapshot,
+            created_at: nowIso,
+            updated_at: nowIso,
+            Status: 'inactive',
+            closed_reason: 'REBALANCE_SELL',
+            closed_at: nowIso,
+            avg_exit: sellFillCents,
+            "Exit_date": fillDateStr,
+            as_of_date: fillDateStr,
+          });
+          if (sellInsertErr) errors.push(`SELL audit ${evt.user_id}: ${sellInsertErr.message}`);
+
+          // Update rebalance_event with fill info
+          const { error: evtUpErr } = await supabaseClient
+            .from('rebalance_event')
+            .update({ avg_fill: sellFillCents, fill_date: fillDateStr, updated_at: nowIso })
+            .eq('id', evt.id);
+          if (evtUpErr) errors.push(`SELL event update: ${evtUpErr.message}`);
+        }
+
+        // ── 2. Create new BUY holdings for every user (primary + wallet) ──
+        const applyBuySettlement = async (buyEvtList, fillCents, label) => {
+          for (const evt of buyEvtList) {
+            const qty = Number(evt.quantity) || 0;
+            if (qty <= 0) continue;
+
+            const { data: insertedBuy, error: buyInsertErr } = await supabaseClient
+              .from('stock_holdings_c')
+              .insert({
+                user_id: evt.user_id,
+                security_id: evt.security_id,
+                quantity: qty,
+                strategy_id: strategyId,
+                trade_side: 'BUY',
+                is_active: true,
+                avg_fill: fillCents,
+                "Fill_date": fillDateStr,
+                rebalance_batch_id: batch.id,
+                strategy_name_snapshot: batch.strategy_name_snapshot,
+                created_at: nowIso,
+                updated_at: nowIso,
+                Status: 'active',
+                closed_reason: evt.closed_reason || 'REBALANCE_EVENT_BUY',
+                as_of_date: fillDateStr,
+              })
+              .select('id')
+              .single();
+
+            if (buyInsertErr) {
+              errors.push(`${label} insert ${evt.user_id}: ${buyInsertErr.message}`);
+              continue;
+            }
+
+            const settledId = insertedBuy?.id || null;
+            const { error: evtUpErr } = await supabaseClient
+              .from('rebalance_event')
+              .update({
+                avg_fill: fillCents,
+                fill_date: fillDateStr,
+                updated_at: nowIso,
+                settled_holding_id: settledId,
+              })
+              .eq('id', evt.id);
+            if (evtUpErr) errors.push(`${label} event update: ${evtUpErr.message}`);
+          }
+        };
+
+        await applyBuySettlement(buyEvts, buyFillCents, 'BUY');
+        if (walletBuyEvts.length) {
+          await applyBuySettlement(walletBuyEvts, extraBuyFillCents || buyFillCents, 'WALLET_BUY');
+        }
+
+        // ── 3. Mark batch SETTLED ──
+        const { error: settleErr } = await supabaseClient.from('rebalance_batch').update({
+          status: 'SETTLED', settled_at: nowIso, updated_at: nowIso,
+        }).eq('id', batch.id);
+        if (settleErr) throw new Error(settleErr.message);
+
+        // Report any non-fatal errors that occurred during settlement
+        if (errors.length) {
+          console.error('Settlement completed with warnings:', errors);
+          throw new Error(`Batch settled but ${errors.length} holding update(s) had issues:\n${errors.join('\n')}`);
+        }
+      };
+
+      /* ── Reverse Rebalance Batch ── */
+      const executeReverseRebalanceBatch = async (batchId) => {
+        const reason = prompt(
+          'Reverse this pending rebalance batch?\n\nThis will:\n• Mark all events as REVERSED\n• Restore the strategy composition to its pre-rebalance state\n• Restore wallet balances to their pre-rebalance values\n\nEnter a reason (optional):',
+          ''
+        );
+        if (reason === null) return;
+        try {
+          const nowIso = new Date().toISOString();
+          const { data: batch, error: bErr } = await supabaseClient
+            .from('rebalance_batch')
+            .select('id, strategy_id, holdings_snapshot_before, wallet_snapshot_before')
+            .eq('id', batchId).single();
+          if (bErr) throw new Error(bErr.message);
+
+          const errors = [];
+
+          // 1. Mark all events as REVERSED
+          const { error: evtErr } = await supabaseClient.from('rebalance_event')
+            .update({ closed_reason: 'REVERSED', updated_at: nowIso })
+            .eq('batch_id', batchId);
+          if (evtErr) errors.push('Events: ' + evtErr.message);
+
+          // 2. Mark batch as REVERSED
+          const { error: rErr } = await supabaseClient.from('rebalance_batch').update({
+            status: 'REVERSED', is_reversed: true, reversed_at: nowIso,
+            reversed_reason: reason.trim() || 'Manual reversal', updated_at: nowIso,
+          }).eq('id', batchId);
+          if (rErr) errors.push('Batch: ' + rErr.message);
+
+          // 3. Restore strategy composition from snapshot
+          if (batch.strategy_id && batch.holdings_snapshot_before) {
+            const { error: stratErr } = await supabaseClient
+              .from('strategies_c')
+              .update({ holdings: batch.holdings_snapshot_before, updated_at: nowIso })
+              .eq('id', batch.strategy_id);
+            if (stratErr) errors.push('Strategy restore: ' + stratErr.message);
+          }
+
+          // 4. Restore wallet balances from snapshot
+          if (batch.strategy_id && batch.wallet_snapshot_before && typeof batch.wallet_snapshot_before === 'object') {
+            const walletRows = Object.entries(batch.wallet_snapshot_before)
+              .map(([userId, balance]) => ({
+                strategy_id: batch.strategy_id,
+                user_id: userId,
+                balance: Number(balance) || 0,
+                updated_at: nowIso,
+              }))
+              .filter((r) => r.user_id);
+            if (walletRows.length) {
+              const { error: walletErr } = await supabaseClient
+                .from('strategy_client_wallet_credits')
+                .upsert(walletRows, { onConflict: 'strategy_id,user_id' });
+              if (walletErr) errors.push('Wallet restore: ' + walletErr.message);
+            }
+          }
+
+          // 5. Delete any stock_holdings_c rows that were created by this batch's settlement
+          //    (in case the batch was settled before reversal — safety net)
+          const { error: holdingsDelErr } = await supabaseClient
+            .from('stock_holdings_c')
+            .delete()
+            .eq('rebalance_batch_id', batchId);
+          if (holdingsDelErr) errors.push('Holdings cleanup: ' + holdingsDelErr.message);
+
+          loadOrderbook().catch(console.error);
+
+          if (errors.length) {
+            alert('Batch reversed with warnings:\n' + errors.join('\n'));
+          } else {
+            alert('Batch reversed successfully. Strategy composition and wallets restored.');
+          }
+        } catch (err) {
+          alert('Reversal failed: ' + err.message);
+        }
+      };
+  
 
     if (filledOrderbooksList) {
       filledOrderbooksList.addEventListener('click', async (event) => {
@@ -4117,6 +5052,139 @@
       });
     }
 
+
+    /* ── Price Update Logic ── */
+    const priceModal = document.getElementById('orderbookPriceModal');
+    const priceInput = document.getElementById('priceInput');
+    const priceModalInstrument = document.getElementById('priceModalInstrument');
+    const priceModalConfirm = document.getElementById('priceModalConfirm');
+    const priceModalCancel = document.getElementById('priceModalCancel');
+    const priceModalClose = document.getElementById('priceModalClose');
+    const batchToggle = document.getElementById('batchToggle');
+    const batchToggleWrap = document.getElementById('batchToggleWrap');
+    let currentEditRow = null;
+
+    const openPriceModal = (row) => {
+      currentEditRow = row;
+      const side = String(row.tradeSide || row.side || '').toUpperCase();
+      const isBuy = side === 'BUY';
+      
+      priceModalInstrument.textContent = `${row.ticker || ''} · ${row.instrumentName || ''}`;
+      
+      // Show side with badge style
+      const sideEl = document.getElementById('priceModalSide');
+      if (sideEl) {
+        const sideClass = isBuy ? 'side-badge-buy' : (side === 'SELL' ? 'side-badge-sell' : 'side-badge-neutral');
+        sideEl.innerHTML = `<span class="side-badge ${sideClass}" style="font-size:10px;padding:2px 8px;">${side}</span>`;
+      }
+      
+      // Update label based on side
+      const labelEl = document.getElementById('priceInputLabel');
+      if (labelEl) {
+        labelEl.textContent = isBuy ? 'Broker Fill Price (R)' : 'Broker Exit Price (R)';
+      }
+
+      priceInput.value = (Number(row.avgFill) || 0).toFixed(2);
+      
+      // Only show batch toggle if we have a rebalance batch ID
+      if (row.rebalanceBatchId) {
+        batchToggleWrap.style.display = 'flex';
+        batchToggle.checked = true;
+      } else {
+        batchToggleWrap.style.display = 'none';
+        batchToggle.checked = false;
+      }
+      
+      priceModal.classList.add('is-active');
+      setTimeout(() => priceInput.focus(), 50);
+    };
+
+    const closePriceModal = () => {
+      priceModal.classList.remove('is-active');
+      currentEditRow = null;
+    };
+
+    if (orderbookTableBody) {
+      orderbookTableBody.addEventListener('click', async (event) => {
+        const editBtn = event.target.closest('[data-edit-price]');
+        if (editBtn) {
+          const lineKey = editBtn.dataset.line;
+          const row = (allOrderbookRows || []).find(r => String(r.line) === String(lineKey));
+          if (row) openPriceModal(row);
+          return;
+        }
+
+        const fillSettleBtn = event.target.closest('[data-fill-settle-batch]');
+        if (fillSettleBtn) {
+          event.stopPropagation();
+          const batchId = fillSettleBtn.dataset.batchId;
+          if (batchId) openFillSettleModal(batchId).catch((err) => alert('Error: ' + err.message));
+          return;
+        }
+
+        const reverseBtn = event.target.closest('[data-reverse-batch]');
+        if (reverseBtn) {
+          event.stopPropagation();
+          const batchId = reverseBtn.dataset.batchId;
+          if (batchId) executeReverseRebalanceBatch(batchId).catch((err) => alert('Reversal error: ' + err.message));
+          return;
+        }
+      });
+    }
+
+    if (priceModalClose) priceModalClose.addEventListener('click', closePriceModal);
+    if (priceModalCancel) priceModalCancel.addEventListener('click', closePriceModal);
+    
+    if (priceModalConfirm) {
+      priceModalConfirm.addEventListener('click', async () => {
+        if (!currentEditRow) return;
+        const newPriceRand = parseFloat(priceInput.value);
+        if (isNaN(newPriceRand)) return;
+        
+        const newPriceCents = Math.round(newPriceRand * 100);
+        priceModalConfirm.disabled = true;
+        priceModalConfirm.textContent = 'Updating...';
+        
+        try {
+          // Identify IDs to update
+          let idsToUpdate = [];
+          if (batchToggle.checked && currentEditRow.rebalanceBatchId) {
+            // Find all matching rows in our current data
+            idsToUpdate = (allOrderbookRawRows || [])
+              .filter(r => r.rebalanceBatchId === currentEditRow.rebalanceBatchId)
+              .map(r => r.id);
+          } else {
+            idsToUpdate = [currentEditRow.id];
+          }
+
+          if (!idsToUpdate.length) throw new Error('No records to update.');
+
+          // Perform Supabase update
+          // Note: We update both avg_fill and avg_exit to be safe, 
+          // though usually one applies per row type.
+          const { error } = await supabaseClient
+            .from('stock_holdings_c')
+            .update({ 
+              avg_fill: newPriceCents,
+              avg_exit: newPriceCents
+            })
+            .in('id', idsToUpdate);
+
+          if (error) throw error;
+
+          // Success - refresh orderbook
+          closePriceModal();
+          await loadOrderbook();
+        } catch (err) {
+          console.error('Price update failed:', err);
+          alert('Failed to update price: ' + (err.message || 'Unknown error'));
+        } finally {
+          priceModalConfirm.disabled = false;
+          priceModalConfirm.textContent = 'Update Price';
+        }
+      });
+    }
+
     filledOrderbooksArchive = readFilledArchive();
     setActiveTab('active');
     updateOrderbookHeaderSequence();
@@ -4126,22 +5194,107 @@
     requireSession().then(async (ok) => {
       if (!ok) return;
 
-      try {
-        const dbArchive = await loadFilledArchiveFromDb();
-        if (Array.isArray(dbArchive)) {
-          filledOrderbooksArchive = dbArchive;
-          persistFilledArchive();
-          updateOrderbookHeaderSequence();
-          renderFilledOrderbooks();
-        }
-      } catch (error) {
-        console.error('Could not load DB archive:', error?.message || error);
-      }
+      const archivePromise = loadFilledArchiveFromDb()
+        .then((dbArchive) => {
+          if (Array.isArray(dbArchive)) {
+            filledOrderbooksArchive = dbArchive;
+            persistFilledArchive();
+            updateOrderbookHeaderSequence();
+            renderFilledOrderbooks();
+          }
+        })
+        .catch((error) => {
+          console.error('Could not load DB archive:', error?.message || error);
+        });
 
-      loadOrderbook();
+      const orderbookPromise = loadOrderbook();
+
+      await Promise.all([archivePromise, orderbookPromise]);
     });
 
     startOrderbookTimer();
   </script>
+  <style>
+    #pageSkeleton{position:fixed;left:220px;top:0;right:0;bottom:0;background:#f8fafc;z-index:50;padding:28px 32px;display:flex;flex-direction:column;gap:20px;pointer-events:none;transition:opacity 0.3s ease}
+    @keyframes skShimmer{from{background-position:-800px 0}to{background-position:800px 0}}
+    .sk-p,.sk-card,.sk-panel,.sk-row{background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);background-size:1600px 100%;animation:skShimmer 1.4s ease infinite;border-radius:8px}
+    .sk-hd{display:flex;align-items:center;height:36px}
+    .sk-w220{width:220px;height:22px}.sk-w100{width:100px;height:22px}.sk-ml-auto{margin-left:auto}
+    .sk-stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.sk-card{height:88px}
+    .sk-panel{border-radius:12px}
+    .sk-rows{display:flex;flex-direction:column;gap:10px}.sk-row{height:44px}
+  </style>
+  <script>
+    (function() {
+      var h = document.documentElement;
+      var sk = document.getElementById('pageSkeleton');
+      h.style.transition = 'opacity 0.22s ease';
+      h.style.opacity = '1';
+      function hideSkeleton() {
+        if (!sk) return;
+        sk.style.opacity = '0';
+        setTimeout(function() { if (sk) sk.style.display = 'none'; }, 300);
+        sk = null;
+      }
+      window.__hideSkeleton = hideSkeleton;
+      window.addEventListener('load', function() { setTimeout(hideSkeleton, 300); });
+      window.addEventListener('pagehide', function() {
+        h.style.transition = 'none';
+        h.style.opacity = '0';
+      });
+      window.addEventListener('pageshow', function(e) {
+        if (e.persisted) {
+          h.style.transition = 'opacity 0.2s ease';
+          h.style.opacity = '1';
+        }
+      });
+      document.addEventListener('click', function(e) {
+        var link = e.target.closest('a.nav-icon');
+        if (!link) return;
+        var href = link.getAttribute('href');
+        if (!href || href === '#') return;
+        e.preventDefault();
+        h.style.transition = 'opacity 0.12s ease';
+        h.style.opacity = '0';
+        setTimeout(function() { window.location.href = href; }, 120);
+      });
+    })();
+  </script>
+<div id="mintAppOverlay" style="display:none;position:fixed;inset:0;z-index:99998;background:#0f172a;">
+  <div style="position:absolute;top:0;left:0;right:0;height:44px;background:#0f172a;display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:1;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <img src="/icon.png" style="width:22px;height:22px;border-radius:6px;" />
+      <span style="color:white;font-size:13px;font-weight:600;">Mint App</span>
+    </div>
+    <button onclick="mintAppClose()" style="background:#1e293b;color:#94a3b8;border:none;border-radius:8px;padding:5px 14px;cursor:pointer;font-size:12px;font-weight:500;">&#8592; Back to Admin</button>
+  </div>
+  <iframe id="mintAppFrame" src="" style="position:absolute;top:44px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 44px);border:none;background:white;" allowfullscreen></iframe>
+</div>
+
+<!-- Price Update Modal -->
+<div id="orderbookPriceModal" class="price-modal-backdrop">
+  <div class="price-modal-content">
+    <div class="price-modal-header">
+      <h3 class="price-modal-title">Update Actual Price</h3>
+      <button id="priceModalClose" style="background:none;border:none;color:#94a3b8;cursor:pointer;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="price-modal-body">
+      <div id="priceModalInstrument" style="font-size:13px;color:#64748b;margin-bottom:-10px;"></div>
+      <div id="priceModalSide" style="margin-bottom:-5px;"></div>
+      <div class="price-input-group">
+        <label id="priceInputLabel" class="price-input-label" for="priceInput">Broker Fill Price (R)</label>
+        <input type="number" id="priceInput" class="price-input" placeholder="0.00" step="0.01">
+      </div>
+      <label id="batchToggleWrap" class="batch-toggle-wrap">
+        <input type="checkbox" id="batchToggle" class="batch-toggle-input">
+        <span class="batch-toggle-label">Apply to entire rebalance batch</span>
+      </label>
+    </div>
+    <div class="price-modal-footer">
+      <button id="priceModalCancel" class="price-modal-btn price-btn-cancel">Cancel</button>
+      <button id="priceModalConfirm" class="price-modal-btn price-btn-confirm">Update Price</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

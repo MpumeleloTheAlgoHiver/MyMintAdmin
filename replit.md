@@ -12,15 +12,24 @@ Internal admin dashboard for the Mint investment platform. Provides client manag
 
 ## Key Pages
 - `/signin.html` - Admin login (Supabase Auth)
-- `/index.html` - Client profiles / CRM
-- `/dashboard.html` - Main dashboard with three tabs: Overview, Strategies, Factsheets
-- `/orderbook.html` - Order book email runs
+- `/index.html` - Client profiles / CRM..
+- `/dashboard.html` - Main dashboard with four tabs: Overview, Strategy Management, Rebalancing, Factsheets
+- `/eft.html` - EFT Payments standalone page (upload bank CSV, confirm pending deposits)
+- `/orderbook.html` - Order book email runs; includes "Pending Rebalances" tab for settling trades
 - `/strategies.html` - Standalone strategies page (legacy, content now in dashboard)
 - `/factsheet.html` - Standalone factsheet page (legacy, content now in dashboard)
 
 ## Dashboard Tabs
-### Overview Tab
-- Strategy chart visualization, user stats (total, KYC, bank linked), featured strategies, top performing holdings, all strategies list
+### Overview Tab (Lovable-style redesign)
+- **Live market ticker** — horizontally scrolling bar with security prices and day-change % from `securities` table (simulated live price updates every 5s)
+- **Strategy selector** — dropdown to pick which strategy to view; data re-renders for each selection
+- **Strategy title bar** — name, inception date, instrument count, client count; AUM and NAV on the right
+- **KPI Strip** (7 cards) — YTD Return, 1Y Return, Sharpe Ratio, Max Drawdown, Volatility, Beta, Alpha (from `strategy_analytics.summary`; shows "—" for unavailable fields)
+- **Performance chart** (ECharts line, 8 cols) — from `strategy_analytics.curves`; falls back to YTD-scaled illustrative data
+- **Sector Exposure** (ECharts donut, 4 cols) — grouped by security sector or individual holding weight with legend
+- **Composition table** (7 cols) — holdings with price, weight bar, day change from `securities`
+- **Investors table** (5 cols) — from `stock_holdings` by strategy_id, joined with `profiles`; shows qty, P&L, return %
+- JS functions: `initOverviewDashboard`, `window.ovSelectStrategy`, `ovRenderTitleBar`, `ovRenderKpiStrip`, `ovRenderTicker`, `ovRenderPerfChart`, `ovRenderSectorChart`, `ovRenderHoldings`, `ovRenderInvestors`
 
 ### Strategies Tab
 - **Create Strategy form** with holdings builder (search securities from DB, add with shares)
@@ -42,7 +51,7 @@ Internal admin dashboard for the Mint investment platform. Provides client manag
 - Missing price data triggers a warning on save
 
 ## API Endpoints
-- `POST /api/securities/sync-fundamentals` — Pulls latest price, P/E, dividend, and YTD data from Yahoo Finance for all securities and writes them to the `securities` table. Requires admin Bearer token. Called from the "Sync market data" button in the Strategies tab.
+- `POST /api/securities/sync-fundamentals` — Pulls latest price, change%, P/E, market cap, dividend, and YTD data from Yahoo Finance for all active securities and writes them to the `securities` table. Requires admin Bearer token. Uses Yahoo Finance crumb auth. Called from the "Sync market data" button in the Strategies tab. Data units: last_price in ZAc (cents), change_percent/dividend_yield/ytd_performance as percentage floats, market_cap in ZAR (rand).
 
 ## Database Tables Used
 - `profiles` - Client profiles
@@ -54,6 +63,17 @@ Internal admin dashboard for the Mint investment platform. Provides client manag
 - `user_onboarding` - KYC status tracking
 - `user_onboarding_pack_details` - Onboarding pack details
 - `orderbook_email_runs` - Email report history
+
+### `_c`-suffixed tables (active data sources — use these, not the originals)
+- `strategies_c` / `strategies_returns_c` - Strategy data and returns
+- `securities_c` / `stock_returns_c` - Securities with prices (in ZAc cents)
+- `stock_holdings_c` - Client holdings (settled positions)
+- `rebalance_batch` - Rebalance batch records: status PENDING→SETTLED, stores `holdings_snapshot_before` (JSONB array of `{id, user_id, remaining}`) for settlement reference
+- `rebalance_event` - Individual trade events per client per rebalance: `batch_id`, `user_id`, `security_id`, `trade_side`, `quantity`, `price_at_commit` (cents), `closed_reason`, `avg_fill`, `fill_date`, `settled_holding_id`
+
+### Rebalancing flow
+1. **Commit (dashboard Rebalancing tab)**: writes a `PENDING` `rebalance_batch` + per-client `rebalance_event` rows. Does NOT touch `stock_holdings_c`.
+2. **Settle (orderbook Pending Rebalances tab)**: admin enters actual fill prices → closes/reduces old sell positions in `stock_holdings_c`, creates new buy positions, marks batch `SETTLED`.
 
 ## Environment Variables Required
 - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` - Database access
