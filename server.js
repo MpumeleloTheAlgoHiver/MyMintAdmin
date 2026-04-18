@@ -378,153 +378,10 @@ const maybeRunDailyOrderbookScheduler = async () => {
 
 const startDailyOrderbookScheduler = () => {
   setInterval(() => {
-    maybeRunDailyOrderbookScheduler().catch(err => console.error('[OrderbookScheduler] Interval error:', err?.message || err));
+    maybeRunDailyOrderbookScheduler();
   }, 30000);
 
-  maybeRunDailyOrderbookScheduler().catch(err => console.error('[OrderbookScheduler] Startup error:', err?.message || err));
-};
-
-const syncAllSecuritiesFromYahoo = async () => {
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
-    console.log('[MarketSync] Skipping — Supabase credentials not configured.');
-    return;
-  }
-
-  console.log('[MarketSync] Starting market data sync…');
-
-  let securities;
-  try {
-    securities = await fetchSupabaseJson('/rest/v1/securities?select=id,symbol,name&is_active=eq.true', null);
-  } catch (err) {
-    console.error('[MarketSync] Failed to load securities:', err.message);
-    return;
-  }
-
-  if (!securities || securities.length === 0) {
-    console.log('[MarketSync] No active securities found.');
-    return;
-  }
-
-  let yfCookie = '';
-  let crumb = '';
-  try {
-    const fcRes = await fetch('https://fc.yahoo.com/', {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0' }
-    });
-    yfCookie = fcRes.headers.get('set-cookie') || '';
-    const crumbRes = await fetch('https://query1.finance.yahoo.com/v1/test/getcrumb', {
-      headers: { 'User-Agent': 'Mozilla/5.0', 'Cookie': yfCookie }
-    });
-    crumb = await crumbRes.text();
-  } catch (err) {
-    console.error('[MarketSync] Failed to get Yahoo Finance crumb:', err.message);
-    return;
-  }
-
-  let updated = 0;
-  let failed = 0;
-
-  for (const sec of securities) {
-    if (!sec.symbol) continue;
-    try {
-      const encodedSymbol = encodeURIComponent(sec.symbol);
-      const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodedSymbol}?modules=price%2CsummaryDetail%2CdefaultKeyStatistics&crumb=${encodeURIComponent(crumb)}`;
-      const yfRes = await fetch(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0', 'Cookie': yfCookie, 'Accept': 'application/json' }
-      });
-
-      if (!yfRes.ok) { failed++; continue; }
-
-      const yfData = await yfRes.json();
-      const result = yfData?.quoteSummary?.result?.[0];
-      if (!result) { failed++; continue; }
-
-      const price = result.price || {};
-      const summary = result.summaryDetail || {};
-      const keyStats = result.defaultKeyStatistics || {};
-
-      const rawChangePct = price.regularMarketChangePercent?.raw ?? null;
-      const rawDivYield = summary.dividendYield?.raw ?? null;
-      const rawYtd = keyStats.ytdReturn?.raw ?? keyStats['52WeekChange']?.raw ?? null;
-
-      // If YTD not returned by quoteSummary, calculate it from the chart API
-      let calculatedYtd = null;
-      if (rawYtd == null) {
-        try {
-          const chartRes = await fetch(
-            `https://query1.finance.yahoo.com/v8/finance/chart/${encodedSymbol}?interval=1d&range=ytd`,
-            { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } }
-          );
-          if (chartRes.ok) {
-            const chartData = await chartRes.json();
-            const chartResult = chartData?.chart?.result?.[0];
-            const currentPrice = chartResult?.meta?.regularMarketPrice;
-            const closes = chartResult?.indicators?.quote?.[0]?.close;
-            const firstClose = closes?.find(c => c != null);
-            if (firstClose && currentPrice) {
-              calculatedYtd = ((currentPrice - firstClose) / firstClose) * 100;
-            }
-          }
-        } catch { /* ignore */ }
-      }
-
-      const updatePayload = {};
-      const lp = price.regularMarketPrice?.raw;
-      if (lp != null) updatePayload.last_price = Math.round(lp);
-      if (rawChangePct != null) updatePayload.change_percent = rawChangePct * 100;
-      const mc = price.marketCap?.raw;
-      if (mc != null) updatePayload.market_cap = Math.round(mc);
-      const pe = summary.trailingPE?.raw ?? keyStats.trailingPE?.raw;
-      if (pe != null) updatePayload.pe_ratio = pe;
-      const dr = summary.dividendRate?.raw;
-      if (dr != null) updatePayload.dividend_per_share = dr;
-      if (rawDivYield != null) updatePayload.dividend_yield = rawDivYield * 100;
-      const ytdFinal = rawYtd != null ? rawYtd * 100 : calculatedYtd;
-      if (ytdFinal != null) updatePayload.ytd_performance = ytdFinal;
-
-      if (Object.keys(updatePayload).length > 0) {
-        await mutateSupabaseJson(
-          `/rest/v1/securities?id=eq.${encodeURIComponent(sec.id)}`,
-          updatePayload,
-          null,
-          'PATCH'
-        );
-        updated++;
-      }
-    } catch {
-      failed++;
-    }
-    await new Promise(r => setTimeout(r, 150));
-  }
-
-  console.log(`[MarketSync] Done — ${updated} updated, ${failed} failed out of ${securities.length} securities.`);
-};
-
-const marketSyncDailyHour = Number(process.env.MARKET_SYNC_HOUR || 7);
-const marketSyncDailyMinute = Number(process.env.MARKET_SYNC_MINUTE || 0);
-let lastMarketSyncDateKey = '';
-
-const maybeRunDailyMarketSync = async () => {
-  const now = new Date();
-  const currentMinuteOfDay = (now.getHours() * 60) + now.getMinutes();
-  const targetMinuteOfDay = (marketSyncDailyHour * 60) + marketSyncDailyMinute;
-  const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-  if (currentMinuteOfDay < targetMinuteOfDay) return;
-  if (lastMarketSyncDateKey === dateKey) return;
-
-  lastMarketSyncDateKey = dateKey;
-  await syncAllSecuritiesFromYahoo();
-};
-
-const startMarketDataScheduler = () => {
-  setTimeout(() => {
-    syncAllSecuritiesFromYahoo().catch(err => console.error('[MarketSync] Startup sync error:', err?.message || err));
-  }, 10000);
-
-  setInterval(() => {
-    maybeRunDailyMarketSync().catch(err => console.error('[MarketSync] Scheduled sync error:', err?.message || err));
-  }, 60000);
+  maybeRunDailyOrderbookScheduler();
 };
 
 const fetchSupabaseJson = async (path, token, useServiceRoleAuth = true) => {
@@ -706,15 +563,6 @@ const getSumsubAuthHeaders = (method, pathWithQuery) => {
 
 
 const server = http.createServer((req, res) => {
-  if (req.url === '/favicon.ico') {
-    fs.readFile(path.join(publicDir, 'icon.png'), (err, data) => {
-      if (err) { res.writeHead(204); res.end(); return; }
-      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
-      res.end(data);
-    });
-    return;
-  }
-
   if (req.url.startsWith('/api/mandate-data') && req.method === 'GET') {
     const token = parseBearerToken(req.headers.authorization);
     if (!token) {
@@ -996,7 +844,7 @@ const server = http.createServer((req, res) => {
         }
 
         const symbols = [...new Set(pledges.map(p => p.symbol))];
-        const pricesData = await fetchSupabaseJson(`/rest/v1/security_prices_c?symbol=in.(${symbols.map(s => `%22${s}%22`).join(',')})`, token);
+        const pricesData = await fetchSupabaseJson(`/rest/v1/security_prices?symbol=in.(${symbols.map(s => `%22${s}%22`).join(',')})`, token);
         
         const priceMap = {};
         (pricesData || []).forEach(p => { priceMap[p.symbol] = p.last_price; });
@@ -1054,99 +902,6 @@ const server = http.createServer((req, res) => {
       }
     })();
 
-    return;
-  }
-
-  if (req.url.startsWith('/api/securities/sync-fundamentals') && req.method === 'POST') {
-    const token = parseBearerToken(req.headers.authorization);
-    if (!token) {
-      sendJson(res, 401, { error: 'Missing Authorization bearer token' });
-      return;
-    }
-
-    (async () => {
-      try {
-        await fetchSupabaseJson('/auth/v1/user', token, false);
-        await syncAllSecuritiesFromYahoo();
-        sendJson(res, 200, { ok: true });
-      } catch (error) {
-        sendJson(res, 500, { error: 'Sync failed', details: error?.message || 'Unknown error' });
-      }
-    })();
-
-    return;
-  }
-
-  /* ── WTD / MTD performance calculated from Yahoo Finance chart API ── */
-  if (req.url.startsWith('/api/security-performance') && req.method === 'GET') {
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    const symbolsParam = url.searchParams.get('symbols') || '';
-    const symbols = symbolsParam.split(',').map(s => s.trim()).filter(Boolean);
-    if (!symbols.length) { sendJson(res, 400, { error: 'symbols param required' }); return; }
-
-    (async () => {
-      try {
-        console.log(`[PerfAPI] request for ${symbols.length} symbols`);
-        const now = new Date();
-        const dow = now.getDay();
-        const monday = new Date(now);
-        monday.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
-        monday.setHours(0, 0, 0, 0);
-        const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-        const YF_HEADERS = { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' };
-
-        const fetchPerf = async (sym) => {
-          const enc = encodeURIComponent(sym);
-          const perf = { symbol: sym, wtd_performance: null, mtd_performance: null };
-
-          const calcReturn = (cr, cutoff) => {
-            const timestamps = cr.timestamp || [];
-            const closes = cr.indicators?.quote?.[0]?.close || [];
-            const cur = cr.meta?.regularMarketPrice;
-            if (!cur) return null;
-            let startPrice = null;
-            for (let i = 0; i < timestamps.length; i++) {
-              if (new Date(timestamps[i] * 1000) >= cutoff && closes[i] != null) { startPrice = closes[i]; break; }
-            }
-            if (startPrice == null) startPrice = closes.find(c => c != null);
-            return (startPrice && cur) ? ((cur - startPrice) / startPrice) * 100 : null;
-          };
-
-          const [wtdRes, mtdRes] = await Promise.allSettled([
-            fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=5d`, { headers: YF_HEADERS }),
-            fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=1mo`, { headers: YF_HEADERS })
-          ]);
-
-          if (wtdRes.status === 'fulfilled' && wtdRes.value.ok) {
-            const d = await wtdRes.value.json().catch(() => null);
-            const cr = d?.chart?.result?.[0];
-            if (cr) perf.wtd_performance = calcReturn(cr, monday);
-          }
-          if (mtdRes.status === 'fulfilled' && mtdRes.value.ok) {
-            const d = await mtdRes.value.json().catch(() => null);
-            const cr = d?.chart?.result?.[0];
-            if (cr) perf.mtd_performance = calcReturn(cr, firstOfMonth);
-          }
-          return perf;
-        };
-
-        /* Process in parallel batches of 8 to avoid overloading Yahoo Finance */
-        const results = {};
-        const BATCH = 8;
-        for (let i = 0; i < symbols.length; i += BATCH) {
-          const batch = symbols.slice(i, i + BATCH);
-          const perfs = await Promise.all(batch.map(fetchPerf));
-          perfs.forEach(p => { results[p.symbol] = p; });
-          if (i + BATCH < symbols.length) await new Promise(r => setTimeout(r, 300));
-        }
-
-        console.log(`[PerfAPI] done — ${Object.values(results).filter(p => p.wtd_performance != null).length}/${symbols.length} with WTD data`);
-        sendJson(res, 200, { results });
-      } catch (err) {
-        sendJson(res, 500, { error: err?.message || 'Failed' });
-      }
-    })();
     return;
   }
 
@@ -1399,56 +1154,14 @@ const server = http.createServer((req, res) => {
 
     const ext = path.extname(filePath).toLowerCase();
     const contentType = mimeTypes[ext] || 'application/octet-stream';
-    const cacheControl = ext === '.html'
-      ? 'public, max-age=60'
-      : 'public, max-age=86400';
-    res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': cacheControl });
+    res.writeHead(200, { 'Content-Type': contentType });
     res.end(data);
   });
 });
 
-process.on('SIGTERM', () => {
-  console.log('[Process] SIGTERM received — closing server gracefully...');
-  server.close(() => {
-    console.log('[Process] Server closed, exiting cleanly.');
-    process.exit(0);
-  });
-  setTimeout(() => process.exit(0), 5000).unref();
-});
-
-process.on('SIGINT', () => {
-  server.close(() => process.exit(0));
-  setTimeout(() => process.exit(0), 3000).unref();
-});
-
-process.on('uncaughtException', (err) => {
-  console.error('[Process] Uncaught exception:', err?.message || err);
-});
-
-process.on('unhandledRejection', (reason) => {
-  console.error('[Process] Unhandled promise rejection:', reason?.message || reason);
-});
-
-const startServer = (portToUse) => {
-  server.listen(portToUse, () => {
-    console.log(`Server running at http://localhost:${portToUse}`);
-    if (orderbookEnableIntervalScheduler) {
-      startDailyOrderbookScheduler();
-    }
-    startMarketDataScheduler();
-  });
-};
-
-let _startRetries = 0;
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE' && _startRetries < 5) {
-    _startRetries++;
-    console.error(`[Server] Port ${port} in use — retry ${_startRetries}/5 in 2s...`);
-    setTimeout(() => startServer(port), 2000);
-  } else {
-    console.error('[Server] HTTP server error:', err?.message || err);
-    process.exit(1);
+server.listen(port, () => {
+  console.log(`Server running at http://localhost:${port}`);
+  if (orderbookEnableIntervalScheduler) {
+    startDailyOrderbookScheduler();
   }
 });
-
-startServer(port);
