@@ -1024,20 +1024,20 @@ const server = http.createServer((req, res) => {
   }
 
   // Team management routes
-  if (req.url.startsWith('/api/team/me') && req.method === 'GET') {
-    teamMeHandler(req, res); return;
-  }
-  if (req.url.startsWith('/api/team/list') && req.method === 'GET') {
-    teamListHandler(req, res); return;
-  }
-  if (req.url.startsWith('/api/team/invite') && req.method === 'POST') {
-    (async () => { req.body = await readJsonBody(req); teamInviteHandler(req, res); })(); return;
-  }
-  if (req.url.startsWith('/api/team/update') && req.method === 'PATCH') {
-    (async () => { req.body = await readJsonBody(req); teamUpdateHandler(req, res); })(); return;
-  }
-  if (req.url.startsWith('/api/team/remove') && req.method === 'DELETE') {
-    (async () => { req.body = await readJsonBody(req).catch(() => ({})); teamRemoveHandler(req, res); })(); return;
+  if (req.url.startsWith('/api/team')) {
+    (async () => {
+      try {
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          req.body = await readJsonBody(req).catch(() => ({}));
+        }
+        await teamHandler(req, res);
+      } catch (err) {
+        if (!res.headersSent) {
+          sendJson(res, 500, { error: err.message });
+        }
+      }
+    })();
+    return;
   }
 
   const urlWithoutQuery = req.url.split('?')[0];
