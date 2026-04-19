@@ -1,4 +1,4 @@
-require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+require('dotenv').config();
 const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
