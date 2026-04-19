@@ -5567,7 +5567,7 @@
             return {
               sym:    (s.symbol || '').replace('.JO', ''),
               logo:   s.logo_url || null,
-              price:  sr.current_price != null ? Number(sr.current_price) / 100 : null,
+              price:  sr.current_price != null ? Number(sr.current_price) : null,
               change: sr['1d_pct']     != null ? Number(sr['1d_pct'])     : null,
             };
           }).filter(item => item.sym);
