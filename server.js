@@ -1022,6 +1022,26 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  /* GET /api/team/me — must be checked BEFORE the startsWith('/api/team') block */
+  if (req.url === '/api/team/me' && req.method === 'GET') {
+    const token = parseBearerToken(req.headers.authorization);
+    if (!token) { sendJson(res, 401, { error: 'Unauthorized' }); return; }
+    (async () => {
+      try {
+        const caller = await fetchSupabaseJson('/auth/v1/user', token, false);
+        if (!caller?.id) { sendJson(res, 401, { error: 'Invalid session' }); return; }
+        const rows = await fetchSupabaseJson(
+          `/rest/v1/admin_team?user_id=eq.${caller.id}&select=role,page_permissions,full_name`,
+          null, true
+        );
+        sendJson(res, 200, rows?.[0] || { role: 'admin', page_permissions: [] });
+      } catch (err) {
+        sendJson(res, 500, { error: err?.message });
+      }
+    })();
+    return;
+  }
+
   /* ── Team management ── */
   if (req.url.startsWith('/api/team') && ['GET','POST','PUT','DELETE'].includes(req.method)) {
     const token = parseBearerToken(req.headers.authorization);
@@ -1132,26 +1152,6 @@ const server = http.createServer((req, res) => {
         sendJson(res, 404, { error: 'Not found' });
       } catch (err) {
         sendJson(res, 500, { error: err?.message || 'Server error' });
-      }
-    })();
-    return;
-  }
-
-  /* GET /api/team/me — check current user's role & permissions (no admin required) */
-  if (req.url === '/api/team/me' && req.method === 'GET') {
-    const token = parseBearerToken(req.headers.authorization);
-    if (!token) { sendJson(res, 401, { error: 'Unauthorized' }); return; }
-    (async () => {
-      try {
-        const caller = await fetchSupabaseJson('/auth/v1/user', token, false);
-        if (!caller?.id) { sendJson(res, 401, { error: 'Invalid session' }); return; }
-        const rows = await fetchSupabaseJson(
-          `/rest/v1/admin_team?user_id=eq.${caller.id}&select=role,page_permissions,full_name`,
-          null, true
-        );
-        sendJson(res, 200, rows?.[0] || { role: 'admin', page_permissions: [] });
-      } catch (err) {
-        sendJson(res, 500, { error: err?.message });
       }
     })();
     return;

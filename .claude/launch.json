@@ -1,0 +1,16 @@
+{
+  "version": "0.0.1",
+  "autoPort": true,
+  "configurations": [
+    {
+      "name": "Dev Server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"]
+    },
+    {
+      "name": "Production Server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start"]
+    }
+  ]
+}
