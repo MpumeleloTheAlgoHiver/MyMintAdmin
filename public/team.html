@@ -300,8 +300,8 @@ const renderMembers = () => {
       : (m.page_permissions || []).map(k => PAGES.find(p => p.key === k)?.label || k).join(', ') || '—';
     const actions = isYou ? '' : `
       <div class="row-actions">
-        <button class="btn-edit" onclick="openEdit('${m.id}')">Edit</button>
-        <button class="btn-remove" onclick="removeMember('${m.id}', '${m.email}')">Remove</button>
+        <button class="btn-edit" onclick="openEdit('${m.idx}')">Edit</button>
+        <button class="btn-remove" onclick="removeMember('${m.idx}', '${m.email}')">Remove</button>
       </div>`;
     return `<tr>
       <td>
@@ -348,7 +348,7 @@ const openInvite = () => {
 };
 
 window.openEdit = (id) => {
-  const m = members.find(x => x.id === id);
+  const m = members.find(x => String(x.idx) === String(id));
   if (!m) return;
   editingId = id;
   document.getElementById('modalTitle').textContent = 'Edit permissions';

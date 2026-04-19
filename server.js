@@ -1044,7 +1044,7 @@ const server = http.createServer((req, res) => {
         /* GET /api/team — list all members */
         if (req.method === 'GET' && req.url === '/api/team') {
           const members = await fetchSupabaseJson(
-            '/rest/v1/admin_team?select=id,email,full_name,role,page_permissions,created_at&order=created_at.asc',
+            '/rest/v1/admin_team?select=idx,email,full_name,role,page_permissions,created_at&order=created_at.asc',
             null, true
           );
           sendJson(res, 200, { members: members || [] });
@@ -1112,7 +1112,7 @@ const server = http.createServer((req, res) => {
           const { role, page_permissions } = body || {};
           if (!role || !['admin','staff'].includes(role)) { sendJson(res, 400, { error: 'Invalid role' }); return; }
           await mutateSupabaseJson(
-            `/rest/v1/admin_team?id=eq.${id}`,
+            `/rest/v1/admin_team?idx=eq.${id}`,
             { role, page_permissions: role === 'admin' ? [] : (page_permissions || []), updated_at: new Date().toISOString() },
             null, 'PATCH', true
           );
@@ -1124,7 +1124,7 @@ const server = http.createServer((req, res) => {
         const delMatch = req.url.match(/^\/api\/team\/([^/?]+)$/);
         if (req.method === 'DELETE' && delMatch) {
           const id = delMatch[1];
-          await mutateSupabaseJson(`/rest/v1/admin_team?id=eq.${id}`, null, null, 'DELETE', true);
+          await mutateSupabaseJson(`/rest/v1/admin_team?idx=eq.${id}`, null, null, 'DELETE', true);
           sendJson(res, 200, { ok: true });
           return;
         }
