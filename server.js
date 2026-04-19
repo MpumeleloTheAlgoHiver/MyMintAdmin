@@ -1,10 +1,15 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const sumsubArchiveHandler = require('./api/sumsub/archive');
+const teamMeHandler = require('./api/team/me');
+const teamListHandler = require('./api/team/list');
+const teamInviteHandler = require('./api/team/invite');
+const teamUpdateHandler = require('./api/team/update');
+const teamRemoveHandler = require('./api/team/remove');
 
 const port = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, 'public');
@@ -1020,6 +1025,23 @@ const server = http.createServer((req, res) => {
     })();
 
     return;
+  }
+
+  // Team management routes
+  if (req.url.startsWith('/api/team/me') && req.method === 'GET') {
+    teamMeHandler(req, res); return;
+  }
+  if (req.url.startsWith('/api/team/list') && req.method === 'GET') {
+    teamListHandler(req, res); return;
+  }
+  if (req.url.startsWith('/api/team/invite') && req.method === 'POST') {
+    (async () => { req.body = await readJsonBody(req); teamInviteHandler(req, res); })(); return;
+  }
+  if (req.url.startsWith('/api/team/update') && req.method === 'PATCH') {
+    (async () => { req.body = await readJsonBody(req); teamUpdateHandler(req, res); })(); return;
+  }
+  if (req.url.startsWith('/api/team/remove') && req.method === 'DELETE') {
+    (async () => { req.body = await readJsonBody(req).catch(() => ({})); teamRemoveHandler(req, res); })(); return;
   }
 
   const urlWithoutQuery = req.url.split('?')[0];

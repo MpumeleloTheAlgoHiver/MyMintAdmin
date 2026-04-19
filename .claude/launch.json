@@ -1,16 +1,11 @@
 {
   "version": "0.0.1",
-  "autoPort": true,
   "configurations": [
     {
-      "name": "Dev Server",
+      "name": "MyMintAdmin",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"]
-    },
-    {
-      "name": "Production Server",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["start"]
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
     }
   ]
 }
