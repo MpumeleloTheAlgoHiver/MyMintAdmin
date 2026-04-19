@@ -295,7 +295,7 @@
     };
 
     const loadTeam = async () => {
-      const data = await api('GET', '/api/team/list');
+      const data = await api('GET', '/api/team?action=list');
       if (data.ok) {
         updateStats(data.members);
         renderTable(data.members);
@@ -336,7 +336,7 @@
       btn.textContent = 'Sending…';
       btn.disabled = true;
 
-      const data = await api('POST', '/api/team/invite', { email, full_name, role, page_permissions });
+      const data = await api('POST', '/api/team?action=invite', { email, full_name, role, page_permissions });
       btn.textContent = 'Send Invite';
       btn.disabled = false;
 
@@ -375,7 +375,7 @@
       btn.textContent = 'Saving…';
       btn.disabled = true;
 
-      const data = await api('PATCH', '/api/team/update', { idx, role, page_permissions });
+      const data = await api('PATCH', '/api/team?action=update', { idx, role, page_permissions });
       btn.textContent = 'Save Changes';
       btn.disabled = false;
 
@@ -390,7 +390,7 @@
     // Remove
     window.removeMember = async (idx, name) => {
       if (!confirm(`Remove ${name} from the team?`)) return;
-      const data = await api('DELETE', '/api/team/remove', { idx });
+      const data = await api('DELETE', '/api/team?action=remove', { idx });
       if (data.ok) {
         await loadTeam();
       } else {
@@ -415,7 +415,7 @@
       if (!ok) return;
 
       // Verify this user is an admin
-      const me = await api('GET', '/api/team/me');
+      const me = await api('GET', '/api/team?action=me');
       if (!me.ok || me.role !== 'admin') {
         window.location.href = '/index.html';
         return;

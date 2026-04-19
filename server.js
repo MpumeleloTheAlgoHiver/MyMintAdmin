@@ -5,11 +5,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const sumsubArchiveHandler = require('./api/sumsub/archive');
-const teamMeHandler = require('./api/team/me');
-const teamListHandler = require('./api/team/list');
-const teamInviteHandler = require('./api/team/invite');
-const teamUpdateHandler = require('./api/team/update');
-const teamRemoveHandler = require('./api/team/remove');
+const teamHandler = require('./api/team');
 
 const port = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, 'public');
