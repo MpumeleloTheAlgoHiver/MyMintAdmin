@@ -1023,7 +1023,7 @@ const server = http.createServer((req, res) => {
   }
 
   const urlWithoutQuery = req.url.split('?')[0];
-  const requestPath = urlWithoutQuery === '/' ? '/index.html' : urlWithoutQuery;
+  const requestPath = urlWithoutQuery === '/' ? '/dashboard.html' : urlWithoutQuery;
   const safePath = path.normalize(requestPath).replace(/^([/\\])+/, '');
   const filePath = path.join(publicDir, safePath);
 
