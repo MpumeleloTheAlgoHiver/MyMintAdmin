@@ -422,15 +422,7 @@ document.getElementById('btnSubmit').addEventListener('click', async () => {
   if (!session) { window.location.href = '/signin.html'; return; }
   currentSession = session;
 
-  /* Check this user is admin */
-  try {
-    const res = await fetch('/api/team/me', { headers: apiHeaders() });
-    const me = await res.json();
-    if (me.role !== 'admin') {
-      document.querySelector('.main').innerHTML = '<div style="padding:60px 28px;text-align:center;color:#8e8e93;font-size:15px;">You do not have permission to view this page.</div>';
-      return;
-    }
-  } catch { /* first-time: no row yet — treat as admin (bootstrapping) */ }
+  /* Access is enforced server-side on all /api/team endpoints */
 
   const email = session.user.email || '';
   document.getElementById('sidebarEmail').textContent = email;
