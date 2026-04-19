@@ -18,7 +18,7 @@ module.exports = async (req, res) => {
       const result = await requireAuth(req, res);
       if (!result) return;
       const { user, member } = result;
-      return sendJson(res, 200, { email: user.email, role: member.role, page_permissions: member.page_permissions || [] });
+      return sendJson(res, 200, { ok: true, email: user.email, role: member.role, page_permissions: member.page_permissions || [], idx: member.idx });
     }
     
     // LIST
