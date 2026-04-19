@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Settings — Admin</title>
+    <style>html{opacity:0}</style>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0;}
+      body{
+        font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+        background:#f2f2f7;
+        color:#1c1c1e;
+        -webkit-font-smoothing:antialiased;
+      }
+      /* ── Sidebar ── */
+      .sidebar{position:fixed;left:0;top:0;width:220px;height:100vh;background:#fff;border-right:1px solid #e5e5ea;display:flex;flex-direction:column;z-index:1000;}
+      .sidebar-header{display:flex;align-items:center;gap:10px;padding:20px 20px 16px;border-bottom:1px solid #f2f2f7;}
+      .sidebar-logo{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+      .sidebar-brand-name{font-size:14px;font-weight:700;color:#1c1c1e;line-height:1.2;}
+      .sidebar-brand-sub{font-size:10px;color:#8e8e93;font-weight:500;letter-spacing:.04em;text-transform:uppercase;}
+      .sidebar-nav{flex:1;display:flex;flex-direction:column;gap:2px;padding:14px 12px;overflow-y:auto;}
+      .sidebar-section-label{font-size:10px;font-weight:600;color:#8e8e93;letter-spacing:.07em;text-transform:uppercase;padding:8px 8px 4px;margin-top:6px;}
+      .nav-icon{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;text-decoration:none;color:#3c3c43;font-size:13px;font-weight:500;}
+      .nav-icon svg{width:18px;height:18px;fill:#8e8e93;}
+      .nav-icon:hover{background:#f2f2f7;color:#1c1c1e;}
+      .nav-icon:hover svg{fill:#3c3c43;}
+      .nav-icon.active{background:#e8e0fd;color:#5e35b1;}
+      .nav-icon.active svg{fill:#7c3aed;}
+      .sidebar-footer{border-top:1px solid #f2f2f7;padding:12px;}
+      .sidebar-user{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;margin-bottom:4px;}
+      .sidebar-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;}
+      .sidebar-user-name{font-size:12px;font-weight:600;color:#1c1c1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .sidebar-user-role{font-size:10px;color:#8e8e93;font-weight:500;}
+      .sidebar-signout{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;cursor:pointer;color:#ff3b30;font-size:13px;font-weight:500;border:none;background:none;width:100%;text-align:left;}
+      .sidebar-signout svg{width:18px;height:18px;fill:#ff3b30;}
+      .sidebar-signout:hover{background:#fff1f0;}
+      /* ── Layout ── */
+      .main{margin-left:220px;min-height:100vh;display:flex;flex-direction:column;}
+      .top-bar{height:56px;border-bottom:1px solid #e5e5ea;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);display:flex;align-items:center;gap:10px;padding:0 24px;position:sticky;top:0;z-index:100;}
+      .top-bar h1{font-size:17px;font-weight:700;color:#1c1c1e;letter-spacing:-.01em;}
+      .top-bar svg{width:20px;height:20px;fill:#7c3aed;}
+      /* ── Views ── */
+      .page{padding:28px 24px;}
+      .view{transition:opacity .25s ease,transform .25s ease;}
+      .view.hidden{opacity:0;pointer-events:none;transform:translateY(6px);position:absolute;}
+      .view.visible{opacity:1;transform:translateY(0);position:relative;}
+      /* ── iOS settings groups ── */
+      .settings-section-label{font-size:12px;font-weight:600;color:#6c6c70;text-transform:uppercase;letter-spacing:.05em;padding:0 6px;margin-bottom:7px;margin-top:22px;}
+      .settings-section-label:first-child{margin-top:0;}
+      .settings-group{background:#fff;border-radius:14px;overflow:hidden;border:1px solid rgba(0,0,0,.06);}
+      .settings-row{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;transition:background .1s;border-bottom:1px solid #f2f2f7;position:relative;}
+      .settings-row:last-child{border-bottom:none;}
+      .settings-row:active,.settings-row:hover{background:#f7f7f9;}
+      .row-icon{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+      .row-icon svg{width:16px;height:16px;}
+      .row-label{flex:1;font-size:15px;font-weight:500;color:#1c1c1e;}
+      .row-sub{font-size:12px;color:#8e8e93;margin-top:1px;}
+      .row-chevron{color:#c7c7cc;font-size:18px;}
+      .row-destructive .row-label{color:#ff3b30;}
+      /* ── Studio ── */
+      .studio-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
+      .back-btn{display:inline-flex;align-items:center;gap:4px;border:none;background:none;padding:0;font-size:16px;font-weight:500;color:#7c3aed;cursor:pointer;}
+      .back-btn svg{width:18px;height:18px;fill:#7c3aed;}
+      .toolbar-title{font-size:17px;font-weight:700;color:#1c1c1e;flex:1;}
+      .toggle-wrap{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#3c3c43;font-weight:600;white-space:nowrap;}
+      .toggle-wrap input{accent-color:#7c3aed;}
+      .studio-grid{display:grid;grid-template-columns:364px 1fr;gap:16px;align-items:start;}
+      @media(max-width:1200px){.studio-grid{grid-template-columns:1fr;}}
+      /* ── Phone ── */
+      .preview-stage{background:radial-gradient(circle at 20% 10%,#f0ebff,#e8e0fd 40%,#f2f2f7 100%);border:1px solid #e5e5ea;border-radius:20px;padding:20px;display:flex;align-items:flex-start;justify-content:center;}
+      .phone-shell{width:324px;background:#111;border-radius:46px;padding:12px;box-shadow:0 24px 60px rgba(0,0,0,.28),0 0 0 1px #2c2c2e;flex-shrink:0;}
+      .phone-screen{background:#f8f6fa;border-radius:36px;height:600px;overflow:hidden;display:flex;flex-direction:column;position:relative;}
+      .phone-notch{width:106px;height:26px;background:#111;border-radius:0 0 18px 18px;margin:0 auto;flex-shrink:0;}
+      .frame-off .phone-shell{width:324px;background:#fff;border-radius:18px;padding:0;box-shadow:0 10px 28px rgba(15,23,42,.1),0 0 0 1px #e5e5ea;}
+      .frame-off .phone-screen{border-radius:18px;height:600px;}
+      .frame-off .phone-notch{display:none;}
+      /* phone slide panels */
+      .phone-screens-wrap{flex:1;overflow:hidden;position:relative;}
+      .phone-panels{display:flex;width:200%;height:100%;transition:transform .32s cubic-bezier(.4,0,.2,1);}
+      .phone-panels.show-profile{transform:translateX(-50%);}
+      .phone-panel{flex:0 0 50%;height:100%;display:flex;flex-direction:column;overflow:hidden;}
+      /* ── Client list ── */
+      .client-list-view{display:flex;flex-direction:column;height:100%;}
+      .client-list-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px;flex-shrink:0;}
+      .client-list-head h3{font-size:16px;font-weight:700;color:#1c1c1e;}
+      .client-count{font-size:11px;color:#7c3aed;background:#ede9fe;border-radius:999px;padding:3px 9px;font-weight:700;}
+      .client-search{margin:0 12px 8px;width:calc(100% - 24px);border:1px solid #e5e5ea;border-radius:10px;padding:9px 12px;font-size:13px;outline:none;background:#f2f2f7;flex-shrink:0;}
+      .client-search:focus{border-color:#7c3aed;background:#fff;}
+      .client-scroll{flex:1;overflow-y:auto;padding:2px 10px 14px;}
+      .client-card{display:flex;align-items:center;gap:10px;padding:10px 8px;border-radius:12px;cursor:pointer;transition:background .1s;}
+      .client-card:hover{background:#f5f3ff;}
+      .client-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+      .client-name{font-size:13px;font-weight:600;color:#1c1c1e;}
+      .client-strategy{font-size:11px;color:#8e8e93;}
+      .client-empty,.client-loading{text-align:center;font-size:12px;color:#8e8e93;padding:28px 12px;}
+      /* ── Profile ── */
+      .client-profile-view{display:flex;flex-direction:column;height:100%;overflow:hidden;}
+      .cp-header{flex-shrink:0;min-height:188px;background:linear-gradient(180deg,#0d0b1a 0%,#2c1a57 18%,#6b3ea6 36%,#c088e0 52%,#e8c9f0 64%,#f6eefa 74%,#f8f6fa 100%);padding:10px 14px 16px;}
+      .cp-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+      .cp-back{width:28px;height:28px;border:none;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;}
+      .cp-title{font-size:12px;color:rgba(255,255,255,.85);font-weight:600;}
+      .cp-avatar{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.22);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;border:2px solid rgba(255,255,255,.28);}
+      .cp-name{font-size:18px;color:#fff;font-weight:700;margin-top:6px;}
+      .cp-email{font-size:10px;color:rgba(255,255,255,.7);margin-top:2px;}
+      .cp-balance{margin-top:8px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:10px 12px;color:#fff;}
+      .cp-balance .label{font-size:9px;text-transform:uppercase;opacity:.75;letter-spacing:.08em;font-weight:700;}
+      .cp-balance .val{font-size:20px;font-weight:700;margin-top:2px;}
+      .cp-balance .delta{font-size:10px;margin-top:2px;opacity:.85;}
+      .cp-body{flex:1;overflow-y:auto;padding:8px 12px 16px;background:#f8f6fa;}
+      .cp-section{margin-bottom:10px;}
+      .cp-section-head{display:flex;align-items:center;justify-content:space-between;padding:0 2px;margin-bottom:5px;}
+      .cp-section-head h4{font-size:11px;font-weight:700;color:#6c6c70;text-transform:uppercase;letter-spacing:.04em;}
+      .cp-section-head span{font-size:10px;color:#8e8e93;}
+      .cp-card{background:#fff;border-radius:11px;padding:9px;border:1px solid #f2f2f7;margin-bottom:5px;}
+      .cp-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+      .cp-pnl-pos{color:#34c759;} .cp-pnl-neg{color:#ff3b30;} .cp-muted{color:#8e8e93;}
+      .cp-pending{font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border-radius:5px;padding:2px 6px;text-transform:uppercase;}
+      /* ── Inspector ── */
+      .inspector{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:18px;padding:18px;position:sticky;top:76px;}
+      .inspector-title{font-size:15px;font-weight:700;color:#1c1c1e;margin-bottom:4px;}
+      .inspector-note{font-size:12px;color:#8e8e93;line-height:1.4;margin-bottom:14px;}
+      .inspector-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px;}
+      .metric{border:1px solid #f2f2f7;border-radius:10px;padding:10px;background:#fafafa;}
+      .metric .k{font-size:10px;text-transform:uppercase;color:#8e8e93;letter-spacing:.06em;font-weight:700;}
+      .metric .v{font-size:14px;margin-top:3px;font-weight:700;color:#1c1c1e;}
+      .inspector-section-label{font-size:11px;font-weight:700;color:#3c3c43;text-transform:uppercase;letter-spacing:.05em;margin:10px 0 6px;}
+      .inspector-list{border:1px solid #f2f2f7;border-radius:10px;overflow:hidden;background:#fff;margin-bottom:14px;}
+      .inspector-item{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:9px 12px;border-bottom:1px solid #f2f2f7;}
+      .inspector-item:last-child{border-bottom:none;}
+      .placeholder{color:#8e8e93;font-size:12px;padding:16px;text-align:center;}
+    </style>
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a class="sidebar-logo" href="/index.html"><img src="/icon.png" alt="Mint" style="width:36px;height:36px;border-radius:10px;"></a>
+        <div><div class="sidebar-brand-name">Mint</div><div class="sidebar-brand-sub">Admin Panel</div></div>
+      </div>
+      <nav class="sidebar-nav">
+        <span class="sidebar-section-label">Main</span>
+        <a class="nav-icon" href="/index.html"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>Clients</a>
+        <span class="sidebar-section-label">Investments</span>
+        <a class="nav-icon" href="/dashboard.html"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>Dashboard</a>
+        <a class="nav-icon" href="/strategies.html"><svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zm0 11h7v7H3zm11-11h7v7h-7zm0 11h7v7h-7z"/></svg>Strategies</a>
+        <a class="nav-icon" href="/factsheets.html"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>Factsheets</a>
+        <a class="nav-icon" href="/investors.html"><svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>Investors</a>
+        <span class="sidebar-section-label">Banking</span>
+        <a class="nav-icon" href="/eft.html"><svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>EFT Payments</a>
+        <a class="nav-icon" href="/orderbook.html"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>Order Book</a>
+        <span class="sidebar-section-label">System</span>
+        <a class="nav-icon active" href="/settings.html"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58z"/></svg>Settings</a>
+        <a class="nav-icon" id="teamNavLink" href="/team.html" style="display:none">
+        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        Team
+      </a>
+    </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <div class="sidebar-avatar" id="sidebarAvatarInitials">A</div>
+          <div><div class="sidebar-user-name" id="sidebarUserEmail">Admin</div><div class="sidebar-user-role">Administrator</div></div>
+        </div>
+        <button class="sidebar-signout" id="signOutBtn"><svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>Sign out</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="top-bar">
+        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58z"/></svg>
+        <h1 id="topBarTitle">Settings</h1>
+      </div>
+
+      <div class="page">
+
+        <!-- ─── Landing: iOS grouped settings ─── -->
+        <div id="settingsLanding" class="view visible">
+
+          <div class="settings-section-label">Studio</div>
+          <div class="settings-group">
+            <div class="settings-row" id="openClientStudioBtn">
+              <div class="row-icon" style="background:#e8e0fd;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01"/></svg>
+              </div>
+              <div style="flex:1;">
+                <div class="row-label">Client View Studio</div>
+                <div class="row-sub">Preview the app as any client</div>
+              </div>
+              <span class="row-chevron">›</span>
+            </div>
+          </div>
+
+          <div class="settings-section-label">Appearance</div>
+          <div class="settings-group">
+            <div class="settings-row">
+              <div class="row-icon" style="background:#fff2cc;">
+                <svg viewBox="0 0 24 24" fill="#f59e0b"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0a.996.996 0 0 0 0-1.41l-1.06-1.06zm1.06-12.37-1.06 1.06a.996.996 0 0 0 0 1.41c.39.39 1.03.39 1.41 0l1.06-1.06a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0zM7.05 18.36l-1.06 1.06a.996.996 0 0 0 0 1.41c.39.39 1.03.39 1.41 0l1.06-1.06a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0z"/></svg>
+              </div>
+              <div class="row-label">Display Mode</div>
+              <span style="font-size:13px;color:#8e8e93;margin-right:4px;">Light</span>
+              <span class="row-chevron">›</span>
+            </div>
+            <div class="settings-row">
+              <div class="row-icon" style="background:#e0f2ff;">
+                <svg viewBox="0 0 24 24" fill="#007aff"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+              </div>
+              <div class="row-label">Language & Region</div>
+              <span style="font-size:13px;color:#8e8e93;margin-right:4px;">English (ZA)</span>
+              <span class="row-chevron">›</span>
+            </div>
+          </div>
+
+          <div class="settings-section-label">Admin</div>
+          <div class="settings-group">
+            <div class="settings-row">
+              <div class="row-icon" style="background:#e6f9ef;">
+                <svg viewBox="0 0 24 24" fill="#34c759"><path d="M12 2a5 5 0 1 0 0 10A5 5 0 0 0 12 2zm0 12c-5.33 0-8 2.67-8 4v2h16v-2c0-1.33-2.67-4-8-4z"/></svg>
+              </div>
+              <div style="flex:1;">
+                <div class="row-label">Admin Account</div>
+                <div class="row-sub" id="accountRowEmail">Loading…</div>
+              </div>
+              <span class="row-chevron">›</span>
+            </div>
+            <div class="settings-row">
+              <div class="row-icon" style="background:#fff0e6;">
+                <svg viewBox="0 0 24 24" fill="#ff9500"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+              </div>
+              <div class="row-label">Security</div>
+              <span class="row-chevron">›</span>
+            </div>
+            <div class="settings-row">
+              <div class="row-icon" style="background:#f0e6ff;">
+                <svg viewBox="0 0 24 24" fill="#7c3aed"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+              </div>
+              <div class="row-label">Notifications</div>
+              <span class="row-chevron">›</span>
+            </div>
+          </div>
+
+          <div class="settings-section-label">Account</div>
+          <div class="settings-group">
+            <div class="settings-row row-destructive" id="logoutRow">
+              <div class="row-icon" style="background:#fff1f0;">
+                <svg viewBox="0 0 24 24" fill="#ff3b30"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+              </div>
+              <div class="row-label">Sign Out</div>
+              <span class="row-chevron">›</span>
+            </div>
+          </div>
+
+          <div style="height:40px;"></div>
+        </div>
+
+        <!-- ─── Client View Studio ─── -->
+        <div id="clientStudio" class="view hidden" style="max-width:1100px;">
+          <div class="studio-toolbar">
+            <button class="back-btn" id="backToSettingsBtn">
+              <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+              Settings
+            </button>
+            <div class="toolbar-title">Client View Studio</div>
+            <label class="toggle-wrap">
+              <input id="frameToggle" type="checkbox" checked>
+              Phone frame
+            </label>
+          </div>
+
+          <div class="studio-grid">
+            <div class="preview-stage" id="previewStage">
+              <div class="phone-shell">
+                <div class="phone-screen">
+                  <div class="phone-notch"></div>
+                  <div class="phone-screens-wrap">
+                    <div class="phone-panels" id="phonePanels">
+                      <!-- List panel -->
+                      <div class="phone-panel">
+                        <div class="client-list-view">
+                          <div class="client-list-head">
+                            <h3>Clients</h3>
+                            <span id="clientCountBadge" class="client-count">…</span>
+                          </div>
+                          <input id="clientSearch" class="client-search" type="text" placeholder="Search…" />
+                          <div id="clientScrollArea" class="client-scroll">
+                            <div id="clientListLoading" class="client-loading">Loading clients…</div>
+                          </div>
+                        </div>
+                      </div>
+                      <!-- Profile panel -->
+                      <div class="phone-panel">
+                        <div class="client-profile-view">
+                          <div class="cp-header">
+                            <div class="cp-top">
+                              <button id="profileBackBtn" class="cp-back">‹</button>
+                              <div class="cp-title">Client Preview</div>
+                              <div style="width:28px;"></div>
+                            </div>
+                            <div id="cpAvatar" class="cp-avatar">—</div>
+                            <div id="cpName" class="cp-name">—</div>
+                            <div id="cpEmail" class="cp-email">—</div>
+                            <div class="cp-balance">
+                              <div class="label">Portfolio Value</div>
+                              <div id="cpBalance" class="val">R0.00</div>
+                              <div id="cpChange" class="delta"></div>
+                            </div>
+                          </div>
+                          <div class="cp-body">
+                            <div class="cp-section">
+                              <div class="cp-section-head"><h4>Holdings</h4><span id="cpHoldingsCount"></span></div>
+                              <div id="cpHoldingsList"></div>
+                            </div>
+                            <div class="cp-section">
+                              <div class="cp-section-head"><h4>Strategies</h4><span id="cpStrategiesCount"></span></div>
+                              <div id="cpStrategiesList"></div>
+                            </div>
+                            <div class="cp-section">
+                              <div class="cp-section-head"><h4>Recent Activity</h4></div>
+                              <div id="cpTransactionsList"></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <aside class="inspector">
+              <div class="inspector-title">Client Breakdown</div>
+              <p class="inspector-note" id="inspectorHint">Select a client to load their full profile and data breakdown.</p>
+              <div class="inspector-grid">
+                <div class="metric"><div class="k">Client</div><div class="v" id="mClient">—</div></div>
+                <div class="metric"><div class="k">Portfolio</div><div class="v" id="mPortfolio">—</div></div>
+                <div class="metric"><div class="k">P&amp;L</div><div class="v" id="mPnl">—</div></div>
+                <div class="metric"><div class="k">Strategies</div><div class="v" id="mStrategies">—</div></div>
+              </div>
+              <div class="inspector-section-label">Top Holdings</div>
+              <div id="inspectorHoldings" class="inspector-list"><div class="placeholder">No client selected</div></div>
+              <div class="inspector-section-label">Recent Transactions</div>
+              <div id="inspectorTransactions" class="inspector-list"><div class="placeholder">No client selected</div></div>
+            </aside>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
+      const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      const settingsLanding = document.getElementById('settingsLanding');
+      const clientStudio    = document.getElementById('clientStudio');
+      const previewStage    = document.getElementById('previewStage');
+      const phonePanels     = document.getElementById('phonePanels');
+      let allClients = [];
+
+      (async () => {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) { window.location.href = '/signin.html'; return; }
+        const email = session?.user?.email || '';
+        document.getElementById('sidebarUserEmail').textContent = email || 'Admin';
+        document.getElementById('sidebarAvatarInitials').textContent = email ? email[0].toUpperCase() : 'A';
+        document.getElementById('accountRowEmail').textContent = email;
+        document.querySelector('html').style.opacity = '1';
+      })();
+
+      function showView(show, hide) {
+        hide.classList.remove('visible'); hide.classList.add('hidden');
+        show.classList.remove('hidden'); show.classList.add('visible');
+      }
+
+      function showPhonePanel(panel) {
+        phonePanels.classList.toggle('show-profile', panel === 'profile');
+      }
+
+      async function signOut() {
+        await supabaseClient.auth.signOut();
+        window.location.href = '/signin.html';
+      }
+
+      document.getElementById('signOutBtn').addEventListener('click', signOut);
+      document.getElementById('logoutRow').addEventListener('click', signOut);
+
+      document.getElementById('openClientStudioBtn').addEventListener('click', async () => {
+        showView(clientStudio, settingsLanding);
+        document.getElementById('topBarTitle').textContent = 'Client View Studio';
+        showPhonePanel('list');
+        await loadClientsInStrategies();
+      });
+
+      document.getElementById('backToSettingsBtn').addEventListener('click', () => {
+        showView(settingsLanding, clientStudio);
+        document.getElementById('topBarTitle').textContent = 'Settings';
+      });
+
+      document.getElementById('frameToggle').addEventListener('change', e => {
+        previewStage.classList.toggle('frame-off', !e.target.checked);
+      });
+
+      document.getElementById('profileBackBtn').addEventListener('click', () => showPhonePanel('list'));
+
+      async function loadClientsInStrategies() {
+        const loading    = document.getElementById('clientListLoading');
+        const countBadge = document.getElementById('clientCountBadge');
+        const scrollArea = document.getElementById('clientScrollArea');
+        loading.style.display = 'block';
+        countBadge.textContent = '…';
+        try {
+          const { data: holdings, error: holdingsErr } = await supabaseClient
+            .from('stock_holdings_c').select('user_id,strategy_id').eq('is_active',true).eq('trade_side','BUY');
+          if (holdingsErr) throw holdingsErr;
+          const userIds     = [...new Set((holdings||[]).map(h=>h.user_id).filter(Boolean))];
+          const strategyIds = [...new Set((holdings||[]).map(h=>h.strategy_id).filter(Boolean))];
+          if (!userIds.length) { loading.style.display='none'; countBadge.textContent='0'; scrollArea.innerHTML='<div class="client-empty">No clients found.</div>'; return; }
+          const { data: strategies } = await supabaseClient.from('strategies_c').select('id,name,short_name').in('id',strategyIds);
+          const stratMap = {};
+          (strategies||[]).forEach(s=>{ stratMap[s.id]=s.name||s.short_name||'Strategy'; });
+          const userStrategies = {};
+          (holdings||[]).forEach(h=>{ if(!userStrategies[h.user_id]) userStrategies[h.user_id]=new Set(); userStrategies[h.user_id].add(stratMap[h.strategy_id]||'Strategy'); });
+          const profileResults=[];
+          for(let i=0;i<userIds.length;i+=50){
+            const {data:p}=await supabaseClient.from('profiles').select('id,first_name,last_name,email').in('id',userIds.slice(i,i+50));
+            if(p) profileResults.push(...p);
+          }
+          allClients = profileResults.map(p=>{
+            const strats=[...(userStrategies[p.id]||new Set())];
+            const name=[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email||'Unknown';
+            const initials=name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+            return {id:p.id,name,initials,email:p.email||'',strategyLabel:strats.join(', ')};
+          }).sort((a,b)=>a.name.localeCompare(b.name));
+          countBadge.textContent = allClients.length;
+          loading.style.display='none';
+          renderClientList(allClients);
+        } catch(err) {
+          loading.style.display='none'; countBadge.textContent='Err';
+          scrollArea.innerHTML=`<div class="client-empty">Error: ${escapeHtml(err.message||'Unknown')}</div>`;
+        }
+      }
+
+      function renderClientList(clients) {
+        const scrollArea = document.getElementById('clientScrollArea');
+        if(!clients.length){ scrollArea.innerHTML='<div class="client-empty">No clients match.</div>'; return; }
+        scrollArea.innerHTML = clients.map(c=>`
+          <div class="client-card" data-client-id="${c.id}">
+            <div class="client-avatar">${escapeHtml(c.initials)}</div>
+            <div style="flex:1;min-width:0;"><div class="client-name">${escapeHtml(c.name)}</div><div class="client-strategy">${escapeHtml(c.strategyLabel)}</div></div>
+            <span style="color:#c7c7cc;font-size:15px;">›</span>
+          </div>`).join('');
+      }
+
+      document.getElementById('clientSearch').addEventListener('input',e=>{
+        const q=(e.target.value||'').toLowerCase().trim();
+        if(!q){renderClientList(allClients);return;}
+        renderClientList(allClients.filter(c=>c.name.toLowerCase().includes(q)||c.email.toLowerCase().includes(q)||c.strategyLabel.toLowerCase().includes(q)));
+      });
+
+      document.getElementById('clientScrollArea').addEventListener('click',e=>{
+        const card=e.target.closest('.client-card'); if(!card) return;
+        const client=allClients.find(c=>c.id===card.dataset.clientId); if(client) loadClientProfile(client);
+      });
+
+      async function loadClientProfile(client) {
+        showPhonePanel('profile');
+        document.getElementById('cpAvatar').textContent=client.initials;
+        document.getElementById('cpName').textContent=client.name;
+        document.getElementById('cpEmail').textContent=client.email;
+        document.getElementById('cpBalance').textContent='Loading…';
+        document.getElementById('cpChange').textContent='';
+        document.getElementById('cpHoldingsList').innerHTML='<div class="client-loading">Loading…</div>';
+        document.getElementById('cpStrategiesList').innerHTML='<div class="client-loading">Loading…</div>';
+        document.getElementById('cpTransactionsList').innerHTML='<div class="client-loading">Loading…</div>';
+        try {
+          const [hr, tr] = await Promise.all([
+            supabaseClient.from('stock_holdings_c').select('id,security_id,quantity,avg_fill,strategy_id,Status,trade_side,is_active').eq('user_id',client.id).eq('Status','active').eq('is_active',true).eq('trade_side','BUY'),
+            supabaseClient.from('transactions').select('id,name,description,amount,direction,status,transaction_date,created_at').eq('user_id',client.id).order('created_at',{ascending:false}).limit(6),
+          ]);
+          const holdings=hr.data||[], transactions=tr.data||[];
+          const secIds=[...new Set(holdings.map(h=>h.security_id).filter(Boolean))];
+          const strIds=[...new Set(holdings.map(h=>h.strategy_id).filter(Boolean))];
+          const secMap={}, strMap={};
+          if(secIds.length){ const {data:s}=await supabaseClient.from('securities_c').select('id,symbol,name,last_price,logo_url').in('id',secIds); (s||[]).forEach(x=>secMap[x.id]=x); }
+          if(strIds.length){ const {data:s}=await supabaseClient.from('strategies_c').select('id,name,short_name,risk_level').in('id',strIds); (s||[]).forEach(x=>strMap[x.id]=x); }
+          let tv=0,tc=0;
+          const fh=holdings.filter(h=>secMap[h.security_id]).map(h=>{
+            const sec=secMap[h.security_id],qty=Number(h.quantity||0),af=Number(h.avg_fill||0),ip=!af;
+            const lp=Number(sec.last_price||af),mv=(lp*qty)/100,cb=(af*qty)/100,pr=mv-cb,pp=cb>0?(pr/cb)*100:0;
+            if(!ip){tv+=mv;tc+=cb;}
+            return {symbol:sec.symbol,name:sec.name,logo:sec.logo_url||'',value:mv,pnlRands:pr,pnlPct:pp,isPending:ip,strategyId:h.strategy_id};
+          }).sort((a,b)=>b.value-a.value);
+          const sa={};
+          fh.forEach(h=>{ if(!h.strategyId) return; if(!sa[h.strategyId]) sa[h.strategyId]={value:0,count:0}; if(!h.isPending) sa[h.strategyId].value+=h.value; sa[h.strategyId].count+=1; });
+          const se=Object.entries(sa).map(([id,v])=>({id,strategy:strMap[id],value:v.value,count:v.count})).filter(s=>s.strategy).sort((a,b)=>b.value-a.value);
+          const tp=tv-tc,tpp=tc>0?(tp/tc)*100:0;
+          document.getElementById('cpBalance').textContent=`R${fmt(tv)}`;
+          document.getElementById('cpChange').textContent=tc>0?`${tp>=0?'+':''}R${fmt(Math.abs(tp))} (${tp>=0?'+':''}${tpp.toFixed(2)}%)`:'';
+          document.getElementById('cpHoldingsCount').textContent=fh.length;
+          document.getElementById('cpStrategiesCount').textContent=se.length;
+          document.getElementById('cpHoldingsList').innerHTML=fh.length?fh.map(h=>{
+            const cls=h.pnlRands>=0?'cp-pnl-pos':'cp-pnl-neg';
+            const logoHtml=h.logo?`<img src="${escapeHtml(h.logo)}" style="width:28px;height:28px;border-radius:8px;object-fit:cover;flex-shrink:0;border:1px solid #f2f2f7;" onerror="this.style.display='none'">`:`<div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#a855f7);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;">${escapeHtml((h.symbol||'?')[0])}</div>`;
+            return `<div class="cp-card"><div class="cp-row" style="align-items:center;">${logoHtml}<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">${escapeHtml(h.symbol)}${h.isPending?' <span class="cp-pending">Pending</span>':''}</div><div class="cp-muted" style="font-size:11px;">${escapeHtml(h.name)}</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:700;">R${fmt(h.value)}</div>${h.isPending?'<div class="cp-muted" style="font-size:11px;">Awaiting fill</div>':`<div class="${cls}" style="font-size:11px;font-weight:600;">${h.pnlRands>=0?'+':'-'}R${fmt(Math.abs(h.pnlRands))}</div>`}</div></div></div>`;
+          }).join(''):'<div class="client-empty">No active holdings</div>';
+          document.getElementById('cpStrategiesList').innerHTML=se.length?se.map(s=>`<div class="cp-card"><div style="font-size:13px;font-weight:700;">${escapeHtml(s.strategy.name||s.strategy.short_name)}</div><div class="cp-row" style="margin-top:4px;"><span class="cp-muted" style="font-size:11px;">${escapeHtml(s.strategy.risk_level||'Balanced')} · ${s.count} holding${s.count===1?'':'s'}</span><span style="font-size:12px;font-weight:700;">R${fmt(s.value)}</span></div></div>`).join(''):'<div class="client-empty">No strategies</div>';
+          document.getElementById('cpTransactionsList').innerHTML=transactions.length?transactions.map(t=>{
+            const a=Math.abs(Number(t.amount||0)/100),cr=t.direction==='credit';
+            return `<div class="cp-card"><div class="cp-row"><div><div style="font-size:12px;font-weight:700;">${escapeHtml(t.name||t.description||'Transaction')}</div><div class="cp-muted" style="font-size:10px;">${escapeHtml(fmtDate(t.transaction_date||t.created_at))}</div></div><div style="font-size:12px;font-weight:700;color:${cr?'#34c759':'#1c1c1e'};">${cr?'+':''}R${fmt(a)}</div></div></div>`;
+          }).join(''):'<div class="client-empty">No recent activity</div>';
+          renderInspector({client,totalValue:tv,totalPnl:tp,totalPnlPct:tpp,strategyCount:se.length,holdings:fh.slice(0,8),transactions});
+        } catch(err) {
+          document.getElementById('cpBalance').textContent='Error';
+          document.getElementById('cpHoldingsList').innerHTML=`<div class="client-empty">${escapeHtml(err.message||'Failed')}</div>`;
+        }
+      }
+
+      function renderInspector(s) {
+        document.getElementById('inspectorHint').textContent='Live data for '+s.client.name;
+        document.getElementById('mClient').textContent=s.client.name;
+        document.getElementById('mPortfolio').textContent=`R${fmt(s.totalValue)}`;
+        const pe=document.getElementById('mPnl');
+        pe.textContent=`${s.totalPnl>=0?'+':''}R${fmt(Math.abs(s.totalPnl))}`;
+        pe.style.color=s.totalPnl>=0?'#34c759':'#ff3b30';
+        document.getElementById('mStrategies').textContent=String(s.strategyCount);
+        document.getElementById('inspectorHoldings').innerHTML=s.holdings.length?s.holdings.map(h=>`<div class="inspector-item"><span>${escapeHtml(h.symbol)}${h.isPending?' · Pending':''}</span><span style="font-weight:700;">R${fmt(h.value)}</span></div>`).join(''):'<div class="placeholder">No holdings</div>';
+        document.getElementById('inspectorTransactions').innerHTML=(s.transactions||[]).length?s.transactions.map(t=>{
+          const a=Math.abs(Number(t.amount||0)/100),cr=t.direction==='credit';
+          return `<div class="inspector-item"><span>${escapeHtml(t.name||t.description||'Transaction')}</span><span style="font-weight:700;color:${cr?'#34c759':'#1c1c1e'};">${cr?'+':''}R${fmt(a)}</span></div>`;
+        }).join(''):'<div class="placeholder">No transactions</div>';
+      }
+
+      function escapeHtml(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+      function fmt(n){return Number(n||0).toLocaleString('en-ZA',{minimumFractionDigits:2,maximumFractionDigits:2});}
+      function fmtDate(d){if(!d)return'';const dt=new Date(d);if(isNaN(dt))return'';const diff=Math.floor((Date.now()-dt)/86400000);if(diff===0)return'Today';if(diff===1)return'Yesterday';if(diff<7)return`${diff}d ago`;return dt.toLocaleDateString('en-ZA',{day:'numeric',month:'short'});}
+    </script>
+  <script>
+(function(){
+  var link=document.getElementById("teamNavLink");
+  if(!link)return;
+  var key=Object.keys(localStorage).find(function(k){return k.startsWith("sb-")&&k.endsWith("-auth-token");});
+  if(!key)return;
+  try{
+    var token=JSON.parse(localStorage.getItem(key))&&JSON.parse(localStorage.getItem(key)).access_token;
+    if(!token)return;
+    fetch("/api/team/me",{headers:{Authorization:"Bearer "+token}})
+      .then(function(r){return r.json();})
+      .then(function(d){if(d.role==="admin")link.style.display="";})
+      .catch(function(){});
+  }catch(e){}
+})();
+</script>
+</body>
+</html>
