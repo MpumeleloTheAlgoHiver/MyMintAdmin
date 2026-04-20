@@ -5406,14 +5406,14 @@
         const status = row.status || row.Status || '-';
         const currentPrice = security.last_price ? Number(security.last_price) / 100 : 0;
         const qty = Number(row.quantity) || 0;
-        const avgFillRands = row.avg_fill ? Number(row.avg_fill) / 100 : 0;
-        const mv = currentPrice ? qty * currentPrice : (Number(row.market_value) || 0) / 100;
-        const pnl = avgFillRands > 0 && currentPrice ? (currentPrice - avgFillRands) * qty : (Number(row.unrealized_pnl) || 0) / 100;
+        const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
+        const mv = currentPrice ? qty * currentPrice : (Number(row.market_value) || 0);
+        const pnl = avgFill > 0 && currentPrice ? (currentPrice - avgFill) * qty : (Number(row.unrealized_pnl) || 0);
         return `
           <tr>
             <td>${escapeHtml(label)}</td>
             <td>${formatNumber(qty, 2)}</td>
-            <td>R ${formatNumber(avgFillRands, 2)}</td>
+            <td>R ${formatNumber(avgFill, 2)}</td>
             <td>R ${formatNumber(mv, 2)}</td>
             <td>R ${formatNumber(pnl, 2)}</td>
             <td>${escapeHtml(status)}</td>
@@ -10511,7 +10511,7 @@
   try{
     var token=JSON.parse(localStorage.getItem(key))&&JSON.parse(localStorage.getItem(key)).access_token;
     if(!token)return;
-    fetch("/api/team?action=me",{headers:{Authorization:"Bearer "+token}})
+    fetch("/api/team/me",{headers:{Authorization:"Bearer "+token}})
       .then(function(r){return r.json();})
       .then(function(d){if(d.role==="admin")link.style.display="";})
       .catch(function(){});

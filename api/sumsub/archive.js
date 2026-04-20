@@ -190,7 +190,16 @@ const createSignedUrl = async (storagePath, expiresInSeconds = 3600) => {
 };
 
 const archiveCompletedUser = async ({ profileId, externalUserId }) => {
-  const applicant = await fetchSumsubJson(`/resources/applicants/-;externalUserId=${encodeURIComponent(externalUserId)}/one`);
+  let applicant;
+  try {
+    applicant = await fetchSumsubJson(`/resources/applicants/-;externalUserId=${encodeURIComponent(externalUserId)}/one`);
+  } catch (err) {
+    if (err.message.toLowerCase().includes('not found') || err.message.includes('404')) {
+      return { skipped: true, reason: 'Applicant not found', archivedCount: 0, applicantId: null };
+    }
+    throw err;
+  }
+
   if (!isApplicantCompleted(applicant)) {
     return {
       skipped: true,

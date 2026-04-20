@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const sumsubArchiveHandler = require('./api/sumsub/archive');
+const teamHandler = require('./api/team');
 
 const port = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, 'public');
@@ -1022,8 +1023,25 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Team management routes
+  if (req.url.startsWith('/api/team')) {
+    (async () => {
+      try {
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          req.body = await readJsonBody(req).catch(() => ({}));
+        }
+        await teamHandler(req, res);
+      } catch (err) {
+        if (!res.headersSent) {
+          sendJson(res, 500, { error: err.message });
+        }
+      }
+    })();
+    return;
+  }
+
   const urlWithoutQuery = req.url.split('?')[0];
-  const requestPath = urlWithoutQuery === '/' ? '/index.html' : urlWithoutQuery;
+  const requestPath = urlWithoutQuery === '/' ? '/dashboard.html' : urlWithoutQuery;
   const safePath = path.normalize(requestPath).replace(/^([/\\])+/, '');
   const filePath = path.join(publicDir, safePath);
 

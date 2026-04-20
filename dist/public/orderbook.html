@@ -5309,7 +5309,7 @@
   try{
     var token=JSON.parse(localStorage.getItem(key))&&JSON.parse(localStorage.getItem(key)).access_token;
     if(!token)return;
-    fetch("/api/team?action=me",{headers:{Authorization:"Bearer "+token}})
+    fetch("/api/team/me",{headers:{Authorization:"Bearer "+token}})
       .then(function(r){return r.json();})
       .then(function(d){if(d.role==="admin")link.style.display="";})
       .catch(function(){});
