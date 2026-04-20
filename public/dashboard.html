@@ -7147,7 +7147,13 @@
           });
           btn.addEventListener("click", () => {
             const strategy = (allStrategiesFullData || [])[idx];
-            if (strategy) editStrategy(strategy, globalSecuritiesMap);
+            if (!strategy) return;
+            const ovIdx = (_ovAllStrategies || []).findIndex(s => String(s.id) === String(strategy.id));
+            if (ovIdx >= 0 && typeof window.ovSelectStrategy === 'function') {
+              window.ovSelectStrategy(ovIdx);
+            } else {
+              editStrategy(strategy, globalSecuritiesMap);
+            }
           });
         });
       };
