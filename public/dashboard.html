@@ -3097,7 +3097,7 @@
             matched++;
           }
         }
-        return matched > 0 ? Math.round(total) : null;
+        return matched > 0 ? (total / 100) : null;
       };
 
       let allSecuritiesCache = null;
