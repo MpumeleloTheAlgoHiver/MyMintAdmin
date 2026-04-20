@@ -2167,26 +2167,32 @@
         try {
           const { data: newsData, error } = await supabaseClient
             .from('News_articles')
-            .select('id, title, source, channel, published_at, body_text')
+            .select('id, title, source, channel, published_at, body_text, author, url')
             .order('published_at', { ascending: false })
             .limit(8);
           if (error || !newsData || !newsData.length) {
             listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No news available</div>';
             return;
           }
+          window._newsCache = window._newsCache || {};
+          newsData.forEach(a => { window._newsCache[a.id] = a; });
           listEl.innerHTML = newsData.map(article => {
             const src = article.source || article.channel || 'Mint';
             const dateStr = article.published_at
               ? new Date(article.published_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })
               : '';
-            const preview = (article.body_text || '').slice(0, 120) + (article.body_text?.length > 120 ? '…' : '');
-            return `<div class="news-item-hover" style="border:1px solid #f1f5f9;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s;background:white;">
+            const preview = (article.body_text || '').slice(0, 120) + ((article.body_text || '').length > 120 ? '…' : '');
+            return `<div onclick="openNewsArticle(window._newsCache['${article.id}'])" class="news-item-hover" style="border:1px solid #f1f5f9;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s;background:white;" onmouseenter="this.style.borderColor='#ddd6fe';this.style.background='#fafafe'" onmouseleave="this.style.borderColor='#f1f5f9';this.style.background='white'">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
                 <span style="font-size:10px;font-weight:700;color:#7c3aed;background:#ede9fe;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:0.04em;">${src}</span>
                 <span style="font-size:10px;color:#94a3b8;">${dateStr}</span>
               </div>
               <div style="font-size:12px;font-weight:600;color:#0f172a;line-height:1.4;margin-bottom:3px;">${article.title}</div>
               ${preview ? `<div style="font-size:11px;color:#64748b;line-height:1.5;">${preview}</div>` : ''}
+              <div style="display:flex;align-items:center;gap:4px;margin-top:6px;">
+                <span style="font-size:10px;color:#a78bfa;font-weight:500;">Read more</span>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2.5"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+              </div>
             </div>`;
           }).join('');
         } catch(e) {
@@ -5603,7 +5609,7 @@
         try {
           const { data: newsData, error } = await supabaseClient
             .from('News_articles')
-            .select('id, title, source, channel, published_at, body_text, author')
+            .select('id, title, source, channel, published_at, body_text, author, url')
             .order('published_at', { ascending: false })
             .limit(10);
 
@@ -5612,8 +5618,11 @@
             return;
           }
 
+          window._newsCache = window._newsCache || {};
+          newsData.forEach(a => { window._newsCache[a.id] = a; });
+
           listEl.innerHTML = newsData.map(article => `
-            <div style="border:1px solid #f1f5f9;border-radius:10px;padding:14px 16px;margin-bottom:8px;">
+            <div onclick="openNewsArticle(window._newsCache['${article.id}'])" style="border:1px solid #f1f5f9;border-radius:10px;padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:border-color 0.15s,background 0.15s;" onmouseenter="this.style.borderColor='#ddd6fe';this.style.background='#fafafe'" onmouseleave="this.style.borderColor='#f1f5f9';this.style.background=''">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                 <span style="font-size:10px;font-weight:700;color:#7c3aed;background:#ede9fe;padding:2px 8px;border-radius:20px;text-transform:uppercase;">
                   ${article.source || article.channel || 'News'}
@@ -5626,7 +5635,11 @@
                 ${article.title}
               </div>
               <div style="font-size:11px;color:#64748b;line-height:1.5;">
-                ${(article.body_text || '').slice(0, 150)}${article.body_text?.length > 150 ? '...' : ''}
+                ${(article.body_text || '').slice(0, 150)}${(article.body_text || '').length > 150 ? '…' : ''}
+              </div>
+              <div style="display:flex;align-items:center;gap:4px;margin-top:7px;">
+                <span style="font-size:10px;color:#a78bfa;font-weight:500;">Read more</span>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2.5"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
               </div>
             </div>
           `).join('');
@@ -9907,5 +9920,61 @@
   }catch(e){}
 })();
 </script>
+  <!-- News Article Modal -->
+  <div id="newsArticleModal" class="modal-backdrop hidden" onclick="if(event.target===this)closeNewsModal()">
+    <div class="modal-content" style="max-width:640px;padding:0;border-radius:20px;overflow:hidden;">
+      <!-- Header -->
+      <div style="padding:22px 26px 16px;border-bottom:1px solid #f1f5f9;position:sticky;top:0;background:#fff;z-index:1;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+          <div style="flex:1;min-width:0;">
+            <div id="newsModalSource" style="display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;color:#7c3aed;background:#ede9fe;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px;"></div>
+            <div id="newsModalTitle" style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:#0f172a;line-height:1.35;"></div>
+          </div>
+          <button onclick="closeNewsModal()" style="flex-shrink:0;width:32px;height:32px;border-radius:50%;border:1px solid #e2e8f0;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#64748b;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='#fff'">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div id="newsModalMeta" style="display:flex;align-items:center;gap:10px;margin-top:8px;font-size:11px;color:#94a3b8;"></div>
+      </div>
+      <!-- Body -->
+      <div style="padding:20px 26px 24px;">
+        <div id="newsModalBody" style="font-size:13.5px;color:#334155;line-height:1.7;white-space:pre-wrap;"></div>
+        <div id="newsModalActions" style="margin-top:20px;display:flex;gap:10px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.openNewsArticle = function(articleJson) {
+      const a = typeof articleJson === 'string' ? JSON.parse(articleJson) : articleJson;
+      const modal = document.getElementById('newsArticleModal');
+      if (!modal) return;
+      document.getElementById('newsModalTitle').textContent = a.title || '';
+      document.getElementById('newsModalSource').textContent = a.source || a.channel || 'News';
+      const dateStr = a.published_at
+        ? new Date(a.published_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
+        : '';
+      const authorStr = a.author ? `By ${a.author}` : '';
+      document.getElementById('newsModalMeta').innerHTML = [authorStr, dateStr].filter(Boolean).map(s=>`<span>${s}</span>`).join('<span style="color:#e2e8f0;">·</span>');
+      document.getElementById('newsModalBody').textContent = a.body_text || 'No content available.';
+      const actionsEl = document.getElementById('newsModalActions');
+      if (a.url) {
+        actionsEl.innerHTML = `<a href="${a.url}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;background:#7c3aed;color:#fff;font-size:12.5px;font-weight:600;text-decoration:none;" onmouseenter="this.style.background='#6d28d9'" onmouseleave="this.style.background='#7c3aed'">
+          Read full article
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>`;
+      } else {
+        actionsEl.innerHTML = '';
+      }
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    };
+
+    window.closeNewsModal = function() {
+      const modal = document.getElementById('newsArticleModal');
+      if (modal) modal.classList.add('hidden');
+      document.body.style.overflow = '';
+    };
+  </script>
 </body>
 </html>
