@@ -4511,8 +4511,8 @@
         return palettes[seed];
       };
 
-      /* --- single premium card (light-mode, matches factsheets.html reference) --- */
-      const _fsCard = (s, animIdx) => {
+      /* --- single premium card (clean white, matches reference design) --- */
+      const _fsCard = (s, animIdx, logoMap) => {
         const holdings = Array.isArray(s.holdings) ? s.holdings : [];
         const holdingCount = holdings.length;
         const [c0, c1] = _fsIconColors(s);
@@ -4520,69 +4520,98 @@
         const ytdRaw = strategyYtdMap ? strategyYtdMap.get(String(s.id)) : null;
         const ytd = ytdRaw != null ? parseFloat(ytdRaw) : null;
         const isUp = ytd == null ? true : ytd >= 0;
-        const fmtPct = (v) => v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(2)}%`;
+        const ytdStr = ytd == null ? '—' : `${ytd > 0 ? '+' : ''}${ytd.toFixed(2)}%`;
+        const ytdClass = ytd == null ? 'na' : (isUp ? 'pos' : 'neg');
+        const ytdColor = ytd == null ? '#94a3b8' : (isUp ? '#059669' : '#e11d48');
         const inv = strategyInvestedIds && strategyInvestedIds.has(String(s.id));
-        const spark = null;
+        const sparkData = strategyYtdMap && window._fsSparkMap ? window._fsSparkMap[String(s.id)] : null;
+
+        /* Asset logos */
+        const lmap = logoMap || {};
+        const logoItems = holdings.slice(0, 8).map(h => {
+          const ticker = (h.ticker || h.symbol || h || '').toString();
+          const lu = lmap[ticker] || null;
+          const initH = ticker.replace('.JO','').slice(0, 2).toUpperCase() || '?';
+          if (lu) return `<img src="${lu}" alt="${initH}" style="width:24px;height:24px;border-radius:50%;border:2px solid #fff;object-fit:cover;margin-left:-7px;flex-shrink:0;background:#f1f5f9;" onerror="this.outerHTML='<div style=\\'width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#7c3aed;margin-left:-7px;\\'>${initH}</div>'">`;
+          return `<div style="width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#7c3aed;margin-left:-7px;flex-shrink:0;">${initH}</div>`;
+        }).slice(0, 5);
+        /* Fix first child margin */
+        if (logoItems.length > 0) {
+          logoItems[0] = logoItems[0].replace('margin-left:-7px', 'margin-left:0');
+        }
+        const logosHtml = logoItems.length > 0
+          ? `<div style="display:flex;align-items:center;margin-top:12px;">${logoItems.join('')}</div>`
+          : '';
+
+        /* Sparkline */
+        let sparkHtml = `<div style="display:flex;align-items:center;justify-content:center;height:100%;"><div style="height:2px;width:55%;background:#e2e8f0;border-radius:2px;"></div></div>`;
+        if (sparkData && sparkData.length >= 2) {
+          const sd = sparkData, w=300, h=80, p=4;
+          const mn=Math.min(...sd), mx=Math.max(...sd), rng=mx-mn||1;
+          const pts = sd.map((v,i)=>[p+(i/(sd.length-1))*(w-p*2), h-p-((v-mn)/rng)*(h-p*2)]);
+          const path = pts.map((pt,i)=>(i===0?`M ${pt[0]} ${pt[1]}`:`L ${pt[0]} ${pt[1]}`)).join(' ');
+          const area = `${path} L ${pts[pts.length-1][0]} ${h} L ${pts[0][0]} ${h} Z`;
+          const stroke = isUp ? '#34d399' : '#fb7185';
+          const gid = 'fsg'+Math.random().toString(36).slice(2,8);
+          sparkHtml = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:100%;">
+            <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="${stroke}" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="${stroke}" stop-opacity="0"/>
+            </linearGradient></defs>
+            <path d="${area}" fill="url(#${gid})"/>
+            <path d="${path}" stroke="${stroke}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>`;
+        }
+
+        /* Stats row */
+        const statParts = [`<span style="color:#64748b;font-size:12px;">${holdingCount} holding${holdingCount!==1?'s':''}</span>`];
+        if (inv) statParts.push(`<span style="color:#cbd5e1;font-size:13px;">·</span><span style="color:#059669;font-weight:600;font-size:12px;">1+ investors</span>`);
+        statParts.push(`<span style="color:#cbd5e1;font-size:13px;">·</span><span style="color:#64748b;font-size:12px;">${s.is_public ? 'Public' : 'Private'}</span>`);
+        if (s.is_featured) statParts.push(`<span style="color:#cbd5e1;font-size:13px;">·</span><span style="color:#d97706;font-weight:600;font-size:12px;">★ Featured</span>`);
+
+        const desc = (s.description || '').trim();
 
         return `
         <div onclick="openFactsheetInline('${s.id}')" style="
-          position:relative;border-radius:22px;padding:1px;cursor:pointer;
-          background:linear-gradient(140deg,rgba(139,92,246,0.35),rgba(15,23,42,0.06) 40%,rgba(99,102,241,0.30));
-          transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s;
-          animation:fsCardRise .55s cubic-bezier(.2,.8,.2,1) ${animIdx * 55}ms both;
+          position:relative;border-radius:18px;cursor:pointer;overflow:hidden;
+          background:#fff;border:1px solid rgba(15,23,42,0.08);
+          box-shadow:0 1px 4px rgba(15,23,42,0.05),0 4px 16px rgba(15,23,42,0.03);
+          transition:transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .3s;
+          animation:fsCardRise .5s cubic-bezier(.2,.8,.2,1) ${animIdx * 55}ms both;
         "
-        onmouseenter="this.style.transform='translateY(-4px)';this.style.boxShadow='0 30px 60px -25px rgba(15,23,42,0.18),0 0 0 1px rgba(139,92,246,0.4),0 0 60px -20px rgba(139,92,246,0.35)';"
+        onmouseenter="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 36px rgba(15,23,42,0.12),0 0 0 1px rgba(15,23,42,0.07)';"
         onmouseleave="this.style.transform='';this.style.boxShadow='';">
-          <div style="
-            position:relative;z-index:2;border-radius:21px;padding:22px;padding-top:0;overflow:hidden;min-height:200px;
-            background:radial-gradient(120% 80% at 0% 0%,rgba(139,92,246,0.08),transparent 55%),
-                        linear-gradient(180deg,rgba(255,255,255,0.95),rgba(248,250,252,0.98));
-            backdrop-filter:blur(14px);
-          ">
-            <!-- Color band -->
-            <div style="height:6px;border-radius:21px 21px 0 0;margin:0 -22px 18px;width:calc(100% + 44px);background:linear-gradient(90deg,${c0},${c1})"></div>
-            <!-- Card top -->
+          <div style="padding:20px;">
+            <!-- Header -->
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
-              <div style="display:flex;gap:13px;align-items:center;min-width:0;">
-                <div style="width:42px;height:42px;border-radius:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;color:#fff;background:linear-gradient(135deg,${c0},${c1});box-shadow:inset 0 1px 0 rgba(255,255,255,0.25),0 8px 24px -8px rgba(0,0,0,0.6);">${initials}</div>
+              <div style="display:flex;gap:12px;align-items:center;min-width:0;flex:1;">
+                <div style="width:42px;height:42px;border-radius:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;color:#fff;background:linear-gradient(135deg,${c0},${c1});box-shadow:0 4px 12px rgba(0,0,0,0.15);">${initials}</div>
                 <div style="min-width:0;">
-                  <div style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;letter-spacing:-0.01em;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;">${s.name || 'Untitled'}</div>
+                  <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-0.01em;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:175px;">${s.name || 'Untitled'}</div>
                   <div style="font-size:11.5px;color:#64748b;margin-top:2px;">${s.short_name || ''}${s.sector ? ' · ' + s.sector : ''}</div>
                 </div>
               </div>
               ${_fsDarkRiskPill(s.risk_level)}
             </div>
-            <!-- YTD big number -->
-            <div style="display:flex;align-items:baseline;gap:10px;margin-top:14px;">
-              <div style="font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;letter-spacing:-0.03em;line-height:1;color:${isUp ? '#059669' : '#e11d48'};">${fmtPct(ytd)}</div>
-              <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;">YTD</div>
-            </div>
+            ${desc ? `<div style="font-size:12.5px;color:#475569;line-height:1.55;margin-top:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${desc}</div>` : ''}
+            ${logosHtml}
             <!-- Sparkline -->
-            <div style="height:34px;width:100%;margin-top:10px;">${spark ? _fsSparkSVG(spark) : ''}</div>
-            <!-- Badges -->
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">
-              ${s.is_public ? '<span style="display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;font-size:10.5px;font-weight:600;background:rgba(16,217,160,0.10);color:#34d399;border:1px solid rgba(16,217,160,0.22);">Public</span>' : '<span style="display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;font-size:10.5px;font-weight:600;background:rgba(15,23,42,0.04);color:#475569;border:1px solid rgba(15,23,42,0.10);">Private</span>'}
-              ${s.is_featured ? '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:999px;font-size:10.5px;font-weight:600;background:linear-gradient(90deg,rgba(245,181,68,0.18),rgba(245,158,11,0.05));color:#fbbf24;border:1px solid rgba(245,181,68,0.3);">★ Featured</span>' : ''}
+            <div style="height:80px;width:100%;margin-top:14px;">${sparkHtml}</div>
+            <!-- YTD chip -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:10px;background:#f8fafc;border:1px solid rgba(15,23,42,0.07);margin-top:8px;">
+              <span style="font-size:9.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.12em;">YTD RETURN</span>
+              <span style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:-0.02em;color:${ytdColor};">${ytdStr}</span>
             </div>
-            <!-- Footer grid -->
-            <div style="margin-top:16px;padding-top:14px;border-top:1px dashed rgba(15,23,42,0.10);display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <div>
-                <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;">Holdings</div>
-                <div style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;margin-top:2px;color:#0f172a;">${holdingCount || 0}</div>
-              </div>
-              <div>
-                <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;">Investors</div>
-                <div style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;margin-top:2px;color:${inv ? '#059669' : '#64748b'};">${inv ? '1+' : '—'}</div>
-              </div>
-            </div>
+            <!-- Stats row -->
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-top:13px;padding-top:11px;border-top:1px solid rgba(15,23,42,0.07);">${statParts.join('')}</div>
           </div>
         </div>`;
       };
 
       /* --- section label --- */
-      const _fsSection = (title, color, items, startIdx) => {
+      const _fsSection = (title, color, items, startIdx, logoMap) => {
         if (!items.length) return '';
-        const grid = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:18px;margin-bottom:8px;">${items.map((s, i) => _fsCard(s, startIdx + i)).join('')}</div>`;
+        const grid = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:18px;margin-bottom:8px;">${items.map((s, i) => _fsCard(s, startIdx + i, logoMap)).join('')}</div>`;
         return `
           <div style="display:flex;align-items:center;gap:12px;margin:28px 0 14px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${color};">
             ${title}
@@ -4592,7 +4621,7 @@
           ${grid}`;
       };
 
-      const renderFactsheetStrategyList = () => {
+      const renderFactsheetStrategyList = async () => {
         const root = document.getElementById('factsheetStrategyList');
         root.innerHTML = '';
         if (!allStrategiesFullData.length) {
@@ -4604,18 +4633,52 @@
         if (!document.getElementById('fsCardRiseKF')) {
           const kf = document.createElement('style');
           kf.id = 'fsCardRiseKF';
-          kf.textContent = '@keyframes fsCardRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}';
+          kf.textContent = '@keyframes fsCardRise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}';
           document.head.appendChild(kf);
         }
+
+        /* Fetch logos for all holdings across all strategies */
+        const fsLogoMap = {};
+        try {
+          const allTickers = [...new Set(
+            allStrategiesFullData.flatMap(s => (Array.isArray(s.holdings) ? s.holdings : [])
+              .map(h => (h.ticker || h.symbol || h || '').toString())
+              .filter(t => t.length > 0))
+          )];
+          if (allTickers.length > 0) {
+            const { data: logSecs } = await supabaseClient
+              .from('securities_c').select('symbol,logo_url').in('symbol', allTickers);
+            if (logSecs) logSecs.forEach(sec => { if (sec.logo_url) fsLogoMap[sec.symbol] = sec.logo_url; });
+          }
+        } catch(_){}
+
+        /* Fetch spark data for all strategies */
+        try {
+          const ids = allStrategiesFullData.map(s => s.id).filter(Boolean);
+          if (ids.length > 0) {
+            const { data: retRows } = await supabaseClient
+              .from('strategies_returns_c')
+              .select('strategy_id,basket_value,as_of_date')
+              .in('strategy_id', ids)
+              .order('as_of_date', { ascending: true });
+            const sparks = {};
+            (retRows || []).forEach(r => {
+              if (r.basket_value == null) return;
+              if (!sparks[r.strategy_id]) sparks[r.strategy_id] = [];
+              sparks[r.strategy_id].push(Number(r.basket_value));
+            });
+            window._fsSparkMap = sparks;
+          }
+        } catch(_){}
 
         const live    = allStrategiesFullData.filter(s => (s.status || 'draft') === 'active' && strategyInvestedIds && strategyInvestedIds.has(String(s.id)));
         const staged  = allStrategiesFullData.filter(s => (s.status || 'draft') === 'active' && !(strategyInvestedIds && strategyInvestedIds.has(String(s.id))));
         const draft   = allStrategiesFullData.filter(s => (s.status || 'draft') !== 'active');
 
         root.innerHTML =
-          _fsSection('Live · With Investors',    '#34d399', live,   0) +
-          _fsSection('Live · No Investors Yet',  '#a78bfa', staged, live.length) +
-          _fsSection('Inactive / Draft',         '#94a3b8', draft,  live.length + staged.length);
+          _fsSection('Live · With Investors',    '#34d399', live,   0,                          fsLogoMap) +
+          _fsSection('Live · No Investors Yet',  '#a78bfa', staged, live.length,                fsLogoMap) +
+          _fsSection('Inactive / Draft',         '#94a3b8', draft,  live.length + staged.length, fsLogoMap);
       };
 
       let _factsheetPrevTab = null;

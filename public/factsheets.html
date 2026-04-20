@@ -280,63 +280,61 @@
     .section-label.draft{color:#94a3b8}
 
     /* Strategy grid */
-    .strategy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:22px}
+    .strategy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px}
 
-    /* Card top color band */
-    .s-band{height:6px;border-radius:21px 21px 0 0;margin:0 -22px 18px;width:calc(100% + 44px)}
-    .s-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-top:18px}
-    .s-return-row{display:flex;align-items:baseline;gap:10px;margin-top:14px}
-    .s-return-big{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;letter-spacing:-0.03em;line-height:1}
-    .s-return-big.pos{color:#059669}
-    .s-return-big.neg{color:#e11d48}
-    .s-return-lbl{font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:0.1em;font-weight:700}
-    .s-card-foot{
-      margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);
-      display:grid;grid-template-columns:1fr 1fr;gap:10px;
-    }
-    .foot-cell .lbl{font-size:10px;color:var(--text-mute);font-weight:700;text-transform:uppercase;letter-spacing:0.1em}
-    .foot-cell .val{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;margin-top:2px;color:var(--text)}
-    .badges-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+    /* Card top */
+    .s-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
 
-    /* Premium card */
+    /* Clean white card - no gradient border, no top band */
     .s-card{
-      position:relative;border-radius:22px;padding:1px;
-      background:linear-gradient(140deg,rgba(139,92,246,0.35),rgba(15,23,42,0.06) 40%,rgba(99,102,241,0.30));
-      transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s;
-      cursor:pointer;opacity:0;transform:translateY(14px);
-      animation:rise .6s cubic-bezier(.2,.8,.2,1) forwards;
+      position:relative;border-radius:18px;
+      background:#fff;
+      border:1px solid rgba(15,23,42,0.08);
+      box-shadow:0 1px 4px rgba(15,23,42,0.05),0 4px 16px rgba(15,23,42,0.03);
+      transition:transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .3s;
+      cursor:pointer;opacity:0;transform:translateY(10px);
+      animation:rise .5s cubic-bezier(.2,.8,.2,1) forwards;
+      overflow:hidden;
     }
     @keyframes rise{to{opacity:1;transform:none}}
-    .s-card-inner{
-      position:relative;z-index:2;
-      border-radius:21px;padding:22px;padding-top:0;
-      background:
-        radial-gradient(120% 80% at 0% 0%,rgba(139,92,246,0.08),transparent 55%),
-        linear-gradient(180deg,rgba(255,255,255,0.95),rgba(248,250,252,0.98));
-      backdrop-filter:blur(14px);overflow:hidden;min-height:200px;
-    }
-    .s-card-inner::after{
-      content:"";position:absolute;inset:0;pointer-events:none;
-      background:linear-gradient(115deg,transparent 35%,rgba(139,92,246,0.10) 50%,transparent 65%);
-      transform:translateX(-120%);transition:transform .9s ease;
-    }
-    .s-card:hover{transform:translateY(-4px)}
-    .s-card:hover .s-card-inner::after{transform:translateX(120%)}
-    .s-card:hover{
-      box-shadow:
-        0 30px 60px -25px rgba(15,23,42,0.18),
-        0 0 0 1px rgba(139,92,246,0.4),
-        0 0 60px -20px rgba(139,92,246,0.35);
-    }
+    .s-card:hover{transform:translateY(-4px);box-shadow:0 12px 36px rgba(15,23,42,0.12),0 0 0 1px rgba(15,23,42,0.07);}
+    .s-card-inner{padding:20px;}
     .s-icon{
       width:42px;height:42px;border-radius:13px;
       display:flex;align-items:center;justify-content:center;
       font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;color:#fff;
-      box-shadow:inset 0 1px 0 rgba(255,255,255,0.25),0 8px 24px -8px rgba(0,0,0,0.6);
+      box-shadow:0 4px 12px rgba(0,0,0,0.15);
       flex-shrink:0;
     }
-    .s-name{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;letter-spacing:-0.01em;color:var(--text)}
-    .s-meta{font-size:11.5px;color:var(--text-mute);margin-top:2px}
+    .s-name{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-0.01em;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:175px;}
+    .s-meta{font-size:11.5px;color:#64748b;margin-top:2px;}
+
+    /* Description */
+    .s-desc{font-size:12.5px;color:#475569;line-height:1.55;margin-top:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+
+    /* Asset logos row */
+    .s-logos-row{display:flex;align-items:center;margin-top:12px;}
+    .s-logo{width:24px;height:24px;border-radius:50%;border:2px solid #fff;object-fit:cover;margin-left:-7px;background:#f1f5f9;flex-shrink:0;}
+    .s-logo:first-child{margin-left:0;}
+    .s-logo-fb{width:24px;height:24px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#7c3aed;background:#ede9fe;margin-left:-7px;flex-shrink:0;}
+    .s-logo-fb:first-child{margin-left:0;}
+
+    /* YTD chip */
+    .s-ytd-chip{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:10px;background:#f8fafc;border:1px solid rgba(15,23,42,0.07);margin-top:8px;}
+    .s-ytd-chip .ytd-lbl{font-size:9.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.12em;}
+    .s-ytd-chip .ytd-val{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:-0.02em;}
+    .s-ytd-chip .ytd-val.pos{color:#059669;}
+    .s-ytd-chip .ytd-val.neg{color:#e11d48;}
+    .s-ytd-chip .ytd-val.na{color:#94a3b8;}
+
+    /* Stats row */
+    .s-stats-row{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-top:13px;padding-top:11px;border-top:1px solid rgba(15,23,42,0.07);font-size:12px;color:#64748b;}
+    .s-stats-row .sdot{color:#cbd5e1;font-size:13px;}
+    .s-stats-row .sinv{color:#059669;font-weight:600;}
+    .s-stats-row .sfeat{color:#d97706;font-weight:600;}
+
+    /* Spark container */
+    .spark-wrap{height:80px;width:100%;margin-top:14px;}
 
     /* Pills */
     .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;font-size:10.5px;font-weight:600;border:1px solid transparent}
@@ -347,9 +345,6 @@
     .pill-feat{background:linear-gradient(90deg,rgba(245,181,68,0.18),rgba(245,158,11,0.05));color:#fbbf24;border-color:rgba(245,181,68,0.3)}
     .pill-status-active{background:rgba(139,92,246,0.14);color:#c4b5fd;border-color:rgba(139,92,246,0.3)}
     .pill-status-draft{background:rgba(15,23,42,0.04);color:var(--text-dim);border-color:var(--border)}
-
-    /* Spark */
-    .spark{height:34px;width:100%;margin-top:10px}
 
     /* Detail view */
     .detail{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
@@ -694,9 +689,9 @@
       const isUp = data[data.length-1] >= data[0];
       const stroke = isUp ? '#34d399' : '#fb7185';
       const gid = 'sg'+Math.random().toString(36).slice(2,8);
-      return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      return `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
         <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${stroke}" stop-opacity="0.4"/>
+          <stop offset="0%" stop-color="${stroke}" stop-opacity="0.35"/>
           <stop offset="100%" stop-color="${stroke}" stop-opacity="0"/>
         </linearGradient></defs>
         <path d="${area}" fill="url(#${gid})"/>
@@ -752,8 +747,11 @@
     let _ytdMap = {};
     let _sparkMap = {};
     let _investorCounts = {};
+    let _logoMap = {};
     let _filter = 'all';
     let _query = '';
+
+    const escHtml = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
     /* ── Overview band ── */
     function renderOverview() {
@@ -834,46 +832,56 @@
       const initials = (s.short_name||s.name||'S').slice(0,2).toUpperCase();
       const ytdRaw = _ytdMap[s.id] != null ? Number(_ytdMap[s.id]) : null;
       const isUp = ytdRaw == null ? true : ytdRaw >= 0;
-      const spark = _sparkMap[s.id];
+      const sparkData = _sparkMap[s.id];
       const inv = _investorCounts[s.id]||0;
       const holdings = Array.isArray(s.holdings) ? s.holdings : [];
+
+      /* Asset logos */
+      const logoItems = holdings.slice(0, 8).map(h => {
+        const ticker = (h.ticker || h.symbol || h || '').toString();
+        const logoUrl = _logoMap[ticker] || null;
+        const initH = ticker.replace('.JO','').slice(0, 2).toUpperCase() || '?';
+        if (logoUrl) return `<img class="s-logo" src="${logoUrl}" alt="${initH}" onerror="this.outerHTML='<div class=\\'s-logo-fb\\'>${initH}</div>'">`;
+        return `<div class="s-logo-fb">${initH}</div>`;
+      }).slice(0, 5);
+      const logosHtml = logoItems.length > 0 ? `<div class="s-logos-row">${logoItems.join('')}</div>` : '';
+
+      /* Sparkline */
+      const sparkHtml = sparkData && sparkData.length >= 2
+        ? sparkSVG(sparkData)
+        : `<div style="display:flex;align-items:center;justify-content:center;height:100%;"><div style="height:2px;width:55%;background:#e2e8f0;border-radius:2px;"></div></div>`;
+
+      /* YTD chip value */
+      const ytdClass = ytdRaw == null ? 'na' : (isUp ? 'pos' : 'neg');
+      const ytdStr = ytdRaw == null ? '—' : `${ytdRaw > 0 ? '+' : ''}${ytdRaw.toFixed(2)}%`;
+
+      /* Stats row */
+      const statParts = [`<span>${holdings.length} holding${holdings.length!==1?'s':''}</span>`];
+      if (inv > 0) statParts.push(`<span class="sdot">·</span><span class="sinv">${inv} investor${inv!==1?'s':''}</span>`);
+      statParts.push(`<span class="sdot">·</span><span>${s.is_public ? 'Public' : 'Private'}</span>`);
+      if (s.is_featured) statParts.push(`<span class="sdot">·</span><span class="sfeat">★ Featured</span>`);
+
       return `
         <div class="s-card" style="animation-delay:${idx*60}ms" onclick="openDetail('${s.id}','${(s.name||'').replace(/'/g,"\\'")}')">
           <div class="s-card-inner">
-            <div class="s-band" style="background:linear-gradient(90deg,${c0},${c1})"></div>
             <div class="s-card-top">
-              <div style="display:flex;gap:13px;align-items:center;min-width:0">
+              <div style="display:flex;gap:12px;align-items:center;min-width:0;flex:1;">
                 <div class="s-icon" style="background:linear-gradient(135deg,${c0},${c1})">${initials}</div>
-                <div style="min-width:0">
-                  <div class="s-name">${s.name||'Untitled'}</div>
-                  <div class="s-meta">${s.short_name||''}${s.sector?' · '+s.sector:''}</div>
+                <div style="min-width:0;">
+                  <div class="s-name">${escHtml(s.name||'Untitled')}</div>
+                  <div class="s-meta">${escHtml(s.short_name||'')}${s.sector?' · '+escHtml(s.sector):''}</div>
                 </div>
               </div>
-              <span class="pill ${riskPillCls(s.risk_level)}">${s.risk_level||'N/A'}</span>
+              <span class="pill ${riskPillCls(s.risk_level)}" style="flex-shrink:0;">${s.risk_level||'N/A'}</span>
             </div>
-
-            <div class="s-return-row">
-              <div class="s-return-big ${isUp?'pos':'neg'}">${fmtPct(ytdRaw)}</div>
-              <div class="s-return-lbl">YTD</div>
+            ${s.description ? `<div class="s-desc">${escHtml(s.description)}</div>` : ''}
+            ${logosHtml}
+            <div class="spark-wrap">${sparkHtml}</div>
+            <div class="s-ytd-chip">
+              <span class="ytd-lbl">YTD RETURN</span>
+              <span class="ytd-val ${ytdClass}">${ytdStr}</span>
             </div>
-
-            <div class="spark">${sparkSVG(spark)}</div>
-
-            <div class="badges-row">
-              ${s.is_public ? `<span class="pill pill-pub">Public</span>` : `<span class="pill pill-status-draft">Private</span>`}
-              ${s.is_featured ? `<span class="pill pill-feat">★ Featured</span>` : ''}
-            </div>
-
-            <div class="s-card-foot">
-              <div class="foot-cell">
-                <div class="lbl">Holdings</div>
-                <div class="val">${holdings.length||0}</div>
-              </div>
-              <div class="foot-cell">
-                <div class="lbl">Investors</div>
-                <div class="val" style="color:${inv>0?'#059669':'var(--text-mute)'}">${inv||'—'}</div>
-              </div>
-            </div>
+            <div class="s-stats-row">${statParts.join('')}</div>
           </div>
         </div>`;
     }
@@ -1267,6 +1275,21 @@
       } catch(_){}
 
       _allStrategies = strategies;
+
+      /* Fetch holding logos for all strategies */
+      try {
+        const allTickers = [...new Set(
+          strategies.flatMap(s => (Array.isArray(s.holdings) ? s.holdings : [])
+            .map(h => (h.ticker || h.symbol || h || '').toString())
+            .filter(t => t.length > 0))
+        )];
+        if (allTickers.length > 0) {
+          const { data: logSecs } = await supabaseClient
+            .from('securities_c').select('symbol,logo_url').in('symbol', allTickers);
+          if (logSecs) logSecs.forEach(s => { if (s.logo_url) _logoMap[s.symbol] = s.logo_url; });
+        }
+      } catch(_){}
+
       renderList();
 
       /* Deep-link to detail if ?id= */
