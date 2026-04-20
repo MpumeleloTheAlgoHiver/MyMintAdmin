@@ -628,6 +628,42 @@
       margin-bottom: 6px;
     }
 
+    .filled-orderbooks-heading-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .filled-orderbooks-heading-row .filled-orderbooks-title {
+      margin-bottom: 0;
+    }
+
+    .ob-sort-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #6b7280;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+      line-height: 1;
+    }
+    .ob-sort-btn:hover {
+      background: #e5e7eb;
+      color: #374151;
+    }
+    .ob-sort-btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
     .filled-orderbooks-subtitle {
       font-size: 0.84rem;
       color: #6b7280;
@@ -1247,7 +1283,13 @@
         </div>
 
         <div class="filled-orderbooks-card">
-          <h2 class="filled-orderbooks-title">Active Order Books</h2>
+          <div class="filled-orderbooks-heading-row">
+            <button class="ob-sort-btn" id="obSortBtn" title="Change sort order">
+              <svg viewBox="0 0 24 24"><path d="M3 18h6v-2H3v2zm0-5h12v-2H3v2zm0-7v2h18V6H3z"/></svg>
+              <span id="obSortLabel">Newest first</span>
+            </button>
+            <h2 class="filled-orderbooks-title">Active Order Books</h2>
+          </div>
           <p class="filled-orderbooks-subtitle">Snapshots captured when the timer hits 15:30.</p>
           <div class="filled-orderbooks-list" id="filledOrderbooksList">
             <div class="filled-orderbook-empty">No active order books yet.</div>
@@ -1353,6 +1395,7 @@
     let showActiveBooksFilledColumn = false;
     let isArchiveBooksLoading = true;
     let settledBatchesForClosedBooks = [];
+    let activeBooksSortOrder = 'newest'; // 'newest' | 'oldest' | 'as-is'
 
     const requireSession = async () => {
       const { data } = await supabaseClient.auth.getSession();
@@ -3621,7 +3664,15 @@
       if (!activeBooks.length) {
         filledOrderbooksList.innerHTML = '<div class="filled-orderbook-empty">No active order books yet.</div>';
       } else {
-        const sorted = activeBooks.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        let sorted;
+        if (activeBooksSortOrder === 'oldest') {
+          sorted = activeBooks.slice().sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+        } else if (activeBooksSortOrder === 'as-is') {
+          sorted = activeBooks.slice();
+        } else {
+          // 'newest' — biggest sequence first
+          sorted = activeBooks.slice().sort((a, b) => (b.sequence || 0) - (a.sequence || 0));
+        }
 
       filledOrderbooksList.innerHTML = sorted.map((book) => {
         const rows = Array.isArray(book.rows) ? book.rows : [];
@@ -4500,6 +4551,20 @@
 
     if (orderbookSearch) {
       orderbookSearch.addEventListener('input', applySearchFilter);
+    }
+
+    /* ── Sort toggle for Active Order Books ── */
+    const obSortBtn = document.getElementById('obSortBtn');
+    const obSortLabel = document.getElementById('obSortLabel');
+    const sortCycle = ['newest', 'oldest', 'as-is'];
+    const sortLabels = { newest: 'Newest first', oldest: 'Oldest first', 'as-is': 'As-is' };
+    if (obSortBtn) {
+      obSortBtn.addEventListener('click', () => {
+        const idx = sortCycle.indexOf(activeBooksSortOrder);
+        activeBooksSortOrder = sortCycle[(idx + 1) % sortCycle.length];
+        if (obSortLabel) obSortLabel.textContent = sortLabels[activeBooksSortOrder];
+        renderFilledOrderbooks();
+      });
     }
 
     if (activeBooksTab) {
