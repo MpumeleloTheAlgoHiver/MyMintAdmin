@@ -2167,9 +2167,10 @@
         try {
           const { data: newsData, error } = await supabaseClient
             .from('News_articles')
-            .select('id, title, source, channel, published_at, body_text, author, url')
+            .select('id, title, source, channel, published_at, body_text, author')
             .order('published_at', { ascending: false })
             .limit(8);
+          if (error) { console.error('News fetch error:', error); }
           if (error || !newsData || !newsData.length) {
             listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No news available</div>';
             return;
@@ -5609,10 +5610,11 @@
         try {
           const { data: newsData, error } = await supabaseClient
             .from('News_articles')
-            .select('id, title, source, channel, published_at, body_text, author, url')
+            .select('id, title, source, channel, published_at, body_text, author')
             .order('published_at', { ascending: false })
             .limit(10);
 
+          if (error) { console.error('News insights fetch error:', error); }
           if (error || !newsData || newsData.length === 0) {
             listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;">No news available</div>';
             return;
