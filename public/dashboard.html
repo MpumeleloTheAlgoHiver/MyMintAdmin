@@ -3923,7 +3923,12 @@
             openFactsheetInline(strategy.id);
             return;
           }
-          openStrategyModal(strategy, securitiesMap);
+          const idx = (_ovAllStrategies || []).findIndex(s => String(s.id) === String(strategy.id));
+          if (idx >= 0 && typeof window.ovSelectStrategy === 'function') {
+            window.ovSelectStrategy(idx);
+          } else {
+            openStrategyModal(strategy, securitiesMap);
+          }
         });
         return wrapper;
       };
