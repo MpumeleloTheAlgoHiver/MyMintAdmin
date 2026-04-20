@@ -4653,8 +4653,9 @@
           if (fetchErr) { errors.push(`SELL lookup: ${fetchErr.message}`); continue; }
 
           const activePos = (activePositions || []).find((p) => Number(p.quantity) > 0);
+          const soldQty = Number(evt.quantity) || 0;
+
           if (activePos) {
-            const soldQty = Number(evt.quantity) || 0;
             const remaining = Math.max(0, Number(activePos.quantity) - soldQty);
             if (remaining <= 0) {
               // Full close — mark position inactive
@@ -4675,6 +4676,49 @@
                 updated_at: nowIso,
               }).eq('id', activePos.id);
               if (reduceErr) errors.push(`SELL reduce ${evt.user_id}: ${reduceErr.message}`);
+            }
+          } else {
+            // No existing stock_holdings_c row (position only in strategy JSON).
+            // Determine original qty from holdings_snapshot_before so we can
+            // materialise the remaining shares as an active BUY row.
+            let originalQty = 0;
+            try {
+              const snap = typeof batch.holdings_snapshot_before === 'string'
+                ? JSON.parse(batch.holdings_snapshot_before)
+                : batch.holdings_snapshot_before;
+              if (Array.isArray(snap)) {
+                // The sell security can be matched by security_id on the batch
+                // or by scanning the snapshot for a matching symbol / ticker.
+                // The snapshot stores per-user qty in the "quantity" field.
+                const match = snap.find((h) => {
+                  const sym = (h.symbol || h.ticker || '').replace('.JO', '');
+                  return sym === batch.sell_isin_code;
+                });
+                if (match) originalQty = Number(match.quantity) || 0;
+              }
+            } catch (_) { /* snapshot parse failed – originalQty stays 0 */ }
+
+            const remaining = originalQty - soldQty;
+            if (remaining > 0) {
+              // Materialise the leftover shares as an active BUY in stock_holdings_c
+              const { error: matErr } = await supabaseClient.from('stock_holdings_c').insert({
+                user_id: evt.user_id,
+                security_id: evt.security_id,
+                quantity: remaining,
+                strategy_id: strategyId,
+                trade_side: 'BUY',
+                is_active: true,
+                avg_fill: sellFillCents,          // best available price reference
+                "Fill_date": fillDateStr,
+                rebalance_batch_id: batch.id,
+                strategy_name_snapshot: batch.strategy_name_snapshot,
+                created_at: nowIso,
+                updated_at: nowIso,
+                Status: 'active',
+                closed_reason: 'REBALANCE_MATERIALISED_REMAINDER',
+                as_of_date: fillDateStr,
+              });
+              if (matErr) errors.push(`SELL materialise remainder ${evt.user_id}: ${matErr.message}`);
             }
           }
 
