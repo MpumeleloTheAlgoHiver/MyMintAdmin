@@ -7100,7 +7100,7 @@
             ? strategy.provider_name.trim()
             : null;
 
-          return `<button type="button" data-strat-idx="${idx}"
+          return `<button type="button" data-strat-id="${strategy.id}"
           style="flex-shrink:0;width:320px;display:flex;flex-direction:column;padding:16px;border-radius:16px;cursor:pointer;text-align:left;background:#ffffff;border:1px solid #f1f5f9;box-shadow:0 1px 2px rgba(0,0,0,0.05);transition:box-shadow 0.18s,border-color 0.18s;outline:none;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none;">
             <!-- Top: name + sparkline -->
             <div style="display:flex;align-items:flex-start;gap:16px;">
@@ -7135,8 +7135,8 @@
           </button>`;
         }).join("");
 
-        row.querySelectorAll("button[data-strat-idx]").forEach((btn) => {
-          const idx = parseInt(btn.dataset.stratIdx, 10);
+        row.querySelectorAll("button[data-strat-id]").forEach((btn) => {
+          const stratId = btn.dataset.stratId;
           btn.addEventListener("mouseenter", () => {
             btn.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
             btn.style.borderColor = "#e2e8f0";
@@ -7146,13 +7146,12 @@
             btn.style.borderColor = "#f1f5f9";
           });
           btn.addEventListener("click", () => {
-            const strategy = (allStrategiesFullData || [])[idx];
-            if (!strategy) return;
-            const ovIdx = (_ovAllStrategies || []).findIndex(s => String(s.id) === String(strategy.id));
+            const ovIdx = (_ovAllStrategies || []).findIndex(s => String(s.id) === String(stratId));
             if (ovIdx >= 0 && typeof window.ovSelectStrategy === 'function') {
               window.ovSelectStrategy(ovIdx);
             } else {
-              editStrategy(strategy, globalSecuritiesMap);
+              const strategy = (allStrategiesFullData || []).find(s => String(s.id) === String(stratId));
+              if (strategy) editStrategy(strategy, globalSecuritiesMap);
             }
           });
         });
