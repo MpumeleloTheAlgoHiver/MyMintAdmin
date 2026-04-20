@@ -5,10 +5,106 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mint — Factsheets</title>
   <style>html{opacity:0}</style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; overflow: auto; }
     .gradient-bg { background: #f5f6fa; }
+
+    /* ── Dark factsheet grid ── */
+    .fs-dark-shell {
+      background: linear-gradient(160deg, #07071a 0%, #0d0d28 55%, #080818 100%);
+      border-radius: 20px;
+      padding: 32px;
+      min-height: 60vh;
+      position: relative;
+      overflow: hidden;
+    }
+    @keyframes fsCardRise { from { opacity:0; transform:translateY(14px) } to { opacity:1; transform:none } }
+    .fs-card {
+      position: relative;
+      border-radius: 22px;
+      padding: 1px;
+      cursor: pointer;
+      background: linear-gradient(140deg, rgba(255,255,255,0.16), rgba(255,255,255,0.02) 40%, rgba(139,92,246,0.18));
+      transition: transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s;
+      animation: fsCardRise .55s cubic-bezier(.2,.8,.2,1) both;
+    }
+    .fs-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 30px 60px -25px rgba(0,0,0,0.6), 0 0 0 1px rgba(139,92,246,0.4), 0 0 60px -20px rgba(139,92,246,0.5);
+    }
+    .fs-card-inner {
+      position: relative;
+      z-index: 2;
+      border-radius: 21px;
+      padding: 22px;
+      overflow: hidden;
+      min-height: 210px;
+      background:
+        radial-gradient(120% 80% at 0% 0%, rgba(139,92,246,0.10), transparent 55%),
+        linear-gradient(180deg, rgba(20,20,40,0.88), rgba(13,13,30,0.95));
+    }
+    .fs-section-label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 28px 0 14px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    .fs-section-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent);
+    }
+    .fs-section-badge {
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      background: rgba(255,255,255,0.05);
+      color: #a3a3c2;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .fs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+      gap: 18px;
+      margin-bottom: 8px;
+    }
+    .fs-risk-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-size: 10.5px;
+      font-weight: 600;
+    }
+    .fs-ytd-chip {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 13px;
+      border-radius: 13px;
+    }
+    .fs-stats-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px dashed rgba(255,255,255,0.08);
+      font-size: 11.5px;
+      color: #a3a3c2;
+      flex-wrap: wrap;
+    }
+    .fs-dot { width:3px; height:3px; border-radius:50%; background:#6b6b89; display:inline-block; flex-shrink:0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .sidebar { position: fixed; left: 0; top: 0; width: 220px; height: 100vh; background: #ffffff; border-right: 1px solid #ede9fe; display: flex; flex-direction: column; padding: 0; z-index: 1000; overflow: hidden; }
     .sidebar-header { display: flex; align-items: center; gap: 10px; padding: 20px 20px 16px; border-bottom: 1px solid #f3f0ff; }
     .sidebar-logo { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -237,17 +333,23 @@
 
       <!-- Strategy selection grid -->
       <div id="selectView">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h2 class="text-2xl font-semibold text-slate-900">Factsheets</h2>
-            <p class="text-sm text-slate-500 mt-1">Select a strategy to view its factsheet preview.</p>
+        <div class="fs-dark-shell">
+          <!-- Aurora blobs -->
+          <div style="position:absolute;top:-180px;left:-120px;width:550px;height:550px;border-radius:50%;background:radial-gradient(circle,rgba(109,40,217,0.38) 0%,transparent 60%);filter:blur(80px);pointer-events:none;z-index:0;"></div>
+          <div style="position:absolute;bottom:-180px;right:-120px;width:550px;height:550px;border-radius:50%;background:radial-gradient(circle,rgba(29,78,216,0.28) 0%,transparent 60%);filter:blur(80px);pointer-events:none;z-index:0;"></div>
+          <div style="position:absolute;top:35%;left:42%;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(6,182,212,0.15) 0%,transparent 60%);filter:blur(100px);pointer-events:none;z-index:0;"></div>
+          <!-- Header -->
+          <div style="position:relative;z-index:2;">
+            <h1 style="font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:700;letter-spacing:-0.025em;background:linear-gradient(180deg,#fff 30%,#b4b4d6 100%);-webkit-background-clip:text;background-clip:text;color:transparent;margin:0;">Factsheets</h1>
+            <p style="margin-top:6px;color:#a3a3c2;font-size:14px;">Premium portfolio strategies — select one to view its full factsheet preview.</p>
           </div>
-        </div>
-        <div id="strategyGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          <div class="col-span-3 flex items-center justify-center py-20">
-            <div class="text-center">
-              <div class="w-10 h-10 border-2 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-              <p class="text-sm text-slate-500">Loading strategies...</p>
+          <!-- Grid injected by JS -->
+          <div id="strategyGrid" style="position:relative;z-index:2;margin-top:8px;">
+            <div style="display:flex;align-items:center;justify-content:center;padding:80px 0;">
+              <div style="text-align:center;">
+                <div style="width:36px;height:36px;border:2px solid #8b5cf6;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;"></div>
+                <p style="color:#a3a3c2;font-size:13px;">Loading strategies...</p>
+              </div>
             </div>
           </div>
         </div>
@@ -392,57 +494,125 @@
       const groupB = strategies.filter(s => isLive(s) && investorCount(s.id) === 0); /* live, no investors */
       const groupC = strategies.filter(s => !isLive(s));                              /* everything else */
 
-      const buildCard = (s) => {
+      /* ── Icon palette keyed to first char of strategy name ── */
+      const iconPalettes = [
+        ['#a78bfa','#6366f1'],['#10b981','#06b6d4'],['#f59e0b','#ef4444'],
+        ['#3b82f6','#8b5cf6'],['#ec4899','#f59e0b'],['#06b6d4','#3b82f6'],
+        ['#8b5cf6','#ec4899'],['#64748b','#94a3b8'],
+      ];
+      const iconColors = (name) => iconPalettes[(name || '').charCodeAt(0) % iconPalettes.length];
+
+      const darkRiskPill = (risk) => {
+        const map = {
+          low:    { bg:'rgba(16,217,160,0.12)', color:'#34d399', border:'rgba(16,217,160,0.25)' },
+          medium: { bg:'rgba(245,181,68,0.12)',  color:'#fbbf24', border:'rgba(245,181,68,0.25)' },
+          high:   { bg:'rgba(255,93,122,0.12)',  color:'#fb7185', border:'rgba(255,93,122,0.25)' },
+        };
+        const r = (risk || '').toLowerCase();
+        const st = map[r] || { bg:'rgba(255,255,255,0.06)', color:'#a3a3c2', border:'rgba(255,255,255,0.10)' };
+        const label = risk || 'unspecified';
+        return `<span class="fs-risk-pill" style="background:${st.bg};color:${st.color};border:1px solid ${st.border};">${label}</span>`;
+      };
+
+      const sparkSVG = (data) => {
+        if (!data || data.length < 2) return '';
+        const w = 300, h = 48, p = 4;
+        const min = Math.min(...data), max = Math.max(...data), range = max - min || 1;
+        const pts = data.map((v, i) => [p + (i / (data.length - 1)) * (w - p * 2), h - p - ((v - min) / range) * (h - p * 2)]);
+        const line = pts.map((pt, i) => (i === 0 ? `M ${pt[0]} ${pt[1]}` : `L ${pt[0]} ${pt[1]}`)).join(' ');
+        const area = `${line} L ${pts[pts.length - 1][0]} ${h} L ${pts[0][0]} ${h} Z`;
+        const isUp = data[data.length - 1] >= data[0];
+        const stroke = isUp ? '#34d399' : '#fb7185';
+        const gid = 'fg' + Math.random().toString(36).slice(2, 7);
+        return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:100%;">
+          <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${stroke}" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="${stroke}" stop-opacity="0"/>
+          </linearGradient></defs>
+          <path d="${area}" fill="url(#${gid})"/>
+          <path d="${line}" stroke="${stroke}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>`;
+      };
+
+      const buildCard = (s, animIdx, ytdMap) => {
         const holdings = Array.isArray(s.holdings) ? s.holdings : [];
         const count    = investorCount(s.id);
-        const card = document.createElement('div');
-        card.className = 'bg-white rounded-2xl p-5 shadow-sm border border-slate-100 cursor-pointer hover:border-violet-300 hover:shadow-md transition-all';
-        card.innerHTML = `
-          <div class="flex items-start justify-between gap-3 mb-3">
-            <div>
-              <h3 class="font-semibold text-slate-900">${s.name || 'Untitled'}</h3>
-              <p class="text-xs text-slate-500 mt-0.5">${s.short_name || ''}${s.sector ? ' · ' + s.sector : ''}</p>
+        const [c0, c1] = iconColors(s.name);
+        const initials = (s.short_name || s.name || 'S').slice(0, 2).toUpperCase();
+        const ytdRaw   = ytdMap ? ytdMap[s.id] : null;
+        const ytd      = ytdRaw != null ? parseFloat(ytdRaw) : null;
+        const isUp     = ytd == null ? true : ytd >= 0;
+        const fmtPct   = (v) => v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(2)}%`;
+        const isLive   = s.status === 'active';
+
+        const div = document.createElement('div');
+        div.className = 'fs-card';
+        div.style.animationDelay = `${animIdx * 55}ms`;
+        div.innerHTML = `
+          <div class="fs-card-inner">
+            <!-- Header -->
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+              <div style="display:flex;gap:13px;align-items:center;min-width:0;">
+                <div style="width:42px;height:42px;border-radius:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;color:#fff;background:linear-gradient(135deg,${c0},${c1});box-shadow:inset 0 1px 0 rgba(255,255,255,0.25),0 8px 24px -8px rgba(0,0,0,0.6);">${initials}</div>
+                <div style="min-width:0;">
+                  <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-0.01em;color:#f5f5fa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;">${s.name || 'Untitled'}</div>
+                  <div style="font-size:11.5px;color:#6b6b89;margin-top:2px;">${s.short_name || ''}${s.sector ? ' · ' + s.sector : ''}</div>
+                </div>
+              </div>
+              ${darkRiskPill(s.risk_level)}
             </div>
-            <span class="px-2 py-0.5 text-[10px] rounded-full font-semibold ${riskBadgeClass(s.risk_level)}">${s.risk_level || 'unspecified'}</span>
-          </div>
-          ${s.description ? `<p class="text-xs text-slate-500 mb-3 line-clamp-2">${s.description}</p>` : ''}
-          <div class="flex items-center gap-3 text-[11px] text-slate-400">
-            <span>${holdings.length} holding${holdings.length !== 1 ? 's' : ''}</span>
-            ${count > 0
-              ? `<span style="color:#059669;font-weight:600;">${count} investor${count !== 1 ? 's' : ''}</span>`
-              : ''}
-            ${s.is_public ? '<span class="text-emerald-600">Public</span>' : ''}
+            <!-- Description -->
+            ${s.description ? `<div style="font-size:12.5px;color:#a3a3c2;line-height:1.55;margin-top:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${s.description}</div>` : ''}
+            <!-- YTD chip -->
+            <div class="fs-ytd-chip" style="background:${isUp ? 'linear-gradient(180deg,rgba(16,217,160,0.1),rgba(16,217,160,0.02))' : 'linear-gradient(180deg,rgba(255,93,122,0.1),rgba(255,93,122,0.02))'};border:1px solid ${isUp ? 'rgba(16,217,160,0.2)' : 'rgba(255,93,122,0.2)'};">
+              <div style="font-size:11px;color:#a3a3c2;text-transform:uppercase;letter-spacing:0.08em;font-weight:600;">YTD Return</div>
+              <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:-0.02em;color:${isUp ? '#34d399' : '#fb7185'};">${fmtPct(ytd)}</div>
+            </div>
+            <!-- Stats row -->
+            <div class="fs-stats-row">
+              <span>${holdings.length} holding${holdings.length !== 1 ? 's' : ''}</span>
+              <span class="fs-dot"></span>
+              <span style="${isLive ? 'color:#34d399;font-weight:600;' : 'color:#6b6b89;'}">${isLive ? 'Active' : (s.status || 'Draft')}</span>
+              ${count > 0 ? `<span class="fs-dot"></span><span style="color:#34d399;font-weight:600;">${count} investor${count !== 1 ? 's' : ''}</span>` : ''}
+              ${s.is_public ? `<span class="fs-dot"></span><span style="color:#34d399;">Public</span>` : ''}
+            </div>
           </div>`;
-        card.addEventListener('click', () => openFactsheet(s.id, s.name));
-        return card;
+        div.addEventListener('click', () => openFactsheet(s.id, s.name));
+        return div;
       };
 
-      const sectionLabel = (text, count, accent) => {
-        const el = document.createElement('div');
-        el.className = 'col-span-3';
-        el.innerHTML = `
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
-            <span style="font-size:12px;font-weight:700;color:${accent};text-transform:uppercase;letter-spacing:0.06em;">${text}</span>
-            <span style="font-size:11px;color:#94a3b8;">(${count})</span>
-            <div style="flex:1;height:1px;background:#f1f5f9;"></div>
-          </div>`;
-        return el;
+      const renderSection = (title, color, items, startIdx, ytdMap) => {
+        if (!items.length) return;
+        const label = document.createElement('div');
+        label.className = 'fs-section-label';
+        label.style.color = color;
+        label.innerHTML = `${title}<span class="fs-section-badge">${items.length}</span><div class="fs-section-line"></div>`;
+        grid.appendChild(label);
+        const gridRow = document.createElement('div');
+        gridRow.className = 'fs-grid';
+        items.forEach((s, i) => gridRow.appendChild(buildCard(s, startIdx + i, ytdMap)));
+        grid.appendChild(gridRow);
       };
+
+      /* Fetch YTD returns for all strategies */
+      let ytdMap = {};
+      try {
+        const ids = strategies.map(s => s.id).filter(Boolean);
+        const { data: retRows } = await supabaseClient
+          .from('strategies_returns_c')
+          .select('strategy_id, ytd_pct')
+          .in('strategy_id', ids)
+          .order('as_of_date', { ascending: false });
+        const seen = new Set();
+        (retRows || []).forEach(r => {
+          if (!seen.has(r.strategy_id)) { ytdMap[r.strategy_id] = r.ytd_pct; seen.add(r.strategy_id); }
+        });
+      } catch (_) {}
 
       grid.innerHTML = '';
-
-      if (groupA.length > 0) {
-        grid.appendChild(sectionLabel('Live · With Investors', groupA.length, '#059669'));
-        groupA.forEach(s => grid.appendChild(buildCard(s)));
-      }
-      if (groupB.length > 0) {
-        grid.appendChild(sectionLabel('Live · No Investors Yet', groupB.length, '#7c3aed'));
-        groupB.forEach(s => grid.appendChild(buildCard(s)));
-      }
-      if (groupC.length > 0) {
-        grid.appendChild(sectionLabel('Inactive / Draft', groupC.length, '#94a3b8'));
-        groupC.forEach(s => grid.appendChild(buildCard(s)));
-      }
+      renderSection('Live · With Investors',   '#34d399', groupA, 0,                       ytdMap);
+      renderSection('Live · No Investors Yet', '#a78bfa', groupB, groupA.length,            ytdMap);
+      renderSection('Inactive / Draft',        '#94a3b8', groupC, groupA.length+groupB.length, ytdMap);
     };
 
     const openFactsheet = async (strategyId, strategyName) => {
