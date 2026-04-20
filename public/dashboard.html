@@ -8,6 +8,9 @@
     <link rel="prefetch" href="/index.html">
     <link rel="prefetch" href="/orderbook.html">
     <link rel="prefetch" href="/eft.html">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       body {
@@ -734,16 +737,16 @@
           Investors
         </a>
 
+        <a class="nav-icon" href="/orderbook.html" aria-label="Order Book">
+          <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
+          Order Book
+        </a>
+
         <span class="sidebar-section-label">Banking</span>
 
         <a class="nav-icon" href="/eft.html" aria-label="EFT Payments">
           <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
           EFT Payments
-        </a>
-
-        <a class="nav-icon" href="/orderbook.html" aria-label="Order Book">
-          <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
-          Order Book
         </a>
 
         <span class="sidebar-section-label">System</span>
@@ -1426,20 +1429,20 @@
 
           <div id="tabFactsheetsPanel" class="hidden">
             <div id="factsheetSelectView">
-              <div class="flex items-center justify-between mb-4">
-                <div>
-                  <h2 class="text-2xl font-semibold text-slate-900">
-                    Factsheets
-                  </h2>
-                  <p class="text-sm text-slate-500 mt-1">
-                    Select a strategy to view its factsheet preview.
-                  </p>
+              <!-- Light premium factsheets landing -->
+              <div style="background:linear-gradient(160deg,#f8f6ff 0%,#f0f4ff 55%,#f6f7fb 100%);border-radius:20px;padding:32px;min-height:60vh;position:relative;overflow:hidden;">
+                <!-- Aurora blobs (light) -->
+                <div style="position:absolute;top:-180px;left:-120px;width:550px;height:550px;border-radius:50%;background:radial-gradient(circle,rgba(139,92,246,0.14) 0%,transparent 60%);filter:blur(80px);pointer-events:none;z-index:0;"></div>
+                <div style="position:absolute;bottom:-180px;right:-120px;width:550px;height:550px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,0.10) 0%,transparent 60%);filter:blur(80px);pointer-events:none;z-index:0;"></div>
+                <div style="position:absolute;top:35%;left:42%;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(6,182,212,0.07) 0%,transparent 60%);filter:blur(100px);pointer-events:none;z-index:0;"></div>
+                <!-- Header -->
+                <div style="position:relative;z-index:2;">
+                  <h1 style="font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:700;letter-spacing:-0.025em;color:#0f172a;margin:0;">Factsheets</h1>
+                  <p style="margin-top:6px;color:#475569;font-size:14px;">Premium portfolio strategies — select one to view its full factsheet preview.</p>
                 </div>
+                <!-- Strategy grid injected by JS -->
+                <div id="factsheetStrategyList" style="position:relative;z-index:2;margin-top:8px;"></div>
               </div>
-              <div
-                id="factsheetStrategyList"
-                class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
-              ></div>
             </div>
             <div id="factsheetDetailView" class="hidden">
               <button
@@ -2164,26 +2167,33 @@
         try {
           const { data: newsData, error } = await supabaseClient
             .from('News_articles')
-            .select('id, title, source, channel, published_at, body_text')
+            .select('id, title, source, channel, published_at, body_text, author')
             .order('published_at', { ascending: false })
             .limit(8);
+          if (error) { console.error('News fetch error:', error); }
           if (error || !newsData || !newsData.length) {
             listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No news available</div>';
             return;
           }
+          window._newsCache = window._newsCache || {};
+          newsData.forEach(a => { window._newsCache[a.id] = a; });
           listEl.innerHTML = newsData.map(article => {
             const src = article.source || article.channel || 'Mint';
             const dateStr = article.published_at
               ? new Date(article.published_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })
               : '';
-            const preview = (article.body_text || '').slice(0, 120) + (article.body_text?.length > 120 ? '…' : '');
-            return `<div class="news-item-hover" style="border:1px solid #f1f5f9;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s;background:white;">
+            const preview = (article.body_text || '').slice(0, 120) + ((article.body_text || '').length > 120 ? '…' : '');
+            return `<div onclick="openNewsArticle(window._newsCache['${article.id}'])" class="news-item-hover" style="border:1px solid #f1f5f9;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s;background:white;" onmouseenter="this.style.borderColor='#ddd6fe';this.style.background='#fafafe'" onmouseleave="this.style.borderColor='#f1f5f9';this.style.background='white'">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
                 <span style="font-size:10px;font-weight:700;color:#7c3aed;background:#ede9fe;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:0.04em;">${src}</span>
                 <span style="font-size:10px;color:#94a3b8;">${dateStr}</span>
               </div>
               <div style="font-size:12px;font-weight:600;color:#0f172a;line-height:1.4;margin-bottom:3px;">${article.title}</div>
               ${preview ? `<div style="font-size:11px;color:#64748b;line-height:1.5;">${preview}</div>` : ''}
+              <div style="display:flex;align-items:center;gap:4px;margin-top:6px;">
+                <span style="font-size:10px;color:#a78bfa;font-weight:500;">Read more</span>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2.5"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+              </div>
             </div>`;
           }).join('');
         } catch(e) {
@@ -3923,7 +3933,12 @@
             openFactsheetInline(strategy.id);
             return;
           }
-          openStrategyModal(strategy, securitiesMap);
+          const idx = (_ovAllStrategies || []).findIndex(s => String(s.id) === String(strategy.id));
+          if (idx >= 0 && typeof window.ovSelectStrategy === 'function') {
+            window.ovSelectStrategy(idx);
+          } else {
+            openStrategyModal(strategy, securitiesMap);
+          }
         });
         return wrapper;
       };
@@ -4451,36 +4466,226 @@
       };
 
       /* ─────────────────────── FACTSHEETS TAB LOGIC ─────────────────────── */
-      const renderFactsheetStrategyList = () => {
-        factsheetStrategyList.innerHTML = "";
+
+      /* --- sparkline SVG helper --- */
+      const _fsSparkSVG = (data) => {
+        if (!data || data.length < 2) return '';
+        const w = 300, h = 52, p = 4;
+        const min = Math.min(...data), max = Math.max(...data);
+        const range = max - min || 1;
+        const pts = data.map((v, i) => {
+          const x = p + (i / (data.length - 1)) * (w - p * 2);
+          const y = h - p - ((v - min) / range) * (h - p * 2);
+          return [x, y];
+        });
+        const linePath = pts.map((pt, i) => (i === 0 ? `M ${pt[0]} ${pt[1]}` : `L ${pt[0]} ${pt[1]}`)).join(' ');
+        const areaPath = `${linePath} L ${pts[pts.length - 1][0]} ${h} L ${pts[0][0]} ${h} Z`;
+        const isUp = data[data.length - 1] >= data[0];
+        const stroke = isUp ? '#34d399' : '#fb7185';
+        const gradId = 'fsg' + Math.random().toString(36).slice(2, 7);
+        return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:100%;">
+          <defs>
+            <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="${stroke}" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="${stroke}" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="${areaPath}" fill="url(#${gradId})"/>
+          <path d="${linePath}" stroke="${stroke}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>`;
+      };
+
+      /* --- risk pill (light mode) --- */
+      const _fsDarkRiskPill = (risk) => {
+        const r = (risk || 'low').toLowerCase();
+        const styles = {
+          low:    'background:rgba(16,217,160,0.12);color:#34d399;border:1px solid rgba(16,217,160,0.25)',
+          medium: 'background:rgba(245,181,68,0.12);color:#fbbf24;border:1px solid rgba(245,181,68,0.25)',
+          high:   'background:rgba(255,93,122,0.12);color:#fb7185;border:1px solid rgba(255,93,122,0.25)',
+        };
+        const st = styles[r] || styles['low'];
+        return `<span style="display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;font-size:10.5px;font-weight:600;${st}">${r}</span>`;
+      };
+
+      /* --- icon gradient colours from risk/name --- */
+      const _fsIconColors = (s) => {
+        const palettes = [
+          ['#a78bfa','#6366f1'],['#10b981','#06b6d4'],['#f59e0b','#ef4444'],
+          ['#3b82f6','#8b5cf6'],['#ec4899','#f59e0b'],['#06b6d4','#3b82f6'],
+          ['#8b5cf6','#ec4899'],['#64748b','#94a3b8'],
+        ];
+        const seed = (s.name || '').charCodeAt(0) % palettes.length;
+        return palettes[seed];
+      };
+
+      /* --- single premium card (clean white, matches reference design) --- */
+      const _fsCard = (s, animIdx, logoMap) => {
+        const holdings = Array.isArray(s.holdings) ? s.holdings : [];
+        const holdingCount = holdings.length;
+        const [c0, c1] = _fsIconColors(s);
+        const initials = (s.short_name || s.name || 'S').slice(0, 2).toUpperCase();
+        const ytdRaw = strategyYtdMap ? strategyYtdMap.get(String(s.id)) : null;
+        const ytd = ytdRaw != null ? parseFloat(ytdRaw) : null;
+        const isUp = ytd == null ? true : ytd >= 0;
+        const ytdStr = ytd == null ? '—' : `${ytd > 0 ? '+' : ''}${ytd.toFixed(2)}%`;
+        const ytdClass = ytd == null ? 'na' : (isUp ? 'pos' : 'neg');
+        const ytdColor = ytd == null ? '#94a3b8' : (isUp ? '#059669' : '#e11d48');
+        const inv = strategyInvestedIds && strategyInvestedIds.has(String(s.id));
+        const sparkData = strategyYtdMap && window._fsSparkMap ? window._fsSparkMap[String(s.id)] : null;
+
+        /* Asset logos */
+        const lmap = logoMap || {};
+        const logoItems = holdings.slice(0, 8).map(h => {
+          const ticker = (h.ticker || h.symbol || h || '').toString();
+          const lu = lmap[ticker] || null;
+          const initH = ticker.replace('.JO','').slice(0, 2).toUpperCase() || '?';
+          if (lu) return `<img src="${lu}" alt="${initH}" style="width:24px;height:24px;border-radius:50%;border:2px solid #fff;object-fit:cover;margin-left:-7px;flex-shrink:0;background:#f1f5f9;" onerror="this.outerHTML='<div style=\\'width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#7c3aed;margin-left:-7px;\\'>${initH}</div>'">`;
+          return `<div style="width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#7c3aed;margin-left:-7px;flex-shrink:0;">${initH}</div>`;
+        }).slice(0, 5);
+        /* Fix first child margin */
+        if (logoItems.length > 0) {
+          logoItems[0] = logoItems[0].replace('margin-left:-7px', 'margin-left:0');
+        }
+        const logosHtml = logoItems.length > 0
+          ? `<div style="display:flex;align-items:center;margin-top:12px;">${logoItems.join('')}</div>`
+          : '';
+
+        /* Sparkline */
+        let sparkHtml = `<div style="display:flex;align-items:center;justify-content:center;height:100%;"><div style="height:2px;width:55%;background:#e2e8f0;border-radius:2px;"></div></div>`;
+        if (sparkData && sparkData.length >= 2) {
+          const sd = sparkData, w=300, h=80, p=4;
+          const mn=Math.min(...sd), mx=Math.max(...sd), rng=mx-mn||1;
+          const pts = sd.map((v,i)=>[p+(i/(sd.length-1))*(w-p*2), h-p-((v-mn)/rng)*(h-p*2)]);
+          const path = pts.map((pt,i)=>(i===0?`M ${pt[0]} ${pt[1]}`:`L ${pt[0]} ${pt[1]}`)).join(' ');
+          const area = `${path} L ${pts[pts.length-1][0]} ${h} L ${pts[0][0]} ${h} Z`;
+          const stroke = isUp ? '#34d399' : '#fb7185';
+          const gid = 'fsg'+Math.random().toString(36).slice(2,8);
+          sparkHtml = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:100%;">
+            <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="${stroke}" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="${stroke}" stop-opacity="0"/>
+            </linearGradient></defs>
+            <path d="${area}" fill="url(#${gid})"/>
+            <path d="${path}" stroke="${stroke}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>`;
+        }
+
+        /* Stats row */
+        const statParts = [`<span style="color:#64748b;font-size:12px;">${holdingCount} holding${holdingCount!==1?'s':''}</span>`];
+        if (inv) statParts.push(`<span style="color:#cbd5e1;font-size:13px;">·</span><span style="color:#059669;font-weight:600;font-size:12px;">1+ investors</span>`);
+        statParts.push(`<span style="color:#cbd5e1;font-size:13px;">·</span><span style="color:#64748b;font-size:12px;">${s.is_public ? 'Public' : 'Private'}</span>`);
+        if (s.is_featured) statParts.push(`<span style="color:#cbd5e1;font-size:13px;">·</span><span style="color:#d97706;font-weight:600;font-size:12px;">★ Featured</span>`);
+
+        const desc = (s.description || '').trim();
+
+        return `
+        <div onclick="openFactsheetInline('${s.id}')" style="
+          position:relative;border-radius:18px;cursor:pointer;overflow:hidden;
+          background:#fff;border:1px solid rgba(15,23,42,0.08);
+          box-shadow:0 1px 4px rgba(15,23,42,0.05),0 4px 16px rgba(15,23,42,0.03);
+          transition:transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .3s;
+          animation:fsCardRise .5s cubic-bezier(.2,.8,.2,1) ${animIdx * 55}ms both;
+        "
+        onmouseenter="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 36px rgba(15,23,42,0.12),0 0 0 1px rgba(15,23,42,0.07)';"
+        onmouseleave="this.style.transform='';this.style.boxShadow='';">
+          <div style="padding:20px;">
+            <!-- Header -->
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+              <div style="display:flex;gap:12px;align-items:center;min-width:0;flex:1;">
+                <div style="width:42px;height:42px;border-radius:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;color:#fff;background:linear-gradient(135deg,${c0},${c1});box-shadow:0 4px 12px rgba(0,0,0,0.15);">${initials}</div>
+                <div style="min-width:0;">
+                  <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-0.01em;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:175px;">${s.name || 'Untitled'}</div>
+                  <div style="font-size:11.5px;color:#64748b;margin-top:2px;">${s.short_name || ''}${s.sector ? ' · ' + s.sector : ''}</div>
+                </div>
+              </div>
+              ${_fsDarkRiskPill(s.risk_level)}
+            </div>
+            ${desc ? `<div style="font-size:12.5px;color:#475569;line-height:1.55;margin-top:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${desc}</div>` : ''}
+            ${logosHtml}
+            <!-- Sparkline -->
+            <div style="height:80px;width:100%;margin-top:14px;">${sparkHtml}</div>
+            <!-- YTD chip -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:10px;background:#f8fafc;border:1px solid rgba(15,23,42,0.07);margin-top:8px;">
+              <span style="font-size:9.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.12em;">YTD RETURN</span>
+              <span style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:-0.02em;color:${ytdColor};">${ytdStr}</span>
+            </div>
+            <!-- Stats row -->
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-top:13px;padding-top:11px;border-top:1px solid rgba(15,23,42,0.07);">${statParts.join('')}</div>
+          </div>
+        </div>`;
+      };
+
+      /* --- section label --- */
+      const _fsSection = (title, color, items, startIdx, logoMap) => {
+        if (!items.length) return '';
+        const grid = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:18px;margin-bottom:8px;">${items.map((s, i) => _fsCard(s, startIdx + i, logoMap)).join('')}</div>`;
+        return `
+          <div style="display:flex;align-items:center;gap:12px;margin:28px 0 14px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${color};">
+            ${title}
+            <span style="padding:2px 8px;border-radius:999px;font-size:10px;background:rgba(15,23,42,0.05);color:#64748b;border:1px solid rgba(15,23,42,0.10);">${items.length}</span>
+            <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(15,23,42,0.10),transparent);"></div>
+          </div>
+          ${grid}`;
+      };
+
+      const renderFactsheetStrategyList = async () => {
+        const root = document.getElementById('factsheetStrategyList');
+        root.innerHTML = '';
         if (!allStrategiesFullData.length) {
-          factsheetStrategyList.innerHTML =
-            '<div class="col-span-3 text-sm text-slate-500 text-center py-12">No strategies available.</div>';
+          root.innerHTML = '<p style="color:#a3a3c2;text-align:center;padding:48px 0;font-size:14px;">No strategies available.</p>';
           return;
         }
-        allStrategiesFullData.forEach((s) => {
-          const holdings = Array.isArray(s.holdings) ? s.holdings : [];
-          const card = document.createElement("div");
-          card.className =
-            "bg-white rounded-2xl p-5 shadow-sm border border-slate-100 cursor-pointer hover:border-violet-300 hover:shadow-md transition-all";
-          card.innerHTML = `
-          <div class="flex items-start justify-between gap-3 mb-3">
-            <div>
-              <h3 class="font-semibold text-slate-900">${s.name || "Untitled"}</h3>
-              <p class="text-xs text-slate-500 mt-0.5">${s.short_name || ""} ${s.sector ? "· " + s.sector : ""}</p>
-            </div>
-            <span class="px-2 py-0.5 text-[10px] rounded-full font-semibold ${riskBadgeClass(s.risk_level)}">${s.risk_level || "unspecified"}</span>
-          </div>
-          ${s.description ? `<p class="text-xs text-slate-500 mb-3 line-clamp-2">${s.description}</p>` : ""}
-          <div class="flex items-center gap-3 text-[11px] text-slate-400">
-            <span>${holdings.length} holding${holdings.length !== 1 ? "s" : ""}</span>
-            <span>${s.status || "draft"}</span>
-            ${s.is_public ? '<span class="text-emerald-600">Public</span>' : ""}
-          </div>
-        `;
-          card.addEventListener("click", () => openFactsheetInline(s.id));
-          factsheetStrategyList.appendChild(card);
-        });
+
+        /* Inject keyframe once */
+        if (!document.getElementById('fsCardRiseKF')) {
+          const kf = document.createElement('style');
+          kf.id = 'fsCardRiseKF';
+          kf.textContent = '@keyframes fsCardRise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}';
+          document.head.appendChild(kf);
+        }
+
+        /* Fetch logos for all holdings across all strategies */
+        const fsLogoMap = {};
+        try {
+          const allTickers = [...new Set(
+            allStrategiesFullData.flatMap(s => (Array.isArray(s.holdings) ? s.holdings : [])
+              .map(h => (h.ticker || h.symbol || h || '').toString())
+              .filter(t => t.length > 0))
+          )];
+          if (allTickers.length > 0) {
+            const { data: logSecs } = await supabaseClient
+              .from('securities_c').select('symbol,logo_url').in('symbol', allTickers);
+            if (logSecs) logSecs.forEach(sec => { if (sec.logo_url) fsLogoMap[sec.symbol] = sec.logo_url; });
+          }
+        } catch(_){}
+
+        /* Fetch spark data for all strategies */
+        try {
+          const ids = allStrategiesFullData.map(s => s.id).filter(Boolean);
+          if (ids.length > 0) {
+            const { data: retRows } = await supabaseClient
+              .from('strategies_returns_c')
+              .select('strategy_id,basket_value,as_of_date')
+              .in('strategy_id', ids)
+              .order('as_of_date', { ascending: true });
+            const sparks = {};
+            (retRows || []).forEach(r => {
+              if (r.basket_value == null) return;
+              if (!sparks[r.strategy_id]) sparks[r.strategy_id] = [];
+              sparks[r.strategy_id].push(Number(r.basket_value));
+            });
+            window._fsSparkMap = sparks;
+          }
+        } catch(_){}
+
+        const live    = allStrategiesFullData.filter(s => (s.status || 'draft') === 'active' && strategyInvestedIds && strategyInvestedIds.has(String(s.id)));
+        const staged  = allStrategiesFullData.filter(s => (s.status || 'draft') === 'active' && !(strategyInvestedIds && strategyInvestedIds.has(String(s.id))));
+        const draft   = allStrategiesFullData.filter(s => (s.status || 'draft') !== 'active');
+
+        root.innerHTML =
+          _fsSection('Live · With Investors',    '#34d399', live,   0,                          fsLogoMap) +
+          _fsSection('Live · No Investors Yet',  '#a78bfa', staged, live.length,                fsLogoMap) +
+          _fsSection('Inactive / Draft',         '#94a3b8', draft,  live.length + staged.length, fsLogoMap);
       };
 
       let _factsheetPrevTab = null;
@@ -5409,13 +5614,17 @@
             .order('published_at', { ascending: false })
             .limit(10);
 
+          if (error) { console.error('News insights fetch error:', error); }
           if (error || !newsData || newsData.length === 0) {
             listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;">No news available</div>';
             return;
           }
 
+          window._newsCache = window._newsCache || {};
+          newsData.forEach(a => { window._newsCache[a.id] = a; });
+
           listEl.innerHTML = newsData.map(article => `
-            <div style="border:1px solid #f1f5f9;border-radius:10px;padding:14px 16px;margin-bottom:8px;">
+            <div onclick="openNewsArticle(window._newsCache['${article.id}'])" style="border:1px solid #f1f5f9;border-radius:10px;padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:border-color 0.15s,background 0.15s;" onmouseenter="this.style.borderColor='#ddd6fe';this.style.background='#fafafe'" onmouseleave="this.style.borderColor='#f1f5f9';this.style.background=''">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                 <span style="font-size:10px;font-weight:700;color:#7c3aed;background:#ede9fe;padding:2px 8px;border-radius:20px;text-transform:uppercase;">
                   ${article.source || article.channel || 'News'}
@@ -5428,7 +5637,11 @@
                 ${article.title}
               </div>
               <div style="font-size:11px;color:#64748b;line-height:1.5;">
-                ${(article.body_text || '').slice(0, 150)}${article.body_text?.length > 150 ? '...' : ''}
+                ${(article.body_text || '').slice(0, 150)}${(article.body_text || '').length > 150 ? '…' : ''}
+              </div>
+              <div style="display:flex;align-items:center;gap:4px;margin-top:7px;">
+                <span style="font-size:10px;color:#a78bfa;font-weight:500;">Read more</span>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2.5"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
               </div>
             </div>
           `).join('');
@@ -7095,7 +7308,7 @@
             ? strategy.provider_name.trim()
             : null;
 
-          return `<button type="button" data-strat-idx="${idx}"
+          return `<button type="button" data-strat-id="${strategy.id}"
           style="flex-shrink:0;width:320px;display:flex;flex-direction:column;padding:16px;border-radius:16px;cursor:pointer;text-align:left;background:#ffffff;border:1px solid #f1f5f9;box-shadow:0 1px 2px rgba(0,0,0,0.05);transition:box-shadow 0.18s,border-color 0.18s;outline:none;-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none;">
             <!-- Top: name + sparkline -->
             <div style="display:flex;align-items:flex-start;gap:16px;">
@@ -7130,8 +7343,8 @@
           </button>`;
         }).join("");
 
-        row.querySelectorAll("button[data-strat-idx]").forEach((btn) => {
-          const idx = parseInt(btn.dataset.stratIdx, 10);
+        row.querySelectorAll("button[data-strat-id]").forEach((btn) => {
+          const stratId = btn.dataset.stratId;
           btn.addEventListener("mouseenter", () => {
             btn.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
             btn.style.borderColor = "#e2e8f0";
@@ -7141,8 +7354,13 @@
             btn.style.borderColor = "#f1f5f9";
           });
           btn.addEventListener("click", () => {
-            const strategy = (allStrategiesFullData || [])[idx];
-            if (strategy) editStrategy(strategy, globalSecuritiesMap);
+            const ovIdx = (_ovAllStrategies || []).findIndex(s => String(s.id) === String(stratId));
+            if (ovIdx >= 0 && typeof window.ovSelectStrategy === 'function') {
+              window.ovSelectStrategy(ovIdx);
+            } else {
+              const strategy = (allStrategiesFullData || []).find(s => String(s.id) === String(stratId));
+              if (strategy) editStrategy(strategy, globalSecuritiesMap);
+            }
           });
         });
       };
@@ -9704,5 +9922,61 @@
   }catch(e){}
 })();
 </script>
+  <!-- News Article Modal -->
+  <div id="newsArticleModal" class="modal-backdrop hidden" onclick="if(event.target===this)closeNewsModal()">
+    <div class="modal-content" style="max-width:640px;padding:0;border-radius:20px;overflow:hidden;">
+      <!-- Header -->
+      <div style="padding:22px 26px 16px;border-bottom:1px solid #f1f5f9;position:sticky;top:0;background:#fff;z-index:1;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+          <div style="flex:1;min-width:0;">
+            <div id="newsModalSource" style="display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;color:#7c3aed;background:#ede9fe;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px;"></div>
+            <div id="newsModalTitle" style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:#0f172a;line-height:1.35;"></div>
+          </div>
+          <button onclick="closeNewsModal()" style="flex-shrink:0;width:32px;height:32px;border-radius:50%;border:1px solid #e2e8f0;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#64748b;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='#fff'">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div id="newsModalMeta" style="display:flex;align-items:center;gap:10px;margin-top:8px;font-size:11px;color:#94a3b8;"></div>
+      </div>
+      <!-- Body -->
+      <div style="padding:20px 26px 24px;">
+        <div id="newsModalBody" style="font-size:13.5px;color:#334155;line-height:1.7;white-space:pre-wrap;"></div>
+        <div id="newsModalActions" style="margin-top:20px;display:flex;gap:10px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.openNewsArticle = function(articleJson) {
+      const a = typeof articleJson === 'string' ? JSON.parse(articleJson) : articleJson;
+      const modal = document.getElementById('newsArticleModal');
+      if (!modal) return;
+      document.getElementById('newsModalTitle').textContent = a.title || '';
+      document.getElementById('newsModalSource').textContent = a.source || a.channel || 'News';
+      const dateStr = a.published_at
+        ? new Date(a.published_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
+        : '';
+      const authorStr = a.author ? `By ${a.author}` : '';
+      document.getElementById('newsModalMeta').innerHTML = [authorStr, dateStr].filter(Boolean).map(s=>`<span>${s}</span>`).join('<span style="color:#e2e8f0;">·</span>');
+      document.getElementById('newsModalBody').textContent = a.body_text || 'No content available.';
+      const actionsEl = document.getElementById('newsModalActions');
+      if (a.url) {
+        actionsEl.innerHTML = `<a href="${a.url}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;background:#7c3aed;color:#fff;font-size:12.5px;font-weight:600;text-decoration:none;" onmouseenter="this.style.background='#6d28d9'" onmouseleave="this.style.background='#7c3aed'">
+          Read full article
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>`;
+      } else {
+        actionsEl.innerHTML = '';
+      }
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    };
+
+    window.closeNewsModal = function() {
+      const modal = document.getElementById('newsArticleModal');
+      if (modal) modal.classList.add('hidden');
+      document.body.style.overflow = '';
+    };
+  </script>
 </body>
 </html>
