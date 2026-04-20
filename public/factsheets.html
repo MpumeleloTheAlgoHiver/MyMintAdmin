@@ -7,174 +7,466 @@
   <style>html{opacity:0}</style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #f5f6fa; overflow: auto; }
-
-    /* Sidebar — light */
-    .sidebar { position: fixed; left: 0; top: 0; width: 220px; height: 100vh; background: #ffffff; border-right: 1px solid #ede9fe; display: flex; flex-direction: column; padding: 0; z-index: 1000; overflow: hidden; }
-    .sidebar-header { display: flex; align-items: center; gap: 10px; padding: 20px 20px 16px; border-bottom: 1px solid #f3f0ff; cursor: pointer; position: relative; user-select: none; }
-    .sidebar-logo { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
-    .sidebar-brand { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-    .sidebar-brand-name { font-size: 14px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em; line-height: 1.2; }
-    .sidebar-brand-sub { font-size: 10px; color: #94a3b8; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
-    .sidebar-nav { flex: 1; display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 16px 12px; overflow-y: auto; }
-    .sidebar-section-label { font-size: 10px; font-weight: 600; color: #94a3b8; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 8px 4px; margin-top: 8px; }
-    .nav-icon { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: pointer; transition: all 0.15s ease; text-decoration: none; color: #64748b; font-size: 13px; font-weight: 500; white-space: nowrap; }
-    .nav-icon svg { width: 18px; height: 18px; fill: #94a3b8; transition: fill 0.15s ease; flex-shrink: 0; }
-    .nav-icon:hover { background: #f5f3ff; color: #5b21b6; }
-    .nav-icon:hover svg { fill: #7c3aed; }
-    .nav-icon.active { background: #ede9fe; color: #5b21b6; font-weight: 600; }
-    .nav-icon.active svg { fill: #7c3aed; }
-    .sidebar-footer { border-top: 1px solid #f1f5f9; padding: 12px; }
-    .sidebar-user { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; margin-bottom: 4px; }
-    .sidebar-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #a855f7); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0; }
-    .sidebar-user-info { flex: 1; min-width: 0; }
-    .sidebar-user-name { font-size: 12px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .sidebar-user-role { font-size: 11px; color: #94a3b8; }
-    .sidebar-signout { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: pointer; color: #ef4444; font-size: 13px; font-weight: 500; transition: all 0.15s ease; border: none; background: none; width: 100%; text-align: left; }
-    .sidebar-signout svg { width: 18px; height: 18px; fill: #ef4444; flex-shrink: 0; }
-    .sidebar-signout:hover { background: #fef2f2; }
-
-    /* Main */
-    .main-content { margin-left: 220px; min-height: 100vh; display: flex; flex-direction: column; }
-    .top-nav { background: rgba(255,255,255,0.96); backdrop-filter: blur(12px); border-bottom: 1px solid #f3f0ff; padding: 0 28px; height: 72px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
-    .top-nav-crumb { font-size: 14px; font-weight: 600; color: #0f172a; }
-
-    /* Page */
-    .page { flex: 1; overflow: visible; padding: 24px 28px; }
-    .page-head h1 { font-size: 22px; font-weight: 700; color: #0f172a; margin: 0; }
-    .page-head p { margin-top: 4px; color: #64748b; font-size: 13px; }
-
-    /* Section labels */
-    .section-label { display: flex; align-items: center; gap: 10px; margin: 28px 0 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-    .section-label .badge { padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
-    .section-label .line { flex: 1; height: 1px; background: #f1f5f9; }
-    .section-label.live { color: #059669; }
-    .section-label.staged { color: #7c3aed; }
-    .section-label.draft { color: #94a3b8; }
-
-    /* Strategy grid */
-    .strategy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-
-    /* Cards */
-    .s-card {
-      background: #fff; border-radius: 16px; border: 1px solid #e2e8f0;
-      cursor: pointer; transition: border-color .2s, box-shadow .2s, transform .2s;
-      opacity: 0; transform: translateY(10px);
-      animation: rise .45s cubic-bezier(.2,.8,.2,1) forwards;
+    :root{
+      --bg-0:#f6f7fb;
+      --bg-1:#eef0f7;
+      --bg-2:#e6e9f3;
+      --surface:rgba(255,255,255,0.85);
+      --surface-2:rgba(255,255,255,0.95);
+      --border:rgba(15,23,42,0.10);
+      --border-strong:rgba(15,23,42,0.18);
+      --text:#0f172a;
+      --text-dim:#475569;
+      --text-mute:#64748b;
+      --violet:#8b5cf6;
+      --violet-2:#a78bfa;
+      --indigo:#6366f1;
+      --emerald:#10d9a0;
+      --rose:#ff5d7a;
+      --amber:#f5b544;
     }
-    @keyframes rise { to { opacity:1; transform:none; } }
-    .s-card:hover { border-color: #c4b5fd; box-shadow: 0 8px 24px -8px rgba(139,92,246,0.18); transform: translateY(-2px); }
-    .s-card-inner { padding: 20px; }
-    .s-icon { width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px; color: #fff; flex-shrink: 0; }
-    .s-name { font-size: 15px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em; }
-    .s-meta { font-size: 11.5px; color: #94a3b8; margin-top: 2px; }
-    .s-desc { font-size: 12.5px; color: #64748b; line-height: 1.5; margin-top: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{
+      font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+      background:var(--bg-0);
+      color:var(--text);
+      min-height:100vh;
+      overflow-x:hidden;
+      -webkit-font-smoothing:antialiased;
+      letter-spacing:-0.011em;
+    }
+    /* Animated aurora — light mode, very subtle */
+    .aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+    .aurora::before,.aurora::after{
+      content:"";position:absolute;width:900px;height:900px;border-radius:50%;
+      filter:blur(120px);opacity:0.22;
+      animation:drift 22s ease-in-out infinite alternate;
+    }
+    .aurora::before{top:-300px;left:-200px;background:radial-gradient(circle,#c4b5fd 0%,transparent 60%)}
+    .aurora::after{bottom:-300px;right:-200px;background:radial-gradient(circle,#93c5fd 0%,transparent 60%);animation-delay:-11s}
+    .aurora .blob3{
+      position:absolute;top:30%;left:40%;width:600px;height:600px;border-radius:50%;
+      background:radial-gradient(circle,#a5f3fc 0%,transparent 60%);
+      filter:blur(140px);opacity:0.18;
+      animation:drift 30s ease-in-out infinite alternate;
+    }
+    @keyframes drift{0%{transform:translate(0,0) scale(1)}100%{transform:translate(80px,60px) scale(1.15)}}
+    /* Grid noise overlay */
+    body::before{
+      content:"";position:fixed;inset:0;z-index:1;pointer-events:none;
+      background-image:linear-gradient(rgba(15,23,42,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(15,23,42,0.04) 1px,transparent 1px);
+      background-size:56px 56px;
+      mask-image:radial-gradient(ellipse at center,black 30%,transparent 80%);
+    }
 
-    /* Pills */
-    .pill { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; border: 1px solid transparent; }
-    .pill-low { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
-    .pill-medium { background: #fef3c7; color: #92400e; border-color: #fde68a; }
-    .pill-high { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
-    .pill-pub { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
-    .pill-feat { background: #fef3c7; color: #92400e; border-color: #fde68a; }
-    .pill-status-active { background: #ede9fe; color: #5b21b6; border-color: #c4b5fd; }
-    .pill-status-draft { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
-
-    /* Stats row */
-    .s-stats { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px dashed #e2e8f0; font-size: 11.5px; color: #64748b; flex-wrap: wrap; }
-    .s-stats .dot { width: 3px; height: 3px; border-radius: 50%; background: #cbd5e1; display: inline-block; flex-shrink: 0; }
-    .s-stats .green { color: #059669; font-weight: 600; }
-
-    /* Return chip */
-    .return-chip { margin-top: 12px; display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; border-radius: 10px; background: #f0fdf4; border: 1px solid #bbf7d0; }
-    .return-chip.neg { background: #fff1f2; border-color: #fecdd3; }
-    .return-chip .lbl { font-size: 10.5px; color: #64748b; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; }
-    .return-chip .val { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
-    .return-chip.pos .val { color: #059669; }
-    .return-chip.neg .val { color: #dc2626; }
-
-    /* Spark */
-    .spark { height: 34px; width: 100%; margin-top: 10px; }
-
-    /* Back button */
-    .back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; border: 1.5px solid #e2e8f0; background: #fff; color: #475569; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s; }
-    .back-btn:hover { border-color: #c4b5fd; color: #5b21b6; background: #f5f3ff; }
-    .back-btn svg { width: 14px; height: 14px; }
-
-    /* Marquee */
-    .marquee-scroll { overflow-x: auto; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
-    .marquee-scroll::-webkit-scrollbar { height: 4px; }
-    .marquee-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
-
-    /* Detail cards */
-    .glass-card { background: #fff; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 0; }
-    .glass-card-inner { padding: 24px; }
-
-    /* KPIs */
-    .kpi { border-radius: 12px; padding: 14px; background: #f8fafc; border: 1px solid #e2e8f0; transition: all .2s; }
-    .kpi:hover { border-color: #c4b5fd; transform: translateY(-1px); }
-    .kpi .lbl { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
-    .kpi .val { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; margin-top: 6px; color: #0f172a; }
-    .kpi.violet { background: #f5f3ff; border-color: #c4b5fd; }
-    .kpi.violet .lbl { color: #7c3aed; }
-    .kpi.violet .val { color: #5b21b6; }
-
-    /* Year buttons */
-    .year-btn { padding: 5px 12px; border-radius: 999px; font-size: 11px; font-weight: 600; background: transparent; border: 1px solid #e2e8f0; color: #64748b; cursor: pointer; transition: all .15s; }
-    .year-btn:hover { border-color: #c4b5fd; color: #5b21b6; }
-    .year-btn.active { background: #7c3aed; color: #fff; border-color: transparent; box-shadow: 0 4px 12px -4px rgba(124,58,237,0.5); }
-
-    /* Calendar */
-    .cal-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
-    .cal-cell { border-radius: 10px; padding: 10px 6px; text-align: center; background: #f8fafc; border: 1px solid #e2e8f0; transition: all .2s; }
-    .cal-cell:hover { transform: scale(1.04); }
-    .cal-cell .m { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
-    .cal-cell .v { font-size: 12px; font-weight: 700; margin-top: 5px; color: #0f172a; }
-    .cal-pos { background: #f0fdf4; border-color: #bbf7d0; }
-    .cal-pos .v { color: #059669; }
-    .cal-neg { background: #fff1f2; border-color: #fecdd3; }
-    .cal-neg .v { color: #dc2626; }
-
-    /* Holding rows */
-    .holding-row { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 10px; transition: background .15s; }
-    .holding-row:hover { background: #f8fafc; }
-    .h-logo { width: 36px; height: 36px; border-radius: 10px; background: #ede9fe; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; color: #7c3aed; flex-shrink: 0; }
-    .h-bar { height: 5px; border-radius: 999px; background: #e2e8f0; overflow: hidden; margin-top: 5px; }
-    .h-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7c3aed, #a855f7); transition: width 1s cubic-bezier(.2,.8,.2,1); }
-
-    /* Ticker cards */
-    .ticker-card { flex-shrink: 0; width: 190px; padding: 12px; border-radius: 12px; background: #f8fafc; border: 1px solid #e2e8f0; transition: all .2s; }
-    .ticker-card:hover { transform: translateY(-2px); border-color: #c4b5fd; box-shadow: 0 8px 20px -10px rgba(124,58,237,0.3); }
-
-    /* Chart */
-    .chart-wrap { margin-top: 16px; height: 160px; border-radius: 14px; overflow: hidden; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px; position: relative; }
-    .chart-wrap svg { width: 100%; height: 100%; }
+    /* Sidebar */
+    .sidebar{
+      position:fixed;left:0;top:0;width:240px;height:100vh;z-index:50;
+      background:linear-gradient(180deg,rgba(255,255,255,0.85),rgba(248,250,252,0.85));
+      backdrop-filter:blur(24px) saturate(180%);
+      -webkit-backdrop-filter:blur(24px) saturate(180%);
+      border-right:1px solid var(--border);
+      display:flex;flex-direction:column;
+    }
+    .sidebar-header{
+      padding:22px 20px 18px;display:flex;align-items:center;gap:12px;
+      border-bottom:1px solid var(--border);cursor:pointer;position:relative;user-select:none;
+    }
+    .sidebar-logo{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden}
+    .sidebar-brand{display:flex;flex-direction:column;flex:1;min-width:0}
+    .sidebar-brand-name{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:-0.02em;color:var(--text)}
+    .sidebar-brand-sub{font-size:10px;color:var(--text-mute);letter-spacing:0.12em;text-transform:uppercase;margin-top:2px}
+    .sidebar-nav{flex:1;display:flex;flex-direction:column;padding:0 14px;overflow-y:auto}
+    .sidebar-section-label{font-size:10px;font-weight:600;color:var(--text-mute);letter-spacing:0.14em;text-transform:uppercase;padding:16px 10px 6px}
+    .nav-icon{
+      display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:10px;
+      cursor:pointer;transition:all .2s ease;text-decoration:none;
+      color:var(--text-dim);font-size:13px;font-weight:500;position:relative;
+    }
+    .nav-icon svg{width:17px;height:17px;fill:currentColor;opacity:0.7;transition:all .2s;flex-shrink:0}
+    .nav-icon:hover{background:rgba(139,92,246,0.08);color:var(--text)}
+    .nav-icon:hover svg{opacity:1;color:#a78bfa}
+    .nav-icon.active{
+      background:linear-gradient(90deg,rgba(139,92,246,0.18),rgba(99,102,241,0.06));
+      color:#4c1d95;font-weight:600;
+      box-shadow:inset 0 0 0 1px rgba(139,92,246,0.25);
+    }
+    .nav-icon.active::before{
+      content:"";position:absolute;left:-14px;top:50%;transform:translateY(-50%);
+      width:3px;height:18px;border-radius:3px;
+      background:linear-gradient(180deg,#a78bfa,#6366f1);
+      box-shadow:0 0 12px rgba(139,92,246,0.7);
+    }
+    .nav-icon.active svg{opacity:1}
+    .sidebar-footer{margin-top:auto;padding:14px;border-top:1px solid var(--border)}
+    .sidebar-user{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:10px;margin-bottom:4px}
+    .sidebar-avatar{
+      width:34px;height:34px;border-radius:50%;
+      background:linear-gradient(135deg,#a78bfa,#6366f1);
+      display:flex;align-items:center;justify-content:center;
+      font-weight:700;font-size:13px;color:#fff;
+      box-shadow:0 4px 14px -4px rgba(139,92,246,0.6);flex-shrink:0;
+    }
+    .sidebar-user-info{flex:1;min-width:0}
+    .sidebar-user-name{font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .sidebar-user-role{font-size:11px;color:var(--text-mute)}
+    .sidebar-signout{
+      display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:10px;cursor:pointer;
+      color:#fb7185;font-size:13px;font-weight:500;transition:background .15s;border:none;background:transparent;width:100%;text-align:left;
+    }
+    .sidebar-signout:hover{background:rgba(251,113,133,0.08)}
+    .sidebar-signout svg{width:17px;height:17px;fill:currentColor;flex-shrink:0}
 
     /* Mint Hub dropdown */
-    .mint-hub-dd { display: none; position: absolute; top: calc(100% + 6px); left: 8px; right: 8px; background: #fff; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 0 0 1px rgba(139,92,246,0.1); z-index: 9999; overflow: hidden; }
+    .mint-hub-dd{
+      display:none;position:absolute;top:calc(100% + 6px);left:8px;right:8px;
+      background:rgba(255,255,255,0.98);border-radius:12px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.12),0 0 0 1px rgba(139,92,246,0.12);
+      z-index:9999;overflow:hidden;backdrop-filter:blur(20px);
+    }
 
-    .fade-in { animation: fadeIn .4s ease both; }
-    @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .hidden { display: none !important; }
+    /* Main */
+    .main{margin-left:240px;min-height:100vh;position:relative;z-index:2}
+    .topbar{
+      position:sticky;top:0;z-index:30;
+      background:rgba(255,255,255,0.7);
+      backdrop-filter:blur(20px) saturate(180%);
+      -webkit-backdrop-filter:blur(20px) saturate(180%);
+      border-bottom:1px solid var(--border);
+      padding:0 32px;height:72px;
+      display:flex;align-items:center;justify-content:space-between;
+    }
+    .crumb{font-size:13px;color:var(--text-dim);font-weight:500}
+    .crumb b{color:var(--text);font-weight:600}
+    .topbar-pill{
+      display:flex;align-items:center;gap:8px;
+      padding:7px 14px;border-radius:999px;
+      background:var(--surface);border:1px solid var(--border);
+      font-size:12px;color:var(--text-dim);
+    }
+    .live-dot{width:7px;height:7px;border-radius:50%;background:#10d9a0;
+      box-shadow:0 0 0 0 rgba(16,217,160,0.7);animation:pulse 2s infinite}
+    @keyframes pulse{
+      0%{box-shadow:0 0 0 0 rgba(16,217,160,0.6)}
+      70%{box-shadow:0 0 0 12px rgba(16,217,160,0)}
+      100%{box-shadow:0 0 0 0 rgba(16,217,160,0)}
+    }
+
+    .page{padding:32px}
+
+    .page-head h1{
+      font-family:'Space Grotesk',sans-serif;
+      font-size:34px;font-weight:700;letter-spacing:-0.025em;
+      background:linear-gradient(180deg,#0f172a 30%,#4c1d95 100%);
+      -webkit-background-clip:text;background-clip:text;color:transparent;
+      margin:0;
+    }
+    .page-head p{margin-top:6px;color:var(--text-dim);font-size:14px}
+
+    /* Overview band */
+    .overview{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:22px 0 6px}
+    .ov-card{
+      position:relative;border-radius:18px;padding:1px;
+      background:linear-gradient(140deg,rgba(139,92,246,0.28),rgba(15,23,42,0.05) 60%,rgba(99,102,241,0.22));
+    }
+    .ov-card-inner{
+      border-radius:17px;padding:16px 18px;
+      background:linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.92));
+      backdrop-filter:blur(12px);
+      display:flex;flex-direction:column;gap:6px;min-height:96px;
+    }
+    .ov-icon{
+      width:32px;height:32px;border-radius:10px;
+      display:flex;align-items:center;justify-content:center;
+      background:linear-gradient(135deg,rgba(139,92,246,0.18),rgba(99,102,241,0.10));
+      color:#6d28d9;
+    }
+    .ov-icon svg{width:16px;height:16px}
+    .ov-lbl{font-size:10.5px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-mute)}
+    .ov-val{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;letter-spacing:-0.02em;color:var(--text)}
+    .ov-delta{font-size:11px;font-weight:600;color:#10b981}
+    .ov-delta.neg{color:#fb7185}
+
+    /* Spotlight featured card */
+    .spotlight{
+      position:relative;border-radius:24px;padding:1px;margin:22px 0 8px;
+      background:linear-gradient(140deg,rgba(139,92,246,0.45),rgba(99,102,241,0.18) 50%,rgba(6,182,212,0.35));
+    }
+    .spotlight-inner{
+      position:relative;overflow:hidden;
+      border-radius:23px;padding:26px;
+      background:
+        radial-gradient(120% 80% at 100% 0%,rgba(139,92,246,0.16),transparent 55%),
+        radial-gradient(80% 60% at 0% 100%,rgba(6,182,212,0.10),transparent 55%),
+        linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.97));
+      display:grid;grid-template-columns:1.05fr 1fr;gap:28px;align-items:center;
+    }
+    .spotlight-tag{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:5px 11px;border-radius:999px;
+      background:linear-gradient(90deg,rgba(245,181,68,0.22),rgba(245,158,11,0.06));
+      border:1px solid rgba(245,181,68,0.35);
+      color:#b45309;font-size:10.5px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;
+    }
+    .spotlight h2{
+      font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;
+      letter-spacing:-0.025em;margin:12px 0 6px;
+      background:linear-gradient(180deg,#0f172a,#4c1d95);
+      -webkit-background-clip:text;background-clip:text;color:transparent;
+    }
+    .spotlight-meta{font-size:13px;color:var(--text-dim);margin-bottom:14px}
+    .spotlight-cta{
+      display:inline-flex;align-items:center;gap:8px;margin-top:18px;
+      padding:10px 16px;border-radius:12px;cursor:pointer;border:none;
+      background:linear-gradient(90deg,#8b5cf6,#6366f1);color:#fff;
+      font-size:13px;font-weight:600;letter-spacing:-0.005em;font-family:inherit;
+      box-shadow:0 10px 28px -10px rgba(139,92,246,0.6);
+      transition:transform .15s ease,box-shadow .25s;
+    }
+    .spotlight-cta:hover{transform:translateY(-2px);box-shadow:0 16px 36px -12px rgba(139,92,246,0.7)}
+    .spotlight-chart{
+      height:200px;border-radius:18px;padding:10px;
+      background:linear-gradient(180deg,rgba(139,92,246,0.06),transparent);
+      border:1px solid var(--border);
+    }
+    .spotlight-chart svg{width:100%;height:100%}
+
+    /* Toolbar */
+    .toolbar{
+      display:flex;align-items:center;justify-content:space-between;
+      gap:14px;margin:28px 0 10px;flex-wrap:wrap;
+    }
+    .filter-tabs{display:flex;gap:6px;background:var(--surface);border:1px solid var(--border);padding:4px;border-radius:14px}
+    .filter-tab{
+      padding:7px 14px;border-radius:10px;font-size:12px;font-weight:600;
+      color:var(--text-dim);background:transparent;border:none;cursor:pointer;
+      transition:all .15s;font-family:inherit;
+    }
+    .filter-tab:hover{color:var(--text)}
+    .filter-tab.active{
+      background:linear-gradient(180deg,#fff,#f1f5f9);
+      color:#4c1d95;
+      box-shadow:0 1px 0 rgba(15,23,42,0.04),inset 0 0 0 1px rgba(139,92,246,0.18);
+    }
+    .toolbar .right{display:flex;align-items:center;gap:10px}
+    .search-box{
+      display:flex;align-items:center;gap:8px;
+      padding:8px 12px;border-radius:12px;
+      background:var(--surface);border:1px solid var(--border);
+      color:var(--text-dim);font-size:12.5px;min-width:220px;
+    }
+    .search-box input{
+      border:none;outline:none;background:transparent;flex:1;
+      color:var(--text);font-size:13px;font-family:inherit;
+    }
+    .search-box svg{width:14px;height:14px;flex-shrink:0}
+
+    /* Section labels */
+    .section-label{
+      display:flex;align-items:center;gap:12px;margin:28px 0 14px;
+      font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;
+    }
+    .section-label .badge{
+      padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;
+      background:var(--surface-2);color:var(--text-dim);border:1px solid var(--border);
+    }
+    .section-label .line{flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
+    .section-label.live{color:#34d399}
+    .section-label.staged{color:var(--violet-2)}
+    .section-label.draft{color:#94a3b8}
+
+    /* Strategy grid */
+    .strategy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:22px}
+
+    /* Card top color band */
+    .s-band{height:6px;border-radius:21px 21px 0 0;margin:0 -22px 18px;width:calc(100% + 44px)}
+    .s-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-top:18px}
+    .s-return-row{display:flex;align-items:baseline;gap:10px;margin-top:14px}
+    .s-return-big{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;letter-spacing:-0.03em;line-height:1}
+    .s-return-big.pos{color:#059669}
+    .s-return-big.neg{color:#e11d48}
+    .s-return-lbl{font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:0.1em;font-weight:700}
+    .s-card-foot{
+      margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);
+      display:grid;grid-template-columns:1fr 1fr;gap:10px;
+    }
+    .foot-cell .lbl{font-size:10px;color:var(--text-mute);font-weight:700;text-transform:uppercase;letter-spacing:0.1em}
+    .foot-cell .val{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;margin-top:2px;color:var(--text)}
+    .badges-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+
+    /* Premium card */
+    .s-card{
+      position:relative;border-radius:22px;padding:1px;
+      background:linear-gradient(140deg,rgba(139,92,246,0.35),rgba(15,23,42,0.06) 40%,rgba(99,102,241,0.30));
+      transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s;
+      cursor:pointer;opacity:0;transform:translateY(14px);
+      animation:rise .6s cubic-bezier(.2,.8,.2,1) forwards;
+    }
+    @keyframes rise{to{opacity:1;transform:none}}
+    .s-card-inner{
+      position:relative;z-index:2;
+      border-radius:21px;padding:22px;padding-top:0;
+      background:
+        radial-gradient(120% 80% at 0% 0%,rgba(139,92,246,0.08),transparent 55%),
+        linear-gradient(180deg,rgba(255,255,255,0.95),rgba(248,250,252,0.98));
+      backdrop-filter:blur(14px);overflow:hidden;min-height:200px;
+    }
+    .s-card-inner::after{
+      content:"";position:absolute;inset:0;pointer-events:none;
+      background:linear-gradient(115deg,transparent 35%,rgba(139,92,246,0.10) 50%,transparent 65%);
+      transform:translateX(-120%);transition:transform .9s ease;
+    }
+    .s-card:hover{transform:translateY(-4px)}
+    .s-card:hover .s-card-inner::after{transform:translateX(120%)}
+    .s-card:hover{
+      box-shadow:
+        0 30px 60px -25px rgba(15,23,42,0.18),
+        0 0 0 1px rgba(139,92,246,0.4),
+        0 0 60px -20px rgba(139,92,246,0.35);
+    }
+    .s-icon{
+      width:42px;height:42px;border-radius:13px;
+      display:flex;align-items:center;justify-content:center;
+      font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;color:#fff;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.25),0 8px 24px -8px rgba(0,0,0,0.6);
+      flex-shrink:0;
+    }
+    .s-name{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;letter-spacing:-0.01em;color:var(--text)}
+    .s-meta{font-size:11.5px;color:var(--text-mute);margin-top:2px}
+
+    /* Pills */
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;font-size:10.5px;font-weight:600;border:1px solid transparent}
+    .pill-low{background:rgba(16,217,160,0.12);color:#34d399;border-color:rgba(16,217,160,0.25)}
+    .pill-medium{background:rgba(245,181,68,0.12);color:#fbbf24;border-color:rgba(245,181,68,0.25)}
+    .pill-high{background:rgba(255,93,122,0.12);color:#fb7185;border-color:rgba(255,93,122,0.25)}
+    .pill-pub{background:rgba(16,217,160,0.10);color:#34d399;border-color:rgba(16,217,160,0.22)}
+    .pill-feat{background:linear-gradient(90deg,rgba(245,181,68,0.18),rgba(245,158,11,0.05));color:#fbbf24;border-color:rgba(245,181,68,0.3)}
+    .pill-status-active{background:rgba(139,92,246,0.14);color:#c4b5fd;border-color:rgba(139,92,246,0.3)}
+    .pill-status-draft{background:rgba(15,23,42,0.04);color:var(--text-dim);border-color:var(--border)}
+
+    /* Spark */
+    .spark{height:34px;width:100%;margin-top:10px}
+
+    /* Detail view */
+    .detail{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+
+    .glass-card{
+      position:relative;border-radius:24px;padding:1px;
+      background:linear-gradient(140deg,rgba(139,92,246,0.30),rgba(15,23,42,0.05) 40%,rgba(99,102,241,0.25));
+    }
+    .glass-card-inner{
+      border-radius:23px;padding:26px;
+      background:
+        radial-gradient(120% 80% at 0% 0%,rgba(139,92,246,0.06),transparent 60%),
+        linear-gradient(180deg,rgba(255,255,255,0.95),rgba(248,250,252,0.98));
+      backdrop-filter:blur(14px);
+    }
+    .hero-title{
+      font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;letter-spacing:-0.025em;
+      background:linear-gradient(180deg,#0f172a,#4c1d95);
+      -webkit-background-clip:text;background-clip:text;color:transparent;
+    }
+    .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}
+    .kpi{border-radius:16px;padding:14px;background:rgba(15,23,42,0.025);border:1px solid var(--border);transition:all .25s}
+    .kpi:hover{background:rgba(15,23,42,0.05);border-color:var(--border-strong);transform:translateY(-2px)}
+    .kpi .lbl{font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:0.1em;font-weight:600}
+    .kpi .val{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin-top:6px;letter-spacing:-0.02em}
+    .kpi.violet{background:linear-gradient(180deg,rgba(139,92,246,0.18),rgba(139,92,246,0.04));border-color:rgba(139,92,246,0.3)}
+    .kpi.violet .lbl{color:#6d28d9}
+    .kpi.violet .val{color:#4c1d95}
+
+    /* Chart */
+    .chart-wrap{
+      margin-top:20px;height:180px;border-radius:18px;overflow:hidden;
+      background:linear-gradient(180deg,rgba(139,92,246,0.06),transparent);
+      border:1px solid var(--border);padding:8px;position:relative;
+    }
+    .chart-wrap svg{width:100%;height:100%}
+
+    /* Holdings */
+    .holding-row{display:flex;align-items:center;gap:14px;padding:12px;border-radius:14px;transition:background .15s}
+    .holding-row:hover{background:rgba(15,23,42,0.04)}
+    .h-logo{
+      width:38px;height:38px;border-radius:11px;
+      background:linear-gradient(135deg,rgba(139,92,246,0.22),rgba(99,102,241,0.12));
+      border:1px solid var(--border);
+      display:flex;align-items:center;justify-content:center;
+      font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;color:#5b21b6;flex-shrink:0;
+    }
+    .h-bar{height:6px;border-radius:999px;background:rgba(15,23,42,0.08);overflow:hidden;margin-top:6px}
+    .h-bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#a78bfa,#6366f1);transition:width 1s cubic-bezier(.2,.8,.2,1)}
+
+    /* Ticker cards */
+    .ticker-card{
+      flex-shrink:0;width:200px;padding:14px;border-radius:16px;
+      background:linear-gradient(180deg,rgba(255,255,255,0.95),rgba(248,250,252,0.85));
+      border:1px solid var(--border);transition:all .25s;
+    }
+    .ticker-card:hover{transform:translateY(-3px);border-color:rgba(139,92,246,0.4);box-shadow:0 12px 30px -15px rgba(139,92,246,0.5)}
+
+    /* Marquee */
+    .marquee-scroll{overflow-x:auto;scroll-behavior:smooth;padding-bottom:8px}
+    .marquee-scroll::-webkit-scrollbar{height:5px}
+    .marquee-scroll::-webkit-scrollbar-thumb{background:rgba(15,23,42,0.15);border-radius:999px}
+
+    /* Calendar */
+    .cal-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+    .cal-cell{border-radius:13px;padding:12px 8px;text-align:center;background:rgba(15,23,42,0.03);border:1px solid var(--border);transition:all .2s}
+    .cal-cell:hover{transform:scale(1.05)}
+    .cal-cell .m{font-size:10.5px;color:var(--text-mute);font-weight:600;text-transform:uppercase;letter-spacing:0.08em}
+    .cal-cell .v{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;margin-top:6px}
+    .cal-pos{background:linear-gradient(180deg,rgba(16,217,160,0.18),rgba(16,217,160,0.04));border-color:rgba(16,217,160,0.3)}
+    .cal-pos .v{color:#34d399}
+    .cal-neg{background:linear-gradient(180deg,rgba(255,93,122,0.18),rgba(255,93,122,0.04));border-color:rgba(255,93,122,0.3)}
+    .cal-neg .v{color:#fb7185}
+
+    .year-btn{
+      padding:5px 12px;border-radius:999px;font-size:11px;font-weight:600;
+      background:transparent;border:1px solid var(--border);color:var(--text-dim);
+      cursor:pointer;transition:all .15s;font-family:inherit;
+    }
+    .year-btn:hover{border-color:var(--border-strong);color:var(--text)}
+    .year-btn.active{
+      background:linear-gradient(90deg,#8b5cf6,#6366f1);color:#fff;
+      border-color:transparent;box-shadow:0 6px 18px -6px rgba(139,92,246,0.7);
+    }
+
+    /* Back button */
+    .back-btn{
+      display:inline-flex;align-items:center;gap:7px;
+      padding:8px 14px;border-radius:10px;
+      background:var(--surface);border:1px solid var(--border);
+      color:var(--text-dim);font-size:12.5px;font-weight:600;cursor:pointer;
+      transition:all .15s;font-family:inherit;
+    }
+    .back-btn:hover{background:var(--surface-2);border-color:var(--border-strong);color:var(--text)}
+    .back-btn svg{width:14px;height:14px}
+
+    .fade-in{animation:fadeIn .5s ease both}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .hidden{display:none !important}
   </style>
 </head>
 <body>
+  <div class="aurora"><div class="blob3"></div></div>
+
   <aside class="sidebar">
     <div class="sidebar-header" onclick="mintHubDropdownToggle(event)">
       <div class="sidebar-logo">
-        <img src="/icon.png" alt="Mint logo" style="width:34px;height:34px;border-radius:8px;" />
+        <img src="/icon.png" alt="Mint logo" style="width:36px;height:36px;border-radius:9px;" />
       </div>
       <div class="sidebar-brand">
         <span class="sidebar-brand-name">Mint</span>
         <span class="sidebar-brand-sub">Mint Hub</span>
       </div>
-      <svg id="mintHubChevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0;transition:transform 0.2s;margin-right:-2px;"><polyline points="6 9 12 15 18 9"/></svg>
+      <svg id="mintHubChevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(100,116,139,0.6)" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0;transition:transform 0.2s;"><polyline points="6 9 12 15 18 9"/></svg>
       <div id="mintHubDropdown" class="mint-hub-dd" onclick="event.stopPropagation()">
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f5f3ff;border-bottom:1px solid #ede9fe;">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f5f3ff;border-bottom:1px solid rgba(139,92,246,0.1);">
           <img src="/icon.png" style="width:26px;height:26px;border-radius:7px;flex-shrink:0;" />
           <div style="flex:1;min-width:0;">
             <div style="font-size:12px;font-weight:700;color:#0f172a;line-height:1.3;">Mint Hub</div>
@@ -182,7 +474,7 @@
           </div>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
-        <div onclick="mintAppLaunch()" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-top:1px solid #f1f5f9;" onmouseover="this.style.background='#f5f3ff'" onmouseout="this.style.background=''">
+        <div onclick="mintAppLaunch()" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;" onmouseover="this.style.background='#f5f3ff'" onmouseout="this.style.background=''">
           <div style="width:26px;height:26px;border-radius:7px;background:#f0fdf4;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
             <img src="/icon.png" style="width:18px;height:18px;border-radius:4px;" />
           </div>
@@ -195,189 +487,165 @@
       </div>
     </div>
     <script>
-    function mintHubDropdownToggle(e) {
+    function mintHubDropdownToggle(e){
       e.stopPropagation();
-      const dd = document.getElementById('mintHubDropdown');
-      const ch = document.getElementById('mintHubChevron');
-      const open = dd.style.display !== 'block';
-      dd.style.display = open ? 'block' : 'none';
-      if (ch) ch.style.transform = open ? 'rotate(180deg)' : '';
-      if (open) {
-        setTimeout(() => {
-          const close = (ev) => {
-            if (!ev.target.closest('.sidebar-header')) {
-              dd.style.display = 'none';
-              if (ch) ch.style.transform = '';
-              document.removeEventListener('click', close);
-            }
-          };
-          document.addEventListener('click', close);
-        }, 0);
-      }
+      const dd=document.getElementById('mintHubDropdown');
+      const ch=document.getElementById('mintHubChevron');
+      const open=dd.style.display==='block';
+      dd.style.display=open?'none':'block';
+      ch.style.transform=open?'':'rotate(180deg)';
     }
-    function mintAppLaunch() {
-      const dd = document.getElementById('mintHubDropdown');
-      const ch = document.getElementById('mintHubChevron');
-      if (dd) dd.style.display = 'none';
-      if (ch) ch.style.transform = '';
-      const ov = document.getElementById('mintAppOverlay');
-      const fr = document.getElementById('mintAppFrame');
-      if (ov && fr) { fr.src = 'https://mint-henna.vercel.app/'; ov.style.display = 'block'; }
-    }
-    function mintAppClose() {
-      const ov = document.getElementById('mintAppOverlay');
-      const fr = document.getElementById('mintAppFrame');
-      if (ov) ov.style.display = 'none';
-      if (fr) fr.src = '';
-    }
+    document.addEventListener('click',()=>{
+      const dd=document.getElementById('mintHubDropdown');
+      const ch=document.getElementById('mintHubChevron');
+      if(dd){dd.style.display='none';ch.style.transform='';}
+    });
+    function mintAppLaunch(){window.open('https://app.mint.co','_blank')}
     </script>
 
-    <!-- View Switcher -->
-    <style>
-      #viewSwitcherDropdown { display:grid; grid-template-rows:0fr; transition:grid-template-rows 0.2s ease; }
-      #viewSwitcherDropdown.vs-open { grid-template-rows:1fr; }
-      #viewSwitcherDropdown > div { overflow:hidden; }
-    </style>
-    <div style="padding:0 12px 2px;">
+    <div style="padding:12px 14px 4px;">
+      <style>
+        #viewSwitcherDropdown{display:grid;grid-template-rows:0fr;transition:grid-template-rows 0.2s ease}
+        #viewSwitcherDropdown.vs-open{grid-template-rows:1fr}
+        #viewSwitcherDropdown>div{overflow:hidden}
+      </style>
       <button id="viewSwitcherBtn" onclick="viewSwitcherToggle(event)"
-        style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:10px;background:#ede9fe;border:none;cursor:pointer;text-align:left;box-sizing:border-box;transition:background 0.15s;outline:none;" onmouseover="this.style.background='#ddd6fe'" onmouseout="this.style.background='#ede9fe'">
-        <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#7c3aed;flex-shrink:0;"><path d="M3 3h7v7H3zm0 11h7v7H3zm11-11h7v7h-7zm0 11h7v7h-7z"/></svg>
-        <span style="flex:1;font-size:13px;font-weight:600;color:#5b21b6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Investments</span>
-        <svg id="viewSwitcherChevron" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" style="width:12px;height:12px;flex-shrink:0;transition:transform 0.2s;"><polyline points="6 9 12 15 18 9"/></svg>
+        style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border-radius:10px;background:linear-gradient(90deg,rgba(139,92,246,0.2),rgba(99,102,241,0.05));border:1px solid rgba(139,92,246,0.25);cursor:pointer;color:#4c1d95;font-size:13px;font-weight:600;font-family:inherit;text-align:left;">
+        <svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:currentColor;flex-shrink:0;"><path d="M3 3h7v7H3zm0 11h7v7H3zm11-11h7v7h-7zm0 11h7v7h-7z"/></svg>
+        <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Investments</span>
+        <svg id="viewSwitcherChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="width:12px;height:12px;flex-shrink:0;transition:transform 0.2s;opacity:0.5;"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
       <div id="viewSwitcherDropdown">
         <div>
-          <div style="padding:3px 0 2px 10px;">
-            <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;background:#f5f3ff;">
-              <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#7c3aed;flex-shrink:0;"><path d="M3 3h7v7H3zm0 11h7v7H3zm11-11h7v7h-7zm0 11h7v7h-7z"/></svg>
-              <span style="flex:1;font-size:12px;font-weight:600;color:#5b21b6;">Investments</span>
-              <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#7c3aed" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div style="padding:4px 0 2px 10px;">
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;background:rgba(139,92,246,0.08);">
+              <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#a78bfa;flex-shrink:0;"><path d="M3 3h7v7H3zm0 11h7v7H3zm11-11h7v7h-7zm0 11h7v7h-7z"/></svg>
+              <span style="flex:1;font-size:12px;font-weight:600;color:#4c1d95;">Investments</span>
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#a78bfa" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </div>
           </div>
         </div>
       </div>
     </div>
     <script>
-    function viewSwitcherToggle(e) {
+    function viewSwitcherToggle(e){
       e.stopPropagation();
-      const dd = document.getElementById('viewSwitcherDropdown');
-      const ch = document.getElementById('viewSwitcherChevron');
-      const open = !dd.classList.contains('vs-open');
-      dd.classList.toggle('vs-open', open);
-      if (ch) ch.style.transform = open ? 'rotate(180deg)' : '';
-      if (open) {
-        setTimeout(() => {
-          const close = (ev) => {
-            if (!ev.target.closest('#viewSwitcherBtn') && !ev.target.closest('#viewSwitcherDropdown')) {
-              dd.classList.remove('vs-open');
-              if (ch) ch.style.transform = '';
-              document.removeEventListener('click', close);
-            }
-          };
-          document.addEventListener('click', close);
-        }, 0);
-      }
+      const dd=document.getElementById('viewSwitcherDropdown');
+      const ch=document.getElementById('viewSwitcherChevron');
+      const open=dd.classList.contains('vs-open');
+      dd.classList.toggle('vs-open',!open);
+      ch.style.transform=open?'':'rotate(180deg)';
     }
+    document.addEventListener('click',()=>{
+      const dd=document.getElementById('viewSwitcherDropdown');
+      const ch=document.getElementById('viewSwitcherChevron');
+      if(dd){dd.classList.remove('vs-open');ch.style.transform='';}
+    });
     </script>
 
     <nav class="sidebar-nav">
-      <span class="sidebar-section-label">Main</span>
-
-      <a class="nav-icon" href="/index.html" aria-label="Clients">
-        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+      <div class="sidebar-section-label">Main</div>
+      <a href="/clients.html" class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
         Clients
       </a>
-
-      <span class="sidebar-section-label">Investments</span>
-
-      <a class="nav-icon" href="/dashboard.html" aria-label="Dashboard">
-        <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+      <div class="sidebar-section-label">Investments</div>
+      <a href="/dashboard.html" class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
         Dashboard
       </a>
-
-      <a class="nav-icon active" href="/factsheets.html" aria-label="Factsheets">
-        <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+      <a href="/factsheets.html" class="nav-icon active">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
         Factsheets
       </a>
-
-      <a class="nav-icon" href="/investors.html" aria-label="Investors">
-        <svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
-        Investors
+      <a href="/rebalancing.html" class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
+        Rebalancing
       </a>
-
-      <span class="sidebar-section-label">Banking</span>
-
-      <a class="nav-icon" href="/eft.html" aria-label="EFT Payments">
-        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
+      <div class="sidebar-section-label">Banking</div>
+      <a href="/eft-payments.html" class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
         EFT Payments
       </a>
-
-      <a class="nav-icon" href="/orderbook.html" aria-label="Order Book">
-        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
+      <a href="/orderbook.html" class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
         Order Book
       </a>
-
-      <span class="sidebar-section-label">System</span>
-
-      <a class="nav-icon" href="/settings.html" aria-label="Settings">
-        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+      <div class="sidebar-section-label">System</div>
+      <a href="/settings.html" class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
         Settings
-      </a>
-      <a class="nav-icon" id="teamNavLink" href="/team.html" style="display:none">
-        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-        Team
       </a>
     </nav>
 
     <div class="sidebar-footer">
       <div class="sidebar-user">
-        <div class="sidebar-avatar" id="sidebarAvatarInitials">A</div>
+        <div class="sidebar-avatar" id="sidebarInitial">A</div>
         <div class="sidebar-user-info">
-          <div class="sidebar-user-name" id="sidebarUserEmail">Admin</div>
+          <div class="sidebar-user-name" id="sidebarEmail">Loading…</div>
           <div class="sidebar-user-role">Administrator</div>
         </div>
       </div>
-      <button class="sidebar-signout" id="signOutBtn">
-        <svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+      <button class="sidebar-signout" onclick="signOut()">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
         Sign out
       </button>
     </div>
   </aside>
 
-  <main class="main-content">
-    <div class="top-nav">
-      <div style="display:flex;align-items:center;gap:12px;">
-        <button id="backToListBtn" class="back-btn hidden" onclick="showSelectView()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+  <main class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:14px">
+        <button id="backBtn" class="back-btn hidden" onclick="showList()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
           All Strategies
         </button>
-        <span class="top-nav-crumb" id="topNavTitle">Factsheets</span>
+        <span class="crumb">Investments / <b id="crumbTitle">Factsheets</b></span>
+      </div>
+      <div class="topbar-pill">
+        <span class="live-dot"></span>
+        Markets open · JSE
       </div>
     </div>
 
     <div class="page">
-
-      <!-- Strategy selection grid -->
-      <div id="selectView">
+      <!-- LIST VIEW -->
+      <div id="listView">
         <div class="page-head fade-in">
           <h1>Factsheets</h1>
-          <p>Premium portfolio strategies — select one to view its full factsheet preview.</p>
+          <p>Premium portfolio strategies — select one to view its full factsheet.</p>
         </div>
-        <div id="strategyGrid">
+
+        <div id="overviewBand"></div>
+        <div id="spotlightSlot"></div>
+
+        <div class="toolbar">
+          <div class="filter-tabs" id="filterTabs">
+            <button class="filter-tab active" data-filter="all">All</button>
+            <button class="filter-tab" data-filter="live">Live</button>
+            <button class="filter-tab" data-filter="staged">Staged</button>
+            <button class="filter-tab" data-filter="draft">Draft</button>
+          </div>
+          <div class="right">
+            <div class="search-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+              <input id="searchInput" placeholder="Search strategies…" />
+            </div>
+          </div>
+        </div>
+
+        <div id="strategyContainer">
           <div style="display:flex;align-items:center;justify-content:center;padding:80px 0;">
             <div style="text-align:center;">
-              <div style="width:36px;height:36px;border:2px solid #7c3aed;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;"></div>
-              <p style="color:#64748b;font-size:13px;">Loading strategies...</p>
+              <div style="width:36px;height:36px;border:2px solid #8b5cf6;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;"></div>
+              <p style="color:var(--text-mute);font-size:13px;">Loading strategies…</p>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Factsheet detail -->
-      <div id="detailView" class="hidden" style="max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:18px;">
-        <div id="factsheetContent"></div>
-      </div>
-
+      <!-- DETAIL VIEW -->
+      <div id="detailView" class="hidden detail"></div>
     </div>
   </main>
 
@@ -387,570 +655,628 @@
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    /* ── Helpers ── */
+    const $ = id => document.getElementById(id);
+    const fmtPct  = (v, sign=true) => v==null ? '—' : `${sign && v>0?'+':''}${Number(v).toFixed(2)}%`;
+    const fmtMoney = v => v==null ? '—' : `R ${Number(v).toLocaleString('en-ZA',{minimumFractionDigits:0,maximumFractionDigits:0})}`;
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-    const normalizeSymbol = (symbol) => {
-      if (typeof symbol !== 'string') return symbol;
-      return symbol.trim().split('.')[0].toUpperCase();
+    const normalizeSymbol = sym => typeof sym === 'string' ? sym.trim().split('.')[0].toUpperCase() : sym;
+
+    const formatCurrency = (v, cur='ZAR') => {
+      if (v==null) return null;
+      const n = Number(v);
+      if (Number.isNaN(n)) return null;
+      try { return new Intl.NumberFormat('en-ZA',{style:'currency',currency:cur,minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
+      catch { return `R ${n.toFixed(2)}`; }
     };
 
-    const formatCurrency = (value, currency = 'ZAR') => {
-      if (value === null || value === undefined) return null;
-      const numeric = Number(value);
-      if (Number.isNaN(numeric)) return null;
-      try {
-        return new Intl.NumberFormat('en-ZA', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(numeric);
-      } catch { return `R ${numeric.toFixed(2)}`; }
+    const iconPalettes = [
+      ['#a78bfa','#6366f1'],['#10b981','#06b6d4'],['#f59e0b','#ef4444'],
+      ['#3b82f6','#8b5cf6'],['#ec4899','#f59e0b'],['#06b6d4','#3b82f6'],
+      ['#8b5cf6','#ec4899'],['#64748b','#94a3b8'],
+    ];
+    const iconColors = name => iconPalettes[((name||'').charCodeAt(0)||0) % iconPalettes.length];
+
+    const riskPillCls = r => {
+      const m = {low:'pill-low',medium:'pill-medium',high:'pill-high'};
+      return m[(r||'').toLowerCase()] || 'pill-low';
     };
 
-    const formatPercent = (value) => {
-      if (value == null || Number.isNaN(Number(value))) return 'N/A';
-      return `${(Number(value) * 100).toFixed(2)}%`;
+    /* ── SVG helpers ── */
+    const sparkSVG = (data) => {
+      if (!data || data.length < 2) return '';
+      const w=300, h=60, p=4;
+      const min=Math.min(...data), max=Math.max(...data), range=max-min||1;
+      const pts = data.map((v,i)=>[p+(i/(data.length-1))*(w-p*2), h-p-((v-min)/range)*(h-p*2)]);
+      const path = pts.map((pt,i)=>(i===0?`M ${pt[0]} ${pt[1]}`:`L ${pt[0]} ${pt[1]}`)).join(' ');
+      const area = `${path} L ${pts[pts.length-1][0]} ${h} L ${pts[0][0]} ${h} Z`;
+      const isUp = data[data.length-1] >= data[0];
+      const stroke = isUp ? '#34d399' : '#fb7185';
+      const gid = 'sg'+Math.random().toString(36).slice(2,8);
+      return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+        <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${stroke}" stop-opacity="0.4"/>
+          <stop offset="100%" stop-color="${stroke}" stop-opacity="0"/>
+        </linearGradient></defs>
+        <path d="${area}" fill="url(#${gid})"/>
+        <path d="${path}" stroke="${stroke}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`;
     };
 
-    const getReturnBgColor = (value) => {
-      if (value == null) return 'bg-slate-50 text-slate-600';
-      if (value > 0) return 'bg-emerald-50 text-emerald-700';
-      if (value < 0) return 'bg-rose-50 text-rose-700';
-      return 'bg-slate-50 text-slate-600';
-    };
-
-    const riskBadgeClass = (risk) => {
-      switch ((risk || '').toLowerCase()) {
-        case 'low': return 'bg-emerald-100 text-emerald-700';
-        case 'medium': return 'bg-amber-100 text-amber-700';
-        case 'high': return 'bg-rose-100 text-rose-700';
-        default: return 'bg-slate-100 text-slate-600';
+    const bigChartSVG = (data) => {
+      if (!data || data.length < 2) return '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-mute);font-size:12px;">No chart data</div>';
+      const w=820, h=170, pl=10, pr=10, pt=15, pb=15;
+      const min=Math.min(...data), max=Math.max(...data), range=max-min||1;
+      const pts = data.map((v,i)=>[pl+(i/(data.length-1))*(w-pl-pr), (h-pb)-((v-min)/range)*(h-pt-pb)]);
+      let path = `M ${pts[0][0]} ${pts[0][1]}`;
+      for(let i=1;i<pts.length;i++){
+        const p0=pts[i-1],p1=pts[i], cx=(p0[0]+p1[0])/2;
+        path+=` Q ${cx} ${p0[1]} ${cx} ${(p0[1]+p1[1])/2} T ${p1[0]} ${p1[1]}`;
       }
-    };
-
-    const calculateMinInvestment = (holdings, securitiesMap) => {
-      if (!holdings || !holdings.length) return null;
-      let total = 0, matched = 0;
-      for (const h of holdings) {
-        const sym = h.ticker || h.symbol || h;
-        const sec = securitiesMap.get(sym) || securitiesMap.get(normalizeSymbol(sym));
-        if (sec?.last_price != null) {
-          const shares = Number(h.shares || h.quantity || 1);
-          total += shares * (Number(sec.last_price) / 100);
-          matched++;
-        }
-      }
-      return matched > 0 ? Math.round(total) : null;
-    };
-
-    const renderCalendarGrid = (calendarData, year) => `
-      <p class="mb-2 text-xs font-semibold text-slate-500">${year}</p>
-      <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-        ${monthNames.map((label, index) => {
-          const monthKey = String(index + 1).padStart(2, '0');
-          const value = calendarData[String(year)]?.[monthKey];
-          return `<div class="rounded-2xl px-3 py-3 text-center text-xs font-semibold ${getReturnBgColor(value)}">
-            <p class="text-[11px] font-semibold text-slate-600">${label}</p>
-            <p class="mt-1 text-sm">${value == null ? '-' : `${(Number(value) * 100).toFixed(2)}%`}</p>
-          </div>`;
-        }).join('')}
-      </div>`;
-
-    window.switchCalendarYear = (year) => {
-      const grid = document.getElementById('calendarGrid');
-      if (grid && window._calendarData) grid.innerHTML = renderCalendarGrid(window._calendarData, year);
-      document.querySelectorAll('.calendar-year-btn').forEach(btn => {
-        btn.className = btn.dataset.year === year
-          ? 'calendar-year-btn rounded-full px-3 py-1 text-xs font-semibold bg-slate-900 text-white'
-          : 'calendar-year-btn rounded-full px-3 py-1 text-xs font-semibold border border-slate-200 bg-white text-slate-600';
-      });
-    };
-
-    const showSelectView = () => {
-      document.getElementById('selectView').classList.remove('hidden');
-      document.getElementById('detailView').classList.add('hidden');
-      document.getElementById('backToListBtn').classList.add('hidden');
-      document.getElementById('topNavTitle').textContent = 'Factsheets';
-      history.replaceState(null, '', '/factsheets.html');
-    };
-
-    const showDetailView = () => {
-      document.getElementById('selectView').classList.add('hidden');
-      document.getElementById('detailView').classList.remove('hidden');
-      document.getElementById('backToListBtn').classList.remove('hidden');
-    };
-
-    const loadStrategyList = async () => {
-      const grid = document.getElementById('strategyGrid');
-
-      /* Fetch strategies + active investor counts in parallel */
-      const [{ data: strategies, error }, { data: holdingRows }] = await Promise.all([
-        supabaseClient
-          .from('strategies_c')
-          .select('id, name, short_name, description, risk_level, sector, status, is_public, holdings')
-          .order('name'),
-        supabaseClient
-          .from('stock_holdings_c')
-          .select('strategy_id, user_id')
-          .eq('is_active', true)
-          .eq('trade_side', 'BUY')
-      ]);
-
-      if (error || !strategies || strategies.length === 0) {
-        grid.innerHTML = '<div style="text-align:center;padding:60px 0;color:#64748b;font-size:14px;">No strategies available.</div>';
-        return;
-      }
-
-      /* Count distinct investors per strategy */
-      const investorCounts = {};
-      (holdingRows || []).forEach(r => {
-        if (!r.strategy_id) return;
-        if (!investorCounts[r.strategy_id]) investorCounts[r.strategy_id] = new Set();
-        investorCounts[r.strategy_id].add(r.user_id);
-      });
-      const investorCount = id => investorCounts[id] ? investorCounts[id].size : 0;
-
-      /* Group strategies into three buckets */
-      const isLive = s => s.status === 'active';
-      const groupA = strategies.filter(s => isLive(s) && investorCount(s.id) > 0);  /* live + investors */
-      const groupB = strategies.filter(s => isLive(s) && investorCount(s.id) === 0); /* live, no investors */
-      const groupC = strategies.filter(s => !isLive(s));                              /* everything else */
-
-      /* ── Icon palettes keyed to strategy name ── */
-      const iconPalettes = [
-        ['#a78bfa','#6366f1'],['#10b981','#06b6d4'],['#f59e0b','#ef4444'],
-        ['#3b82f6','#8b5cf6'],['#ec4899','#f59e0b'],['#06b6d4','#3b82f6'],
-        ['#8b5cf6','#ec4899'],['#64748b','#94a3b8'],
-      ];
-      const iconColors = (name) => iconPalettes[(name || '').charCodeAt(0) % iconPalettes.length];
-
-      const riskPillClass = (r) => {
-        const m = { low:'pill-low', medium:'pill-medium', high:'pill-high' };
-        return m[(r||'').toLowerCase()] || 'pill-low';
-      };
-
-      const miniSparkSVG = (data) => {
-        if (!data || data.length < 2) return '';
-        const w = 300, h = 60, p = 4;
-        const min = Math.min(...data), max = Math.max(...data), range = max - min || 1;
-        const pts = data.map((v, i) => {
-          const x = p + (i / (data.length - 1)) * (w - p * 2);
-          const y = h - p - ((v - min) / range) * (h - p * 2);
-          return [x, y];
-        });
-        const path = pts.map((pt, i) => (i === 0 ? `M ${pt[0]} ${pt[1]}` : `L ${pt[0]} ${pt[1]}`)).join(' ');
-        const areaPath = `${path} L ${pts[pts.length-1][0]} ${h} L ${pts[0][0]} ${h} Z`;
-        const isUp = data[data.length - 1] >= data[0];
-        const stroke = isUp ? '#34d399' : '#fb7185';
-        const gid = 'sg' + Math.random().toString(36).slice(2, 8);
-        return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-          <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="${stroke}" stop-opacity="0.4"/>
+      const area=`${path} L ${pts[pts.length-1][0]} ${h-pb} L ${pts[0][0]} ${h-pb} Z`;
+      const last=pts[pts.length-1];
+      const isUp=data[data.length-1]>=data[0];
+      const stroke=isUp?'#34d399':'#fb7185';
+      const glow=isUp?'rgba(52,211,153,0.5)':'rgba(251,113,133,0.5)';
+      return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="bigG" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${stroke}" stop-opacity="0.35"/>
             <stop offset="100%" stop-color="${stroke}" stop-opacity="0"/>
-          </linearGradient></defs>
-          <path d="${areaPath}" fill="url(#${gid})"/>
-          <path d="${path}" stroke="${stroke}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>`;
-      };
+          </linearGradient>
+          <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <path d="${area}" fill="url(#bigG)"/>
+        <path d="${path}" stroke="${stroke}" stroke-width="2.5" fill="none" stroke-linecap="round" filter="url(#glow)"/>
+        <circle cx="${last[0]}" cy="${last[1]}" r="5" fill="${stroke}"/>
+        <circle cx="${last[0]}" cy="${last[1]}" r="10" fill="${glow}" opacity="0.5">
+          <animate attributeName="r" values="6;14;6" dur="2s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.6;0;0.6" dur="2s" repeatCount="indefinite"/>
+        </circle>
+      </svg>`;
+    };
 
-      const buildCard = (s, animIdx, ytdMap, sparkMap) => {
-        const holdings = Array.isArray(s.holdings) ? s.holdings : [];
-        const count    = investorCount(s.id);
-        const [c0, c1] = iconColors(s.name);
-        const initials = (s.short_name || s.name || 'S').slice(0, 2).toUpperCase();
-        const ytdRaw   = ytdMap ? ytdMap[s.id] : null;
-        const ytd      = ytdRaw != null ? parseFloat(ytdRaw) : null;
-        const isUp     = ytd == null ? true : ytd >= 0;
-        const fmtPct   = (v) => v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(2)}%`;
-        const spark    = sparkMap ? sparkMap[s.id] : null;
-        const isFeatured = s.is_featured || false;
+    const expandSpark = (arr, n) => {
+      const out=[];
+      for(let i=0;i<n;i++){
+        const t=(i/(n-1))*(arr.length-1);
+        const lo=Math.floor(t),hi=Math.min(arr.length-1,lo+1);
+        out.push(arr[lo]*(1-(t-lo))+arr[hi]*(t-lo));
+      }
+      return out;
+    };
 
-        const div = document.createElement('div');
-        div.className = 's-card';
-        div.style.animationDelay = `${animIdx * 60}ms`;
-        div.innerHTML = `
-          <div class="s-card-inner">
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
-              <div style="display:flex;gap:13px;align-items:center">
-                <div class="s-icon" style="background:linear-gradient(135deg,${c0},${c1})">${initials}</div>
+    /* ── State ── */
+    let _allStrategies = [];
+    let _ytdMap = {};
+    let _sparkMap = {};
+    let _investorCounts = {};
+    let _filter = 'all';
+    let _query = '';
+
+    /* ── Overview band ── */
+    function renderOverview() {
+      const live = _allStrategies.filter(s=>s.status==='active');
+      const totalInv = _allStrategies.reduce((a,s)=>a+(_investorCounts[s.id]||0),0);
+      const avgYtd = live.length > 0
+        ? live.reduce((a,s)=>a+(Number(_ytdMap[s.id])||0),0) / live.length
+        : 0;
+      const best = _allStrategies.reduce((a,s)=>{
+        const y=Number(_ytdMap[s.id])||0, ay=Number(_ytdMap[a.id])||0;
+        return y > ay ? s : a;
+      }, _allStrategies[0] || {id:'',short_name:'—'});
+
+      const items = [
+        { lbl:'Strategies Live', val:live.length, delta:'+'+live.length+' total',
+          icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l3-3 4 4 5-5 6 6"/><path d="M14 8h7v7"/></svg>` },
+        { lbl:'Total Investors', val:totalInv, delta:'across all strategies',
+          icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3"/><path d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M2 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 15h2a4 4 0 0 1 4 4v2"/></svg>` },
+        { lbl:'Avg YTD Return', val:fmtPct(avgYtd), delta:avgYtd>=0?'beating benchmark':'below benchmark', neg:avgYtd<0,
+          icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M5 9l7-7 7 7"/></svg>` },
+        { lbl:'Top Performer', val:best.short_name||best.name||'—', delta:fmtPct(Number(_ytdMap[best.id])||0)+' YTD', neg:(Number(_ytdMap[best.id])||0)<0,
+          icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg>` },
+      ];
+
+      $('overviewBand').innerHTML = `
+        <div class="overview">
+          ${items.map((it,i)=>`
+            <div class="ov-card" style="opacity:0;transform:translateY(10px);animation:rise .5s cubic-bezier(.2,.8,.2,1) ${i*80}ms forwards">
+              <div class="ov-card-inner">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <div class="ov-lbl">${it.lbl}</div>
+                  <div class="ov-icon">${it.icon}</div>
+                </div>
+                <div class="ov-val">${it.val}</div>
+                <div class="ov-delta${it.neg?' neg':''}">${it.delta}</div>
+              </div>
+            </div>`).join('')}
+        </div>`;
+    }
+
+    /* ── Spotlight ── */
+    function renderSpotlight() {
+      const feat = _allStrategies.find(s=>s.is_featured && s.status==='active') || _allStrategies.find(s=>s.status==='active');
+      if (!feat) { $('spotlightSlot').innerHTML=''; return; }
+      const [c0,c1] = iconColors(feat.name);
+      const ytdRaw = Number(_ytdMap[feat.id])||0;
+      const isUp = ytdRaw >= 0;
+      const spark = _sparkMap[feat.id];
+      const expanded = spark && spark.length>=2 ? expandSpark(spark,60) : null;
+
+      $('spotlightSlot').innerHTML = `
+        <div class="spotlight fade-in">
+          <div class="spotlight-inner">
+            <div>
+              <span class="spotlight-tag">★ Featured strategy</span>
+              <h2>${feat.name}</h2>
+              <div class="spotlight-meta">${feat.sector||'Multi-asset'} · ${(feat.risk_level||'balanced')[0].toUpperCase()+(feat.risk_level||'balanced').slice(1)} risk · ${Array.isArray(feat.holdings)?feat.holdings.length:0} holdings</div>
+              <p style="font-size:13.5px;color:var(--text-dim);line-height:1.6;margin:0;max-width:46ch">${feat.description||''}</p>
+              <div style="display:flex;align-items:baseline;gap:14px;margin-top:18px">
                 <div>
-                  <div class="s-name">${s.name || 'Untitled'}</div>
-                  <div class="s-meta">${s.short_name || ''}${s.sector ? ' · ' + s.sector : ''}</div>
+                  <div style="font-size:10.5px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-mute)">YTD</div>
+                  <div class="s-return-big ${isUp?'pos':'neg'}" style="font-size:34px">${fmtPct(ytdRaw)}</div>
                 </div>
               </div>
-              <span class="pill ${riskPillClass(s.risk_level)}">${s.risk_level || 'N/A'}</span>
+              <button class="spotlight-cta" onclick="openDetail('${feat.id}','${feat.name.replace(/'/g,"\\'")}')">
+                View full factsheet
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:14px;height:14px"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+              </button>
+            </div>
+            <div class="spotlight-chart">${expanded ? bigChartSVG(expanded) : '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-mute);font-size:12px;">No data yet</div>'}</div>
+          </div>
+        </div>`;
+    }
+
+    /* ── Card builder ── */
+    function buildCard(s, idx) {
+      const [c0,c1] = iconColors(s.name);
+      const initials = (s.short_name||s.name||'S').slice(0,2).toUpperCase();
+      const ytdRaw = _ytdMap[s.id] != null ? Number(_ytdMap[s.id]) : null;
+      const isUp = ytdRaw == null ? true : ytdRaw >= 0;
+      const spark = _sparkMap[s.id];
+      const inv = _investorCounts[s.id]||0;
+      const holdings = Array.isArray(s.holdings) ? s.holdings : [];
+      return `
+        <div class="s-card" style="animation-delay:${idx*60}ms" onclick="openDetail('${s.id}','${(s.name||'').replace(/'/g,"\\'")}')">
+          <div class="s-card-inner">
+            <div class="s-band" style="background:linear-gradient(90deg,${c0},${c1})"></div>
+            <div class="s-card-top">
+              <div style="display:flex;gap:13px;align-items:center;min-width:0">
+                <div class="s-icon" style="background:linear-gradient(135deg,${c0},${c1})">${initials}</div>
+                <div style="min-width:0">
+                  <div class="s-name">${s.name||'Untitled'}</div>
+                  <div class="s-meta">${s.short_name||''}${s.sector?' · '+s.sector:''}</div>
+                </div>
+              </div>
+              <span class="pill ${riskPillCls(s.risk_level)}">${s.risk_level||'N/A'}</span>
             </div>
 
-            ${s.description ? `<div class="s-desc">${s.description}</div>` : ''}
-
-            <div class="spark">${miniSparkSVG(spark)}</div>
-
-            <div class="return-chip ${isUp ? 'pos' : 'neg'}">
-              <div><div class="lbl">YTD Return</div></div>
-              <div class="val">${fmtPct(ytd)}</div>
+            <div class="s-return-row">
+              <div class="s-return-big ${isUp?'pos':'neg'}">${fmtPct(ytdRaw)}</div>
+              <div class="s-return-lbl">YTD</div>
             </div>
 
-            <div class="s-stats">
-              <span>${holdings.length} holding${holdings.length !== 1 ? 's' : ''}</span>
-              <span class="dot"></span>
-              ${count > 0
-                ? `<span class="green">${count} investor${count !== 1 ? 's' : ''}</span>`
-                : `<span style="color:var(--text-mute)">no investors</span>`}
-              ${s.is_public ? `<span class="dot"></span><span style="color:#34d399">Public</span>` : ''}
-              ${isFeatured ? `<span class="dot"></span><span style="color:#fbbf24">★ Featured</span>` : ''}
+            <div class="spark">${sparkSVG(spark)}</div>
+
+            <div class="badges-row">
+              ${s.is_public ? `<span class="pill pill-pub">Public</span>` : `<span class="pill pill-status-draft">Private</span>`}
+              ${s.is_featured ? `<span class="pill pill-feat">★ Featured</span>` : ''}
             </div>
-          </div>`;
-        div.addEventListener('click', () => openFactsheet(s.id, s.name));
-        return div;
-      };
 
-      /* Fetch YTD returns for all strategies */
-      let ytdMap = {};
-      try {
-        const ids = strategies.map(s => s.id).filter(Boolean);
-        const { data: retRows } = await supabaseClient
-          .from('strategies_returns_c')
-          .select('strategy_id, ytd_pct, basket_value, as_of_date')
-          .in('strategy_id', ids)
-          .order('as_of_date', { ascending: true });
-        /* latest ytd per strategy */
-        const latestYtd = {};
-        const sparkBuckets = {};
-        (retRows || []).forEach(r => {
-          latestYtd[r.strategy_id] = r.ytd_pct;
-          if (!sparkBuckets[r.strategy_id]) sparkBuckets[r.strategy_id] = [];
-          if (r.basket_value != null) sparkBuckets[r.strategy_id].push(Number(r.basket_value));
-        });
-        ytdMap = latestYtd;
-        window._sparkMap = sparkBuckets;
-      } catch (_) {}
+            <div class="s-card-foot">
+              <div class="foot-cell">
+                <div class="lbl">Holdings</div>
+                <div class="val">${holdings.length||0}</div>
+              </div>
+              <div class="foot-cell">
+                <div class="lbl">Investors</div>
+                <div class="val" style="color:${inv>0?'#059669':'var(--text-mute)'}">${inv||'—'}</div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }
 
-      const sparkMap = window._sparkMap || {};
+    /* ── Render list ── */
+    function renderList() {
+      renderOverview();
+      renderSpotlight();
 
-      const section = (title, items, cls, startIdx) => {
-        if (!items.length) return;
-        const label = document.createElement('div');
-        label.className = `section-label ${cls}`;
-        label.innerHTML = `${title}<span class="badge">${items.length}</span><div class="line"></div>`;
-        grid.appendChild(label);
-        const gridRow = document.createElement('div');
-        gridRow.className = 'strategy-grid';
-        items.forEach((s, i) => gridRow.appendChild(buildCard(s, startIdx + i, ytdMap, sparkMap)));
-        grid.appendChild(gridRow);
-      };
+      const q = _query.trim().toLowerCase();
+      const matches = s => !q || (s.name||'').toLowerCase().includes(q) || (s.short_name||'').toLowerCase().includes(q) || (s.sector||'').toLowerCase().includes(q);
 
-      grid.innerHTML = '';
-      section('Live · With Investors',   groupA, 'live',   0);
-      section('Live · No Investors Yet', groupB, 'staged', groupA.length);
-      section('Inactive / Draft',        groupC, 'draft',  groupA.length + groupB.length);
-    };
+      const live   = _allStrategies.filter(s=> s.status==='active' && (_investorCounts[s.id]||0) > 0 && matches(s));
+      const staged = _allStrategies.filter(s=> s.status==='active' && (_investorCounts[s.id]||0)===0 && matches(s));
+      const draft  = _allStrategies.filter(s=> s.status!=='active' && matches(s));
 
-    const openFactsheet = async (strategyId, strategyName) => {
-      showDetailView();
-      document.getElementById('topNavTitle').textContent = strategyName || 'Factsheet';
-      history.replaceState(null, '', `/factsheets.html?id=${strategyId}`);
+      const sections = [];
+      if (_filter==='all'||_filter==='live')   sections.push(['Live · With Investors', live,   'live']);
+      if (_filter==='all'||_filter==='staged') sections.push(['Live · No Investors Yet',staged,'staged']);
+      if (_filter==='all'||_filter==='draft')  sections.push(['Inactive / Draft',       draft,  'draft']);
 
-      document.getElementById('factsheetContent').innerHTML = `
+      const root = $('strategyContainer');
+      let html = '';
+      let totalIdx = 0;
+
+      sections.forEach(([title,items,cls])=>{
+        if(!items.length) return;
+        html += `
+          <div class="section-label ${cls}">${title}<span class="badge">${items.length}</span><div class="line"></div></div>
+          <div class="strategy-grid">${items.map(s=>buildCard(s,totalIdx++)).join('')}</div>`;
+      });
+
+      root.innerHTML = html || `<div style="padding:60px 20px;text-align:center;color:var(--text-mute);font-size:14px">No strategies match your search.</div>`;
+    }
+
+    /* ── Filter tabs + search ── */
+    document.addEventListener('click', e=>{
+      const t = e.target.closest('.filter-tab');
+      if(!t) return;
+      document.querySelectorAll('.filter-tab').forEach(b=>b.classList.remove('active'));
+      t.classList.add('active');
+      _filter = t.dataset.filter;
+      renderList();
+    });
+    document.addEventListener('input', e=>{
+      if(e.target && e.target.id==='searchInput'){
+        _query = e.target.value;
+        renderList();
+      }
+    });
+
+    /* ── Show/hide views ── */
+    function showList() {
+      $('listView').classList.remove('hidden');
+      $('detailView').classList.add('hidden');
+      $('backBtn').classList.add('hidden');
+      $('crumbTitle').textContent = 'Factsheets';
+      history.replaceState(null,'','/factsheets.html');
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
+
+    /* ── Detail view ── */
+    async function openDetail(strategyId, strategyName) {
+      $('listView').classList.add('hidden');
+      $('detailView').classList.remove('hidden');
+      $('backBtn').classList.remove('hidden');
+      $('crumbTitle').textContent = strategyName || 'Factsheet';
+      history.replaceState(null,'',`/factsheets.html?id=${strategyId}`);
+      window.scrollTo({top:0,behavior:'smooth'});
+
+      $('detailView').innerHTML = `
         <div style="display:flex;align-items:center;justify-content:center;padding:80px 0;">
           <div style="text-align:center;">
-            <div style="width:36px;height:36px;border:2px solid #7c3aed;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;"></div>
-            <p style="color:#64748b;font-size:13px;">Loading factsheet...</p>
+            <div style="width:36px;height:36px;border:2px solid #8b5cf6;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;"></div>
+            <p style="color:var(--text-mute);font-size:13px;">Loading factsheet…</p>
           </div>
         </div>`;
 
-      const { data: strategy, error: stratError } = await supabaseClient
+      const { data: strategy, error } = await supabaseClient
         .from('strategies_c')
-        .select('id, slug, name, short_name, description, risk_level, sector, tags, base_currency, icon_url, image_url, holdings, min_investment, is_public, is_featured, status, created_at')
+        .select('id, slug, name, short_name, description, risk_level, sector, tags, base_currency, icon_url, holdings, min_investment, is_public, is_featured, status, created_at')
         .eq('id', strategyId)
         .maybeSingle();
 
-      if (stratError || !strategy) {
-        document.getElementById('factsheetContent').innerHTML = '<div class="text-center py-20"><p class="text-slate-500">Strategy not found.</p></div>';
+      if (error || !strategy) {
+        $('detailView').innerHTML = '<div style="text-align:center;padding:80px 0;color:var(--text-mute);">Strategy not found.</div>';
         return;
       }
 
-      document.getElementById('topNavTitle').textContent = strategy.name || 'Factsheet';
+      $('crumbTitle').textContent = strategy.name || 'Factsheet';
 
-      const analytics = null; // strategy_analytics is not a _c table — all fields show as unavailable
-
+      const [c0,c1] = iconColors(strategy.name);
+      const initials = (strategy.short_name||strategy.name||'S').slice(0,2).toUpperCase();
       const holdings = Array.isArray(strategy.holdings) ? strategy.holdings : [];
+
+      /* Securities */
       let securitiesMap = new Map();
       if (holdings.length > 0) {
-        const symbols = holdings.map(h => h.ticker || h.symbol || h);
-        const allSymbols = [...new Set([...symbols, ...symbols.map(normalizeSymbol)])];
-        const { data: secs } = await supabaseClient.from('securities_c').select('id, symbol, name, logo_url').in('symbol', allSymbols);
+        const symbols = holdings.map(h=>h.ticker||h.symbol||h);
+        const allSyms = [...new Set([...symbols,...symbols.map(normalizeSymbol)])];
+        const { data: secs } = await supabaseClient.from('securities_c').select('id,symbol,name,logo_url').in('symbol',allSyms);
         if (secs) {
-          const secIds = secs.map(s => s.id).filter(Boolean);
+          const secIds = secs.map(s=>s.id).filter(Boolean);
           let retMap = {};
-          if (secIds.length > 0) {
+          if (secIds.length>0) {
             const { data: rets } = await supabaseClient.from('stock_returns_c')
-              .select('security_id, current_price, 1d_pct')
-              .in('security_id', secIds)
-              .order('as_of_date', { ascending: false });
-            (rets || []).forEach(r => { if (!retMap[r.security_id]) retMap[r.security_id] = r; });
+              .select('security_id,current_price,1d_pct').in('security_id',secIds)
+              .order('as_of_date',{ascending:false});
+            (rets||[]).forEach(r=>{ if(!retMap[r.security_id]) retMap[r.security_id]=r; });
           }
-          secs.forEach(s => {
-            const r = retMap[s.id] || {};
-            const merged = { ...s, last_price: r.current_price != null ? Number(r.current_price) : null, change_percent: r['1d_pct'] ?? null };
-            securitiesMap.set(s.symbol, merged);
-            const norm = normalizeSymbol(s.symbol);
-            if (norm !== s.symbol) securitiesMap.set(norm, merged);
+          secs.forEach(s=>{
+            const r = retMap[s.id]||{};
+            const m = {...s, last_price:r.current_price!=null?Number(r.current_price):null, change_percent:r['1d_pct']??null};
+            securitiesMap.set(s.symbol,m);
+            const norm=normalizeSymbol(s.symbol);
+            if(norm!==s.symbol) securitiesMap.set(norm,m);
           });
         }
       }
 
-      const { data: stratRetRows } = await supabaseClient
+      /* Returns */
+      const { data: retRows } = await supabaseClient
         .from('strategies_returns_c')
-        .select('strategy_id, ytd_pct, 1d_pct, basket_value, as_of_date')
-        .eq('strategy_id', strategyId)
-        .order('as_of_date', { ascending: true });
-      const stratRet = stratRetRows && stratRetRows.length > 0 ? stratRetRows[stratRetRows.length - 1] : null;
+        .select('strategy_id,ytd_pct,basket_value,as_of_date')
+        .eq('strategy_id',strategyId)
+        .order('as_of_date',{ascending:true});
 
-      const totalWeight = holdings.reduce((sum, h) => sum + (Number(h.weight) || 0), 0);
-      const minInvestment = calculateMinInvestment(holdings, securitiesMap) || null;
-      const cashAmount = minInvestment ? minInvestment * 0.08 : null;
-      const analyticsTimestamp = analytics?.computed_at || analytics?.as_of_date || null;
-      const analyticsUnavailable = !analytics || analytics?.error;
+      const latestRet = retRows && retRows.length>0 ? retRows[retRows.length-1] : null;
+      const ytdVal = latestRet?.ytd_pct != null ? Number(latestRet.ytd_pct) : null;
+      const isUp = ytdVal == null ? true : ytdVal >= 0;
 
-      let allTimeReturn = null;
-      if (analytics?.latest_value != null) {
-        const lv = Number(analytics.latest_value);
-        allTimeReturn = (lv > 50 && lv < 200) ? (lv / 100) - 1 : (lv >= -1 && lv <= 1) ? lv : (lv / 100) - 1;
-      }
-      if (allTimeReturn == null && analytics?.ytd_return != null) allTimeReturn = Number(analytics.ytd_return);
-      const formattedAllTimeReturn = allTimeReturn != null ? `${allTimeReturn >= 0 ? '+' : ''}${(allTimeReturn * 100).toFixed(2)}%` : '-';
-      const allTimeTextClass = allTimeReturn != null ? (allTimeReturn > 0 ? 'text-emerald-600' : allTimeReturn < 0 ? 'text-rose-600' : 'text-slate-500') : 'text-slate-500';
+      /* Chart data from basket_value */
+      const chartData = (retRows||[]).map(r=>Number(r.basket_value)).filter(v=>!Number.isNaN(v)&&v!=null);
+      const sparkForDetail = chartData.length>=2 ? expandSpark(chartData,60) : null;
 
-      const summary = analytics?.summary || {};
-      const performanceSummary = [
-        { label: 'Best Day', value: formatPercent(summary.best_day), description: 'The highest daily return this strategy has achieved.' },
-        { label: 'Worst Day', value: formatPercent(summary.worst_day), description: 'The lowest daily return this strategy has experienced.' },
-        { label: 'Avg Daily Return', value: formatPercent(summary.avg_day), description: 'The average daily percentage change across all trading days.' },
-        { label: 'YTD Return', value: stratRet?.ytd_pct != null ? `${Number(stratRet.ytd_pct) >= 0 ? '+' : ''}${Number(stratRet.ytd_pct).toFixed(2)}%` : '—', description: 'Year-to-date return for the strategy.' },
-      ];
+      /* Holdings with metrics */
+      const totalWeight = holdings.reduce((s,h)=>s+(Number(h.weight)||0),0);
+      const holdingsWithMetrics = holdings.map(h=>{
+        const sym = h.ticker||h.symbol||h;
+        const sec = securitiesMap.get(sym)||securitiesMap.get(normalizeSymbol(sym));
+        const rawW = Number(h.weight)||0;
+        const weightPct = totalWeight>0?(rawW/totalWeight)*100:rawW;
+        const price = sec?.last_price ? Number(sec.last_price)/100 : 0;
+        const shares = Number(h.shares||h.quantity||1);
+        return {
+          sym, name:h.name||sec?.name||sym,
+          weight:rawW, weightPct,
+          logoUrl:sec?.logo_url||null,
+          change:sec?.change_percent!=null?Number(sec.change_percent):null,
+          mv:shares*price,
+        };
+      });
 
+      /* Estimate cash */
+      const minInv = strategy.min_investment || null;
+      const cashAmt = minInv ? minInv*0.08 : null;
+      holdingsWithMetrics.push({sym:'CASH',name:cashAmt?`Cash (${formatCurrency(cashAmt,strategy.base_currency||'ZAR')})`: 'Cash',weight:8,weightPct:8,logoUrl:null,change:null,mv:cashAmt||0});
+
+      /* Calendar returns from basket_value */
       const calendarData = {};
-      const createdYm = strategy.created_at ? strategy.created_at.slice(0, 7) : null;
-      if (stratRetRows && stratRetRows.length > 0) {
-        const monthlyLastValue = {};
-        stratRetRows.forEach(row => {
-          if (row.basket_value == null || !row.as_of_date) return;
-          const ym = row.as_of_date.slice(0, 7);
-          monthlyLastValue[ym] = Number(row.basket_value);
+      if (retRows && retRows.length>1) {
+        const monthlyLast = {};
+        retRows.forEach(r=>{
+          if(r.basket_value==null||!r.as_of_date) return;
+          const ym=r.as_of_date.slice(0,7);
+          monthlyLast[ym]=Number(r.basket_value);
         });
-        const sortedMonths = Object.keys(monthlyLastValue).sort();
-        for (let i = 1; i < sortedMonths.length; i++) {
-          const ym = sortedMonths[i];
-          if (createdYm && ym < createdYm) continue;
-          const prevYm = sortedMonths[i - 1];
-          if (createdYm && prevYm < createdYm) continue;
-          const [year, month] = ym.split('-');
-          const endVal = monthlyLastValue[ym];
-          const startVal = monthlyLastValue[prevYm];
-          if (startVal && startVal !== 0) {
-            if (!calendarData[year]) calendarData[year] = {};
-            calendarData[year][month] = (endVal / startVal) - 1;
+        const sortedM = Object.keys(monthlyLast).sort();
+        const createdYm = strategy.created_at?strategy.created_at.slice(0,7):null;
+        for(let i=1;i<sortedM.length;i++){
+          const ym=sortedM[i], prevYm=sortedM[i-1];
+          if(createdYm&&(ym<createdYm||prevYm<createdYm)) continue;
+          const [year,month]=ym.split('-');
+          const end=monthlyLast[ym], start=monthlyLast[prevYm];
+          if(start&&start!==0){
+            if(!calendarData[year]) calendarData[year]={};
+            calendarData[year][month]=(end/start)-1;
           }
         }
       }
-      const availableCalendarYears = Object.keys(calendarData).sort();
-      const currentCalendarYear = availableCalendarYears.length > 0 ? availableCalendarYears[availableCalendarYears.length - 1] : new Date().getFullYear().toString();
+      const calYears = Object.keys(calendarData).sort();
+      let currentCalYear = calYears.length>0?calYears[calYears.length-1]:new Date().getFullYear().toString();
 
-      const holdingsWithMetrics = holdings.map(h => {
-        const sym = h.ticker || h.symbol || h;
-        const sec = securitiesMap.get(sym) || securitiesMap.get(normalizeSymbol(sym));
-        const rawWeight = Number(h.weight) || 0;
-        const weightNorm = totalWeight > 0 ? (rawWeight / totalWeight) * 100 : rawWeight;
-        const price = sec?.last_price ? Number(sec.last_price) / 100 : 0;
-        const shares = Number(h.shares || h.quantity || 1);
-        const mv = shares * price;
-        const dailyChange = sec?.change_percent != null ? Number(sec.change_percent) : null;
-        return { symbol: sym, name: h.name || sec?.name || sym, weight: rawWeight, weightNorm, logoUrl: sec?.logo_url || null, dailyChange, shares, marketValue: mv };
+      const calCell=(m,v)=>{
+        if(v==null) return `<div class="cal-cell"><div class="m">${m}</div><div class="v" style="color:var(--text-mute)">—</div></div>`;
+        const cls=v>=0?'cal-pos':'cal-neg';
+        return `<div class="cal-cell ${cls}"><div class="m">${m}</div><div class="v">${v>=0?'+':''}${(v*100).toFixed(2)}%</div></div>`;
+      };
+      const renderCal = yr=>`<div class="cal-grid">${monthNames.map((m,i)=>calCell(m,(calendarData[yr]||{})[String(i+1).padStart(2,'0')])).join('')}</div>`;
+
+      /* Ticker cards */
+      const nonCash = holdingsWithMetrics.filter(h=>h.sym!=='CASH');
+      const tickerCards = nonCash.map(h=>`
+        <div class="ticker-card">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="h-logo" style="background:linear-gradient(135deg,rgba(139,92,246,0.2),rgba(99,102,241,0.1));color:#5b21b6">${h.logoUrl?`<img src="${h.logoUrl}" style="width:24px;height:24px;object-fit:contain;border-radius:4px;">`:h.sym.slice(0,2)}</div>
+            <div style="min-width:0">
+              <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px">${h.sym}</div>
+              <div style="font-size:10.5px;color:var(--text-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">${h.name}</div>
+            </div>
+          </div>
+          <div style="margin-top:12px">
+            ${h.change!=null?`<div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:${h.change>=0?'#34d399':'#fb7185'}">${h.change>=0?'+':''}${h.change.toFixed(2)}%</div>`:`<div style="font-size:13px;color:var(--text-mute)">—</div>`}
+            <div style="font-size:11px;color:var(--text-dim);margin-top:3px">${h.weightPct.toFixed(2)}% weight</div>
+          </div>
+        </div>`).join('');
+
+      $('detailView').innerHTML = `
+        <!-- Hero card -->
+        <div class="glass-card fade-in">
+          <div class="glass-card-inner">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap">
+              <div style="display:flex;gap:16px;align-items:center;min-width:0">
+                <div class="s-icon" style="width:54px;height:54px;border-radius:16px;font-size:18px;background:linear-gradient(135deg,${c0},${c1})">${initials}</div>
+                <div>
+                  <h1 class="hero-title">${strategy.name}</h1>
+                  <p style="margin:4px 0 0;color:var(--text-dim);font-size:13.5px">${(strategy.risk_level||'balanced')[0].toUpperCase()+(strategy.risk_level||'balanced').slice(1)} risk · ${strategy.sector||'Multi-asset'} · ${strategy.base_currency||'ZAR'}</p>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0">
+                <span class="pill ${riskPillCls(strategy.risk_level)}">${strategy.risk_level||'N/A'}</span>
+                <span class="pill pill-status-${strategy.status==='active'?'active':'draft'}">${strategy.status||'draft'}</span>
+                ${strategy.is_public?`<span class="pill pill-pub">Public</span>`:''}
+                ${strategy.is_featured?`<span class="pill pill-feat">★ Featured</span>`:''}
+              </div>
+            </div>
+
+            <div class="chart-wrap">${sparkForDetail?bigChartSVG(sparkForDetail):'<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-mute);font-size:12px;">No performance data available</div>'}</div>
+
+            <div style="display:flex;align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap">
+              ${['YTD','3M','6M','1Y','ALL'].map((t,i)=>`<button class="year-btn${i===0?' active':''}" style="pointer-events:none">${t}</button>`).join('')}
+            </div>
+
+            <div class="kpi-grid">
+              <div class="kpi"><div class="lbl">Holdings</div><div class="val">${holdings.length}</div></div>
+              <div class="kpi violet"><div class="lbl">Min. Investment</div><div class="val">${minInv?fmtMoney(minInv):'—'}</div></div>
+              <div class="kpi"><div class="lbl">YTD Return</div><div class="val" style="color:${isUp?'#34d399':'#fb7185'}">${fmtPct(ytdVal)}</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Daily change -->
+        ${nonCash.length>0?`
+        <div class="glass-card fade-in">
+          <div class="glass-card-inner">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <h2 style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;margin:0">Daily Change</h2>
+              <div style="font-size:11.5px;color:var(--text-mute)">Live data</div>
+            </div>
+            <div class="marquee-scroll" style="margin-top:16px;display:flex;gap:12px">${tickerCards}</div>
+          </div>
+        </div>`:''}
+
+        <!-- Description -->
+        <div class="glass-card fade-in">
+          <div class="glass-card-inner">
+            <h2 style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;margin:0 0 12px">Strategy Description</h2>
+            <p style="margin:0;color:var(--text-dim);font-size:13.5px;line-height:1.7">${strategy.description||'No description available.'}</p>
+            ${strategy.tags&&strategy.tags.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">${(strategy.tags||[]).map(t=>`<span style="padding:3px 10px;border-radius:999px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.15);font-size:11px;font-weight:600;color:#6d28d9">${t}</span>`).join('')}</div>`:''}
+          </div>
+        </div>
+
+        <!-- Holdings -->
+        ${holdingsWithMetrics.length>0?`
+        <div class="glass-card fade-in">
+          <div class="glass-card-inner">
+            <h2 style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;margin:0 0 4px">Portfolio Holdings</h2>
+            <p style="font-size:11.5px;color:var(--text-mute);margin:0 0 14px">${holdingsWithMetrics.length} assets including cash</p>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              ${holdingsWithMetrics.map(h=>`
+                <div class="holding-row">
+                  <div class="h-logo">${h.logoUrl?`<img src="${h.logoUrl}" style="width:24px;height:24px;object-fit:contain;border-radius:4px;">`:h.sym.slice(0,2)}</div>
+                  <div style="flex:1;min-width:0">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                      <div style="min-width:0">
+                        <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13.5px">${h.sym}</div>
+                        <div style="font-size:11px;color:var(--text-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px">${h.name}</div>
+                      </div>
+                      <div style="text-align:right;flex-shrink:0">
+                        <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13.5px">${h.weightPct.toFixed(2)}%</div>
+                        ${h.change!=null?`<div style="font-size:11px;font-weight:600;color:${h.change>=0?'#34d399':'#fb7185'}">${h.change>=0?'+':''}${h.change.toFixed(2)}%</div>`:''}
+                      </div>
+                    </div>
+                    <div class="h-bar"><div class="h-bar-fill" style="width:0%" data-w="${Math.min(h.weightPct*1.5,100)}"></div></div>
+                  </div>
+                </div>`).join('')}
+            </div>
+          </div>
+        </div>`:''}
+
+        <!-- Calendar returns -->
+        ${calYears.length>0?`
+        <div class="glass-card fade-in">
+          <div class="glass-card-inner">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+              <h2 style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;margin:0">Calendar Returns</h2>
+              <div style="display:flex;gap:6px" id="yearTabs">
+                ${calYears.map(y=>`<button class="year-btn${y===currentCalYear?' active':''}" data-yr="${y}">${y}</button>`).join('')}
+              </div>
+            </div>
+            <div id="calGrid">${renderCal(currentCalYear)}</div>
+          </div>
+        </div>`:''}
+
+        <!-- Fees -->
+        <div class="glass-card fade-in">
+          <div class="glass-card-inner">
+            <h2 style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;margin:0 0 14px">Fees &amp; Disclaimers</h2>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              ${[['Management fee','0.00% p.a.'],['Performance fee','20% of profits'],['Min. holding period','None'],['Settlement','T+2']].map(([l,v])=>`
+                <div style="padding:12px 14px;border-radius:13px;background:rgba(139,92,246,0.03);border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+                  <span style="font-size:12px;color:var(--text-dim)">${l}</span>
+                  <span style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13px;color:var(--text)">${v}</span>
+                </div>`).join('')}
+            </div>
+            <p style="margin-top:14px;font-size:11px;color:var(--text-mute);line-height:1.6">Past performance does not guarantee future results. All data is shown for informational purposes only and does not constitute financial advice. Investments may go up or down in value.</p>
+          </div>
+        </div>`;
+
+      /* Animate h-bar-fill after render */
+      requestAnimationFrame(()=>{
+        document.querySelectorAll('.h-bar-fill').forEach(b=>{ b.style.width=b.dataset.w+'%'; });
       });
 
-      const nonCashHoldings = holdingsWithMetrics.filter(h => h.symbol.toUpperCase() !== 'CASH');
-      const formattedCashAmount = cashAmount ? formatCurrency(cashAmount, strategy.base_currency || 'ZAR') : null;
-      nonCashHoldings.push({ symbol: 'CASH', name: formattedCashAmount ? `Cash (${formattedCashAmount})` : 'Cash', weight: 8, weightNorm: 8, logoUrl: null, dailyChange: null, shares: 0, marketValue: cashAmount || 0 });
+      /* Year tabs */
+      document.querySelectorAll('#yearTabs .year-btn').forEach(btn=>{
+        btn.onclick=()=>{
+          document.querySelectorAll('#yearTabs .year-btn').forEach(b=>b.classList.remove('active'));
+          btn.classList.add('active');
+          $('calGrid').innerHTML=renderCal(btn.dataset.yr);
+        };
+      });
+    }
 
-      const curves = analytics?.curves || {};
-      const availableTimeframes = ['1W','1M','3M','6M','YTD'].filter(key => Array.isArray(curves[key]) && curves[key].length > 0);
-      const hasChartData = availableTimeframes.length > 0;
+    /* ── Auth + load ── */
+    async function signOut() {
+      await supabaseClient.auth.signOut();
+      window.location.href = '/';
+    }
 
-      const cashIconSvg = `<svg class="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="currentColor"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>`;
-      const logoOrInitial = (h, size='w-8 h-8') => h.logoUrl ? `<img src="${h.logoUrl}" alt="${h.symbol}" class="w-full h-full object-cover" />` : h.symbol === 'CASH' ? cashIconSvg : `<span class="text-[10px] font-semibold text-slate-500">${(h.symbol || '').slice(0, 2)}</span>`;
+    (async () => {
+      const { data:{ session } } = await supabaseClient.auth.getSession();
+      if (!session) { window.location.href = '/'; return; }
 
-      let html = '';
+      const email = session.user?.email||'';
+      const el = $('sidebarEmail');
+      if(el) el.textContent = email;
+      const av = $('sidebarInitial');
+      if(av) av.textContent = email[0]?.toUpperCase()||'A';
+      document.documentElement.style.opacity='1';
 
-      html += `
-        <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <h1 class="text-2xl font-semibold text-slate-900">${strategy.name}</h1>
-              <p class="text-sm text-slate-500 mt-1">${strategy.risk_level || 'Balanced'} · ${strategy.sector || 'Multi-asset'} · ${strategy.base_currency || 'ZAR'}</p>
-            </div>
-            <div class="flex items-center gap-2 flex-shrink-0">
-              <span class="px-3 py-1 text-xs font-semibold rounded-full ${riskBadgeClass(strategy.risk_level)}">${strategy.risk_level || 'Unspecified'}</span>
-              <span class="px-3 py-1 text-xs font-semibold rounded-full ${strategy.status === 'active' ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500'}">${strategy.status || 'draft'}</span>
-            </div>
-          </div>
-          <div class="flex flex-wrap gap-2 mt-3">
-            ${(strategy.tags || []).map(tag => `<span class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">${tag}</span>`).join('')}
-            ${strategy.is_public ? '<span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">Public</span>' : ''}
-            ${strategy.is_featured ? '<span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">Featured</span>' : ''}
-          </div>
-          ${hasChartData ? `<div class="mt-5 h-48 w-full flex items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50"><p class="text-sm text-slate-400">Chart available on Mint platform</p></div>` : ''}
-          <div class="mt-4 grid grid-cols-3 gap-3">
-            <div class="bg-slate-50 rounded-xl p-3 text-center"><p class="text-[11px] text-slate-500">Holdings</p><p class="text-xl font-semibold text-slate-900">${holdings.length}</p></div>
-            <div class="bg-violet-50 rounded-xl p-3 text-center"><p class="text-[11px] text-violet-600">Min. Investment</p><p class="text-xl font-semibold text-violet-700">${minInvestment ? formatCurrency(minInvestment) : 'N/A'}</p></div>
-            <div class="bg-slate-50 rounded-xl p-3 text-center"><p class="text-[11px] text-slate-500">All-time Return</p><p class="text-xl font-semibold ${allTimeTextClass}">${formattedAllTimeReturn}</p></div>
-          </div>
-        </div>`;
+      /* Fetch strategies + investor counts */
+      const [{ data: strategies, error }, { data: holdingRows }] = await Promise.all([
+        supabaseClient.from('strategies_c')
+          .select('id,name,short_name,description,risk_level,sector,status,is_public,is_featured,holdings')
+          .order('name'),
+        supabaseClient.from('stock_holdings_c')
+          .select('strategy_id,user_id').eq('is_active',true).eq('trade_side','BUY'),
+      ]);
 
-      if (nonCashHoldings.length > 0) {
-        html += `
-        <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-          <div class="flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-900">Daily Change</h2>
-            ${analyticsTimestamp ? `<p class="text-xs text-slate-500">Updated ${new Date(analyticsTimestamp).toLocaleDateString()}</p>` : ''}
-          </div>
-          <div class="marquee-scroll mt-4 flex gap-3 pb-2">
-            ${nonCashHoldings.map(h => `
-              <div class="flex-shrink-0 w-48 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <div class="flex items-center gap-2">
-                  <div class="w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center overflow-hidden">${logoOrInitial(h)}</div>
-                  <div><p class="text-xs font-semibold text-slate-900">${h.symbol}</p><p class="text-[10px] text-slate-500 truncate max-w-[120px]">${h.name}</p></div>
-                </div>
-                <div class="mt-3 space-y-1">
-                  ${h.dailyChange != null ? `<p class="text-sm font-semibold ${h.dailyChange >= 0 ? 'text-emerald-600' : 'text-rose-600'}">${h.dailyChange >= 0 ? '+' : ''}${h.dailyChange.toFixed(2)}%</p>` : '<p class="text-sm font-semibold text-slate-400">Data unavailable</p>'}
-                  <p class="text-xs text-slate-600">${h.weightNorm.toFixed(2)}% weight</p>
-                </div>
-              </div>`).join('')}
-          </div>
-        </div>`;
+      if (error || !strategies) {
+        $('strategyContainer').innerHTML='<div style="text-align:center;padding:60px 0;color:var(--text-mute);font-size:14px;">No strategies available.</div>';
+        return;
       }
 
-      html += `
-        <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-          <div class="flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-900">Performance Summary</h2>
-          </div>
-          <div class="mt-4 grid grid-cols-2 gap-3">
-            ${performanceSummary.map(m => `
-              <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <p class="text-xs font-semibold text-slate-500">${m.label}</p>
-                <p class="mt-2 text-lg font-semibold text-slate-400">${m.value}</p>
-                <p class="mt-1 text-[11px] text-slate-400">${m.description}</p>
-              </div>`).join('')}
-          </div>
-        </div>`;
+      /* Investor counts */
+      const invSets = {};
+      (holdingRows||[]).forEach(r=>{
+        if(!r.strategy_id) return;
+        if(!invSets[r.strategy_id]) invSets[r.strategy_id]=new Set();
+        invSets[r.strategy_id].add(r.user_id);
+      });
+      strategies.forEach(s=>{ _investorCounts[s.id]=invSets[s.id]?invSets[s.id].size:0; });
 
-      if (strategy.description) {
-        html += `
-        <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-          <h2 class="text-base font-semibold text-slate-900">Strategy Description</h2>
-          <p class="mt-3 text-sm text-slate-600 leading-relaxed">${strategy.description}</p>
-        </div>`;
-      }
+      /* YTD + spark data */
+      try {
+        const ids = strategies.map(s=>s.id).filter(Boolean);
+        const { data: retRows } = await supabaseClient
+          .from('strategies_returns_c')
+          .select('strategy_id,ytd_pct,basket_value,as_of_date')
+          .in('strategy_id',ids)
+          .order('as_of_date',{ascending:true});
+        const latestYtd={}, sparks={};
+        (retRows||[]).forEach(r=>{
+          latestYtd[r.strategy_id]=r.ytd_pct;
+          if(!sparks[r.strategy_id]) sparks[r.strategy_id]=[];
+          if(r.basket_value!=null) sparks[r.strategy_id].push(Number(r.basket_value));
+        });
+        _ytdMap=latestYtd;
+        _sparkMap=sparks;
+      } catch(_){}
 
-      html += `
-        <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-          <h2 class="text-base font-semibold text-slate-900">Portfolio Holdings</h2>
-          <p class="mt-1 text-xs text-slate-500">${nonCashHoldings.length} asset${nonCashHoldings.length !== 1 ? 's' : ''} including cash</p>
-          <div class="mt-4 space-y-3">
-            ${nonCashHoldings.length > 0 ? nonCashHoldings.map(h => `
-              <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-lg border border-slate-200 bg-white flex items-center justify-center overflow-hidden shadow-sm flex-shrink-0">${logoOrInitial(h, 'w-9 h-9')}</div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-semibold text-slate-900">${h.symbol}</p>
-                  <p class="text-xs text-slate-500 truncate">${h.name}</p>
-                </div>
-                <div class="text-right flex-shrink-0">
-                  ${h.shares > 0 ? `<p class="text-xs text-slate-400">${h.shares} share${h.shares !== 1 ? 's' : ''}</p>` : ''}
-                  ${h.marketValue > 0 ? `<p class="text-xs text-slate-500">R ${h.marketValue.toFixed(2)}</p>` : ''}
-                </div>
-                <div class="text-right w-16 flex-shrink-0">
-                  <p class="text-sm font-semibold text-slate-900">${h.weightNorm.toFixed(2)}%</p>
-                  ${h.dailyChange != null ? `<p class="text-[11px] font-medium ${h.dailyChange >= 0 ? 'text-emerald-600' : 'text-rose-600'}">${h.dailyChange >= 0 ? '+' : ''}${h.dailyChange.toFixed(2)}%</p>` : ''}
-                </div>
-              </div>`).join('')
-            : '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">No holdings configured</div>'}
-          </div>
-        </div>`;
+      _allStrategies = strategies;
+      renderList();
 
-      html += `
-        <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-          <div class="flex items-center justify-between gap-4 mb-4">
-            <h2 class="text-base font-semibold text-slate-900">Calendar Returns</h2>
-          </div>
-          ${availableCalendarYears.length > 0 ? `
-            ${availableCalendarYears.length > 1 ? `<div class="flex flex-wrap gap-2 mb-4">${availableCalendarYears.map(year => `<button type="button" onclick="switchCalendarYear('${year}')" class="calendar-year-btn rounded-full px-3 py-1 text-xs font-semibold ${year === currentCalendarYear ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600'}" data-year="${year}">${year}</button>`).join('')}</div>` : ''}
-            <div id="calendarGrid">${renderCalendarGrid(calendarData, currentCalendarYear)}</div>
-          ` : `<p class="text-sm text-slate-400">—</p>`}
-        </div>`;
-
-      html += `
-        <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-          <h2 class="text-base font-semibold text-slate-900">Fees &amp; Disclaimers</h2>
-          <ul class="mt-3 space-y-2 text-xs text-slate-600">
-            <li>Management fee: 0% per annum</li>
-            <li>Performance fee: 20% of profits (if applicable)</li>
-            <li>Past performance does not guarantee future results</li>
-            <li>All data is for informational purposes only</li>
-          </ul>
-        </div>`;
-
-      document.getElementById('factsheetContent').innerHTML = html;
-      window._calendarData = calendarData;
-    };
-
-    window.addEventListener('DOMContentLoaded', async () => {
-      const { data } = await supabaseClient.auth.getSession();
-      if (!data.session) { window.location.href = '/signin.html'; return; }
-
-      document.documentElement.style.opacity = '1';
-
-      const email = data.session.user?.email || '';
-      const initials = email.slice(0, 1).toUpperCase();
-      const el = document.getElementById('sidebarAvatarInitials');
-      if (el) el.textContent = initials;
-      const emailEl = document.getElementById('sidebarUserEmail');
-      if (emailEl) emailEl.textContent = email;
-
-      document.getElementById('signOutBtn').onclick = async () => {
-        await supabaseClient.auth.signOut();
-        window.location.href = '/signin.html';
-      };
-
+      /* Deep-link to detail if ?id= */
       const params = new URLSearchParams(window.location.search);
-      const strategyId = params.get('id');
-      if (strategyId) {
-        await openFactsheet(strategyId);
-      } else {
-        await loadStrategyList();
+      const id = params.get('id');
+      if (id) {
+        const s = strategies.find(x=>x.id===id);
+        if(s) openDetail(id, s.name);
       }
-    });
+    })();
   </script>
-<div id="mintAppOverlay" style="display:none;position:fixed;inset:0;z-index:99998;background:#0f172a;">
-  <div style="position:absolute;top:0;left:0;right:0;height:44px;background:#0f172a;display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:1;">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <img src="/icon.png" style="width:22px;height:22px;border-radius:6px;" />
-      <span style="color:white;font-size:13px;font-weight:600;">Mint App</span>
-    </div>
-    <button onclick="mintAppClose()" style="background:#1e293b;color:#94a3b8;border:none;border-radius:8px;padding:5px 14px;cursor:pointer;font-size:12px;font-weight:500;">&#8592; Back to Admin</button>
-  </div>
-  <iframe id="mintAppFrame" src="" style="position:absolute;top:44px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 44px);border:none;background:white;" allowfullscreen></iframe>
-</div>
-<script>
-(function(){
-  var link=document.getElementById("teamNavLink");
-  if(!link)return;
-  var key=Object.keys(localStorage).find(function(k){return k.startsWith("sb-")&&k.endsWith("-auth-token");});
-  if(!key)return;
-  try{
-    var token=JSON.parse(localStorage.getItem(key))&&JSON.parse(localStorage.getItem(key)).access_token;
-    if(!token)return;
-    fetch("/api/team?action=me",{headers:{Authorization:"Bearer "+token}})
-      .then(function(r){return r.json();})
-      .then(function(d){if(d.role==="admin")link.style.display="";})
-      .catch(function(){});
-  }catch(e){}
-})();
-</script>
 </body>
 </html>
