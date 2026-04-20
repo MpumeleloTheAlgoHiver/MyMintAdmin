@@ -4326,13 +4326,20 @@
 
         // Keep active holdings and explicit rebalance event rows.
         // Hide inactive BUY rows that are old replaced bucket positions.
+        // Hide stock_holdings_c rows created by Fill & Settle (they belong
+        // in the settled-batch section of Closed Books, not in the live orderbook).
         const isActive = row.isActive !== false;
         const side = String(row.tradeSide || row.side || '').toUpperCase();
         const reason = String(row.closedReason || '').toUpperCase();
+
+        // Rows linked to a rebalance batch should NOT appear in the regular
+        // orderbook — they are already represented by the "Rebalance —" entry
+        // in Closed Books.  Only PENDING rebalance rows (handled above) belong
+        // in the live view.
+        if (row.rebalanceBatchId) return false;
+
         if (isActive) return true;
         if (side === 'SELL') return true;
-        if (side === 'BUY' && reason === 'REBALANCE_EVENT_BUY') return true;
-        if (side === 'BUY' && reason === 'REBALANCE_EVENT_BUY_WALLET') return true;
         return false;
       });
 
