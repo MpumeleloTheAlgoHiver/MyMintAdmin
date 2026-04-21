@@ -3421,6 +3421,12 @@
           const intradayPrice    = iv.current_price != null ? Number(iv.current_price) : null;
           const intradayChangeAbs= iv['1d_abs']     != null ? Number(iv['1d_abs'])     : null;
           const intradayChangePct= iv['1d_pct']     != null ? Number(iv['1d_pct'])     : null;
+          try {
+            const sym = (sr && sr.symbol) || (iv && iv.symbol) || '';
+            if (sym === 'VKE.JO' || sym === 'VOD.JO' || sym === 'NED.JO' || sym === 'PIK.JO') {
+              console.log('[price-debug]', sym, 'stock_returns_c.current_price=', sr.current_price, 'stock_intraday_c.current_price=', iv.current_price);
+            }
+          } catch(e){}
           _metricsMap[id] = {
             last_price:      sr.current_price != null ? Math.round(Number(sr.current_price)) : null,
             change_percent:  intradayChangePct,
