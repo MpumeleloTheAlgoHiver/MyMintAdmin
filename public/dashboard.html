@@ -3180,9 +3180,9 @@
         const results = await Promise.all(
           chunks.map(chunk =>
             supabaseClient.from('stock_intraday_c')
-              .select('security_id, current_price, 1d_abs, 1d_pct, as_of_date, updated_at')
+              .select('security_id, current_price, 1d_abs, 1d_pct, timestamp')
               .in('security_id', chunk)
-              .order('as_of_date', { ascending: false })
+              .order('timestamp', { ascending: false })
           )
         );
         results.forEach(({ data, error }) => {
