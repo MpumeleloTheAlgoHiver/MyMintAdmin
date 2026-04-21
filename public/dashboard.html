@@ -7459,13 +7459,24 @@
               .in("symbol", symbols);
             secMap = new Map();
             if (data) {
-              editStratReturns = await fetchStockReturnsBySec(data.map(s => s.id).filter(Boolean));
+              const _editIds = data.map(s => s.id).filter(Boolean);
+              const [stockRetMap, intradayMap] = await Promise.all([
+                fetchStockReturnsBySec(_editIds),
+                fetchIntradayBySec(_editIds),
+              ]);
+              editStratReturns = stockRetMap;
               data.forEach((s) => {
-                const sr = editStratReturns[s.id] || {};
+                const sr = stockRetMap[s.id] || {};
+                const iv = intradayMap[s.id] || {};
+                const intradayPrice = iv.current_price != null ? Number(iv.current_price) : null;
+                const intradayChangeAbs = iv['1d_abs'] != null ? Number(iv['1d_abs']) : null;
+                const intradayChangePct = iv['1d_pct'] != null ? Number(iv['1d_pct']) : null;
                 const merged = {
                   ...s,
                   last_price:       sr.current_price != null ? Math.round(Number(sr.current_price) * 100) : null,
-                  change_percent:   sr['1d_pct']  ?? null,
+                  change_percent:   intradayChangePct,
+                  change_abs:       intradayChangeAbs,
+                  prev_close:       intradayPrice,
                   w1_performance:   sr['5d_pct']  ?? null,
                   mtd_performance:  sr['1m_pct']  ?? null,
                   r_6m_performance: sr['6m_pct']  ?? null,
