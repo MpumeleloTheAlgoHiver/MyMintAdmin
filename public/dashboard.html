@@ -1708,8 +1708,8 @@
       const _HC = [
         { k:'last_close',     l:'Prev Close',        t:'Source: stock_returns_c.current_price', v:true,  isReturn:false },
         { k:'prev_close',     l:'Current Price',     t:'Source: stock_intraday_c.current_price', v:true,  isReturn:false },
-        { k:'change_abs',     l:'Day Change (R)',    t:'Source: change_abs',           v:false, isReturn:false },
-        { k:'change_pct',     l:'Day Change %',     t:'Source: stock_intraday_c.1d_abs ÷ 100', v:true,  isReturn:true  },
+        { k:'change_abs',     l:'Day Change (R)',    t:'Source: stock_intraday_c.1d_abs', v:false, isReturn:false },
+        { k:'change_pct',     l:'Day Change %',     t:'Source: stock_intraday_c.1d_pct', v:true,  isReturn:true  },
         { k:'mkt_value',      l:'Market Value',     t:'Shares × last_close',          v:true,  isReturn:false, isMv:true },
         { k:'1W_Return',      l:'1 Week %',         t:'Source: 1W_Return × 100',      v:false, isReturn:true  },
         { k:'1M_Return',      l:'1 Month %',        t:'Source: 1M_Return × 100',      v:true,  isReturn:true  },
@@ -3180,7 +3180,7 @@
         const results = await Promise.all(
           chunks.map(chunk =>
             supabaseClient.from('stock_intraday_c')
-              .select('security_id, current_price, 1d_abs, as_of_date, updated_at')
+              .select('security_id, current_price, 1d_abs, 1d_pct, as_of_date, updated_at')
               .in('security_id', chunk)
               .order('as_of_date', { ascending: false })
           )
@@ -3205,7 +3205,8 @@
           const sr = stockRetMap[secId] || {};
           const iv = intradayMap[secId] || {};
           const intradayPrice = iv.current_price != null ? Number(iv.current_price) : null;
-          const intradayChangePct = iv['1d_abs'] != null ? Number(iv['1d_abs']) / 100 : null;
+          const intradayChangeAbs = iv['1d_abs'] != null ? Number(iv['1d_abs']) : null;
+          const intradayChangePct = iv['1d_pct'] != null ? Number(iv['1d_pct']) : null;
           metricsMap[secId] = {
             last_price:       sr.current_price != null ? Math.round(Number(sr.current_price) * 100) : null,
             change_percent:   intradayChangePct,
@@ -3218,7 +3219,7 @@
             sr_all_pct:       sr['all_pct']    ?? null,
             wtd_performance:  null,
             m3_performance:   null,
-            change_abs:       null,
+            change_abs:       intradayChangeAbs,
             prev_close:       intradayPrice,
             last_close_rand:  sr.current_price ?? null,
             volatility_30d:   null,
