@@ -18,7 +18,7 @@ module.exports = async (req, res) => {
       const result = await requireAuth(req, res);
       if (!result) return;
       const { user, member } = result;
-      return sendJson(res, 200, { ok: true, email: user.email, role: member.role, page_permissions: member.page_permissions || [], idx: member.idx });
+      return sendJson(res, 200, { ok: true, email: user.email, role: member.role, page_access: member.page_access || [], id: member.id });
     }
     
     // LIST
@@ -35,13 +35,13 @@ module.exports = async (req, res) => {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
       const result = await requireAdmin(req, res);
       if (!result) return;
-      const { email, full_name, role = 'staff', page_permissions = [] } = req.body || {};
+      const { email, full_name, role = 'staff', page_access = [] } = req.body || {};
       if (!email) return sendJson(res, 400, { error: 'Email is required' });
       const existing = await supabaseRequest(`/rest/v1/admin_team?email=eq.${encodeURIComponent(email)}`);
       if (existing && existing.length > 0) return sendJson(res, 400, { error: 'User is already in team' });
       const [member] = await supabaseRequest('/rest/v1/admin_team', {
         method: 'POST',
-        body: { email, full_name: full_name || null, role, page_permissions: role === 'admin' ? [] : page_permissions, invited_by: result.user.id }
+        body: { email, full_name: full_name || null, role, page_access: role === 'admin' ? [] : page_access, invited_by: result.user.id }
       });
       await sendInviteEmail(email, full_name, result.user.email).catch(() => {});
       return sendJson(res, 200, { ok: true, member });
@@ -52,12 +52,12 @@ module.exports = async (req, res) => {
       if (req.method !== 'PUT' && req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
       const result = await requireAdmin(req, res);
       if (!result) return;
-      const { idx, role, page_permissions } = req.body || {};
-      if (!idx) return sendJson(res, 400, { error: 'idx is required' });
-      const [updated] = await supabaseRequest(`/rest/v1/admin_team?idx=eq.${idx}`, {
+      const { id, role, page_access } = req.body || {};
+      if (!id) return sendJson(res, 400, { error: 'id is required' });
+      const [updated] = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}`, {
         method: 'PATCH',
         headers: { 'Prefer': 'return=representation' },
-        body: { role, page_permissions: role === 'admin' ? [] : (page_permissions || []) }
+        body: { role, page_access: role === 'admin' ? [] : (page_access || []) }
       });
       return sendJson(res, 200, { ok: true, member: updated });
     }
@@ -67,10 +67,10 @@ module.exports = async (req, res) => {
       if (req.method !== 'DELETE') return sendJson(res, 405, { error: 'Method not allowed' });
       const result = await requireAdmin(req, res);
       if (!result) return;
-      const idx = req.body?.idx || url.searchParams.get('idx');
-      if (!idx) return sendJson(res, 400, { error: 'idx is required' });
-      if (String(idx) === String(result.member.idx)) return sendJson(res, 400, { error: 'Cannot remove yourself' });
-      await supabaseRequest(`/rest/v1/admin_team?idx=eq.${idx}`, { method: 'DELETE' });
+      const id = req.body?.id || url.searchParams.get('id');
+      if (!id) return sendJson(res, 400, { error: 'id is required' });
+      if (String(id) === String(result.member.id)) return sendJson(res, 400, { error: 'Cannot remove yourself' });
+      await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}`, { method: 'DELETE' });
       return sendJson(res, 200, { ok: true });
     }
     

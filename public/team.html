@@ -216,7 +216,7 @@
     ];
 
     let currentToken = null;
-    let myMemberIdx = null;
+    let myMemberId = null;
 
     const authHeaders = () => ({ 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' });
 
@@ -261,8 +261,8 @@
         return;
       }
       body.innerHTML = members.map(m => {
-        const isSelf = m.idx === myMemberIdx;
-        const perms = m.page_permissions || [];
+        const isSelf = m.id === myMemberId;
+        const perms = m.page_access || [];
         const pages = m.role === 'admin'
           ? '<span class="badge badge-admin">All pages</span>'
           : (perms.length
@@ -278,8 +278,8 @@
             <td>${pages}</td>
             <td>
               <div class="td-actions">
-                <button class="btn btn-sm btn-ghost" onclick="openEdit(${m.idx},'${m.role}',${JSON.stringify(perms)})">Edit</button>
-                ${isSelf ? '' : `<button class="btn btn-sm btn-danger" onclick="removeMember(${m.idx},'${m.full_name || m.email}')">Remove</button>`}
+                <button class="btn btn-sm btn-ghost" onclick="openEdit('${m.id}','${m.role}',${JSON.stringify(perms)})">Edit</button>
+                ${isSelf ? '' : `<button class="btn btn-sm btn-danger" onclick="removeMember('${m.id}','${m.full_name || m.email}')">Remove</button>`}
               </div>
             </td>
           </tr>
@@ -328,7 +328,7 @@
       const email = document.getElementById('inviteEmail').value.trim();
       const full_name = document.getElementById('inviteName').value.trim();
       const role = document.getElementById('inviteRole').value;
-      const page_permissions = role === 'staff' ? getCheckedPages('invitePageGrid') : [];
+      const page_access = role === 'staff' ? getCheckedPages('invitePageGrid') : [];
 
       if (!email) { alert('Email is required'); return; }
 
@@ -336,7 +336,7 @@
       btn.textContent = 'Sending…';
       btn.disabled = true;
 
-      const data = await api('POST', '/api/team?action=invite', { email, full_name, role, page_permissions });
+      const data = await api('POST', '/api/team?action=invite', { email, full_name, role, page_access });
       btn.textContent = 'Send Invite';
       btn.disabled = false;
 
@@ -349,10 +349,10 @@
     });
 
     // Edit modal
-    window.openEdit = (idx, role, page_permissions) => {
-      document.getElementById('editMemberId').value = idx;
+    window.openEdit = (id, role, page_access) => {
+      document.getElementById('editMemberId').value = id;
       document.getElementById('editRole').value = role;
-      buildPageGrid('editPageGrid', page_permissions);
+      buildPageGrid('editPageGrid', page_access);
       document.getElementById('editPageAccessSection').style.display = role === 'staff' ? 'block' : 'none';
       document.getElementById('editOverlay').classList.add('open');
     };
@@ -367,15 +367,15 @@
     });
 
     document.getElementById('editSubmitBtn').addEventListener('click', async () => {
-      const idx = parseInt(document.getElementById('editMemberId').value, 10);
+      const id = document.getElementById('editMemberId').value;
       const role = document.getElementById('editRole').value;
-      const page_permissions = role === 'staff' ? getCheckedPages('editPageGrid') : [];
+      const page_access = role === 'staff' ? getCheckedPages('editPageGrid') : [];
 
       const btn = document.getElementById('editSubmitBtn');
       btn.textContent = 'Saving…';
       btn.disabled = true;
 
-      const data = await api('PATCH', '/api/team?action=update', { idx, role, page_permissions });
+      const data = await api('PATCH', '/api/team?action=update', { id, role, page_access });
       btn.textContent = 'Save Changes';
       btn.disabled = false;
 
@@ -388,9 +388,9 @@
     });
 
     // Remove
-    window.removeMember = async (idx, name) => {
+    window.removeMember = async (id, name) => {
       if (!confirm(`Remove ${name} from the team?`)) return;
-      const data = await api('DELETE', '/api/team?action=remove', { idx });
+      const data = await api('DELETE', '/api/team?action=remove', { id });
       if (data.ok) {
         await loadTeam();
       } else {
@@ -420,7 +420,7 @@
         window.location.href = '/index.html';
         return;
       }
-      myMemberIdx = me.idx || null;
+      myMemberId = me.id || null;
 
       await loadTeam();
     })();
