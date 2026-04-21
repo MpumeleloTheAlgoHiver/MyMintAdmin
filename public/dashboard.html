@@ -3185,10 +3185,15 @@
               .order('timestamp', { ascending: false })
           )
         );
+        let _err = null;
+        let _rows = 0;
         results.forEach(({ data, error }) => {
-          if (error || !data) return;
+          if (error) { _err = error; return; }
+          if (!data) return;
+          _rows += data.length;
           data.forEach(r => { if (!map[r.security_id]) map[r.security_id] = r; });
         });
+        try { console.log('[intraday] secIds=' + secIds.length + ' rows=' + _rows + ' mapped=' + Object.keys(map).length, _err ? ('ERR=' + JSON.stringify(_err)) : ''); } catch(e) {}
         return map;
       };
 
