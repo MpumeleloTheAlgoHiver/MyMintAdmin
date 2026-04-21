@@ -3175,25 +3175,26 @@
       const fetchIntradayBySec = async (secIds) => {
         if (!secIds || !secIds.length) return {};
         const map = {};
-        const chunks = [];
-        for (let i = 0; i < secIds.length; i += 50) chunks.push(secIds.slice(i, i + 50));
-        const results = await Promise.all(
-          chunks.map(chunk =>
-            supabaseClient.from('stock_intraday_c')
-              .select('security_id, current_price, 1d_abs, 1d_pct, timestamp')
-              .in('security_id', chunk)
-              .order('timestamp', { ascending: false })
-          )
-        );
+        const uniqIds = [...new Set(secIds.filter(Boolean))];
+        const CONCURRENCY = 8;
         let _err = null;
-        let _rows = 0;
-        results.forEach(({ data, error }) => {
-          if (error) { _err = error; return; }
-          if (!data) return;
-          _rows += data.length;
-          data.forEach(r => { if (!map[r.security_id]) map[r.security_id] = r; });
-        });
-        try { console.log('[intraday] secIds=' + secIds.length + ' rows=' + _rows + ' mapped=' + Object.keys(map).length, _err ? ('ERR=' + JSON.stringify(_err)) : ''); } catch(e) {}
+        let i = 0;
+        const worker = async () => {
+          while (i < uniqIds.length) {
+            const myIdx = i++;
+            const id = uniqIds[myIdx];
+            const { data, error } = await supabaseClient
+              .from('stock_intraday_c')
+              .select('security_id, current_price, 1d_abs, 1d_pct, timestamp')
+              .eq('security_id', id)
+              .order('timestamp', { ascending: false })
+              .limit(1);
+            if (error) { _err = error; continue; }
+            if (data && data[0]) map[id] = data[0];
+          }
+        };
+        await Promise.all(Array.from({ length: Math.min(CONCURRENCY, uniqIds.length) }, () => worker()));
+        try { console.log('[intraday] secIds=' + uniqIds.length + ' mapped=' + Object.keys(map).length, _err ? ('ERR=' + JSON.stringify(_err)) : ''); } catch(e) {}
         return map;
       };
 
