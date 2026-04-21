@@ -1952,6 +1952,78 @@
             listEl.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No ${tab.toUpperCase()} data available</div>`;
             return;
           }
+
+          /* If a specific strategy is selected → show its assets ranked by IN-STRATEGY contribution
+             contribution = (holding.weight / 100) * asset_period_return
+             - Asset return: stock_returns_c[<period>_pct] (cached in _returnInsightsData via fieldMap)
+             - Weight: strategy holding weight from allStrategiesFullData                                  */
+          if (_riSelectedStratId) {
+            const assetField = ({
+              '1d':'change_percent','5d':'w1_performance','1m':'mtd_performance','6m':'r_6m_performance',
+              ytd:'ytd_performance','1y':'r_1y_performance','5y':'sr_5y_pct',all:'sr_all_pct',
+            })[tab];
+            const strat = (allStrategiesFullData || []).find(s => String(s.id) === _riSelectedStratId);
+            const holdings = (strat && Array.isArray(strat.holdings)) ? strat.holdings : [];
+            const dataBySym = {};
+            (_returnInsightsData || []).forEach(a => { dataBySym[a.symbol] = a; });
+            const wSum = holdings.reduce((acc, h) => acc + (Number(h.weight) || 0), 0) || 1;
+            const sAll = holdings.map(h => {
+              const sym = h.ticker || h.symbol || '';
+              const a   = dataBySym[sym] || {};
+              const r   = a[assetField] != null ? Number(a[assetField]) : null;
+              const w   = Number(h.weight) || 0;             /* may be 0..1 or 0..100 */
+              const wPct= wSum > 1.5 ? (w / 100) : w;        /* normalize to fraction */
+              const contrib = (r != null) ? (r * wPct) : null;
+              return { id: sym, name: sym.replace('.JO',''), logo_url: a.logo_url || null, _val: contrib };
+            }).filter(x => x._val != null).sort((a, b) => b._val - a._val);
+
+            if (!sAll.length) {
+              listEl.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No ${tab.toUpperCase()} data for this strategy's assets</div>`;
+              return;
+            }
+            const sGainers = sAll.filter(x => x._val >= 0).slice(0, 4);
+            const sLosers  = [...sAll].reverse().filter(x => x._val <= 0).slice(0, 4);
+            const sMaxG = Math.max(...sGainers.map(x => x._val), 0.001);
+            const sMaxL = Math.max(...sLosers.map(x => Math.abs(x._val)), 0.001);
+            const buildSRow = (x, rank, isG) => {
+              const val = x._val;
+              const valStr = (val >= 0 ? '+' : '') + val.toFixed(2) + '%';
+              const barPct = Math.round((Math.abs(val) / (isG ? sMaxG : sMaxL)) * 100);
+              const init = (x.name || 'A').slice(0, 2).toUpperCase();
+              const logoEl = x.logo_url
+                ? `<img src="${x.logo_url}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;border:1px solid #e2e8f0;flex-shrink:0;" onerror="this.outerHTML='<div style=\\'width:26px;height:26px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#7c3aed;\\'>${init}</div>'">`
+                : `<div style="width:26px;height:26px;border-radius:50%;background:${isG ? '#dcfce7' : '#fee2e2'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:${isG ? '#16a34a' : '#dc2626'};flex-shrink:0;">${init}</div>`;
+              return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;margin-bottom:2px;">
+                <span style="font-size:10px;color:#cbd5e1;font-weight:700;width:14px;text-align:center;flex-shrink:0;">${rank}</span>
+                ${logoEl}
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:11px;font-weight:700;color:#0f172a;">${x.name}</div>
+                  <div style="height:3px;background:#f1f5f9;border-radius:4px;margin-top:3px;overflow:hidden;">
+                    <div style="height:100%;width:${barPct}%;background:${isG ? '#86efac' : '#fca5a5'};border-radius:4px;transition:width 0.4s ease;"></div>
+                  </div>
+                </div>
+                <span style="font-size:12px;font-weight:800;color:${isG ? '#16a34a' : '#dc2626'};flex-shrink:0;">${valStr}</span>
+              </div>`;
+            };
+            let html = '';
+            if (sGainers.length) {
+              html += `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px 4px;margin-top:2px;">
+                <div style="width:6px;height:6px;border-radius:50%;background:#16a34a;flex-shrink:0;"></div>
+                <span style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:0.06em;">Top Contributors</span>
+              </div>`;
+              html += sGainers.map((x, i) => buildSRow(x, i + 1, true)).join('');
+            }
+            if (sLosers.length) {
+              html += `<div style="display:flex;align-items:center;gap:6px;padding:8px 8px 4px;margin-top:4px;border-top:1px solid #f1f5f9;">
+                <div style="width:6px;height:6px;border-radius:50%;background:#dc2626;flex-shrink:0;"></div>
+                <span style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:0.06em;">Top Detractors</span>
+              </div>`;
+              html += sLosers.map((x, i) => buildSRow(x, i + 1, false)).join('');
+            }
+            listEl.innerHTML = html;
+            return;
+          }
+
           const strategies = (typeof allStrategiesFullData !== 'undefined' && Array.isArray(allStrategiesFullData)) ? allStrategiesFullData : [];
           const sAll = strategies.map(s => {
             const row = strategyReturnsMap.get(String(s.id)) || {};
@@ -2095,6 +2167,7 @@
       /* ── Return Insights view-mode state ── */
       let _riViewMode     = 'assets'; /* 'assets' | 'strategy' */
       let _riFilterSymbols = null;    /* Set<string> of symbols when mode = strategy */
+      let _riSelectedStratId = null;  /* selected strategy id when in strategy mode */
 
       window.toggleRiViewMenu = (e) => {
         e.stopPropagation();
@@ -2126,12 +2199,15 @@
       window.setRiStrategy = (stratId) => {
         if (!stratId) {
           _riFilterSymbols = null;
+          _riSelectedStratId = null;
         } else {
           const strat = (allStrategiesFullData || []).find(s => String(s.id) === String(stratId));
           if (strat && Array.isArray(strat.holdings) && strat.holdings.length) {
             _riFilterSymbols = new Set(strat.holdings.map(h => h.ticker || h.symbol || '').filter(Boolean));
+            _riSelectedStratId = String(stratId);
           } else {
             _riFilterSymbols = null;
+            _riSelectedStratId = null;
           }
         }
         _renderReturnInsights(_activeReturnTab);
