@@ -486,7 +486,7 @@
           let tv=0,tc=0;
           const fh=holdings.filter(h=>secMap[h.security_id]).map(h=>{
             const sec=secMap[h.security_id],qty=Number(h.quantity||0),af=Number(h.avg_fill||0),ip=!af;
-            const lp=Number(sec.last_price||af),mv=(lp*qty)/100,cb=(af*qty)/100,pr=mv-cb,pp=cb>0?(pr/cb)*100:0;
+            const lp=Number(sec.last_price||af),mv=(lp*qty),cb=(af*qty),pr=mv-cb,pp=cb>0?(pr/cb)*100:0;
             if(!ip){tv+=mv;tc+=cb;}
             return {symbol:sec.symbol,name:sec.name,logo:sec.logo_url||'',value:mv,pnlRands:pr,pnlPct:pp,isPending:ip,strategyId:h.strategy_id};
           }).sort((a,b)=>b.value-a.value);

@@ -263,7 +263,7 @@
         const sec = securitiesMap.get(sym) || securitiesMap.get(normalizeSymbol(sym));
         if (sec?.last_price != null) {
           const shares = Number(h.shares || h.quantity || 1);
-          total += shares * (Number(sec.last_price) / 100);
+          total += shares * (Number(sec.last_price));
           matched++;
         }
       }
@@ -347,11 +347,11 @@
       if (analytics?.latest_value != null) {
         const latestVal = Number(analytics.latest_value);
         if (latestVal > 50 && latestVal < 200) {
-          allTimeReturn = (latestVal / 100) - 1;
+          allTimeReturn = (latestVal) - 1;
         } else if (latestVal >= -1 && latestVal <= 1) {
           allTimeReturn = latestVal;
         } else {
-          allTimeReturn = (latestVal / 100) - 1;
+          allTimeReturn = (latestVal) - 1;
         }
       }
       if (allTimeReturn == null && analytics?.ytd_return != null) {
@@ -404,7 +404,7 @@
         const sec = securitiesMap.get(sym) || securitiesMap.get(normalizeSymbol(sym));
         const rawWeight = Number(h.weight) || 0;
         const weightNorm = totalWeight > 0 ? (rawWeight / totalWeight) * 100 : rawWeight;
-        const price = sec?.last_price ? Number(sec.last_price) / 100 : 0;
+        const price = sec?.last_price ? Number(sec.last_price) : 0;
         const shares = Number(h.shares || h.quantity || 1);
         const mv = shares * price;
         const dailyChange = sec?.change_percent != null ? Number(sec.change_percent) : null;
@@ -929,7 +929,7 @@
         const sec = securitiesMap.get(sym) || securitiesMap.get(normalizeSymbol(sym));
         if (sec?.last_price != null) {
           const shares = Number(h.shares || h.quantity || 1);
-          total += shares * (Number(sec.last_price) / 100);
+          total += shares * (Number(sec.last_price));
           matched++;
         }
       }
@@ -1013,11 +1013,11 @@
       if (analytics?.latest_value != null) {
         const latestVal = Number(analytics.latest_value);
         if (latestVal > 50 && latestVal < 200) {
-          allTimeReturn = (latestVal / 100) - 1;
+          allTimeReturn = (latestVal) - 1;
         } else if (latestVal >= -1 && latestVal <= 1) {
           allTimeReturn = latestVal;
         } else {
-          allTimeReturn = (latestVal / 100) - 1;
+          allTimeReturn = (latestVal) - 1;
         }
       }
       if (allTimeReturn == null && analytics?.ytd_return != null) {
@@ -1070,7 +1070,7 @@
         const sec = securitiesMap.get(sym) || securitiesMap.get(normalizeSymbol(sym));
         const rawWeight = Number(h.weight) || 0;
         const weightNorm = totalWeight > 0 ? (rawWeight / totalWeight) * 100 : rawWeight;
-        const price = sec?.last_price ? Number(sec.last_price) / 100 : 0;
+        const price = sec?.last_price ? Number(sec.last_price) : 0;
         const shares = Number(h.shares || h.quantity || 1);
         const mv = shares * price;
         const dailyChange = sec?.change_percent != null ? Number(sec.change_percent) : null;

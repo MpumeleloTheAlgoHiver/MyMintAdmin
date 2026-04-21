@@ -1954,7 +1954,7 @@
           }
 
           /* If a specific strategy is selected → show its assets ranked by IN-STRATEGY contribution
-             contribution = (holding.weight / 100) * asset_period_return
+             contribution = (holding.weight) * asset_period_return
              - Asset return: stock_returns_c[<period>_pct] (cached in _returnInsightsData via fieldMap)
              - Weight: strategy holding weight from allStrategiesFullData                                  */
           if (_riSelectedStratId) {
@@ -1972,7 +1972,7 @@
               const a   = dataBySym[sym] || {};
               const r   = a[assetField] != null ? Number(a[assetField]) : null;
               const w   = Number(h.weight) || 0;             /* may be 0..1 or 0..100 */
-              const wPct= wSum > 1.5 ? (w / 100) : w;        /* normalize to fraction */
+              const wPct= wSum > 1.5 ? (w) : w;        /* normalize to fraction */
               const contrib = (r != null) ? (r * wPct) : null;
               return { id: sym, name: sym.replace('.JO',''), logo_url: a.logo_url || null, _val: contrib };
             }).filter(x => x._val != null).sort((a, b) => b._val - a._val);
@@ -3089,7 +3089,7 @@
 
         const items = (strategies || []).map((strategy, index) => ({
           name: strategy.short_name || strategy.name || `Strategy ${index + 1}`,
-          value: Math.max(Number(strategy.min_investment || 0) / 100, 0),
+          value: Math.max(Number(strategy.min_investment || 0), 0),
           currency: strategy.base_currency || "ZAR",
           risk: (strategy.risk_level || "unspecified").toLowerCase(),
           sector: strategy.sector || null,
@@ -3178,9 +3178,9 @@
               fontSize: 11,
               formatter: (v) =>
                 v >= 1000000
-                  ? `${v / 1000000}M`
+                  ? `${v0000}M`
                   : v >= 5000
-                    ? `${v / 1000}k`
+                    ? `${v0}k`
                     : String(v),
             },
           },
@@ -3232,7 +3232,7 @@
           const security =
             securitiesMap.get(symbol) || securitiesMap.get(normalizedSym);
           if (security && security.last_price != null) {
-            const price = Number(security.last_price) / 100;
+            const price = Number(security.last_price);
             if (!price || price <= 0 || !isFinite(price)) continue;
             const shares = Number(holding.shares || holding.quantity || 1);
             total += shares * price;
@@ -3347,11 +3347,11 @@
         allIds.forEach((secId) => {
           const sr = stockRetMap[secId] || {};
           const iv = intradayMap[secId] || {};
-          const intradayPrice = iv.current_price != null ? Number(iv.current_price) : null;
-          const intradayChangeAbs = iv['1d_abs'] != null ? Number(iv['1d_abs']) : null;
+          const intradayPrice = iv.current_price != null ? Number(iv.current_price) / 100 : null;
+          const intradayChangeAbs = iv['1d_abs'] != null ? Number(iv['1d_abs']) / 100 : null;
           const intradayChangePct = iv['1d_pct'] != null ? Number(iv['1d_pct']) : null;
           metricsMap[secId] = {
-            last_price:       sr.current_price != null ? Math.round(Number(sr.current_price) * 100) : null,
+            last_price:       sr.current_price != null ? Number(sr.current_price) / 100 : null,
             change_percent:   intradayChangePct,
             ytd_performance:  sr.ytd_pct       ?? null,
             mtd_performance:  sr['1m_pct']     ?? null,
@@ -3418,11 +3418,11 @@
         _allMetricIds.forEach((id) => {
           const sr = _stockRetMap[id] || {};
           const iv = _intradayMap[id] || {};
-          const intradayPrice    = iv.current_price != null ? Number(iv.current_price) : null;
-          const intradayChangeAbs= iv['1d_abs']     != null ? Number(iv['1d_abs'])     : null;
+          const intradayPrice    = iv.current_price != null ? Number(iv.current_price) / 100 : null;
+          const intradayChangeAbs= iv['1d_abs']     != null ? Number(iv['1d_abs']) / 100     : null;
           const intradayChangePct= iv['1d_pct']     != null ? Number(iv['1d_pct'])     : null;
           _metricsMap[id] = {
-            last_price:      sr.current_price != null ? Math.round(Number(sr.current_price) * 100) : null,
+            last_price:      sr.current_price != null ? Number(sr.current_price) / 100 : null,
             change_percent:  intradayChangePct,
             change_abs:      intradayChangeAbs,
             prev_close:      intradayPrice,
@@ -3513,7 +3513,7 @@
             <p class="text-xs text-slate-400">${s._sym}</p>
           </div>
           <div class="text-right flex-shrink-0">
-            <p class="text-xs font-medium text-slate-700">${s.last_price ? "R " + (Number(s.last_price) / 100).toFixed(2) : "N/A"}</p>
+            <p class="text-xs font-medium text-slate-700">${s.last_price ? "R " + (Number(s.last_price)).toFixed(2) : "N/A"}</p>
             <p class="text-[10px] ${s._hasHoldings ? "text-violet-600" : "text-slate-400"}">${s._hasHoldings ? s._totalShares.toLocaleString() + " shares" : "No data"}</p>
           </div>
         </button>
@@ -3576,7 +3576,7 @@
       const recalculate = () => {
         let totalMarketValue = 0;
         formHoldings.forEach((h) => {
-          const price = h.last_price ? Number(h.last_price) / 100 : 0;
+          const price = h.last_price ? Number(h.last_price) : 0;
           h.market_value = h.shares * price;
           totalMarketValue += h.market_value;
         });
@@ -3626,13 +3626,13 @@
       };
       const fmtPrice = (val) => {
         if (val == null || isNaN(val)) return "—";
-        return "R " + (Number(val) / 100).toFixed(2);
+        return "R " + (Number(val)).toFixed(2);
       };
 
       /* ── Per-column sort value extractor ───────────────────────────── */
       const _hcSortVal = (k, h) => {
         switch (k) {
-          case 'last_close':     return h.last_price ? h.last_price / 100 : 0;
+          case 'last_close':     return h.last_price ? h.last_price : 0;
           case 'prev_close':     return h.prev_close || 0;
           case 'change_abs':     return h.change_abs || 0;
           case 'change_pct':     return h.change_percent || 0;
@@ -3663,7 +3663,7 @@
         };
         switch (k) {
           case 'last_close':
-            return `<span style="font-size:13px;font-weight:500;color:#334155;">${h.last_price ? 'R ' + (h.last_price / 100).toFixed(2) : '—'}</span>`;
+            return `<span style="font-size:13px;font-weight:500;color:#334155;">${h.last_price ? 'R ' + (h.last_price).toFixed(2) : '—'}</span>`;
           case 'prev_close':
             return `<span style="font-size:12px;color:#64748b;">${h.prev_close != null ? 'R ' + Number(h.prev_close).toFixed(2) : '—'}</span>`;
           case 'change_abs': {
@@ -4131,7 +4131,7 @@
               ? securitiesMap.get(sym) ||
                 securitiesMap.get(normalizeSymbol(sym))
               : null;
-            const price = sec?.last_price ? Number(sec.last_price) / 100 : 0;
+            const price = sec?.last_price ? Number(sec.last_price) : 0;
             const shares = Number(h.shares || h.quantity || 1);
             const mv = shares * price;
             const weightNorm =
@@ -4879,7 +4879,7 @@
               const sr = _sm[s.id] || {};
               const merged = {
                 ...s,
-                last_price:      sr.current_price != null ? Math.round(Number(sr.current_price) * 100) : null,
+                last_price:      sr.current_price != null ? Number(sr.current_price) / 100 : null,
                 change_percent:  sr['1d_pct']     ?? null,
                 ytd_performance: sr['ytd_pct']    ?? null,
                 w1_performance:  sr['5d_pct']     ?? null,
@@ -4914,7 +4914,7 @@
           const rawWeight = Number(h.weight) || 0;
           const weightNorm =
             totalWeight > 0 ? (rawWeight / totalWeight) * 100 : rawWeight;
-          const price = sec?.last_price ? Number(sec.last_price) / 100 : 0;
+          const price = sec?.last_price ? Number(sec.last_price) : 0;
           const shares = Number(h.shares || h.quantity || 1);
           const mv = shares * price;
           const dailyChange =
@@ -5582,21 +5582,21 @@
           (secRows || []).forEach(s => {
             if (_seenSec.has(s.security_id)) return;
             _seenSec.add(s.security_id);
-            secPriceMap[s.security_id] = s.current_price != null ? Math.round(Number(s.current_price) * 100) : 0;
+            secPriceMap[s.security_id] = s.current_price != null ? Number(s.current_price) / 100 : 0;
           });
         }
 
-        /* Compute AUM from live prices (qty × last_price / 100) or fall back to cost basis */
+        /* Compute AUM from live prices (qty × last_price) or fall back to cost basis */
         let totalAum = 0;
         investRows.forEach(r => {
           const qty = Number(r.quantity) || 0;
           const lp  = secPriceMap[r.security_id] || 0;
           if (lp > 0) {
-            totalAum += (qty * lp) / 100;
+            totalAum += (qty * lp);
           } else {
             let fill = Number(r.avg_fill) || 0;
             if (fill * qty > 10 * (Number(r.market_value) || 0) && Number(r.market_value) > 0) fill /= 100;
-            totalAum += (fill * qty) / 100;
+            totalAum += (fill * qty);
           }
         });
 
@@ -5913,7 +5913,7 @@
           const updated = items.map(item => {
             if (Math.random() < 0.25 && item.price != null) {
               const delta = (Math.random() - 0.5) * 0.4;
-              return { ...item, price: +(item.price * (1 + delta / 100)).toFixed(2), change: item.change != null ? +(item.change + delta * 0.1).toFixed(2) : null };
+              return { ...item, price: +(item.price * (1 + delta)).toFixed(2), change: item.change != null ? +(item.change + delta * 0.1).toFixed(2) : null };
             }
             return item;
           });
@@ -5960,7 +5960,7 @@
             return {
               sym:    (s.symbol || '').replace('.JO', ''),
               logo:   s.logo_url || null,
-              price:  sr.current_price != null ? Number(sr.current_price) : null,
+              price:  sr.current_price != null ? Number(sr.current_price) / 100 : null,
               change: sr['1d_pct']     != null ? Number(sr['1d_pct'])     : null,
             };
           }).filter(item => item.sym);
@@ -6003,8 +6003,8 @@
           for (let d = new Date(soy); d <= now; d.setDate(d.getDate() + 1)) {
             if (d.getDay() === 0 || d.getDay() === 6) continue;
             stratDates.push(d.toISOString().split('T')[0]);
-            sv *= (1 + (Math.random() - 0.46) * 1.5 / 100);
-            bv *= (1 + (Math.random() - 0.48) * 1.2 / 100);
+            sv *= (1 + (Math.random() - 0.46) * 1.5);
+            bv *= (1 + (Math.random() - 0.48) * 1.2);
             stratVals.push(+(sv - 100).toFixed(2));
             benchVals.push(+(bv - 100).toFixed(2));
           }
@@ -6132,7 +6132,7 @@
         const enriched = holdings.map(h => {
           const sym   = h.ticker || h.symbol || (typeof h === 'string' ? h : '');
           const sec   = secMap.get(sym) || secMap.get(normalizeSymbol(sym));
-          const price = sec?.last_price != null ? Number(sec.last_price) / 100 : null;
+          const price = sec?.last_price != null ? Number(sec.last_price) : null;
           const qty   = Number(h.shares || h.quantity || 0);
           const mv    = price != null && qty > 0 ? qty * price : null;
           const change = sec?.change_percent != null ? Number(sec.change_percent) : null;
@@ -6213,10 +6213,10 @@
           let fill = Number(r.avg_fill) || 0;
           const mv = Number(r.market_value) || 0;
           if (fill * qty > 10 * mv && mv > 0) fill /= 100;
-          byUser[uid].costBasis += (fill * qty) / 100;
+          byUser[uid].costBasis += (fill * qty);
           /* Live current value: qty × last_price (cents → rands) */
           const lp = secPriceMap[r.security_id] || 0;
-          if (lp > 0) byUser[uid].currentVal += (qty * lp) / 100;
+          if (lp > 0) byUser[uid].currentVal += (qty * lp);
           if (r.created_at && new Date(r.created_at) < new Date(byUser[uid].inception))
             byUser[uid].inception = r.created_at;
         });
@@ -7241,10 +7241,10 @@
 
           row.innerHTML = display.map((s) => {
             const ticker = (s.symbol || "").replace(".JO", "");
-            const rawPrice = s.last_price ? s.last_price / 100 : null;
+            const rawPrice = s.last_price ? s.last_price : null;
             const price = rawPrice !== null ? rawPrice.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
             const chgVal = typeof s.change_percent === "number" ? s.change_percent : null;
-            const absChange = rawPrice !== null && chgVal !== null ? (rawPrice * chgVal) / 100 : null;
+            const absChange = rawPrice !== null && chgVal !== null ? (rawPrice * chgVal) : null;
             const absStr = absChange !== null ? `${absChange >= 0 ? "+" : ""}${Math.abs(absChange).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "";
             const pctStr = chgVal !== null ? `(${chgVal >= 0 ? "+" : ""}${chgVal.toFixed(2)}%)` : "—";
             const chgStr = absStr ? `${absStr} ${pctStr}` : pctStr;
@@ -7609,12 +7609,12 @@
               data.forEach((s) => {
                 const sr = stockRetMap[s.id] || {};
                 const iv = intradayMap[s.id] || {};
-                const intradayPrice = iv.current_price != null ? Number(iv.current_price) : null;
-                const intradayChangeAbs = iv['1d_abs'] != null ? Number(iv['1d_abs']) : null;
+                const intradayPrice = iv.current_price != null ? Number(iv.current_price) / 100 : null;
+                const intradayChangeAbs = iv['1d_abs'] != null ? Number(iv['1d_abs']) / 100 : null;
                 const intradayChangePct = iv['1d_pct'] != null ? Number(iv['1d_pct']) : null;
                 const merged = {
                   ...s,
-                  last_price:       sr.current_price != null ? Math.round(Number(sr.current_price) * 100) : null,
+                  last_price:       sr.current_price != null ? Number(sr.current_price) / 100 : null,
                   change_percent:   intradayChangePct,
                   change_abs:       intradayChangeAbs,
                   prev_close:       intradayPrice,
@@ -8027,7 +8027,7 @@
           });
 
         return weighted.reduce((acc, item) => {
-          acc[item.userId] = item.floorCents / 100;
+          acc[item.userId] = item.floorCents;
           return acc;
         }, {});
       }
@@ -8484,7 +8484,7 @@
           rebBuySecuritiesCache = (rows || []).map((s) => {
             const rawSymbol = String(s.symbol || "");
             const code = rawSymbol.replace(/\.[A-Z]+$/, "") || rawSymbol || "-";
-            const currentPrice = Number(s.last_price || 0) / 100;
+            const currentPrice = Number(s.last_price || 0);
             return {
               id: String(s.id || code),
               code,
@@ -8536,7 +8536,7 @@
           .filter(h => h.symbol || h.ticker)
           .map(h => {
             const sym = h.symbol || h.ticker || "";
-            const price = h.last_price ? h.last_price / 100 : 0;
+            const price = h.last_price ? h.last_price : 0;
             const units = Math.max(1, Math.round(Number(h.shares) || 1));
             const code = sym.replace(/\.[A-Z]+$/, "");
             return { code, fullSymbol: sym, description: h.name || sym, unitsPerLot: units, currentPrice: price, weightPercent: Number(h.weight) || 0 };
@@ -8559,7 +8559,7 @@
 
             rebIsins = rebIsins.map((isin) => {
               const sec = secBySymbol.get(isin.fullSymbol);
-              const secPrice = Number(sec?.last_price || 0) / 100;
+              const secPrice = Number(sec?.last_price || 0);
               const resolvedPrice = isin.currentPrice > 0
                 ? isin.currentPrice
                 : (Number.isFinite(secPrice) && secPrice > 0 ? secPrice : 0);
@@ -9459,7 +9459,7 @@
             const symbol = String(row.symbol || "");
             const norm = normalizeSymbol(symbol);
             const metrics = _miMetrics[row.id] || {};
-            const price = Number(metrics.last_price || 0) / 100;
+            const price = Number(metrics.last_price || 0);
             if (symbol) {
               priceBySymbol.set(symbol, Number.isFinite(price) ? price : 0);
               if (row.name) nameBySymbol.set(symbol, String(row.name));

@@ -5404,11 +5404,11 @@
         const security = securitiesByIdMap[row.security_id] || {};
         const label = security.symbol || security.name || row.security_id || '-';
         const status = row.status || row.Status || '-';
-        const currentPrice = security.last_price ? Number(security.last_price) / 100 : 0;
+        const currentPrice = security.last_price ? Number(security.last_price) : 0;
         const qty = Number(row.quantity) || 0;
-        const avgFillRands = row.avg_fill ? Number(row.avg_fill) / 100 : 0;
-        const mv = currentPrice ? qty * currentPrice : (Number(row.market_value) || 0) / 100;
-        const pnl = avgFillRands > 0 && currentPrice ? (currentPrice - avgFillRands) * qty : (Number(row.unrealized_pnl) || 0) / 100;
+        const avgFillRands = row.avg_fill ? Number(row.avg_fill) : 0;
+        const mv = currentPrice ? qty * currentPrice : (Number(row.market_value) || 0);
+        const pnl = avgFillRands > 0 && currentPrice ? (currentPrice - avgFillRands) * qty : (Number(row.unrealized_pnl) || 0);
         return `
           <tr>
             <td>${escapeHtml(label)}</td>
@@ -5567,7 +5567,7 @@
         const security = securitiesByIdMap[row.security_id] || {};
         const label = security.name || security.symbol || row.security_id || '-';
         const status = row.status || row.Status || '-';
-        const currentPrice = security.last_price ? Number(security.last_price) / 100 : 0;
+        const currentPrice = security.last_price ? Number(security.last_price) : 0;
         const qty = Number(row.quantity) || 0;
         const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
         const mv = currentPrice ? qty * currentPrice : (Number(row.market_value) || 0);
@@ -8087,16 +8087,16 @@
       const quantityStr = qty ? formatNumber(qty, 2) : '-';
       const isPending = !row.fill_date && !row.Fill_date;
 
-      const currentPrice = security.last_price ? Number(security.last_price) / 100 : 0;
+      const currentPrice = security.last_price ? Number(security.last_price) : 0;
       const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
 
       let liveMarketValue = qty * currentPrice;
       if (!currentPrice && row.market_value) liveMarketValue = Number(row.market_value);
 
-      // Bottom value = unrealized_pnl / 100, fall back to cost basis, then market value
+      // Bottom value = unrealized_pnl, fall back to cost basis, then market value
       let bottomValue;
       if (row.unrealized_pnl !== null && row.unrealized_pnl !== undefined && Number(row.unrealized_pnl) !== 0) {
-        bottomValue = Number(row.unrealized_pnl) / 100;
+        bottomValue = Number(row.unrealized_pnl);
       } else if (avgFill > 0 && qty > 0) {
         bottomValue = avgFill * qty;
       } else {
@@ -8104,7 +8104,7 @@
       }
 
       // Display bottom value divided by 100
-      bottomValue = bottomValue / 100;
+      bottomValue = bottomValue;
 
       // Color: compare bottom vs black top (market value)
       const isPositive = liveMarketValue > 0 && bottomValue > liveMarketValue;
@@ -8158,8 +8158,8 @@
     const renderStrategyGroupCard = (strategyName, holdings, groupId) => {
       let totalValue = 0;
       let totalBottomValue = 0;
-      let totalUserHoldings = 0;   // sum of (avg_fill / 100) * quantity — filled only
-      let totalMarketHoldings = 0; // sum of (last_price / 100) * quantity — filled only
+      let totalUserHoldings = 0;   // sum of (avg_fill) * quantity — filled only
+      let totalMarketHoldings = 0; // sum of (last_price ) * quantity — filled only
       let pendingUserHoldings = 0;   // projected user holdings for pending items
       let pendingMarketHoldings = 0; // projected market holdings for pending items
       let pendingCount = 0;
@@ -8167,23 +8167,23 @@
         const isPending = !row.fill_date && !row.Fill_date;
         if (isPending) { pendingCount++; }
         const security = securitiesByIdMap[row.security_id] || {};
-        const currentPrice = security.last_price ? Number(security.last_price) / 100 : 0;
+        const currentPrice = security.last_price ? Number(security.last_price) : 0;
         const qty = Number(row.quantity) || 0;
         const avgFill = row.avg_fill ? Number(row.avg_fill) : 0;
         if (isPending) {
           // No fill price yet — use current market price as theoretical fill
-          const pendingFillPrice = (avgFill > 0) ? (avgFill / 100) : currentPrice;
+          const pendingFillPrice = (avgFill > 0) ? (avgFill) : currentPrice;
           pendingUserHoldings += pendingFillPrice * qty;
           pendingMarketHoldings += currentPrice * qty;
         } else {
-          totalUserHoldings += (avgFill / 100) * qty;
+          totalUserHoldings += (avgFill) * qty;
           totalMarketHoldings += currentPrice * qty;
         }
         const mv = currentPrice ? qty * currentPrice : (Number(row.market_value) || 0);
-        // Bottom = unrealized_pnl / 100, fall back to cost basis, then market value
+        // Bottom = unrealized_pnl, fall back to cost basis, then market value
         let rowBottom;
         if (row.unrealized_pnl !== null && row.unrealized_pnl !== undefined && Number(row.unrealized_pnl) !== 0) {
-          rowBottom = Number(row.unrealized_pnl) / 100;
+          rowBottom = Number(row.unrealized_pnl);
         } else if (avgFill > 0 && qty > 0) {
           rowBottom = avgFill * qty;
         } else {
@@ -8197,7 +8197,7 @@
       });
 
       // Display total bottom value divided by 100
-      totalBottomValue = totalBottomValue / 100;
+      totalBottomValue = totalBottomValue;
 
       // Color: compare total bottom vs total black top (market value)
       const isPositive = totalValue > 0 && totalBottomValue > totalValue;

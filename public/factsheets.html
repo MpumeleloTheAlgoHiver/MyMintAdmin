@@ -1024,7 +1024,7 @@
         const sec = securitiesMap.get(sym)||securitiesMap.get(normalizeSymbol(sym));
         const rawW = Number(h.weight)||0;
         const weightPct = totalWeight>0?(rawW/totalWeight)*100:rawW;
-        const price = sec?.last_price ? Number(sec.last_price)/100 : 0;
+        const price = sec?.last_price ? Number(sec.last_price) : 0;
         const shares = Number(h.shares||h.quantity||1);
         return {
           sym, name:h.name||sec?.name||sym,
