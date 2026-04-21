@@ -3176,7 +3176,7 @@
 
         Object.entries(stockRetMap).forEach(([secId, sr]) => {
           metricsMap[secId] = {
-            last_price:       sr.current_price != null ? Math.round(Number(sr.current_price)) : null,
+            last_price:       sr.current_price != null ? Math.round(Number(sr.current_price) * 100) : null,
             change_percent:   sr['1d_pct']     ?? null,
             ytd_performance:  sr.ytd_pct       ?? null,
             mtd_performance:  sr['1m_pct']     ?? null,
@@ -3238,7 +3238,7 @@
         const _metricsMap = {};
         Object.entries(_stockRetMap).forEach(([id, sr]) => {
           _metricsMap[id] = {
-            last_price:      sr.current_price != null ? Math.round(Number(sr.current_price)) : null,
+            last_price:      sr.current_price != null ? Math.round(Number(sr.current_price) * 100) : null,
             change_percent:  sr['1d_pct']     != null ? Number(sr['1d_pct'])                       : null,
             ytd_performance: sr['ytd_pct']    != null ? Number(sr['ytd_pct'])                      : null,
             w1_performance:  sr['5d_pct']     != null ? Number(sr['5d_pct'])                       : null,
@@ -4693,7 +4693,7 @@
               const sr = _sm[s.id] || {};
               const merged = {
                 ...s,
-                last_price:      sr.current_price != null ? Math.round(Number(sr.current_price)) : null,
+                last_price:      sr.current_price != null ? Math.round(Number(sr.current_price) * 100) : null,
                 change_percent:  sr['1d_pct']     ?? null,
                 ytd_performance: sr['ytd_pct']    ?? null,
                 w1_performance:  sr['5d_pct']     ?? null,
@@ -5396,7 +5396,7 @@
           (secRows || []).forEach(s => {
             if (_seenSec.has(s.security_id)) return;
             _seenSec.add(s.security_id);
-            secPriceMap[s.security_id] = s.current_price != null ? Math.round(Number(s.current_price)) : 0;
+            secPriceMap[s.security_id] = s.current_price != null ? Math.round(Number(s.current_price) * 100) : 0;
           });
         }
 
@@ -7432,7 +7432,7 @@
                 const sr = editStratReturns[s.id] || {};
                 const merged = {
                   ...s,
-                  last_price:       sr.current_price != null ? Math.round(Number(sr.current_price)) : null,
+                  last_price:       sr.current_price != null ? Math.round(Number(sr.current_price) * 100) : null,
                   change_percent:   sr['1d_pct']  ?? null,
                   w1_performance:   sr['5d_pct']  ?? null,
                   mtd_performance:  sr['1m_pct']  ?? null,
