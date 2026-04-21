@@ -1941,6 +1941,74 @@
           return;
         }
 
+        /* ── Strategy mode: render strategy-level rows from strategies_returns_c ── */
+        if (_riViewMode === 'strategy') {
+          const stratFieldMap = {
+            '1d':  '1d_pct',  '5d':  '5d_pct',  '1m':  '1m_pct',  '6m':  '6m_pct',
+            ytd:   'ytd_pct', '1y':  '1y_pct',  '5y':  '5y_pct',  all:   'all_pct',
+          };
+          const sField = stratFieldMap[tab] ?? null;
+          if (!sField) {
+            listEl.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No ${tab.toUpperCase()} data available</div>`;
+            return;
+          }
+          const strategies = (typeof allStrategiesFullData !== 'undefined' && Array.isArray(allStrategiesFullData)) ? allStrategiesFullData : [];
+          const sAll = strategies.map(s => {
+            const row = strategyReturnsMap.get(String(s.id)) || {};
+            const v = row[sField] != null ? Number(row[sField]) : null;
+            return { id: s.id, name: s.name || s.strategy_name || 'Strategy', logo_url: s.logo_url || null, _val: v };
+          }).filter(x => x._val != null).sort((a, b) => b._val - a._val);
+
+          if (!sAll.length) {
+            listEl.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No ${tab.toUpperCase()} strategy data available</div>`;
+            return;
+          }
+
+          const sGainers = sAll.filter(x => x._val >= 0).slice(0, 4);
+          const sLosers  = [...sAll].reverse().filter(x => x._val <= 0).slice(0, 4);
+          const sMaxG = Math.max(...sGainers.map(x => x._val), 0.001);
+          const sMaxL = Math.max(...sLosers.map(x => Math.abs(x._val)), 0.001);
+
+          const buildSRow = (x, rank, isG) => {
+            const val = x._val;
+            const valStr = (val >= 0 ? '+' : '') + val.toFixed(2) + '%';
+            const barPct = Math.round((Math.abs(val) / (isG ? sMaxG : sMaxL)) * 100);
+            const init = (x.name || 'S').slice(0, 2).toUpperCase();
+            const logoEl = x.logo_url
+              ? `<img src="${x.logo_url}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;border:1px solid #e2e8f0;flex-shrink:0;" onerror="this.outerHTML='<div style=\\'width:26px;height:26px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#7c3aed;\\'>${init}</div>'">`
+              : `<div style="width:26px;height:26px;border-radius:50%;background:${isG ? '#dcfce7' : '#fee2e2'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:${isG ? '#16a34a' : '#dc2626'};flex-shrink:0;">${init}</div>`;
+            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;margin-bottom:2px;">
+              <span style="font-size:10px;color:#cbd5e1;font-weight:700;width:14px;text-align:center;flex-shrink:0;">${rank}</span>
+              ${logoEl}
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:11px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${x.name}</div>
+                <div style="height:3px;background:#f1f5f9;border-radius:4px;margin-top:3px;overflow:hidden;">
+                  <div style="height:100%;width:${barPct}%;background:${isG ? '#86efac' : '#fca5a5'};border-radius:4px;transition:width 0.4s ease;"></div>
+                </div>
+              </div>
+              <span style="font-size:12px;font-weight:800;color:${isG ? '#16a34a' : '#dc2626'};flex-shrink:0;">${valStr}</span>
+            </div>`;
+          };
+
+          let sHtml = '';
+          if (sGainers.length) {
+            sHtml += `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px 4px;margin-top:2px;">
+              <div style="width:6px;height:6px;border-radius:50%;background:#16a34a;flex-shrink:0;"></div>
+              <span style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:0.06em;">Top Gainers</span>
+            </div>`;
+            sHtml += sGainers.map((x, i) => buildSRow(x, i + 1, true)).join('');
+          }
+          if (sLosers.length) {
+            sHtml += `<div style="display:flex;align-items:center;gap:6px;padding:8px 8px 4px;margin-top:4px;border-top:1px solid #f1f5f9;">
+              <div style="width:6px;height:6px;border-radius:50%;background:#dc2626;flex-shrink:0;"></div>
+              <span style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:0.06em;">Top Losers</span>
+            </div>`;
+            sHtml += sLosers.map((x, i) => buildSRow(x, i + 1, false)).join('');
+          }
+          listEl.innerHTML = sHtml;
+          return;
+        }
+
         const fieldMap = {
           '1d':  'change_percent',
           '5d':  'w1_performance',
@@ -1956,20 +2024,8 @@
           listEl.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No ${tab.toUpperCase()} data available</div>`;
           return;
         }
-        /* In strategy mode with no strategy selected yet — prompt user */
-        if (_riViewMode === 'strategy' && !_riFilterSymbols) {
-          listEl.innerHTML = `<div style="text-align:center;padding:28px 16px;">
-            <div style="font-size:24px;margin-bottom:8px;">📊</div>
-            <div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:4px;">Select a strategy</div>
-            <div style="font-size:11px;color:#94a3b8;">Choose a strategy above to see its asset insights.</div>
-          </div>`;
-          return;
-        }
 
-        /* Apply strategy filter when in strategy mode */
-        const _riBase = (_riViewMode === 'strategy' && _riFilterSymbols)
-          ? (_returnInsightsData || []).filter(a => _riFilterSymbols.has(a.symbol))
-          : (_returnInsightsData || []);
+        const _riBase = (_returnInsightsData || []);
 
         const all = _riBase
           .map(a => ({ ...a, _val: a[field] != null ? Number(a[field]) : null }))
