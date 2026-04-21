@@ -8552,7 +8552,7 @@
           const totalQty = holders.reduce((s, r) => s + r.quantity, 0);
           const holderCount = holders.filter(r => r.quantity > 0).length;
           const positionValue = isin.currentPrice > 0 && totalQty > 0 ? isin.currentPrice * totalQty : 0;
-          const displayPrice = rebShowUnitPrice ? isin.currentPrice : positionValue;
+          const displayPrice = rebShowUnitPrice ? (isin.currentPrice / 100) : (positionValue / 100);
           /* Pending rebalance detection */
           const isPendSell = rebPendingRebalance && isin.code === rebPendingRebalance.sellCode;
           const isPendBuy  = rebPendingRebalance && (isin.code === rebPendingRebalance.buyCode || isin.code === rebPendingRebalance.extraBuyCode);
@@ -8602,7 +8602,7 @@
         }
 
         if (metaEl) metaEl.textContent = `${rebSelectedIsin.code} · ${rebSelectedIsin.description} · ${rebSelectedIsin.unitsPerLot} units/lot`;
-        if (priceEl) priceEl.textContent = rebSelectedIsin.currentPrice > 0 ? `ZAR ${rebSelectedIsin.currentPrice.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "";
+        if (priceEl) priceEl.textContent = rebSelectedIsin.currentPrice > 0 ? `ZAR ${(rebSelectedIsin.currentPrice / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : "";
 
         const steps = rebGetRebalanceSteps(rebSelectedIsin.unitsPerLot);
         if (!steps.length) {
