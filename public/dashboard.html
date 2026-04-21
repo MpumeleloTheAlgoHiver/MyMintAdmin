@@ -3273,14 +3273,25 @@
         }
         if (!data) console.error("Failed to load securities from any column variant");
 
-        /* Fetch price and change from stock_returns_c only */
+        /* Fetch price/returns from stock_returns_c AND live tick from stock_intraday_c */
         const _secIds = (data || []).map(s => s.id).filter(Boolean);
-        const _stockRetMap = await fetchStockReturnsBySec(_secIds);
+        const [_stockRetMap, _intradayMap] = await Promise.all([
+          fetchStockReturnsBySec(_secIds),
+          fetchIntradayBySec(_secIds),
+        ]);
         const _metricsMap = {};
-        Object.entries(_stockRetMap).forEach(([id, sr]) => {
+        const _allMetricIds = new Set([...Object.keys(_stockRetMap), ...Object.keys(_intradayMap)]);
+        _allMetricIds.forEach((id) => {
+          const sr = _stockRetMap[id] || {};
+          const iv = _intradayMap[id] || {};
+          const intradayPrice    = iv.current_price != null ? Number(iv.current_price) : null;
+          const intradayChangeAbs= iv['1d_abs']     != null ? Number(iv['1d_abs'])     : null;
+          const intradayChangePct= iv['1d_pct']     != null ? Number(iv['1d_pct'])     : null;
           _metricsMap[id] = {
             last_price:      sr.current_price != null ? Math.round(Number(sr.current_price) * 100) : null,
-            change_percent:  sr['1d_pct']     != null ? Number(sr['1d_pct'])                       : null,
+            change_percent:  intradayChangePct,
+            change_abs:      intradayChangeAbs,
+            prev_close:      intradayPrice,
             ytd_performance: sr['ytd_pct']    != null ? Number(sr['ytd_pct'])                      : null,
             w1_performance:  sr['5d_pct']     != null ? Number(sr['5d_pct'])                       : null,
             mtd_performance: sr['1m_pct']     != null ? Number(sr['1m_pct'])                       : null,
