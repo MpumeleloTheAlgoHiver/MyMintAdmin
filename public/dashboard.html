@@ -3188,11 +3188,13 @@
               .select('security_id, symbol, current_price, 1d_abs, 1d_pct, timestamp')
               .eq('security_id', id)
               .order('timestamp', { ascending: false })
-              .limit(1);
+              .limit(10);
             if (error) { _err = error; continue; }
-            if (data && data[0]) {
-              map[id] = data[0];
-              try { if (data[0].symbol === 'PIK.JO' || /PIK/i.test(data[0].symbol||'')) console.log('[intraday] PIK row =', JSON.stringify(data[0])); } catch(e){}
+            if (data && data.length) {
+              const meaningful = data.find(r => (Number(r['1d_abs']) || 0) !== 0 || (Number(r['1d_pct']) || 0) !== 0);
+              const chosen = meaningful || data[0];
+              map[id] = chosen;
+              try { if (chosen.symbol === 'PIK.JO' || /PIK/i.test(chosen.symbol||'')) console.log('[intraday] PIK row =', JSON.stringify(chosen)); } catch(e){}
             }
           }
         };
