@@ -1706,10 +1706,10 @@
 
       /* ── Holdings table column config ───────────────────────────────── */
       const _HC = [
-        { k:'last_close',     l:'Price (R)',         t:'Source: last_close',           v:true,  isReturn:false },
-        { k:'prev_close',     l:'Prev Close (R)',    t:'Source: prev_close',           v:false, isReturn:false },
+        { k:'last_close',     l:'Prev Close',        t:'Source: stock_returns_c.current_price', v:true,  isReturn:false },
+        { k:'prev_close',     l:'Current Price',     t:'Source: stock_intraday_c.current_price', v:true,  isReturn:false },
         { k:'change_abs',     l:'Day Change (R)',    t:'Source: change_abs',           v:false, isReturn:false },
-        { k:'change_pct',     l:'Day Change %',     t:'Source: change_pct × 100',     v:true,  isReturn:true  },
+        { k:'change_pct',     l:'Day Change %',     t:'Source: stock_intraday_c.1d_abs ÷ 100', v:true,  isReturn:true  },
         { k:'mkt_value',      l:'Market Value',     t:'Shares × last_close',          v:true,  isReturn:false, isMv:true },
         { k:'1W_Return',      l:'1 Week %',         t:'Source: 1W_Return × 100',      v:false, isReturn:true  },
         { k:'1M_Return',      l:'1 Month %',        t:'Source: 1M_Return × 100',      v:true,  isReturn:true  },
@@ -3169,15 +3169,46 @@
         return map;
       };
 
+      /* Fetch latest intraday row per security from stock_intraday_c.
+         current_price → "Current Price" (Rand)
+         1d_abs ÷ 100  → "Day Change %"  */
+      const fetchIntradayBySec = async (secIds) => {
+        if (!secIds || !secIds.length) return {};
+        const map = {};
+        const chunks = [];
+        for (let i = 0; i < secIds.length; i += 50) chunks.push(secIds.slice(i, i + 50));
+        const results = await Promise.all(
+          chunks.map(chunk =>
+            supabaseClient.from('stock_intraday_c')
+              .select('security_id, current_price, 1d_abs, as_of_date, updated_at')
+              .in('security_id', chunk)
+              .order('as_of_date', { ascending: false })
+          )
+        );
+        results.forEach(({ data, error }) => {
+          if (error || !data) return;
+          data.forEach(r => { if (!map[r.security_id]) map[r.security_id] = r; });
+        });
+        return map;
+      };
+
       const fetchSecurityMetrics = async (secIds) => {
         if (!secIds || !secIds.length) return {};
         const metricsMap = {};
-        const stockRetMap = await fetchStockReturnsBySec(secIds);
+        const [stockRetMap, intradayMap] = await Promise.all([
+          fetchStockReturnsBySec(secIds),
+          fetchIntradayBySec(secIds),
+        ]);
 
-        Object.entries(stockRetMap).forEach(([secId, sr]) => {
+        const allIds = new Set([...Object.keys(stockRetMap), ...Object.keys(intradayMap)]);
+        allIds.forEach((secId) => {
+          const sr = stockRetMap[secId] || {};
+          const iv = intradayMap[secId] || {};
+          const intradayPrice = iv.current_price != null ? Number(iv.current_price) : null;
+          const intradayChangePct = iv['1d_abs'] != null ? Number(iv['1d_abs']) / 100 : null;
           metricsMap[secId] = {
             last_price:       sr.current_price != null ? Math.round(Number(sr.current_price) * 100) : null,
-            change_percent:   sr['1d_pct']     ?? null,
+            change_percent:   intradayChangePct,
             ytd_performance:  sr.ytd_pct       ?? null,
             mtd_performance:  sr['1m_pct']     ?? null,
             r_6m_performance: sr['6m_pct']     ?? null,
@@ -3188,7 +3219,7 @@
             wtd_performance:  null,
             m3_performance:   null,
             change_abs:       null,
-            prev_close:       null,
+            prev_close:       intradayPrice,
             last_close_rand:  sr.current_price ?? null,
             volatility_30d:   null,
             avg_volume_30d:   null,
