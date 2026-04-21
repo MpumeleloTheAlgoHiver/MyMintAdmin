@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Research Signals · Mint</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: rgba(20, 20, 30, 0.8);
+      --bg-card-hover: rgba(30, 30, 45, 0.9);
+      --border-color: rgba(124, 58, 237, 0.2);
+      --border-glow: rgba(124, 58, 237, 0.5);
+      --text-primary: #ffffff;
+      --text-secondary: #a1a1aa;
+      --text-muted: #6b6b7b;
+      --accent-purple: #7c3aed;
+      --accent-purple-light: #a78bfa;
+      --accent-purple-glow: rgba(124, 58, 237, 0.4);
+      --buy-green: #10b981;
+      --buy-green-glow: rgba(16, 185, 129, 0.3);
+      --sell-red: #ef4444;
+      --sell-red-glow: rgba(239, 68, 68, 0.3);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow-x: hidden;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    /* Animated background */
+    .bg-gradient {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: 
+        radial-gradient(ellipse 80% 50% at 20% 40%, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 40% at 80% 60%, rgba(124, 58, 237, 0.1) 0%, transparent 50%),
+        var(--bg-primary);
+      z-index: -1;
+    }
+
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 240px;
+      height: 100vh;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      z-index: 1000;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 24px 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .sidebar-logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .sidebar-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .sidebar-brand-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .sidebar-brand-sub {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      padding: 20px 12px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .sidebar-section-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 12px 12px 6px;
+    }
+
+    .nav-icon {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .nav-icon svg {
+      width: 20px;
+      height: 20px;
+      fill: var(--text-muted);
+      transition: fill 0.2s ease;
+    }
+
+    .nav-icon:hover {
+      background: rgba(124, 58, 237, 0.1);
+      color: var(--text-primary);
+    }
+
+    .nav-icon:hover svg {
+      fill: var(--accent-purple-light);
+    }
+
+    .nav-icon.active {
+      background: linear-gradient(135deg, rgba(124, 58, 237, 0.2) 0%, rgba(124, 58, 237, 0.1) 100%);
+      color: var(--text-primary);
+      border: 1px solid var(--border-glow);
+    }
+
+    .nav-icon.active svg {
+      fill: var(--accent-purple-light);
+    }
+
+    .main-content {
+      margin-left: 240px;
+      min-height: 100vh;
+      padding: 0 32px 48px;
+    }
+
+    .page-header {
+      padding: 40px 0 32px;
+      text-align: center;
+    }
+
+    .page-title {
+      font-size: 42px;
+      font-weight: 700;
+      margin: 0 0 12px;
+      background: linear-gradient(135deg, #ffffff 0%, #a78bfa 50%, #7c3aed 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.03em;
+    }
+
+    .page-subtitle {
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin: 0;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(20px);
+      transition: all 0.3s ease;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent-purple), transparent);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--border-glow);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 30px var(--accent-purple-glow);
+    }
+
+    .stat-card:hover::before {
+      opacity: 1;
+    }
+
+    .stat-card.buy {
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+
+    .stat-card.buy:hover {
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 30px var(--buy-green-glow);
+    }
+
+    .stat-card.buy::before {
+      background: linear-gradient(90deg, transparent, var(--buy-green), transparent);
+    }
+
+    .stat-card.sell {
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .stat-card.sell:hover {
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 30px var(--sell-red-glow);
+    }
+
+    .stat-card.sell::before {
+      background: linear-gradient(90deg, transparent, var(--sell-red), transparent);
+    }
+
+    .stat-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+
+    .stat-icon.total {
+      background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(124, 58, 237, 0.1));
+    }
+
+    .stat-icon.buy {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1));
+    }
+
+    .stat-icon.sell {
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1));
+    }
+
+    .stat-icon.ratio {
+      background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(167, 139, 250, 0.1));
+    }
+
+    .stat-icon svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .stat-value.count {
+      background: linear-gradient(135deg, var(--text-primary), var(--accent-purple-light));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-value.buy {
+      color: var(--buy-green);
+    }
+
+    .stat-value.sell {
+      color: var(--sell-red);
+    }
+
+    .stat-change {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    /* Charts Grid */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.5fr 1fr;
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(20px);
+    }
+
+    .chart-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .chart-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .chart-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(124, 58, 237, 0.2);
+      color: var(--accent-purple-light);
+    }
+
+    .chart-container {
+      height: 200px;
+      position: relative;
+    }
+
+    /* Insights Panel */
+    .insights-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .insight-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(20px);
+    }
+
+    .insight-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .insight-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, rgba(124, 58, 237, 0.3), rgba(124, 58, 237, 0.1));
+    }
+
+    .insight-icon svg {
+      width: 20px;
+      height: 20px;
+      fill: var(--accent-purple-light);
+    }
+
+    .insight-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .insight-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .insight-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .insight-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .insight-dot.buy {
+      background: var(--buy-green);
+      box-shadow: 0 0 10px var(--buy-green-glow);
+    }
+
+    .insight-dot.sell {
+      background: var(--sell-red);
+      box-shadow: 0 0 10px var(--sell-red-glow);
+    }
+
+    .insight-text {
+      flex: 1;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .insight-value {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    /* Top Signals */
+    .signals-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .signal-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(20px);
+    }
+
+    .signal-panel.buy {
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+
+    .signal-panel.sell {
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .signal-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .signal-panel-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .signal-badge {
+      font-size: 20px;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 10px;
+    }
+
+    .signal-badge.buy {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1));
+      color: var(--buy-green);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .signal-badge.sell {
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1));
+      color: var(--sell-red);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .signal-count {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .signal-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .signal-item {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 14px;
+      padding: 16px;
+      transition: all 0.2s ease;
+    }
+
+    .signal-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      transform: translateX(4px);
+    }
+
+    .signal-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .signal-symbol {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .signal-confidence-badge {
+      font-size: 14px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+
+    .signal-confidence-badge.buy {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(16, 185, 129, 0.15));
+      color: var(--buy-green);
+    }
+
+    .signal-confidence-badge.sell {
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(239, 68, 68, 0.15));
+      color: var(--sell-red);
+    }
+
+    /* Confidence Bar */
+    .confidence-bar-container {
+      margin-bottom: 12px;
+    }
+
+    .confidence-bar-track {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .confidence-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+
+    .confidence-bar-fill.buy {
+      background: linear-gradient(90deg, var(--buy-green), rgba(16, 185, 129, 0.5));
+    }
+
+    .confidence-bar-fill.sell {
+      background: linear-gradient(90deg, var(--sell-red), rgba(239, 68, 68, 0.5));
+    }
+
+    .signal-metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .signal-metric {
+      text-align: center;
+    }
+
+    .signal-metric-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .signal-metric-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Table Section */
+    .table-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(20px);
+    }
+
+    .table-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .table-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .table-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .filter-tabs {
+      display: flex;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 4px;
+    }
+
+    .filter-tab {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .filter-tab:hover {
+      color: var(--text-primary);
+    }
+
+    .filter-tab.active {
+      background: var(--accent-purple);
+      color: white;
+    }
+
+    .sort-select {
+      padding: 8px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .sort-select:hover,
+    .sort-select:focus {
+      border-color: var(--accent-purple);
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .data-table th {
+      text-align: left;
+      padding: 14px 16px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      border-bottom: 1px solid var(--border-color);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .data-table th:last-child {
+      text-align: right;
+    }
+
+    .data-table td {
+      padding: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .data-table td:last-child {
+      text-align: right;
+    }
+
+    .data-table tbody tr {
+      transition: all 0.2s ease;
+    }
+
+    .data-table tbody tr:hover {
+      background: rgba(124, 58, 237, 0.05);
+    }
+
+    .symbol-cell {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .signal-badge-small {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .signal-badge-small.buy {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--buy-green);
+    }
+
+    .signal-badge-small.sell {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--sell-red);
+    }
+
+    .table-confidence {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .table-confidence-bar {
+      width: 80px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .table-confidence-fill {
+      height: 100%;
+      border-radius: 2px;
+    }
+
+    .table-confidence-fill.buy {
+      background: var(--buy-green);
+    }
+
+    .table-confidence-fill.sell {
+      background: var(--sell-red);
+    }
+
+    .slope-indicator {
+      font-weight: 500;
+    }
+
+    .slope-indicator.positive {
+      color: var(--buy-green);
+    }
+
+    .slope-indicator.negative {
+      color: var(--sell-red);
+    }
+
+    /* Loading State */
+    .loading-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 400px;
+      gap: 20px;
+    }
+
+    .loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(124, 58, 237, 0.2);
+      border-top-color: var(--accent-purple);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .animate-in {
+      animation: fadeInUp 0.5s ease forwards;
+    }
+
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+    .delay-4 { animation-delay: 0.4s; }
+
+    /* Responsive */
+    @media (max-width: 1400px) {
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 1000px) {
+      .sidebar {
+        display: none;
+      }
+      .main-content {
+        margin-left: 0;
+        padding: 0 20px 40px;
+      }
+      .insights-grid,
+      .signals-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+      .page-title {
+        font-size: 28px;
+      }
+      .table-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .table-controls {
+        flex-wrap: wrap;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-gradient"></div>
+
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <img src="/icon.png" alt="Mint" />
+      </div>
+      <div>
+        <div class="sidebar-brand-name">Mint</div>
+        <div class="sidebar-brand-sub">Research Hub</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="sidebar-section-label">Main</span>
+      <a class="nav-icon" href="/index.html">
+        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        Clients
+      </a>
+
+      <span class="sidebar-section-label">Investments</span>
+      <a class="nav-icon" href="/dashboard.html">
+        <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+        Dashboard
+      </a>
+      <a class="nav-icon" href="/orderbook.html">
+        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 10h2v7H7zm4-3h2v10h-2zm4 6h2v4h-2z"/></svg>
+        Order Book
+      </a>
+      <a class="nav-icon active" href="/research.html">
+        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        Research
+      </a>
+
+      <span class="sidebar-section-label">Banking</span>
+      <a class="nav-icon" href="/eft.html">
+        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
+        EFT Payments
+      </a>
+
+      <span class="sidebar-section-label">System</span>
+      <a class="nav-icon" href="/settings.html">
+        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        Settings
+      </a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <header class="page-header">
+      <h1 class="page-title">Research Signals</h1>
+      <p class="page-subtitle">Premium (sell) and discount (buy) signals with AI-powered insights</p>
+    </header>
+
+    <div id="loading" class="loading-container">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Loading signals data...</div>
+    </div>
+
+    <div id="content" style="display:none;">
+      <!-- Stats Cards -->
+      <div class="stats-grid">
+        <div class="stat-card animate-in delay-1">
+          <div class="stat-icon total">
+            <svg viewBox="0 0 24 24" fill="#a78bfa"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+          </div>
+          <div class="stat-label">Total Signals</div>
+          <div class="stat-value count" id="totalSignals">-</div>
+          <div class="stat-change" id="totalChange">Scanning market...</div>
+        </div>
+
+        <div class="stat-card buy animate-in delay-2">
+          <div class="stat-icon buy">
+            <svg viewBox="0 0 24 24" fill="#10b981"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+          </div>
+          <div class="stat-label">Buy Signals</div>
+          <div class="stat-value buy" id="buySignals">-</div>
+          <div class="stat-change" id="buyPercent">-</div>
+        </div>
+
+        <div class="stat-card sell animate-in delay-3">
+          <div class="stat-icon sell">
+            <svg viewBox="0 0 24 24" fill="#ef4444"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+          </div>
+          <div class="stat-label">Sell Signals</div>
+          <div class="stat-value sell" id="sellSignals">-</div>
+          <div class="stat-change" id="sellPercent">-</div>
+        </div>
+
+        <div class="stat-card animate-in delay-4">
+          <div class="stat-icon ratio">
+            <svg viewBox="0 0 24 24" fill="#a78bfa"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+          </div>
+          <div class="stat-label">Buy/Sell Ratio</div>
+          <div class="stat-value count" id="buySellRatio">-</div>
+          <div class="stat-change" id="ratioInsight">Market sentiment</div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3 class="chart-title">Distribution</h3>
+            <span class="chart-badge">Live</span>
+          </div>
+          <div class="chart-container">
+            <canvas id="pieChart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3 class="chart-title">Confidence Levels</h3>
+            <span class="chart-badge">Analysis</span>
+          </div>
+          <div class="chart-container">
+            <canvas id="barChart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3 class="chart-title">Metrics Radar</h3>
+            <span class="chart-badge">Compare</span>
+          </div>
+          <div class="chart-container">
+            <canvas id="radarChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Insights -->
+      <div class="insights-grid">
+        <div class="insight-card">
+          <div class="insight-header">
+            <div class="insight-icon">
+              <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+            </div>
+            <h3 class="insight-title">High Confidence Buys</h3>
+          </div>
+          <div class="insight-list" id="highConfidenceBuys"></div>
+        </div>
+
+        <div class="insight-card">
+          <div class="insight-header">
+            <div class="insight-icon">
+              <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+            </div>
+            <h3 class="insight-title">High Confidence Sells</h3>
+          </div>
+          <div class="insight-list" id="highConfidenceSells"></div>
+        </div>
+      </div>
+
+      <!-- Top Signals -->
+      <div class="signals-grid">
+        <div class="signal-panel buy">
+          <div class="signal-panel-header">
+            <div class="signal-panel-title">
+              <span class="signal-badge buy">BUY</span>
+              <span class="signal-count">Top performers</span>
+            </div>
+          </div>
+          <div class="signal-list" id="topBuySignals"></div>
+        </div>
+
+        <div class="signal-panel sell">
+          <div class="signal-panel-header">
+            <div class="signal-panel-title">
+              <span class="signal-badge sell">SELL</span>
+              <span class="signal-count">Top performers</span>
+            </div>
+          </div>
+          <div class="signal-list" id="topSellSignals"></div>
+        </div>
+      </div>
+
+      <!-- Full Table -->
+      <div class="table-section">
+        <div class="table-header">
+          <h3 class="table-title">All Signals</h3>
+          <div class="table-controls">
+            <div class="filter-tabs">
+              <button class="filter-tab active" data-filter="all" id="tabAll">All</button>
+              <button class="filter-tab" data-filter="buy" id="tabBuy">Buy</button>
+              <button class="filter-tab" data-filter="sell" id="tabSell">Sell</button>
+            </div>
+            <select class="sort-select" id="sortSelect">
+              <option value="confidence">Sort: Confidence</option>
+              <option value="symbol">Sort: Symbol</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Signal</th>
+                <th>Confidence</th>
+                <th>Price</th>
+                <th>Band Dist</th>
+                <th>R²</th>
+                <th>Volatility</th>
+                <th>Slope</th>
+              </tr>
+            </thead>
+            <tbody id="signalsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let signalsData = { buySignals: [], sellSignals: [] };
+    let currentFilter = 'all';
+    let currentSort = 'confidence';
+    let pieChart, barChart, radarChart;
+
+    async function loadData() {
+      try {
+        const response = await fetch('/signals.json');
+        if (!response.ok) throw new Error('Failed to load');
+        signalsData = await response.json();
+        init();
+      } catch (error) {
+        document.querySelector('.loading-text').textContent = 'Error loading data. Please refresh.';
+      }
+    }
+
+    function init() {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+
+      renderStats();
+      renderCharts();
+      renderInsights();
+      renderTopSignals();
+      renderTable();
+
+      document.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          currentFilter = tab.dataset.filter;
+          document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          renderTable();
+        });
+      });
+
+      document.getElementById('sortSelect').addEventListener('change', (e) => {
+        currentSort = e.target.value;
+        renderTable();
+      });
+    }
+
+    function renderStats() {
+      const total = signalsData.buySignals.length + signalsData.sellSignals.length;
+      const buyPct = total > 0 ? ((signalsData.buySignals.length / total) * 100).toFixed(1) : '0.0';
+      const sellPct = total > 0 ? ((signalsData.sellSignals.length / total) * 100).toFixed(1) : '0.0';
+      const ratio = signalsData.sellSignals.length > 0 ? (signalsData.buySignals.length / signalsData.sellSignals.length).toFixed(2) : '0.00';
+
+      animateValue('totalSignals', total);
+      animateValue('buySignals', signalsData.buySignals.length);
+      animateValue('sellSignals', signalsData.sellSignals.length);
+      document.getElementById('buyPercent').textContent = `${buyPct}% of portfolio`;
+      document.getElementById('sellPercent').textContent = `${sellPct}% of portfolio`;
+      document.getElementById('buySellRatio').textContent = ratio;
+
+      const sentiment = ratio > 1 ? 'Bullish bias detected' : ratio < 1 ? 'Bearish bias detected' : 'Market neutral';
+      document.getElementById('ratioInsight').textContent = sentiment;
+    }
+
+    function animateValue(elementId, target) {
+      const el = document.getElementById(elementId);
+      const duration = 1000;
+      const start = 0;
+      const startTime = performance.now();
+
+      function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = Math.round(start + (target - start) * eased);
+        el.textContent = current;
+        if (progress < 1) requestAnimationFrame(update);
+      }
+      requestAnimationFrame(update);
+    }
+
+    function renderCharts() {
+      const colors = {
+        buy: '#10b981',
+        sell: '#ef4444',
+        buyGlow: 'rgba(16, 185, 129, 0.5)',
+        sellGlow: 'rgba(239, 68, 68, 0.5)'
+      };
+
+      // Pie Chart
+      if (pieChart) pieChart.destroy();
+      pieChart = new Chart(document.getElementById('pieChart'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Buy', 'Sell'],
+          datasets: [{
+            data: [signalsData.buySignals.length, signalsData.sellSignals.length],
+            backgroundColor: [colors.buy, colors.sell],
+            borderWidth: 0,
+            hoverOffset: 10
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '65%',
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: '#a1a1aa', padding: 20, usePointStyle: true, font: { size: 12 } }
+            }
+          }
+        }
+      });
+
+      // Bar Chart
+      const buckets = [
+        { range: '0-20', buy: 0, sell: 0 },
+        { range: '21-40', buy: 0, sell: 0 },
+        { range: '41-60', buy: 0, sell: 0 },
+        { range: '61-80', buy: 0, sell: 0 },
+        { range: '81-100', buy: 0, sell: 0 }
+      ];
+
+      signalsData.buySignals.forEach(s => { buckets[Math.min(Math.floor(s.confidence / 21), 4)].buy++; });
+      signalsData.sellSignals.forEach(s => { buckets[Math.min(Math.floor(s.confidence / 21), 4)].sell++; });
+
+      if (barChart) barChart.destroy();
+      barChart = new Chart(document.getElementById('barChart'), {
+        type: 'bar',
+        data: {
+          labels: buckets.map(b => b.range),
+          datasets: [
+            { label: 'Buy', data: buckets.map(b => b.buy), backgroundColor: colors.buy, borderRadius: 6 },
+            { label: 'Sell', data: buckets.map(b => b.sell), backgroundColor: colors.sell, borderRadius: 6 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: '#a1a1aa', padding: 20, usePointStyle: true, font: { size: 12 } }
+            }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#6b6b7b' } },
+            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b6b7b' } }
+          }
+        }
+      });
+
+      // Radar Chart
+      const avg = (arr, key) => arr.length ? arr.reduce((a, b) => a + b[key], 0) / arr.length : 0;
+
+      if (radarChart) radarChart.destroy();
+      radarChart = new Chart(document.getElementById('radarChart'), {
+        type: 'radar',
+        data: {
+          labels: ['Confidence', 'Volatility', 'R² Quality', 'Band Dist'],
+          datasets: [
+            {
+              label: 'Buy Avg',
+              data: [
+                Math.round(avg(signalsData.buySignals, 'confidence')),
+                Math.round(avg(signalsData.buySignals, 'volatility') * 10),
+                Math.round(avg(signalsData.buySignals, 'rSquared') * 100),
+                Math.round(avg(signalsData.buySignals, 'bandDistance'))
+              ],
+              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+              borderColor: colors.buy,
+              pointBackgroundColor: colors.buy
+            },
+            {
+              label: 'Sell Avg',
+              data: [
+                Math.round(avg(signalsData.sellSignals, 'confidence')),
+                Math.round(avg(signalsData.sellSignals, 'volatility') * 10),
+                Math.round(avg(signalsData.sellSignals, 'rSquared') * 100),
+                Math.round(avg(signalsData.sellSignals, 'bandDistance'))
+              ],
+              backgroundColor: 'rgba(239, 68, 68, 0.15)',
+              borderColor: colors.sell,
+              pointBackgroundColor: colors.sell
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: '#a1a1aa', padding: 20, usePointStyle: true, font: { size: 12 } }
+            }
+          },
+          scales: {
+            r: {
+              grid: { color: 'rgba(255,255,255,0.1)' },
+              angleLines: { color: 'rgba(255,255,255,0.1)' },
+              pointLabels: { color: '#6b6b7b', font: { size: 11 } },
+              ticks: { display: false }
+            }
+          }
+        }
+      });
+    }
+
+    function renderInsights() {
+      const highBuy = [...signalsData.buySignals]
+        .filter(s => s.confidence >= 50)
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, 4);
+
+      const highSell = [...signalsData.sellSignals]
+        .filter(s => s.confidence >= 50)
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, 4);
+
+      document.getElementById('highConfidenceBuys').innerHTML = highBuy.length
+        ? highBuy.map(s => `
+          <div class="insight-item">
+            <span class="insight-dot buy"></span>
+            <span class="insight-text">${s.symbol}</span>
+            <span class="insight-value">${s.confidence}%</span>
+          </div>
+        `).join('')
+        : '<div class="insight-item"><span class="insight-text">No high-confidence buy signals</span></div>';
+
+      document.getElementById('highConfidenceSells').innerHTML = highSell.length
+        ? highSell.map(s => `
+          <div class="insight-item">
+            <span class="insight-dot sell"></span>
+            <span class="insight-text">${s.symbol}</span>
+            <span class="insight-value">${s.confidence}%</span>
+          </div>
+        `).join('')
+        : '<div class="insight-item"><span class="insight-text">No high-confidence sell signals</span></div>';
+    }
+
+    function renderTopSignals() {
+      const topBuy = [...signalsData.buySignals]
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, 5);
+
+      const topSell = [...signalsData.sellSignals]
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, 5);
+
+      document.getElementById('topBuySignals').innerHTML = topBuy.map(s => `
+        <div class="signal-item">
+          <div class="signal-item-header">
+            <span class="signal-symbol">${s.symbol}</span>
+            <span class="signal-confidence-badge buy">${s.confidence}%</span>
+          </div>
+          <div class="confidence-bar-container">
+            <div class="confidence-bar-track">
+              <div class="confidence-bar-fill buy" style="width:${s.confidence}%"></div>
+            </div>
+          </div>
+          <div class="signal-metrics">
+            <div class="signal-metric">
+              <div class="signal-metric-value">$${s.currentPrice.toFixed(2)}</div>
+              <div class="signal-metric-label">Price</div>
+            </div>
+            <div class="signal-metric">
+              <div class="signal-metric-value">${s.bandDistance.toFixed(1)}%</div>
+              <div class="signal-metric-label">Band</div>
+            </div>
+            <div class="signal-metric">
+              <div class="signal-metric-value">${s.rSquared.toFixed(3)}</div>
+              <div class="signal-metric-label">R²</div>
+            </div>
+            <div class="signal-metric">
+              <div class="signal-metric-value">${s.volatility.toFixed(2)}</div>
+              <div class="signal-metric-label">Vol</div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      document.getElementById('topSellSignals').innerHTML = topSell.map(s => `
+        <div class="signal-item">
+          <div class="signal-item-header">
+            <span class="signal-symbol">${s.symbol}</span>
+            <span class="signal-confidence-badge sell">${s.confidence}%</span>
+          </div>
+          <div class="confidence-bar-container">
+            <div class="confidence-bar-track">
+              <div class="confidence-bar-fill sell" style="width:${s.confidence}%"></div>
+            </div>
+          </div>
+          <div class="signal-metrics">
+            <div class="signal-metric">
+              <div class="signal-metric-value">$${s.currentPrice.toFixed(2)}</div>
+              <div class="signal-metric-label">Price</div>
+            </div>
+            <div class="signal-metric">
+              <div class="signal-metric-value">${s.bandDistance.toFixed(1)}%</div>
+              <div class="signal-metric-label">Band</div>
+            </div>
+            <div class="signal-metric">
+              <div class="signal-metric-value">${s.rSquared.toFixed(3)}</div>
+              <div class="signal-metric-label">R²</div>
+            </div>
+            <div class="signal-metric">
+              <div class="signal-metric-value">${s.volatility.toFixed(2)}</div>
+              <div class="signal-metric-label">Vol</div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderTable() {
+      let signals = currentFilter === 'all'
+        ? [...signalsData.buySignals, ...signalsData.sellSignals]
+        : currentFilter === 'buy' ? signalsData.buySignals : signalsData.sellSignals;
+
+      signals.sort((a, b) => {
+        if (currentSort === 'confidence') return b.confidence - a.confidence;
+        return a.symbol.localeCompare(b.symbol);
+      });
+
+      document.getElementById('signalsBody').innerHTML = signals.map(s => `
+        <tr>
+          <td class="symbol-cell">${s.symbol}</td>
+          <td><span class="signal-badge-small ${s.signal}">${s.signal}</span></td>
+          <td>
+            <div class="table-confidence">
+              <div class="table-confidence-bar">
+                <div class="table-confidence-fill ${s.signal}" style="width:${s.confidence}%"></div>
+              </div>
+              <span>${s.confidence}%</span>
+            </div>
+          </td>
+          <td>$${s.currentPrice.toFixed(2)}</td>
+          <td>${s.bandDistance.toFixed(1)}%</td>
+          <td>${s.rSquared.toFixed(3)}</td>
+          <td>${s.volatility.toFixed(2)}</td>
+          <td>
+            <span class="slope-indicator ${s.slopeDirection}">
+              ${s.slopeDirection === 'positive' ? '+' : ''}${s.slope.toFixed(4)}
+            </span>
+          </td>
+        </tr>
+      `).join('');
+
+      document.getElementById('tabAll').textContent = `All (${signalsData.buySignals.length + signalsData.sellSignals.length})`;
+      document.getElementById('tabBuy').textContent = `Buy (${signalsData.buySignals.length})`;
+      document.getElementById('tabSell').textContent = `Sell (${signalsData.sellSignals.length})`;
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
