@@ -3185,12 +3185,15 @@
             const id = uniqIds[myIdx];
             const { data, error } = await supabaseClient
               .from('stock_intraday_c')
-              .select('security_id, current_price, 1d_abs, 1d_pct, timestamp')
+              .select('security_id, symbol, current_price, 1d_abs, 1d_pct, timestamp')
               .eq('security_id', id)
               .order('timestamp', { ascending: false })
               .limit(1);
             if (error) { _err = error; continue; }
-            if (data && data[0]) map[id] = data[0];
+            if (data && data[0]) {
+              map[id] = data[0];
+              try { if (data[0].symbol === 'PIK.JO' || /PIK/i.test(data[0].symbol||'')) console.log('[intraday] PIK row =', JSON.stringify(data[0])); } catch(e){}
+            }
           }
         };
         await Promise.all(Array.from({ length: Math.min(CONCURRENCY, uniqIds.length) }, () => worker()));
