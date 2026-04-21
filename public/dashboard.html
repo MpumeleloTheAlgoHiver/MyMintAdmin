@@ -7328,22 +7328,9 @@
           const ytdDisplay = fmtYtd(ytd);
           const ytdClr = ytdColor(ytd);
 
-          /* Daily return — prefer strategies_returns_c.1d_pct; fallback weighted average */
-          let dailyReturn = null;
+          /* Daily return — strictly from strategies_returns_c.1d_pct (no fallback) */
           const stratRet = strategyReturnsMap.get(String(strategy.id));
-          if (stratRet?.['1d_pct'] != null) {
-            dailyReturn = Number(stratRet['1d_pct']);
-          } else if (holdings.length && globalSecuritiesMap) {
-            let wSum = 0, wTotal = 0;
-            holdings.forEach(h => {
-              const sym = h.ticker || h.symbol || (typeof h === "string" ? h : "");
-              const sec = globalSecuritiesMap.get(sym) || globalSecuritiesMap.get(sym + ".JO");
-              const pct = sec?.change_percent != null ? Number(sec.change_percent) : null;
-              const w   = h.weight != null ? Number(h.weight) : null;
-              if (pct != null && w != null && w > 0) { wSum += pct * w; wTotal += w; }
-            });
-            if (wTotal > 0) dailyReturn = wSum / wTotal;
-          }
+          const dailyReturn = stratRet?.['1d_pct'] != null ? Number(stratRet['1d_pct']) : null;
           const dailyDisplay = fmtYtd(dailyReturn);
           const dailyClr = ytdColor(dailyReturn);
 
