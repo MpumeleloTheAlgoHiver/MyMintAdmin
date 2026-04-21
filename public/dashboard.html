@@ -3351,7 +3351,7 @@
           const intradayChangeAbs = iv['1d_abs'] != null ? Number(iv['1d_abs']) : null;
           const intradayChangePct = iv['1d_pct'] != null ? Number(iv['1d_pct']) : null;
           metricsMap[secId] = {
-            last_price:       sr.current_price != null ? Math.round(Number(sr.current_price)) : null,
+            last_price:       sr.current_price != null ? Math.round(Number(sr.current_price) * 100) : null,
             change_percent:   intradayChangePct,
             ytd_performance:  sr.ytd_pct       ?? null,
             mtd_performance:  sr['1m_pct']     ?? null,
@@ -3421,14 +3421,8 @@
           const intradayPrice    = iv.current_price != null ? Number(iv.current_price) : null;
           const intradayChangeAbs= iv['1d_abs']     != null ? Number(iv['1d_abs'])     : null;
           const intradayChangePct= iv['1d_pct']     != null ? Number(iv['1d_pct'])     : null;
-          try {
-            const sym = (sr && sr.symbol) || (iv && iv.symbol) || '';
-            if (sym === 'VKE.JO' || sym === 'VOD.JO' || sym === 'NED.JO' || sym === 'PIK.JO') {
-              console.log('[price-debug]', sym, 'stock_returns_c.current_price=', sr.current_price, 'stock_intraday_c.current_price=', iv.current_price);
-            }
-          } catch(e){}
           _metricsMap[id] = {
-            last_price:      sr.current_price != null ? Math.round(Number(sr.current_price)) : null,
+            last_price:      sr.current_price != null ? Math.round(Number(sr.current_price) * 100) : null,
             change_percent:  intradayChangePct,
             change_abs:      intradayChangeAbs,
             prev_close:      intradayPrice,
@@ -4885,7 +4879,7 @@
               const sr = _sm[s.id] || {};
               const merged = {
                 ...s,
-                last_price:      sr.current_price != null ? Math.round(Number(sr.current_price)) : null,
+                last_price:      sr.current_price != null ? Math.round(Number(sr.current_price) * 100) : null,
                 change_percent:  sr['1d_pct']     ?? null,
                 ytd_performance: sr['ytd_pct']    ?? null,
                 w1_performance:  sr['5d_pct']     ?? null,
@@ -5588,7 +5582,7 @@
           (secRows || []).forEach(s => {
             if (_seenSec.has(s.security_id)) return;
             _seenSec.add(s.security_id);
-            secPriceMap[s.security_id] = s.current_price != null ? Math.round(Number(s.current_price)) : 0;
+            secPriceMap[s.security_id] = s.current_price != null ? Math.round(Number(s.current_price) * 100) : 0;
           });
         }
 
@@ -7620,7 +7614,7 @@
                 const intradayChangePct = iv['1d_pct'] != null ? Number(iv['1d_pct']) : null;
                 const merged = {
                   ...s,
-                  last_price:       sr.current_price != null ? Math.round(Number(sr.current_price)) : null,
+                  last_price:       sr.current_price != null ? Math.round(Number(sr.current_price) * 100) : null,
                   change_percent:   intradayChangePct,
                   change_abs:       intradayChangeAbs,
                   prev_close:       intradayPrice,
