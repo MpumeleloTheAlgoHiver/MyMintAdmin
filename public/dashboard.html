@@ -5954,14 +5954,14 @@
 
           const { data: secs, error } = await query;
           if (error) throw error;
-          const _ovStockRet = await fetchStockReturnsBySec((secs || []).map(s => s.id).filter(Boolean));
+          const _ovIntraday = await fetchIntradayBySec((secs || []).map(s => s.id).filter(Boolean));
           const items = (secs || []).map(s => {
-            const sr = _ovStockRet[s.id] || {};
+            const iv = _ovIntraday[s.id] || {};
             return {
               sym:    (s.symbol || '').replace('.JO', ''),
               logo:   s.logo_url || null,
-              price:  sr.current_price != null ? Number(sr.current_price) / 100 : null,
-              change: sr['1d_pct']     != null ? Number(sr['1d_pct'])     : null,
+              price:  iv.current_price != null ? Number(iv.current_price) / 100 : null,
+              change: iv['1d_pct']     != null ? Number(iv['1d_pct'])     : null,
             };
           }).filter(item => item.sym);
           _ovTickerRenderItems(track, items);
