@@ -258,1138 +258,659 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
   <script>
     document.documentElement.style.opacity = '1';
     const SUPABASE_URL = "https://mfxnghmuccevsxwcetej.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg";
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    let allInvestors = [];
-    let allStrategies = [];
-    let currentInvestor = null;
-    let currentTab = 'performance';
+    /* ─── State ─── */
+    let allInvestors = [], allStrategies = [], stratNavMap = {}, stratMetricsMap = {};
+    let currentInvestor = null, currentTab = 'overview';
+    const _charts = new WeakMap();
+    function disposeChart(el) {
+      if (!el) return;
+      const prev = _charts.get(el);
+      if (prev) { try { prev.dispose(); } catch(e) {} _charts.delete(el); }
+      else if (window.echarts) { try { const inst = echarts.getInstanceByDom(el); if (inst) inst.dispose(); } catch(e) {} }
+    }
 
-    /* ── Formatters ── */
-    const fmtR = (v) => {
-      if (v == null || isNaN(v)) return '—';
-      const abs = Math.abs(v);
-      if (abs >= 1e6) return `R${(v/1e6).toFixed(1)}M`;
-      if (abs >= 10000) return `R${Math.round(v/1e3)}K`;  /* >= R10K → show as K */
-      return `R${Math.round(v).toLocaleString('en-ZA')}`;  /* < R10K → show full amount */
-    };
-    const fmtPct = (v) => {
-      if (v == null || isNaN(v)) return '—';
-      return (v >= 0 ? '+' : '') + Number(v).toFixed(1) + '%';
-    };
-    const pctColor = (v) => (v == null || isNaN(v)) ? '#94a3b8' : (v >= 0 ? '#059669' : '#dc2626');
+    /* ─── Formatters ─── */
+    const fmtR    = n => 'R' + (Number(n) || 0).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    const fmtR2   = n => 'R' + (Number(n) || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtPct  = n => (n == null || isNaN(n)) ? '—' : ((n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%');
+    const fmtPctNoSign = n => (n == null || isNaN(n)) ? '—' : Number(n).toFixed(2) + '%';
+    const pctClr  = n => (n == null || isNaN(n)) ? '#64748b' : (n >= 0 ? '#059669' : '#dc2626');
+    const fmtDate = s => s ? new Date(s).toLocaleDateString('en-ZA', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+    const fmtDateShort = s => s ? new Date(s).toLocaleDateString('en-ZA', { day:'2-digit', month:'short' }) : '—';
 
-    /* ── Build last N months labels ── */
-    function getLastMonthLabels(n) {
-      const result = [];
-      const now = new Date();
-      for (let i = n - 1; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        result.push(d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }));
+    /* ─── Risk math (from daily NAV series) ─── */
+    function computeMetrics(navSeries) {
+      if (!navSeries || navSeries.length < 2) return { sharpe:null, vol:null, maxDD:null, sortino:null };
+      const rets = [];
+      for (let i = 1; i < navSeries.length; i++) {
+        const a = navSeries[i-1].nav, b = navSeries[i].nav;
+        if (a > 0 && b > 0) rets.push(b/a - 1);
       }
-      return result;
-    }
-
-    /* ── Build month list from a start date to now ── */
-    function getMonthsSince(startDateStr) {
-      if (!startDateStr) return getLastMonthLabels(12);
-      const start = new Date(startDateStr);
-      const now = new Date();
-      const result = [];
-      let cur = new Date(start.getFullYear(), start.getMonth(), 1);
-      while (cur <= now) {
-        result.push(cur.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }));
-        cur.setMonth(cur.getMonth() + 1);
-      }
-      return result.length >= 2 ? result : getLastMonthLabels(12);
-    }
-
-    /* ── Convert calendar_returns array into { "YYYY-MM": return_decimal } map ── */
-    function buildCalendarMap(calendarReturns) {
-      const map = {};
-      (calendarReturns || []).forEach(entry => {
-        if (entry?.month) map[entry.month] = Number(entry.return ?? 0);
-      });
-      return map;
-    }
-
-    /* ── Build investor-specific monthly returns from daily NAV curve ──────────
-       navCurve must already be filtered to the investor's inception date.
-       First month return = (end-of-month NAV) / (entry-day NAV) − 1
-       Subsequent months  = (end-of-month NAV) / (prev month end NAV) − 1      */
-    function buildNavCalMap(navCurve) {
-      if (!navCurve || navCurve.length === 0) return {};
-      /* Last NAV point per calendar month */
-      const byMonth = {};
-      navCurve.forEach(p => { byMonth[p.d.slice(0, 7)] = p.v; });
-      const months = Object.keys(byMonth).sort();
-      const result = {};
-      months.forEach((m, i) => {
-        const endNav   = byMonth[m];
-        const startNav = i === 0 ? navCurve[0].v : byMonth[months[i - 1]];
-        if (startNav > 0) result[m] = (endNav - startNav) / startNav;
-      });
-      return result;
-    }
-
-    /* ── Get months from inception to now as [{ month, label, ret }] ── */
-    function getMonthsSinceInception(calMap, inceptionDate) {
-      const result = [];
-      if (!inceptionDate) return result;
-      const start = new Date(inceptionDate);
-      const now   = new Date();
-      let sy = start.getFullYear(), sm = start.getMonth() + 1;
-      const ey = now.getFullYear(),  em = now.getMonth() + 1;
-      while (sy * 12 + sm <= ey * 12 + em) {
-        const key   = `${sy}-${String(sm).padStart(2,'0')}`;
-        const label = new Date(sy, sm - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-        result.push({ month: key, label, ret: calMap[key] ?? null });
-        sm++;
-        if (sm > 12) { sm = 1; sy++; }
-      }
-      return result;
-    }
-
-    /* ── Build cumulative return series from calendar_returns ── */
-    function buildCumulativeSeries(calMap, inceptionDate) {
-      const months = [];
-      const cumulative = [];
-      if (!calMap || Object.keys(calMap).length === 0) return { months, cumulative };
-      const sortedKeys = Object.keys(calMap).sort();
-      let startKey = sortedKeys[0];
-      if (inceptionDate) {
-        const id = new Date(inceptionDate);
-        const idKey = `${id.getFullYear()}-${String(id.getMonth()+1).padStart(2,'0')}`;
-        if (idKey > startKey) startKey = idKey;
-      }
-      const nowDate = new Date();
-      const nowKey = `${nowDate.getFullYear()}-${String(nowDate.getMonth()+1).padStart(2,'0')}`;
-      let cum = 0;
-      let [sy, sm] = startKey.split('-').map(Number);
-      const [ey, em] = nowKey.split('-').map(Number);
-      while (sy * 12 + sm <= ey * 12 + em) {
-        const key = `${sy}-${String(sm).padStart(2,'0')}`;
-        const label = new Date(sy, sm - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-        if (calMap[key] != null) cum += calMap[key] * 100;
-        months.push(label);
-        cumulative.push(+cum.toFixed(2));
-        sm++;
-        if (sm > 12) { sm = 1; sy++; }
-      }
-      return { months, cumulative };
-    }
-
-    /* ── Compute rolling 3-month returns from cumulative ── */
-    function buildRolling3M(cumulative) {
-      return cumulative.map((v, i) => {
-        if (i < 3) return null;
-        return +(v - cumulative[i - 3]).toFixed(2);
-      });
-    }
-
-    /* ── Compute max drawdown from cumulative % series ── */
-    function computeMaxDrawdown(cumulative) {
-      let peak = -Infinity;
-      let maxDD = 0;
-      for (const v of cumulative) {
-        if (v > peak) peak = v;
-        const dd = v - peak;
+      if (!rets.length) return { sharpe:null, vol:null, maxDD:null, sortino:null };
+      const mean = rets.reduce((s,x)=>s+x,0) / rets.length;
+      const variance = rets.reduce((s,x)=>s+(x-mean)**2,0) / rets.length;
+      const std = Math.sqrt(variance);
+      const downside = Math.sqrt(rets.filter(r=>r<0).reduce((s,r)=>s+r*r,0) / rets.length || 1e-9);
+      const annVol = std * Math.sqrt(252);
+      const annRet = mean * 252;
+      const sharpe = std > 0 ? annRet / annVol : null;
+      const sortino = downside > 0 ? annRet / (downside * Math.sqrt(252)) : null;
+      let peak = navSeries[0].nav, maxDD = 0;
+      const ddSeries = navSeries.map(p => {
+        if (p.nav > peak) peak = p.nav;
+        const dd = peak > 0 ? (p.nav - peak) / peak : 0;
         if (dd < maxDD) maxDD = dd;
-      }
-      return maxDD; // negative number, in %
-    }
-
-    /* ── Compute drawdown series from cumulative ── */
-    function buildDrawdownSeries(cumulative) {
-      let peak = -Infinity;
-      return cumulative.map(v => {
-        if (v > peak) peak = v;
-        return +(v - peak).toFixed(2);
+        return { date: p.date, dd: +(dd*100).toFixed(2) };
       });
-    }
-
-    /* ── Compute max drawdown from a raw daily NAV curve [{d, v}] ── */
-    function computeNavMaxDrawdown(navCurve) {
-      let peak = -Infinity, maxDD = 0;
-      navCurve.forEach(({ v }) => {
-        if (v > peak) peak = v;
-        const dd = peak > 0 ? (v - peak) / peak * 100 : 0;
-        if (dd < maxDD) maxDD = dd;
-      });
-      return maxDD; // negative, in %
-    }
-
-    /* ── Build daily drawdown % series from a raw NAV curve [{d, v}] ── */
-    function buildNavDrawdownSeries(navCurve) {
-      let peak = -Infinity;
-      return navCurve.map(({ v }) => {
-        if (v > peak) peak = v;
-        return peak > 0 ? +((v - peak) / peak * 100).toFixed(2) : 0;
-      });
-    }
-
-    /* ── YYYY-MM key helpers ── */
-    function monthKey(y, m) { return `${y}-${String(m).padStart(2,'0')}`; }
-
-    /* ── Compute period return — investor must have at least nMonths×28 days invested ── */
-    function periodReturn(calMap, nMonths, investorDays) {
-      /* Day-based gate: require roughly a full period of history */
-      if (investorDays == null || investorDays < nMonths * 28) return null;
-      const now = new Date();
-      /* Accumulate from nMonths ago to this month */
-      let sy = now.getFullYear(), sm = now.getMonth() + 1 - (nMonths - 1);
-      while (sm <= 0) { sm += 12; sy--; }
-      const ey = now.getFullYear(), em = now.getMonth() + 1;
-      let cum = 1, hasAny = false;
-      while (sy * 12 + sm <= ey * 12 + em) {
-        const key = monthKey(sy, sm);
-        if (calMap[key] != null) { cum *= (1 + calMap[key]); hasAny = true; }
-        sm++; if (sm > 12) { sm = 1; sy++; }
+      /* CAGR from NAV path: (end/start)^(365/days) - 1 */
+      let cagr = null;
+      const first = navSeries[0], last = navSeries[navSeries.length-1];
+      const days = (new Date(last.date) - new Date(first.date)) / 86400000;
+      if (first.nav > 0 && last.nav > 0 && days > 7) {
+        cagr = Math.pow(last.nav / first.nav, 365 / days) - 1;
       }
-      return hasAny ? (cum - 1) * 100 : null;
+      return {
+        sharpe: sharpe != null ? +sharpe.toFixed(2) : null,
+        vol:    annVol != null ? +(annVol*100).toFixed(2) : null,
+        maxDD:  +(maxDD*100).toFixed(2),
+        sortino: sortino != null ? +sortino.toFixed(2) : null,
+        annRet: cagr != null ? +(cagr*100).toFixed(2) : null,
+        ddSeries
+      };
     }
 
-    /* ── Compute YTD — investor must have joined on/before Jan 1 of current year ── */
-    function ytdReturn(calMap, inceptionDate) {
-      if (!inceptionDate) return null;
-      const now = new Date();
-      const jan1 = new Date(now.getFullYear(), 0, 1);
-      /* If investor joined after Jan 1 of this year, YTD predates their entry */
-      if (new Date(inceptionDate) > jan1) return null;
-      let cum = 1, hasAny = false;
-      for (let m = 1; m <= now.getMonth() + 1; m++) {
-        const key = monthKey(now.getFullYear(), m);
-        if (calMap[key] != null) { cum *= (1 + calMap[key]); hasAny = true; }
-      }
-      return hasAny ? (cum - 1) * 100 : null;
+    /* Build calendar-returns table from daily NAV: monthKey → % return for that month */
+    function computeCalendar(navSeries) {
+      if (!navSeries || navSeries.length < 2) return {};
+      const monthLast = {};
+      navSeries.forEach(p => {
+        const d = new Date(p.date);
+        const key = d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0');
+        monthLast[key] = p.nav;
+      });
+      const sortedKeys = Object.keys(monthLast).sort();
+      const monthFirst = {};
+      navSeries.forEach(p => {
+        const d = new Date(p.date);
+        const key = d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0');
+        if (monthFirst[key] == null) monthFirst[key] = p.nav;
+      });
+      const out = {};
+      sortedKeys.forEach((k, i) => {
+        const start = i === 0 ? monthFirst[k] : monthLast[sortedKeys[i-1]];
+        const end   = monthLast[k];
+        if (start > 0) out[k] = (end / start - 1) * 100;
+      });
+      return out;
     }
 
-    /* ─────────────────────────────────────────────────────── */
-    /* LOAD ALL INVESTORS                                      */
-    /* ─────────────────────────────────────────────────────── */
-    async function loadInvestors() {
-      const { data: stratList } = await supabaseClient.from('strategies_c').select('id, name, short_name');
-      allStrategies = stratList || [];
-
-      /* Fetch active buy holdings with created_at for inception date */
-      const { data: holdings } = await supabaseClient
-        .from('stock_holdings_c')
-        .select('user_id, strategy_id, security_id, quantity, avg_fill, market_value, created_at, as_of_date')
-        .eq('is_active', true)
-        .eq('trade_side', 'BUY');
-
-      if (!holdings || holdings.length === 0) return [];
-
-      const userIds    = [...new Set(holdings.map(r => r.user_id).filter(Boolean))];
-      const secIds     = [...new Set(holdings.map(r => r.security_id).filter(Boolean))];
-
-      /* Fetch profiles, transactions, and live security prices in parallel */
-      const [{ data: profiles }, { data: txnRows }, { data: secPrices }] = await Promise.all([
-        supabaseClient.from('profiles').select('id, first_name, last_name, email').in('id', userIds),
-        supabaseClient
-          .from('transactions')
-          .select('user_id, amount, direction, status, transaction_date')
-          .in('user_id', userIds)
-          .eq('direction', 'debit')
-          .eq('status',    'posted')
-          .gte('amount', 10000),   /* exclude tiny per-share test transactions */
-        supabaseClient
-          .from('securities_c')
-          .select('id, last_price, AsOfTime')
-          .in('id', secIds)
+    /* ─── Data Load ─── */
+    async function loadAll() {
+      const [
+        { data: holdings },
+        { data: strategies },
+        { data: stratHist },
+      ] = await Promise.all([
+        sb.from('stock_holdings_c').select('user_id, security_id, strategy_id, quantity, avg_fill, market_value, created_at').eq('is_active', true).eq('trade_side', 'BUY'),
+        sb.from('strategies_c').select('id, name, short_name, description, risk_level, sector'),
+        sb.from('strategies_returns_c').select('strategy_id, as_of_date, basket_value, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct, all_pct').order('as_of_date', { ascending: true }),
       ]);
 
-      const profMap = {};
-      (profiles || []).forEach(p => { profMap[p.id] = p; });
+      const userIds = [...new Set((holdings||[]).map(r=>r.user_id).filter(Boolean))];
+      const secIds  = [...new Set((holdings||[]).map(r=>r.security_id).filter(Boolean))];
 
-      /* Live price map: security_id → { price (cents), asOf (timestamp string) } */
-      const priceMap = {};
-      (secPrices || []).forEach(s => {
-        priceMap[s.id] = { price: Number(s.last_price) || 0, asOf: s.AsOfTime };
+      const [
+        { data: profiles },
+        { data: secMeta },
+        { data: secLive },
+        { data: txns },
+      ] = await Promise.all([
+        userIds.length ? sb.from('profiles').select('id, first_name, last_name, email, mint_number').in('id', userIds) : Promise.resolve({ data: [] }),
+        secIds.length  ? sb.from('securities_c').select('id, symbol, name, sector, logo_url').in('id', secIds) : Promise.resolve({ data: [] }),
+        secIds.length  ? sb.from('stock_returns_c').select('security_id, symbol, current_price, 1d_pct, ytd_pct, 1y_pct, as_of_date').in('security_id', secIds).order('as_of_date', { ascending: false }) : Promise.resolve({ data: [] }),
+        userIds.length ? sb.from('transactions').select('user_id, amount, direction, name, description, status, transaction_date').in('user_id', userIds).order('transaction_date', { ascending: false }) : Promise.resolve({ data: [] }),
+      ]);
+
+      const profMap    = Object.fromEntries((profiles||[]).map(p => [p.id, p]));
+      const stratMap   = Object.fromEntries((strategies||[]).map(s => [s.id, s]));
+      const secMetaMap = Object.fromEntries((secMeta||[]).map(s => [s.id, s]));
+      /* First-write-wins (rows are sorted DESC by as_of_date → first row is latest per security) */
+      const secLiveMap = {};
+      (secLive||[]).forEach(s => {
+        if (secLiveMap[s.security_id]) return;
+        secLiveMap[s.security_id] = { priceR: (Number(s.current_price)||0)/100, dayPct: Number(s['1d_pct'])||0, ytd: Number(s.ytd_pct)||0, y1: Number(s['1y_pct'])||0, asOf: s.as_of_date };
       });
 
-      /* Sum investment transaction amounts per user — DB stores amounts in ZAR cents.
-         Also track the EARLIEST transaction_date as the true "first invested" date. */
-      const txnInvested     = {};
-      const txnInceptionMap = {};  /* userId → earliest transaction_date (YYYY-MM-DD) */
-      (txnRows || []).forEach(t => {
-        txnInvested[t.user_id] = (txnInvested[t.user_id] || 0) + Number(t.amount) / 100;
-        const d = t.transaction_date ? t.transaction_date.split('T')[0] : null;
-        if (d && (!txnInceptionMap[t.user_id] || d < txnInceptionMap[t.user_id])) {
-          txnInceptionMap[t.user_id] = d;
-        }
+      /* Strategy NAV history & metrics */
+      stratNavMap = {}; stratMetricsMap = {};
+      const stratLatest = {};
+      (stratHist||[]).forEach(r => {
+        const sid = r.strategy_id;
+        if (!stratNavMap[sid]) stratNavMap[sid] = [];
+        const nav = Number(r.basket_value);
+        if (nav > 0) stratNavMap[sid].push({ date: r.as_of_date, nav });
+        stratLatest[sid] = r;  /* last one wins → most recent (asc order) */
       });
-
-      const stratMap = {};
-      allStrategies.forEach(s => { stratMap[s.id] = s; });
-
-      /* Group holdings by user — track cost basis, live current value, and earliest holding date */
-      const byUser = {};
-      holdings.forEach(row => {
-        const uid = row.user_id;
-        if (!uid) return;
-        if (!byUser[uid]) {
-          byUser[uid] = {
-            userId: uid,
-            costBasis: 0,
-            current: 0,
-            liveAsOf: null,
-            strategyId: row.strategy_id,
-            inceptionDate: row.created_at
-          };
-        }
-        const mv  = Number(row.market_value) || 0;
-        const qty = Number(row.quantity)     || 0;
-        let fill  = Number(row.avg_fill)     || 0;
-        /* Sanity-check: if avg_fill×qty is >10× market_value, avg_fill is in a larger sub-unit */
-        if (fill * qty > 10 * mv && mv > 0) fill /= 100;
-        /* avg_fill is stored in ZAR cents — convert to rands for cost basis */
-        byUser[uid].costBasis += (fill * qty) / 100;
-        /* Use live price from securities table (updated intraday); fall back to stale market_value */
-        const livePx = priceMap[row.security_id];
-        const liveVal = livePx && livePx.price > 0 ? livePx.price * qty / 100 : mv / 100;
-        byUser[uid].current += liveVal;
-        /* Track the most recent price timestamp across all holdings (date-safe comparison) */
-        if (livePx?.asOf && (!byUser[uid].liveAsOf || new Date(livePx.asOf) > new Date(byUser[uid].liveAsOf))) {
-          byUser[uid].liveAsOf = livePx.asOf;
-        }
-        /* Use the earliest created_at as inception date */
-        if (row.created_at && row.created_at < byUser[uid].inceptionDate) {
-          byUser[uid].inceptionDate = row.created_at;
-        }
-        if (!byUser[uid].strategyId && row.strategy_id) byUser[uid].strategyId = row.strategy_id;
-      });
-
-      return Object.values(byUser).map(u => {
-        const prof  = profMap[u.userId] || {};
-        const strat = u.strategyId ? stratMap[u.strategyId] : null;
-        const name  = [prof.first_name, prof.last_name].filter(Boolean).join(' ') || prof.email || u.userId;
-
-        /* Transaction date is the authoritative "first invested" date; fall back to holdings created_at */
-        const inceptionDate = txnInceptionMap[u.userId]
-          || (u.inceptionDate ? u.inceptionDate.split('T')[0] : null);
-        const days = inceptionDate ? Math.floor((Date.now() - new Date(inceptionDate)) / 86400000) : 0;
-
-        /* ── Live price-based P&L (matches Mint app real-time data) ── */
-        const currentVal = u.current;
-        const base       = u.costBasis > 0 ? u.costBasis : (txnInvested[u.userId] || 0);
-        const pnl        = +(currentVal - base).toFixed(2);
-        const returnPct  = base > 0 ? +((pnl / base) * 100).toFixed(2) : 0;
-
-        const invested = u.costBasis;   /* cost basis = investor's principal in NAV model */
-
-        /* Geometric annualisation: ((1 + r)^(365/days) − 1) × 100 */
-        const annualised = days > 30
-          ? +(((Math.pow(1 + returnPct / 100, 365 / days) - 1) * 100)).toFixed(2)
-          : returnPct;
-
-        /* Skip users with no strategy — they hold individual assets, not a managed strategy */
-        if (!u.strategyId) return null;
-
-        return {
-          userId: u.userId,
-          name,
-          strategy: strat?.short_name || strat?.name || '—',
-          strategyId: u.strategyId,
-          value: fmtR(currentVal),
-          valueFull: currentVal,
-          invested,
-          current: currentVal,
-          pnl,
-          returnPct,
-          days,
-          annualised,
-          inceptionDate,
-          liveAsOf: u.liveAsOf || null
+      Object.entries(stratNavMap).forEach(([sid, series]) => {
+        stratMetricsMap[sid] = {
+          ...computeMetrics(series),
+          calendar: computeCalendar(series),
+          latest: stratLatest[sid] || null,
         };
-      }).filter(Boolean).sort((a, b) => b.valueFull - a.valueFull);
+      });
+
+      /* Group txns by user */
+      const txnByUser = {};
+      (txns||[]).forEach(t => { (txnByUser[t.user_id] = txnByUser[t.user_id] || []).push(t); });
+
+      /* Build investor objects */
+      const byUser = {};
+      (holdings||[]).forEach(row => {
+        const uid = row.user_id; if (!uid) return;
+        if (!byUser[uid]) byUser[uid] = { userId: uid, strategyId: row.strategy_id, holdings: [], inception: row.created_at };
+        const qty   = Number(row.quantity) || 0;
+        let fill    = Number(row.avg_fill) || 0;
+        const mv    = Number(row.market_value) || 0;
+        if (fill * qty > 10 * mv && mv > 0) fill /= 100;
+        const live  = secLiveMap[row.security_id];
+        const meta  = secMetaMap[row.security_id] || {};
+        const investedR = (fill * qty) / 100;
+        const currentR  = live ? live.priceR * qty : (mv / 100);
+        byUser[uid].holdings.push({
+          securityId: row.security_id,
+          symbol: meta.symbol || '—',
+          name:   meta.name   || meta.symbol || '—',
+          sector: meta.sector || 'Other',
+          logo:   meta.logo_url,
+          qty, avgFillR: fill/100, priceR: live ? live.priceR : (mv/qty/100 || 0),
+          investedR, currentR,
+          pnlR: currentR - investedR,
+          retPct: investedR > 0 ? ((currentR - investedR) / investedR) * 100 : 0,
+          dayPct: live ? live.dayPct : null,
+          ytdPct: live ? live.ytd : null,
+        });
+        if (!byUser[uid].strategyId && row.strategy_id) byUser[uid].strategyId = row.strategy_id;
+        if (row.created_at && row.created_at < byUser[uid].inception) byUser[uid].inception = row.created_at;
+      });
+
+      const investors = Object.values(byUser).map(u => {
+        if (!u.strategyId) return null;
+        const prof = profMap[u.userId] || {};
+        const strat = stratMap[u.strategyId] || {};
+        const name = [prof.first_name, prof.last_name].filter(Boolean).join(' ') || prof.email || u.userId.slice(0, 8);
+        const invested = u.holdings.reduce((s,h)=>s+h.investedR, 0);
+        const current  = u.holdings.reduce((s,h)=>s+h.currentR, 0);
+        const pnl = current - invested;
+        const retPct = invested > 0 ? (pnl / invested) * 100 : 0;
+        /* Inception from earliest deposit transaction OR holding created_at */
+        const userTxns = txnByUser[u.userId] || [];
+        const deposits = userTxns.filter(t => t.direction === 'debit' && t.status === 'posted' && Number(t.amount) >= 10000);
+        const earliestDep = deposits.length ? deposits[deposits.length-1].transaction_date : null;
+        const inception = earliestDep || u.inception;
+        const days = inception ? Math.floor((Date.now() - new Date(inception)) / 86400000) : 0;
+        /* Annualise; clamp to -100% to avoid NaN/complex roots when retPct ≤ -100% */
+        let annualised = retPct;
+        if (days > 30) {
+          const safe = Math.max(1 + retPct/100, 0.0001);
+          annualised = +(((Math.pow(safe, 365/days) - 1) * 100)).toFixed(2);
+        }
+        /* Add weights to holdings */
+        u.holdings.forEach(h => { h.weight = current > 0 ? (h.currentR / current) * 100 : 0; });
+        u.holdings.sort((a,b) => b.currentR - a.currentR);
+        return {
+          userId: u.userId, name, email: prof.email, mintNo: prof.mint_number,
+          strategy: strat.short_name || strat.name || '—', strategyId: u.strategyId,
+          strategyDesc: strat.description, riskLevel: strat.risk_level,
+          invested, current, pnl, retPct: +retPct.toFixed(2),
+          days, annualised, inception,
+          holdings: u.holdings,
+          txns: userTxns,
+        };
+      }).filter(Boolean).sort((a,b) => b.current - a.current);
+
+      allStrategies = strategies || [];
+      return investors;
     }
 
-    /* ─────────────────────────────────────────────────────── */
-    /* KPI BAR                                                 */
-    /* ─────────────────────────────────────────────────────── */
+    /* ─── KPI Bar ─── */
     function renderKpiBar(investors) {
-      console.log('[KPI] Per-investor breakdown:', investors.map(i => ({ name: i.name, invested: i.invested, current: i.current, returnPct: i.returnPct })));
-      const aum  = investors.reduce((s, i) => s + (i.current || 0), 0);
-      const inv  = investors.reduce((s, i) => s + (i.invested || 0), 0);
-      const pnl  = aum - inv;
-      const avg  = investors.length ? investors.reduce((s, i) => s + i.returnPct, 0) / investors.length : 0;
-      const sorted = [...investors].sort((a, b) => b.returnPct - a.returnPct);
-      const best = sorted[0];
-      const worst = sorted[sorted.length - 1];
+      const aum = investors.reduce((s,i)=>s+i.current,0);
+      const inv = investors.reduce((s,i)=>s+i.invested,0);
+      const pnl = aum - inv;
+      const avg = investors.length ? investors.reduce((s,i)=>s+i.retPct,0) / investors.length : 0;
+      const sorted = [...investors].sort((a,b) => b.retPct - a.retPct);
+      const best  = sorted[0];
+      const worst = sorted[sorted.length-1];
       const kpis = [
-        { l: 'TOTAL AUM',       v: fmtR(aum),    c: '#0f172a' },
-        { l: 'TOTAL INVESTED',  v: fmtR(inv),     c: '#64748b' },
-        { l: 'TOTAL P&L',       v: (pnl >= 0 ? '+' : '') + fmtR(pnl), c: pnl >= 0 ? '#059669' : '#dc2626' },
-        { l: 'AVG RETURN',      v: fmtPct(avg),   c: avg >= 0 ? '#059669' : '#dc2626' },
-        { l: 'BEST PERFORMER',  v: best  ? `${best.name.split(' ')[0]} ${fmtPct(best.returnPct)}`  : '—', c: '#059669' },
-        { l: 'WORST PERFORMER', v: worst ? `${worst.name.split(' ')[0]} ${fmtPct(worst.returnPct)}` : '—', c: '#dc2626' }
+        { l:'TOTAL AUM',       v: fmtR(aum), c:'#0f172a' },
+        { l:'TOTAL INVESTED',  v: fmtR(inv), c:'#64748b' },
+        { l:'TOTAL P&L',       v: (pnl>=0?'+':'')+fmtR(pnl), c: pctClr(pnl) },
+        { l:'AVG RETURN',      v: fmtPct(avg), c: pctClr(avg) },
+        { l:'BEST PERFORMER',  v: best  ? `${best.name.split(' ')[0]} ${fmtPct(best.retPct)}`   : '—', c:'#059669' },
+        { l:'WORST PERFORMER', v: worst ? `${worst.name.split(' ')[0]} ${fmtPct(worst.retPct)}` : '—', c:'#dc2626' },
       ];
       document.getElementById('kpiBar').innerHTML = kpis.map(k =>
-        `<div class="ov-kpi-card"><div style="font-size:10px;color:#94a3b8;font-weight:500;margin-bottom:5px;">${k.l}</div><div style="font-size:14px;font-weight:700;color:${k.c};font-family:ui-monospace,monospace;">${k.v}</div></div>`
+        `<div class="ov-kpi-card">
+           <div style="font-size:10px;color:#94a3b8;font-weight:500;margin-bottom:5px;letter-spacing:0.04em;">${k.l}</div>
+           <div style="font-size:14px;font-weight:700;color:${k.c};font-family:ui-monospace,monospace;">${k.v}</div>
+         </div>`
       ).join('');
     }
 
-    /* ─────────────────────────────────────────────────────── */
-    /* INVESTOR LIST                                           */
-    /* ─────────────────────────────────────────────────────── */
-    function renderInvestorList(investors) {
-      const searchTerm  = document.getElementById('investorSearch').value.toLowerCase();
-      const stratFilter = document.getElementById('strategyFilter').value;
-      const filtered = investors.filter(i =>
-        i.name.toLowerCase().includes(searchTerm) &&
-        (!stratFilter || i.strategy === stratFilter || i.strategyId === stratFilter)
+    /* ─── Investor list ─── */
+    function renderList(investors) {
+      const q = document.getElementById('investorSearch').value.toLowerCase();
+      const f = document.getElementById('strategyFilter').value;
+      const list = investors.filter(i =>
+        i.name.toLowerCase().includes(q) && (!f || i.strategyId === f)
       );
-      document.getElementById('investorCount').textContent = filtered.length;
-      document.getElementById('investorList').innerHTML = filtered.map(i => `
+      document.getElementById('investorCount').textContent = list.length;
+      document.getElementById('investorList').innerHTML = list.map(i => `
         <div onclick="selectInvestor('${i.userId}')"
           style="display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-radius:8px;cursor:pointer;
-            border-left:3px solid ${currentInvestor?.userId === i.userId ? '#7c3aed' : 'transparent'};
-            background:${currentInvestor?.userId === i.userId ? '#ede9fe' : 'transparent'};transition:background 0.12s;">
-          <div>
-            <div style="font-size:12px;font-weight:600;color:#0f172a;">${i.name}</div>
+            border-left:3px solid ${currentInvestor?.userId===i.userId?'#7c3aed':'transparent'};
+            background:${currentInvestor?.userId===i.userId?'#ede9fe':'transparent'};transition:background 0.12s;">
+          <div style="min-width:0;flex:1;">
+            <div style="font-size:12px;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${i.name}</div>
             <div style="font-size:10px;color:#94a3b8;margin-top:1px;">${i.strategy}</div>
           </div>
-          <div style="text-align:right;">
-            <div style="font-size:12px;font-weight:600;color:#0f172a;font-family:ui-monospace,monospace;">${i.value}</div>
-            <div style="font-size:10px;font-weight:600;color:${pctColor(i.returnPct)};">${fmtPct(i.returnPct)}</div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:12px;font-weight:600;color:#0f172a;font-family:ui-monospace,monospace;">${fmtR(i.current)}</div>
+            <div style="font-size:10px;font-weight:600;color:${pctClr(i.retPct)};">${fmtPct(i.retPct)}</div>
           </div>
         </div>
-      `).join('');
+      `).join('') || `<div style="padding:20px;text-align:center;color:#94a3b8;font-size:12px;">No investors found</div>`;
     }
 
-    /* ─────────────────────────────────────────────────────── */
-    /* SELECT INVESTOR — fetch real analytics + transactions   */
-    /* ─────────────────────────────────────────────────────── */
-    async function selectInvestor(userId, { silent = false } = {}) {
-      const investor = allInvestors.find(i => i.userId === userId);
-      if (!investor) return;
-
-      /* Show loading state only for user-initiated selections, not background refreshes */
-      const dp = document.getElementById('detailPanel');
-      if (!silent) {
-        dp.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;gap:12px;">
-          <div style="width:20px;height:20px;border:2px solid #7c3aed;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;"></div>
-          <span style="font-size:13px;color:#64748b;">Loading investor data…</span>
-        </div>`;
-      }
-
-      /* 1. Strategy holdings (for allocation tab) */
-      const { data: stratData } = await supabaseClient
-        .from('strategies_c')
-        .select('holdings, name, short_name')
-        .eq('id', investor.strategyId)
-        .maybeSingle();
-
-      const holdingColors = ['#2563eb','#7c3aed','#059669','#f97316','#ef4444','#eab308','#06b6d4','#475569'];
-      const sectorMap = {
-        'NPN':'Technology','PRX':'Technology','MTN':'Telecoms','STXNDQ':'Technology','STX500':'Diversified',
-        'CFR':'Luxury Goods','BHP':'Resources','GLN':'Resources','AGL':'Resources','SOL':'Energy','EXX':'Resources',
-        'ANG':'Mining','IMP':'Mining','SSW':'Mining','GFI':'Mining',
-        'SBK':'Financials','FSR':'Financials','NED':'Financials','ABG':'Financials','INL':'Financials',
-        'CML':'Financials','DIB':'Financials','CLI':'Financials','GRT':'Real Estate',
-        'MRP':'Consumer','SHP':'Consumer','WHL':'Consumer','SPP':'Consumer','SUI':'Consumer',
-        'VKE':'Real Estate','NEPI':'Real Estate'
-      };
-
-      let stratHoldings = (stratData?.holdings && Array.isArray(stratData.holdings) && stratData.holdings.length > 0)
-        ? JSON.parse(JSON.stringify(stratData.holdings))
-        : [];
-
-      stratHoldings.forEach((h, idx) => {
-        const rawTicker = h.ticker || h.symbol || h.code || 'N/A';
-        h.ticker = rawTicker.split('.')[0];
-        if (!h.sector || h.sector === 'Other') h.sector = sectorMap[h.ticker] || 'Other';
-        if (!h.color) h.color = holdingColors[idx % holdingColors.length];
-      });
-      investor.strategyHoldings = stratHoldings;
-
-      /* 2. Strategy returns + analytics from strategies_returns_c (single source of truth) */
-      let analytics = null;
-      if (investor.strategyId) {
-        const { data: analyticsRow } = await supabaseClient
-          .from('strategies_returns_c')
-          .select('strategy_id, as_of_date, latest_value, ytd_pct, summary, curves, calendar_returns, 1d_pct, 5d_pct, 1m_pct, 6m_pct, 1y_pct, 5y_pct, basket_value')
-          .eq('strategy_id', investor.strategyId)
-          .order('as_of_date', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        /* Normalise latest_value — fall back to basket_value if not set */
-        if (analyticsRow) {
-          analyticsRow.latest_value = analyticsRow.latest_value ?? analyticsRow.basket_value ?? null;
-        }
-        analytics = analyticsRow || null;
-      }
-      investor.analytics = analytics;
-
-      /* ── Build full merged daily NAV curve from all timeframe buckets ── */
-      const mergedNavPts = {};
-      const rawCurves = analytics?.curves || {};
-      ['YTD', '6M', '3M', '1M', '1W'].forEach(key => {
-        (rawCurves[key] || []).forEach(p => {
-          if (!(p.d in mergedNavPts)) mergedNavPts[p.d] = p.v;
-        });
-      });
-      const fullNavCurve = Object.entries(mergedNavPts)
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([d, v]) => ({ d, v }));
-
-      /* Filter to investor's inception date for investor-specific computations */
-      investor.navCurve = investor.inceptionDate
-        ? fullNavCurve.filter(p => p.d >= investor.inceptionDate)
-        : fullNavCurve;
-
-      /* ── navCalMap: investor-specific monthly returns from daily NAV (primary source)
-              Falls back to stored calendar_returns if no curve data available         ── */
-      const navCalMap = buildNavCalMap(investor.navCurve);
-      const calMap    = buildCalendarMap(analytics?.calendar_returns); // fallback
-      const activeMap = Object.keys(navCalMap).length > 0 ? navCalMap : calMap;
-      investor.calMap = activeMap;
-
-      /* Compute period returns — gated by actual days invested */
-      const ret1M  = periodReturn(activeMap, 1,  investor.days);
-      const ret3M  = periodReturn(activeMap, 3,  investor.days);
-      const ret6M  = periodReturn(activeMap, 6,  investor.days);
-      const retYTD = ytdReturn(activeMap, investor.inceptionDate);
-      const ret1Y  = periodReturn(activeMap, 12, investor.days);
-      /* ITD = investor's actual personal return from holdings */
-      const retITD = investor.returnPct;
-
-      investor.periodReturns = { ret1M, ret3M, ret6M, retYTD, ret1Y, retITD };
-
-      /* Cumulative monthly series (for bar chart) */
-      const { months: cumMonths, cumulative } = buildCumulativeSeries(activeMap, investor.inceptionDate);
-      investor.cumMonths = cumMonths;
-      investor.cumulative = cumulative;
-
-      /* Max drawdown: daily NAV is most accurate */
-      if (investor.navCurve.length > 1) {
-        investor.maxDD = computeNavMaxDrawdown(investor.navCurve);
-      } else if (cumulative.length > 1) {
-        investor.maxDD = computeMaxDrawdown(cumulative);
-      } else {
-        investor.maxDD = null;
-      }
-
-      /* 3. Transactions & Trades */
-      const [{ data: txRows }, { data: tradeRows }] = await Promise.all([
-        supabaseClient
-          .from('transactions')
-          .select('*')
-          .eq('user_id', investor.userId)
-          .order('created_at', { ascending: false }),
-        supabaseClient
-          .from('stock_holdings_c')
-          .select('*, securities(code, description)')
-          .eq('user_id', investor.userId)
-          .eq('Status', 'inactive')
-          .eq('is_active', false)
-          .not('closed_reason', 'is', null) // Only actual trades
-      ]);
-
-      const allTxRecords = [];
-
-      // Add records from transactions table
-      (txRows || []).forEach(row => {
-        let typeLabel = row.name || row.type || 'Transaction';
-        if (row.type === 'DEPOSIT' || typeLabel.toLowerCase().includes('deposit')) typeLabel = 'Subscription';
-        if (row.type === 'WITHDRAWAL' || typeLabel.toLowerCase().includes('withdraw')) typeLabel = 'Withdrawal';
-        if (typeLabel.toLowerCase().includes('investment')) typeLabel = 'Investment';
-
-        const amt = Number(row.amount || 0) / 100;
-        let units = '—', nav = '—';
-        if (row.description && typeof row.description === 'string' && row.description.startsWith('{')) {
-          try {
-            const meta = JSON.parse(row.description);
-            if (meta.shareCount) units = meta.shareCount;
-            if (meta.price || meta.nav) nav = Number(meta.price || meta.nav).toFixed(2);
-          } catch(e) {}
-        }
-
-        allTxRecords.push({
-          rawDate: new Date(row.created_at || row.transaction_date),
-          date: new Date(row.created_at || row.transaction_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
-          type: typeLabel,
-          amount: 'R' + Math.abs(amt).toLocaleString('en-ZA', { maximumFractionDigits: 0 }),
-          units,
-          nav
-        });
-      });
-
-      // Add records from stock_holdings_c (Rebalance Trades)
-      (tradeRows || []).forEach(row => {
-        const isBuy = String(row.trade_side).toUpperCase() === 'BUY';
-        const qty = Number(row.quantity || 0);
-        // Use avg_fill for buys, avg_exit for sells
-        const priceCents = isBuy ? Number(row.avg_fill || 0) : Number(row.avg_exit || row.avg_fill || 0);
-        const totalRands = (qty * priceCents) / 100;
-        const ticker = (row.securities?.code || 'Share').replace(/\.[A-Z]+$/i, "");
-
-        allTxRecords.push({
-          rawDate: new Date(row.updated_at || row.created_at),
-          date: new Date(row.updated_at || row.created_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
-          type: isBuy ? `Buy ${ticker}` : `Sell ${ticker}`,
-          amount: 'R' + Math.abs(totalRands).toLocaleString('en-ZA', { maximumFractionDigits: 0 }),
-          units: qty.toLocaleString(),
-          nav: (priceCents / 100).toFixed(2)
-        });
-      });
-
-      // Sort newest first
-      investor.transactions = allTxRecords.sort((a, b) => b.rawDate - a.rawDate);
-
-      currentInvestor = investor;
-      renderInvestorList(allInvestors);
+    /* ─── Detail panel ─── */
+    function selectInvestor(userId) {
+      const inv = allInvestors.find(i => i.userId === userId);
+      if (!inv) return;
+      currentInvestor = inv;
+      currentTab = 'overview';
+      renderList(allInvestors);
       renderDetail();
     }
 
-    /* ─────────────────────────────────────────────────────── */
-    /* RENDER DETAIL PANEL                                     */
-    /* ─────────────────────────────────────────────────────── */
     function renderDetail() {
-      const el = document.getElementById('detailPanel');
+      const dp = document.getElementById('detailPanel');
       if (!currentInvestor) {
-        el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;padding:40px;">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          <div style="text-align:center;">
-            <div style="font-size:14px;font-weight:600;color:#475569;">Select an Investor</div>
-            <div style="font-size:12px;color:#94a3b8;margin-top:4px;max-width:260px;line-height:1.5;">Choose an investor from the list to view performance analytics, risk metrics, allocation breakdown, and transaction history.</div>
-          </div>
-        </div>`;
+        dp.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:600px;color:#94a3b8;font-size:13px;">Select an investor to view details</div>`;
         return;
       }
-
-      const inv = currentInvestor;
-      const pr = inv.periodReturns || {};
-      const sinceStr = inv.inceptionDate
-        ? new Date(inv.inceptionDate).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })
-        : '—';
-
-      const maxDDStr = inv.maxDD != null ? inv.maxDD.toFixed(1) + '%' : '—';
-      const itdColor = pctColor(pr.retITD);
-
-      /* Context-aware last-column label: MTD if < ~35 days invested, else ITD */
-      const itdLabel = (inv.days != null && inv.days < 35) ? 'MTD' : 'ITD';
-
-      const periodCols = [
-        { l: '1M',     v: pr.ret1M  },
-        { l: '3M',     v: pr.ret3M  },
-        { l: '6M',     v: pr.ret6M  },
-        { l: 'YTD',    v: pr.retYTD },
-        { l: '1Y',     v: pr.ret1Y  },
-        { l: itdLabel, v: pr.retITD }
+      const i = currentInvestor;
+      const tabs = [
+        { id:'overview',     l:'Overview' },
+        { id:'performance',  l:'Performance' },
+        { id:'calendar',     l:'Calendar Returns' },
+        { id:'risk',         l:'Risk & Drawdown' },
+        { id:'allocations',  l:'Allocations' },
+        { id:'transactions', l:'Transactions' },
       ];
-
-      const periodHtml = `
-        <div style="padding:12px 20px;border-bottom:1px solid #f1f5f9;">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.02em;">Period Returns</span>
-            ${inv.analytics
-            ? `<span style="font-size:9px;color:#10b981;background:#f0fdf4;padding:1px 6px;border-radius:10px;font-weight:600;">Live data</span>
-               <span style="font-size:9px;color:#94a3b8;">as of ${inv.analytics.as_of_date || '—'}</span>`
-            : '<span style="font-size:9px;color:#94a3b8;background:#f1f5f9;padding:1px 6px;border-radius:10px;">No analytics yet</span>'}
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;">
-            ${periodCols.map(p => `
-              <div>
-                <div style="font-size:9px;color:#94a3b8;font-weight:600;margin-bottom:2px;">${p.l}</div>
-                <div style="font-size:13px;font-weight:700;color:${pctColor(p.v)};">${fmtPct(p.v)}</div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `;
-
-      el.innerHTML = `
-        <div style="padding:16px 20px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:flex-start;">
-          <div>
-            <div style="font-size:18px;font-weight:600;color:#0f172a;">${inv.name}</div>
-            <div style="font-size:11px;color:#94a3b8;">${inv.strategy} · Since ${sinceStr}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:12px;">
-            <a href="/factsheets.html${inv.strategyId ? '?id=' + inv.strategyId : ''}" style="height:32px;display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#64748b;text-decoration:none;border:1px solid #e2e8f0;border-radius:8px;padding:0 12px;font-weight:600;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              Factsheet
-            </a>
-            <span style="font-size:11px;font-weight:700;color:${itdColor};background:${pr.retITD >= 0 ? '#f0fdf4' : '#fff1f2'};border:1px solid ${pr.retITD >= 0 ? '#bbf7d0' : '#fecdd3'};padding:3px 10px;border-radius:20px;font-family:ui-monospace,monospace;">${fmtPct(pr.retITD)} ${itdLabel}</span>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:12px 20px;background:#f8fafc;border-bottom:1px solid #f1f5f9;">
-          ${(() => {
-            const pnlPos   = inv.pnl >= 0;
-            const annPos   = (inv.annualised ?? 0) >= 0;
-            const ddVal    = inv.maxDD;
-            /* helper: returns {text, bg, border} for a signed value */
-            const fc = (isPos) => isPos
-              ? { text:'#059669', bg:'#f0fdf4', border:'#bbf7d0' }
-              : { text:'#dc2626', bg:'#fff1f2', border:'#fecdd3' };
-            const neutral  = { text:'#0f172a', bg:'white',   border:'#e2e8f0' };
-            /* Format liveAsOf timestamp "2026-04-09 13:24:14" → "13:24" */
-            const liveTimeStr = inv.liveAsOf
-              ? (inv.liveAsOf.match(/(\d{2}:\d{2})/) || [])[1] || null
-              : null;
-            return [
-              { l: 'INVESTED',   v: fmtR(inv.invested),                                                   s: neutral,   note: null         },
-              { l: 'VALUE',      v: fmtR(inv.current),                                                    s: neutral,   note: liveTimeStr  },
-              { l: 'P&L',        v: (pnlPos ? '+' : '') + fmtR(inv.pnl),                                  s: fc(pnlPos),note: null         },
-              { l: 'DAYS',       v: inv.days ?? '—',                                                      s: neutral,   note: null         },
-              { l: 'ANNUALISED', v: fmtPct(inv.annualised),                                               s: fc(annPos),note: null         },
-              { l: 'MAX DD',     v: maxDDStr,                                                              s: ddVal != null ? fc(ddVal >= 0) : neutral, note: null }
-            ].map(k => `
-              <div class="ov-kpi-card" style="box-shadow:none;border:1px solid ${k.s.border};background:${k.s.bg};">
-                <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;">
-                  <span style="font-size:9px;color:#94a3b8;font-weight:600;">${k.l}</span>
-                  ${k.note ? `<span style="font-size:8px;color:#10b981;font-weight:600;">Live·${k.note}</span>` : ''}
+      dp.innerHTML = `
+        <div style="padding:18px 22px;border-bottom:1px solid #f1f5f9;background:linear-gradient(135deg,#faf5ff,#fff);">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+            <div style="min-width:0;flex:1;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">${(i.name[0]||'?').toUpperCase()}</div>
+                <div style="min-width:0;">
+                  <div style="font-size:16px;font-weight:700;color:#0f172a;">${i.name}</div>
+                  <div style="font-size:11px;color:#64748b;margin-top:1px;">${i.strategy}${i.email?' · '+i.email:''}</div>
                 </div>
-                <div style="font-size:11px;font-weight:700;color:${k.s.text};font-family:ui-monospace,monospace;">${k.v}</div>
               </div>
-            `).join('');
-          })()}
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:20px;font-weight:700;color:#0f172a;font-family:ui-monospace,monospace;">${fmtR2(i.current)}</div>
+              <div style="font-size:12px;font-weight:600;color:${pctClr(i.retPct)};">${fmtPct(i.retPct)} all-time</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px;">
+            ${[
+              ['Invested', fmtR(i.invested), '#64748b'],
+              ['P&L',      (i.pnl>=0?'+':'')+fmtR(i.pnl), pctClr(i.pnl)],
+              ['Annualised', fmtPct(i.annualised), pctClr(i.annualised)],
+              ['Inception', fmtDate(i.inception)+' · '+i.days+'d', '#0f172a'],
+            ].map(([l,v,c]) => `
+              <div style="background:rgba(255,255,255,0.7);border-radius:8px;padding:8px 10px;">
+                <div style="font-size:10px;color:#94a3b8;font-weight:500;letter-spacing:0.04em;">${l.toUpperCase()}</div>
+                <div style="font-size:13px;font-weight:700;color:${c};font-family:ui-monospace,monospace;margin-top:2px;">${v}</div>
+              </div>`).join('')}
+          </div>
         </div>
-        ${periodHtml}
-        <div style="display:flex;gap:12px;padding:12px 20px;border-bottom:1px solid #f1f5f9;background:#fff;">
-          ${[
-            { id: 'performance',  label: 'Performance',    icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/></svg>' },
-            { id: 'risk',         label: 'Risk & Drawdown',icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' },
-            { id: 'allocation',   label: 'Allocation',     icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>' },
-            { id: 'transactions', label: 'Transactions',   icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>' }
-          ].map(t => `
-            <button class="${currentTab === t.id ? 'tab-active' : 'tab-inactive'}" onclick="switchTab('${t.id}')"
-              style="display:flex;align-items:center;gap:5px;padding:8px 0;margin-right:24px;border-bottom-width:2px;font-size:12px;">
-              ${t.icon}${t.label}
-            </button>
-          `).join('')}
+        <div style="display:flex;border-bottom:1px solid #f1f5f9;padding:0 14px;background:#fff;">
+          ${tabs.map(t => `
+            <button class="${currentTab===t.id?'tab-active':'tab-inactive'}"
+              onclick="switchTab('${t.id}')"
+              style="${currentTab===t.id?'border-bottom-color:#7c3aed;color:#5b21b6;':''} height:42px;padding:0 14px;font-size:12px;">
+              ${t.l}
+            </button>`).join('')}
         </div>
-        <div id="tabContent" style="flex:1;overflow-y:auto;padding:20px;"></div>
+        <div id="tabContent" style="flex:1;padding:18px 22px;overflow-y:auto;background:#fafbfc;"></div>
       `;
-      renderCurrentTab();
+      renderTab();
     }
 
-    function switchTab(t) { currentTab = t; renderCurrentTab(); renderDetail(); }
+    function switchTab(t) { currentTab = t; renderDetail(); }
 
-    /* ─────────────────────────────────────────────────────── */
-    /* RENDER TAB CONTENT                                      */
-    /* ─────────────────────────────────────────────────────── */
-    function renderCurrentTab() {
-      const tc = document.getElementById('tabContent');
-      if (!tc || !currentInvestor) return;
-      const inv = currentInvestor;
-      const calMap = inv.calMap || {};
-      const cumulative = inv.cumulative || [];
-      const cumMonths  = inv.cumMonths  || [];
-      const hasCalData = Object.keys(calMap).length > 0;
+    function renderTab() {
+      const el = document.getElementById('tabContent');
+      if (!el || !currentInvestor) return;
+      const i = currentInvestor;
+      if (currentTab === 'overview')      el.innerHTML = renderOverviewTab(i);
+      else if (currentTab === 'performance')  { el.innerHTML = `<div id="perfChart" style="width:100%;height:380px;background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);"></div>`; setTimeout(() => renderPerfChart(i), 50); }
+      else if (currentTab === 'calendar')     el.innerHTML = renderCalendarTab(i);
+      else if (currentTab === 'risk')         el.innerHTML = renderRiskTab(i);
+      else if (currentTab === 'allocations')  { el.innerHTML = renderAllocationsTab(i); setTimeout(() => renderSectorChart(i), 50); }
+      else if (currentTab === 'transactions') el.innerHTML = renderTxnsTab(i);
+    }
 
-      if (currentTab === 'performance') {
-        /* Monthly returns since investor's inception date */
-        const monthsSinceInception = getMonthsSinceInception(calMap, inv.inceptionDate);
-        const hasEnoughFor3M = cumulative.length >= 4; /* need 3+ intervals for rolling 3M */
-        const colCount = Math.max(1, monthsSinceInception.length);
-
-        tc.innerHTML = `
-          <div style="margin-bottom:30px;">
-            <div id="perfChartEl" style="height:300px;"></div>
-          </div>
-          <div style="margin-bottom:30px;">
-            <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:16px;">Monthly Returns Since Investment</div>
-            ${monthsSinceInception.length > 0 ? `
-              <div style="display:grid;grid-template-columns:repeat(${Math.min(colCount, 12)},1fr);gap:8px;">
-                ${monthsSinceInception.map(m => `
-                  <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
-                    <div style="width:100%;text-align:center;padding:12px 2px;border-radius:12px;font-size:11px;font-weight:700;font-family:ui-monospace,monospace;
-                      background:${m.ret == null ? '#f8fafc' : m.ret >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'};
-                      color:${m.ret == null ? '#94a3b8' : m.ret >= 0 ? '#059669' : '#dc2626'};">
-                      ${m.ret == null ? '—' : (m.ret >= 0 ? '+' : '') + (m.ret * 100).toFixed(1)}
-                    </div>
-                    <div style="font-size:10px;color:#64748b;font-weight:500;">${m.label}</div>
-                  </div>
-                `).join('')}
-              </div>
-            ` : `<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;">No investment history found for this investor.</div>`}
-          </div>
-          <div style="margin-bottom:10px;">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-              <span style="font-size:13px;font-weight:700;color:#0f172a;">Rolling 3-Month Return</span>
+    /* ─── Tab: Overview ─── */
+    function renderOverviewTab(i) {
+      const m = stratMetricsMap[i.strategyId] || {};
+      const latest = m.latest || {};
+      const periods = [
+        ['1D', latest['1d_pct']], ['5D', latest['5d_pct']], ['1M', latest['1m_pct']],
+        ['6M', latest['6m_pct']], ['YTD', latest['ytd_pct']], ['1Y', latest['1y_pct']], ['ALL', latest.all_pct]
+      ];
+      const topHoldings = i.holdings.slice(0, 5);
+      return `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);">
+            <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;margin-bottom:10px;">STRATEGY PERFORMANCE</div>
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;">
+              ${periods.map(([l,v]) => `
+                <div style="text-align:center;padding:8px 4px;background:#f8fafc;border-radius:6px;">
+                  <div style="font-size:9px;color:#94a3b8;font-weight:600;">${l}</div>
+                  <div style="font-size:11px;font-weight:700;color:${pctClr(v)};margin-top:2px;font-family:ui-monospace,monospace;">${fmtPct(v)}</div>
+                </div>`).join('')}
             </div>
-            ${hasEnoughFor3M
-              ? `<div id="rollingChartEl" style="height:220px;"></div>`
-              : `<div style="height:80px;display:flex;align-items:center;justify-content:center;background:#f8fafc;border-radius:12px;border:1px dashed #e2e8f0;">
-                   <span style="font-size:12px;color:#94a3b8;">Not enough history to display rolling 3-month return — available after 3+ months of investment data.</span>
-                 </div>`
-            }
           </div>
-        `;
-        initPerfChart(cumMonths, cumulative, inv.inceptionDate);
-        if (hasEnoughFor3M) initRollingChart(cumMonths, buildRolling3M(cumulative));
-
-      } else if (currentTab === 'risk') {
-        const summ = inv.analytics?.summary || {};
-        const mkRiskCard = (l, v, c) => `
-          <div class="ov-kpi-card" style="border:1px solid #f1f5f9;box-shadow:none;">
-            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px;">${l}</div>
-            <div style="font-size:13px;font-weight:700;color:${c || '#0f172a'};">${v ?? '—'}</div>
-          </div>`;
-
-        const sharpe   = summ.sharpe_ratio  != null ? Number(summ.sharpe_ratio).toFixed(2)  : null;
-        const sortino  = summ.sortino_ratio != null ? Number(summ.sortino_ratio).toFixed(2)  : null;
-        const infoR    = summ.info_ratio    != null ? Number(summ.info_ratio).toFixed(2)     : null;
-        const vol      = summ.volatility    != null ? (Number(summ.volatility)*100).toFixed(1)+'%' : (summ.annualised_vol != null ? (Number(summ.annualised_vol)*100).toFixed(1)+'%' : null);
-        const beta     = summ.beta          != null ? Number(summ.beta).toFixed(2)            : null;
-        const alpha    = summ.alpha         != null ? (Number(summ.alpha)*100).toFixed(1)+'%' : null;
-        const maxDD    = inv.maxDD          != null ? inv.maxDD.toFixed(1)+'%'                : null;
-        const bestDay  = summ.best_day      != null ? fmtPct(Number(summ.best_day)*100)       : null;
-        const worstDay = summ.worst_day     != null ? fmtPct(Number(summ.worst_day)*100)      : null;
-
-        /* Drawdown chart: use daily NAV data when available (more granular than monthly) */
-        const useNavDD = inv.navCurve && inv.navCurve.length > 1;
-        const ddLabels = useNavDD ? inv.navCurve.map(p => p.d) : cumMonths;
-        const ddSeries = useNavDD ? buildNavDrawdownSeries(inv.navCurve) : buildDrawdownSeries(cumulative);
-
-        tc.innerHTML = `
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">
-            ${mkRiskCard('Sharpe Ratio',  sharpe,   null)}
-            ${mkRiskCard('Sortino',       sortino,  null)}
-            ${mkRiskCard('Info Ratio',    infoR,    null)}
-            ${mkRiskCard('Volatility',    vol,      '#dc2626')}
-            ${mkRiskCard('Beta',          beta,     null)}
-            ${mkRiskCard('Alpha',         alpha,    alpha && !alpha.includes('-') ? '#059669' : '#dc2626')}
-            ${mkRiskCard('Max Drawdown',  maxDD,    '#dc2626')}
-            ${mkRiskCard('Best Day',      bestDay,  '#059669')}
-            ${mkRiskCard('Worst Day',     worstDay, '#dc2626')}
+          <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);">
+            <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;margin-bottom:10px;">RISK SUMMARY</div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+              ${[['Sharpe', m.sharpe], ['Sortino', m.sortino], ['Vol %', m.vol], ['Max DD %', m.maxDD]].map(([l,v]) => `
+                <div style="text-align:center;padding:8px 4px;background:#f8fafc;border-radius:6px;">
+                  <div style="font-size:9px;color:#94a3b8;font-weight:600;">${l}</div>
+                  <div style="font-size:11px;font-weight:700;color:#0f172a;margin-top:2px;font-family:ui-monospace,monospace;">${v == null ? '—' : v}</div>
+                </div>`).join('')}
+            </div>
           </div>
-          ${!inv.analytics ? '<div style="font-size:12px;color:#94a3b8;text-align:center;padding:8px 0 16px;">Risk metrics will appear once strategy analytics have been computed.</div>' : ''}
-          <div style="font-size:13px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:6px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/></svg>
-            Drawdown from Peak
+        </div>
+        <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);margin-top:14px;">
+          <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;margin-bottom:10px;">TOP HOLDINGS</div>
+          <table class="ov-table">
+            <thead><tr><th>Symbol</th><th>Name</th><th class="r">Qty</th><th class="r">Value</th><th class="r">Weight</th><th class="r">Return</th></tr></thead>
+            <tbody>
+              ${topHoldings.map(h => `
+                <tr>
+                  <td style="font-weight:700;">${h.symbol}</td>
+                  <td style="color:#64748b;">${h.name}</td>
+                  <td class="r ov-mono">${h.qty.toLocaleString()}</td>
+                  <td class="r ov-mono">${fmtR(h.currentR)}</td>
+                  <td class="r ov-mono">${h.weight.toFixed(1)}%</td>
+                  <td class="r ov-mono" style="color:${pctClr(h.retPct)};font-weight:600;">${fmtPct(h.retPct)}</td>
+                </tr>`).join('') || `<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:20px;">No holdings</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    /* ─── Tab: Performance ─── */
+    function renderPerfChart(i) {
+      const series = stratNavMap[i.strategyId] || [];
+      const el = document.getElementById('perfChart');
+      if (!el) return;
+      if (series.length < 2) { el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:13px;">Not enough NAV data to chart</div>`; return; }
+      disposeChart(el);
+      const chart = echarts.init(el);
+      _charts.set(el, chart);
+      const base = series[0].nav;
+      const data = series.map(p => [p.date, +(p.nav / base * 100).toFixed(2)]);
+      chart.setOption({
+        grid: { left: 50, right: 20, top: 30, bottom: 40 },
+        tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, formatter: p => `${p[0].axisValueLabel}<br/><b>Index:</b> ${p[0].value[1]}` },
+        xAxis: { type: 'time', axisLine: { lineStyle: { color: '#cbd5e1' } }, axisLabel: { color: '#64748b', fontSize: 10 } },
+        yAxis: { type: 'value', axisLine: { lineStyle: { color: '#cbd5e1' } }, splitLine: { lineStyle: { color: '#f1f5f9' } }, axisLabel: { color: '#64748b', fontSize: 10, formatter: v => v.toFixed(0) } },
+        series: [{
+          type: 'line', smooth: true, symbol: 'none', data,
+          lineStyle: { color: '#7c3aed', width: 2 },
+          areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(124,58,237,0.25)' }, { offset: 1, color: 'rgba(124,58,237,0)' }] } }
+        }]
+      });
+    }
+
+    /* ─── Tab: Calendar ─── */
+    function renderCalendarTab(i) {
+      const cal = (stratMetricsMap[i.strategyId] || {}).calendar || {};
+      const keys = Object.keys(cal).sort();
+      if (!keys.length) return `<div style="background:#fff;border-radius:10px;padding:30px;text-align:center;color:#94a3b8;">No NAV history available to compute calendar returns.</div>`;
+      /* Build year-month matrix */
+      const byYear = {};
+      keys.forEach(k => { const [y, m] = k.split('-'); (byYear[y] = byYear[y] || {})[+m] = cal[k]; });
+      const years = Object.keys(byYear).sort();
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const cellColor = v => {
+        if (v == null) return '#f8fafc';
+        const a = Math.min(Math.abs(v) / 5, 1) * 0.5 + 0.1;
+        return v >= 0 ? `rgba(5,150,105,${a})` : `rgba(220,38,38,${a})`;
+      };
+      return `
+        <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);">
+          <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;margin-bottom:12px;">MONTHLY RETURNS (%)</div>
+          <table class="ov-table">
+            <thead><tr><th>Year</th>${months.map(m => `<th class="r" style="font-size:10px;">${m}</th>`).join('')}<th class="r" style="font-weight:700;color:#0f172a;">YTD</th></tr></thead>
+            <tbody>
+              ${years.map(y => {
+                let cum = 1, hasAny = false;
+                months.forEach((_, idx) => { const v = byYear[y][idx+1]; if (v != null) { cum *= (1 + v/100); hasAny = true; } });
+                const ytd = hasAny ? (cum - 1) * 100 : null;
+                return `<tr>
+                  <td style="font-weight:700;">${y}</td>
+                  ${months.map((_, idx) => {
+                    const v = byYear[y][idx+1];
+                    return `<td class="r ov-mono" style="background:${cellColor(v)};color:${v==null?'#cbd5e1':'#0f172a'};font-weight:${v==null?'400':'600'};font-size:10.5px;">${v==null?'—':v.toFixed(1)}</td>`;
+                  }).join('')}
+                  <td class="r ov-mono" style="font-weight:700;color:${pctClr(ytd)};">${fmtPctNoSign(ytd)}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    /* ─── Tab: Risk ─── */
+    function renderRiskTab(i) {
+      const m = stratMetricsMap[i.strategyId] || {};
+      const cards = [
+        ['Sharpe Ratio',     m.sharpe,  'Annualised return per unit of total risk. Higher is better. > 1 is good.'],
+        ['Sortino Ratio',    m.sortino, 'Like Sharpe but only counts downside risk. Higher is better.'],
+        ['Volatility',       m.vol,     'Annualised standard deviation of returns. Lower means smoother.', '%'],
+        ['Max Drawdown',     m.maxDD,   'Worst peak-to-trough decline. Closer to zero is better.', '%'],
+        ['Annualised Return', m.annRet, 'Compound annual growth rate of the strategy NAV.', '%'],
+      ];
+      setTimeout(() => renderDrawdownChart(i), 50);
+      return `
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:14px;">
+          ${cards.map(([l, v, hint, suffix]) => `
+            <div style="background:#fff;border-radius:10px;padding:16px 18px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);">
+              <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">${l.toUpperCase()}</div>
+              <div style="font-size:24px;font-weight:700;color:${l==='Max Drawdown'?'#dc2626':(l==='Annualised Return'?pctClr(v):'#0f172a')};margin-top:4px;font-family:ui-monospace,monospace;">${v == null ? '—' : v + (suffix||'')}</div>
+              <div style="font-size:11px;color:#64748b;margin-top:6px;line-height:1.4;">${hint}</div>
+            </div>`).join('')}
+        </div>
+        <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);">
+          <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;margin-bottom:10px;">DRAWDOWN OVER TIME (%)</div>
+          <div id="ddChart" style="width:100%;height:280px;"></div>
+        </div>
+      `;
+    }
+
+    function renderDrawdownChart(i) {
+      const el = document.getElementById('ddChart'); if (!el) return;
+      const series = (stratMetricsMap[i.strategyId] || {}).ddSeries || [];
+      if (series.length < 2) { el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:12px;">Not enough NAV data</div>`; return; }
+      disposeChart(el);
+      const chart = echarts.init(el); chart.__instanceFor = el;
+      chart.setOption({
+        grid: { left: 50, right: 20, top: 20, bottom: 40 },
+        tooltip: { trigger: 'axis', formatter: p => `${p[0].axisValueLabel}<br/><b>Drawdown:</b> ${p[0].value[1]}%` },
+        xAxis: { type: 'time', axisLine: { lineStyle: { color: '#cbd5e1' } }, axisLabel: { color: '#64748b', fontSize: 10 } },
+        yAxis: { type: 'value', max: 0, axisLine: { lineStyle: { color: '#cbd5e1' } }, splitLine: { lineStyle: { color: '#f1f5f9' } }, axisLabel: { color: '#64748b', fontSize: 10, formatter: v => v + '%' } },
+        series: [{
+          type: 'line', smooth: true, symbol: 'none',
+          data: series.map(p => [p.date, p.dd]),
+          lineStyle: { color: '#dc2626', width: 1.5 },
+          areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(220,38,38,0)' }, { offset: 1, color: 'rgba(220,38,38,0.35)' }] } }
+        }]
+      });
+      _charts.set(el, chart);
+    }
+
+    /* ─── Tab: Allocations ─── */
+    function renderAllocationsTab(i) {
+      return `
+        <div style="display:grid;grid-template-columns:1fr 360px;gap:14px;">
+          <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);">
+            <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;margin-bottom:10px;">ALL HOLDINGS</div>
+            <table class="ov-table">
+              <thead><tr><th>Symbol</th><th>Name</th><th>Sector</th><th class="r">Qty</th><th class="r">Avg Fill</th><th class="r">Price</th><th class="r">Value</th><th class="r">Weight</th><th class="r">P&L</th></tr></thead>
+              <tbody>
+                ${i.holdings.map(h => `
+                  <tr>
+                    <td style="font-weight:700;">${h.symbol}</td>
+                    <td style="color:#64748b;">${h.name}</td>
+                    <td><span style="font-size:10px;color:#7c3aed;background:#f3e8ff;padding:2px 7px;border-radius:10px;">${h.sector}</span></td>
+                    <td class="r ov-mono">${h.qty.toLocaleString()}</td>
+                    <td class="r ov-mono">${fmtR2(h.avgFillR)}</td>
+                    <td class="r ov-mono">${fmtR2(h.priceR)}</td>
+                    <td class="r ov-mono">${fmtR(h.currentR)}</td>
+                    <td class="r ov-mono">${h.weight.toFixed(1)}%</td>
+                    <td class="r ov-mono" style="color:${pctClr(h.pnlR)};font-weight:600;">${(h.pnlR>=0?'+':'')+fmtR(h.pnlR)}</td>
+                  </tr>`).join('') || `<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:20px;">No holdings</td></tr>`}
+              </tbody>
+            </table>
           </div>
-          <div id="drawdownChartEl" style="height:180px;"></div>
-        `;
-        initRiskChart(ddLabels, ddSeries);
+          <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);">
+            <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;margin-bottom:10px;">SECTOR BREAKDOWN</div>
+            <div id="sectorChart" style="width:100%;height:300px;"></div>
+          </div>
+        </div>
+      `;
+    }
 
-      } else if (currentTab === 'allocation') {
-        const sh = inv.strategyHoldings || [];
-        const sectors = {};
-        sh.forEach(h => {
-          const s = h.sector || 'Other';
-          sectors[s] = (sectors[s] || 0) + (parseFloat(h.weight) || 0);
-        });
-        const sectorColors = ['#2563eb','#7c3aed','#059669','#64748b','#f97316','#eab308'];
-        const sectorList = Object.entries(sectors).map(([name, weight], i) => ({
-          name, weight, color: sectorColors[i % sectorColors.length]
-        }));
+    function renderSectorChart(i) {
+      const el = document.getElementById('sectorChart'); if (!el) return;
+      const bySector = {};
+      i.holdings.forEach(h => { bySector[h.sector] = (bySector[h.sector] || 0) + h.currentR; });
+      const data = Object.entries(bySector).map(([n, v]) => ({ name: n, value: +v.toFixed(2) })).sort((a,b) => b.value - a.value);
+      if (!data.length) { el.innerHTML = `<div style="text-align:center;color:#94a3b8;padding:40px 0;font-size:12px;">No data</div>`; return; }
+      const colors = ['#7c3aed','#2563eb','#0891b2','#059669','#ca8a04','#dc2626','#db2777','#9333ea','#0f766e','#b45309'];
+      disposeChart(el);
+      const pieChart = echarts.init(el); _charts.set(el, pieChart);
+      pieChart.setOption({
+        tooltip: { trigger: 'item', formatter: p => `${p.name}<br/><b>${fmtR(p.value)}</b> (${p.percent}%)` },
+        legend: { bottom: 0, textStyle: { fontSize: 10, color: '#64748b' } },
+        series: [{
+          type: 'pie', radius: ['45%', '70%'], avoidLabelOverlap: true,
+          itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
+          label: { show: false }, labelLine: { show: false },
+          data: data.map((d, idx) => ({ ...d, itemStyle: { color: colors[idx % colors.length] } })),
+        }]
+      });
+    }
 
-        if (sh.length === 0) {
-          tc.innerHTML = `<div style="text-align:center;padding:40px;color:#94a3b8;font-size:13px;">No holdings data available for this strategy.</div>`;
+    /* ─── Tab: Transactions ─── */
+    function renderTxnsTab(i) {
+      const txns = i.txns || [];
+      if (!txns.length) return `<div style="background:#fff;border-radius:10px;padding:30px;text-align:center;color:#94a3b8;">No transactions found.</div>`;
+      return `
+        <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);">
+          <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;margin-bottom:10px;">TRANSACTIONS (${txns.length})</div>
+          <table class="ov-table">
+            <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Status</th><th class="r">Amount</th></tr></thead>
+            <tbody>
+              ${txns.map(t => {
+                const amt = Number(t.amount) / 100;
+                const isDeposit = t.direction === 'debit';
+                const sign = isDeposit ? '+' : '-';
+                const clr  = isDeposit ? '#059669' : '#dc2626';
+                return `<tr>
+                  <td>${fmtDate(t.transaction_date)}</td>
+                  <td style="color:#64748b;">${t.name || t.description || '—'}</td>
+                  <td><span style="font-size:10px;color:${clr};background:${isDeposit?'#dcfce7':'#fee2e2'};padding:2px 7px;border-radius:10px;font-weight:600;">${isDeposit?'DEPOSIT':'WITHDRAWAL'}</span></td>
+                  <td><span style="font-size:10px;color:#64748b;background:#f1f5f9;padding:2px 7px;border-radius:10px;">${t.status||'—'}</span></td>
+                  <td class="r ov-mono" style="color:${clr};font-weight:600;">${sign}${fmtR2(amt)}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    /* ─── Init ─── */
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) {
+          document.querySelector('.sidebar')?.style.setProperty('display','none');
+          document.querySelector('.main-content')?.style.setProperty('margin-left','0','important');
+          document.body.innerHTML = `<div style="text-align:center;padding:60px;color:#64748b;">Please <a href="/index.html" style="color:#7c3aed;">sign in</a> to view investors.</div>`;
           return;
         }
+      } catch (e) { console.warn('Auth check failed', e); }
 
-        tc.innerHTML = `
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
-            <div style="display:flex;flex-direction:column;">
-              <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
-                <span style="font-size:13px;font-weight:600;">Holdings Breakdown</span>
-              </div>
-              <div id="allocChartEl" style="height:170px;"></div>
-              <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px;">
-                ${sh.map(h => `
-                  <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;">
-                    <div style="display:flex;align-items:center;gap:8px;">
-                      <div style="width:8px;height:8px;border-radius:50%;background:${h.color};"></div>
-                      <span style="font-weight:600;color:#0f172a;">${h.ticker}</span>
-                      <span style="color:#64748b;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h.name || ''}</span>
-                    </div>
-                    <span style="font-weight:700;color:#0f172a;font-family:ui-monospace,monospace;">${h.weight}%</span>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-            <div style="display:flex;flex-direction:column;">
-              <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                <span style="font-size:13px;font-weight:600;">Sector Exposure</span>
-              </div>
-              <div style="height:12px;background:#f1f5f9;border-radius:6px;display:flex;overflow:hidden;margin-bottom:20px;">
-                ${sectorList.map(s => `<div style="width:${s.weight}%;background:${s.color};" title="${s.name}: ${s.weight.toFixed(1)}%"></div>`).join('')}
-              </div>
-              <div style="display:flex;flex-direction:column;gap:12px;">
-                ${sectorList.map(s => `
-                  <div style="display:flex;flex-direction:column;gap:4px;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;">
-                      <div style="display:flex;align-items:center;gap:8px;">
-                        <div style="width:8px;height:8px;border-radius:50%;background:${s.color};"></div>
-                        <span style="font-size:11px;font-weight:600;color:#0f172a;">${s.name}</span>
-                      </div>
-                      <span style="font-size:11px;font-weight:700;color:#0f172a;">${s.weight.toFixed(1)}%</span>
-                    </div>
-                    <div style="height:4px;background:#f1f5f9;border-radius:2px;overflow:hidden;">
-                      <div style="width:${s.weight}%;height:100%;background:${s.color};"></div>
-                    </div>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          </div>
-        `;
-        setTimeout(() => initAllocChart(), 50);
-
-      } else if (currentTab === 'transactions') {
-        const txs = inv.transactions || [];
-        const txBody = txs.length > 0
-          ? txs.map(t => {
-              const style = t.type === 'Subscription'
-                ? 'background:#ede9fe;color:#7c3aed;'
-                : t.type === 'Withdrawal'
-                  ? 'background:#fee2e2;color:#dc2626;'
-                  : 'background:#f1f5f9;color:#64748b;';
-              return `<tr>
-                <td>${t.date}</td>
-                <td><span style="${style}padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700;">${t.type}</span></td>
-                <td class="r ov-mono">${t.amount}</td>
-                <td class="r ov-mono">${t.units}</td>
-                <td class="r ov-mono">${t.nav}</td>
-              </tr>`;
-            }).join('')
-          : `<tr><td colspan="5" style="text-align:center;padding:20px;color:#94a3b8;">No transactions found for this investor.</td></tr>`;
-        tc.innerHTML = `
-          <div style="font-size:13px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:6px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            Transaction History
-          </div>
-          <table class="ov-table">
-            <thead><tr><th>Date</th><th>Type</th><th class="r">Amount</th><th class="r">Units</th><th class="r">NAV</th></tr></thead>
-            <tbody>${txBody}</tbody>
-          </table>`;
-      }
-    }
-
-    /* ─────────────────────────────────────────────────────── */
-    /* CHARTS                                                  */
-    /* ─────────────────────────────────────────────────────── */
-    function initPerfChart(months, cumulative, inceptionDate) {
-      const el = document.getElementById('perfChartEl');
-      if (!el) return;
-      if (window._perfChart) { try { window._perfChart.dispose(); } catch(e) {} }
-      const chart = echarts.init(el);
-      window._perfChart = chart;
-
-      if (!months || months.length === 0) {
-        chart.setOption({
-          graphic: [{ type: 'text', left: 'center', top: 'middle', style: { text: 'No performance data available yet.', fill: '#94a3b8', fontSize: 13 } }]
-        });
-        return;
-      }
-
-      /* Format inception date as short label e.g. "15 Jan '23" */
-      const inceptionLabel = inceptionDate
-        ? new Date(inceptionDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: '2-digit' })
-        : '';
-
-      /* Anchor line to 0 at inception so it draws up/down from the baseline */
-      const chartMonths = [inceptionLabel, ...months];
-      const chartData   = [0, ...cumulative];
-
-      chart.setOption({
-        animation: false,
-        title: { text: 'Cumulative Strategy Return', textStyle: { fontSize: 13, fontWeight: 700, color: '#0f172a' }, left: 0, top: 0 },
-        grid: { top: 50, right: 20, bottom: 40, left: 50 },
-        tooltip: { trigger: 'axis', formatter: (params) => {
-          const p = params[0];
-          if (p.dataIndex === 0) return `${p.axisValue || 'Inception'}: <b>0.00%</b>`;
-          return `${p.axisValue}<br/>${p.seriesName}: <b>${p.value >= 0 ? '+' : ''}${p.value}%</b>`;
-        }},
-        xAxis: { type: 'category', data: chartMonths, boundaryGap: false, axisLine: { lineStyle: { color: '#e2e8f0' } }, axisTick: { show: false }, axisLabel: { color: '#94a3b8', fontSize: 10, interval: Math.ceil(chartMonths.length / 8) } },
-        yAxis: { type: 'value', axisLabel: { color: '#94a3b8', fontSize: 10, formatter: '{value}%' }, splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } }, min: v => Math.min(0, v.min) },
-        series: [{
-          name: 'Strategy',
-          type: 'line',
-          data: chartData,
-          symbol: 'none',
-          smooth: true,
-          lineStyle: { color: '#2563eb', width: 2 },
-          areaStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,[{ offset:0, color:'rgba(37,99,235,0.12)' },{ offset:1, color:'rgba(37,99,235,0)' }]) }
-        }]
-      });
-      new ResizeObserver(() => chart.resize()).observe(el);
-    }
-
-    function initRollingChart(months, rolling) {
-      const el = document.getElementById('rollingChartEl');
-      if (!el) return;
-      if (window._rollChart) { try { window._rollChart.dispose(); } catch(e) {} }
-      const chart = echarts.init(el);
-      window._rollChart = chart;
-
-      if (!months || months.length < 4) {
-        chart.setOption({
-          graphic: [{ type: 'text', left: 'center', top: 'middle', style: { text: 'Not enough data for rolling return (need 3+ months).', fill: '#94a3b8', fontSize: 12 } }]
-        });
-        return;
-      }
-
-      const colors = rolling.map(v => v == null ? 'transparent' : v >= 0 ? '#059669' : '#dc2626');
-      chart.setOption({
-        animation: false,
-        grid: { top: 20, right: 20, bottom: 40, left: 50 },
-        tooltip: { trigger: 'axis', formatter: p => `${p[0].axisValue}<br/>3M Return: <b>${p[0].value != null ? (p[0].value >= 0 ? '+' : '') + p[0].value + '%' : '—'}</b>` },
-        xAxis: { type: 'category', data: months, axisLine: { lineStyle: { color: '#e2e8f0' } }, axisTick: { show: false }, axisLabel: { color: '#94a3b8', fontSize: 10, interval: Math.ceil(months.length / 6) } },
-        yAxis: { type: 'value', axisLabel: { color: '#94a3b8', fontSize: 10, formatter: '{value}%' }, splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } } },
-        series: [{
-          type: 'bar',
-          data: rolling.map((v, i) => ({ value: v, itemStyle: { color: colors[i] } })),
-          barMaxWidth: 20
-        }]
-      });
-      new ResizeObserver(() => chart.resize()).observe(el);
-    }
-
-    function initRiskChart(months, ddSeries) {
-      const el = document.getElementById('drawdownChartEl');
-      if (!el) return;
-      if (window._ddChart) { try { window._ddChart.dispose(); } catch(e) {} }
-      const chart = echarts.init(el);
-      window._ddChart = chart;
-
-      if (!months || months.length === 0) {
-        chart.setOption({
-          graphic: [{ type: 'text', left: 'center', top: 'middle', style: { text: 'No drawdown data available.', fill: '#94a3b8', fontSize: 12 } }]
-        });
-        return;
-      }
-
-      chart.setOption({
-        animation: false,
-        grid: { top: 10, right: 10, bottom: 30, left: 50 },
-        tooltip: { trigger: 'axis', formatter: p => `${p[0].axisValue}<br/>Drawdown: <b>${p[0].value}%</b>` },
-        xAxis: { type: 'category', data: months, axisLine: { lineStyle: { color: '#e2e8f0' } }, axisTick: { show: false }, axisLabel: { show: true, interval: Math.ceil(months.length/6), color: '#94a3b8', fontSize: 10 } },
-        yAxis: { type: 'value', max: 0, axisLabel: { color: '#94a3b8', fontSize: 10, formatter: '{value}%' }, splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } } },
-        series: [{
-          type: 'line', data: ddSeries, symbol: 'none', smooth: true,
-          lineStyle: { color: '#dc2626', width: 2 },
-          areaStyle: { color: 'rgba(220,38,38,0.1)' }
-        }]
-      });
-      new ResizeObserver(() => chart.resize()).observe(el);
-    }
-
-    function initAllocChart() {
-      const el = document.getElementById('allocChartEl');
-      if (!el || !currentInvestor) return;
-      if (window._allocChart) { try { window._allocChart.dispose(); } catch(e) {} }
-      const chart = echarts.init(el);
-      window._allocChart = chart;
-      const sh = currentInvestor.strategyHoldings || [];
-      chart.setOption({
-        animation: false,
-        series: [{
-          type: 'pie',
-          radius: ['50%', '80%'],
-          avoidLabelOverlap: false,
-          label: { show: false },
-          data: sh.map(h => ({ value: parseFloat(h.weight) || 0, name: h.name || h.ticker, itemStyle: { color: h.color } })),
-          itemStyle: { borderWidth: 2, borderColor: '#fff' }
-        }]
-      });
-      new ResizeObserver(() => chart.resize()).observe(el);
-    }
-
-    /* ─────────────────────────────────────────────────────── */
-    /* STRATEGY FILTER DROPDOWN                                */
-    /* ─────────────────────────────────────────────────────── */
-    function populateStrategyFilter() {
-      const sel = document.getElementById('strategyFilter');
-      /* Only list strategies that are actually used by loaded investors */
-      const strats = [...new Set(allInvestors.map(i => i.strategy))].filter(s => s && s !== '—').sort();
-      sel.innerHTML = '<option value="">All Strategies</option>';
-      strats.forEach(name => {
-        const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = name;
-        sel.appendChild(opt);
-      });
-    }
-
-    /* ─────────────────────────────────────────────────────── */
-    /* INIT                                                    */
-    /* ─────────────────────────────────────────────────────── */
-    window.addEventListener('DOMContentLoaded', async () => {
-      const { data } = await supabaseClient.auth.getSession();
-      if (!data.session) { window.location.href = '/signin.html'; return; }
-      const email = data.session.user?.email || '';
-      document.getElementById('sidebarUserEmail').textContent = email;
-      document.getElementById('sidebarAvatarInitials').textContent = email.charAt(0).toUpperCase();
-
-      const urlParams = new URLSearchParams(window.location.search);
-      const embedMode = urlParams.get('embed') === '1';
-      const embedUserId = urlParams.get('userId') || null;
-
-      /* ── Embed mode: hide chrome, show only the detail panel ── */
-      if (embedMode) {
-        document.querySelector('aside')?.style.setProperty('display', 'none', 'important');
-        document.querySelector('.top-nav')?.style.setProperty('display', 'none', 'important');
-        document.getElementById('kpiBar')?.style.setProperty('display', 'none', 'important');
-        /* Hide left panel (investor list) and expand detail panel to full width */
-        const grid = document.querySelector('[style*="grid-template-columns:300px"]');
-        if (grid) {
-          grid.style.gridTemplateColumns = '1fr';
-          grid.querySelectorAll(':scope > div:first-child').forEach(el => el.style.display = 'none');
-        }
-        document.querySelector('.main-content')?.style.setProperty('padding', '0', 'important');
-        document.querySelector('.main-content')?.style.setProperty('margin-left', '0', 'important');
-        document.querySelector('body')?.style.setProperty('background', 'white', 'important');
-      }
-
-      allInvestors = await loadInvestors();
-      renderKpiBar(allInvestors);
-      populateStrategyFilter();
-      renderInvestorList(allInvestors);
-      renderDetail();
-
-      /* ── Auto-select investor if userId is in URL ── */
-      if (embedUserId) {
-        await selectInvestor(embedUserId);
-      }
-
-      document.getElementById('investorSearch').oninput  = () => renderInvestorList(allInvestors);
-      document.getElementById('strategyFilter').onchange = () => renderInvestorList(allInvestors);
-      document.getElementById('signOutBtn').onclick = async () => {
-        await supabaseClient.auth.signOut();
-        window.location.href = '/signin.html';
-      };
-
-      /* ── Live data refresh ────────────────────────────────── */
-      let _refreshTimer = null;
-      async function refreshAllData() {
-        const prevId = currentInvestor?.userId;
-        allInvestors = await loadInvestors();
+      try {
+        allInvestors = await loadAll();
         renderKpiBar(allInvestors);
-        renderInvestorList(allInvestors);
-        /* If a detail panel was open, re-load it with fresh data (silent = no spinner) */
-        if (prevId) await selectInvestor(prevId, { silent: true });
+        /* Strategy filter */
+        const sf = document.getElementById('strategyFilter');
+        sf.innerHTML = `<option value="">All Strategies</option>` + allStrategies.sort((a,b) => (a.short_name||a.name).localeCompare(b.short_name||b.name)).map(s => `<option value="${s.id}">${s.short_name||s.name}</option>`).join('');
+        renderList(allInvestors);
+        renderDetail();
+        document.getElementById('investorSearch').oninput = () => renderList(allInvestors);
+        sf.onchange = () => renderList(allInvestors);
+
+        /* Realtime + interval refresh — debounced + in-flight guarded to avoid request storms */
+        let _refreshTimer = null, _refreshInFlight = false, _refreshQueued = false;
+        const doRefresh = async () => {
+          if (_refreshInFlight) { _refreshQueued = true; return; }
+          _refreshInFlight = true;
+          try {
+            const prev = currentInvestor?.userId;
+            allInvestors = await loadAll();
+            if (prev) currentInvestor = allInvestors.find(i => i.userId === prev) || null;
+            renderKpiBar(allInvestors);
+            renderList(allInvestors);
+            if (currentInvestor) renderDetail();
+          } catch (e) { console.error('[investors] refresh failed:', e); }
+          finally {
+            _refreshInFlight = false;
+            if (_refreshQueued) { _refreshQueued = false; scheduleRefresh(); }
+          }
+        };
+        const scheduleRefresh = () => {
+          if (_refreshTimer) clearTimeout(_refreshTimer);
+          _refreshTimer = setTimeout(doRefresh, 1500);
+        };
+        ['stock_holdings_c','strategies_returns_c','stock_returns_c','transactions'].forEach(t => {
+          sb.channel('rt:'+t).on('postgres_changes', { event:'*', schema:'public', table:t }, scheduleRefresh).subscribe();
+        });
+        setInterval(scheduleRefresh, 60000);
+      } catch (err) {
+        console.error('Failed to load investors:', err);
+        document.getElementById('detailPanel').innerHTML = `<div style="padding:30px;color:#dc2626;">Failed to load: ${err.message||err}</div>`;
       }
-
-      /* Debounce rapid bursts (e.g. batch inserts) into one refresh */
-      function scheduleRefresh() {
-        clearTimeout(_refreshTimer);
-        _refreshTimer = setTimeout(refreshAllData, 800);
-      }
-
-      /* Subscribe to the three tables that drive all investor data */
-      supabaseClient
-        .channel('investors-live')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_holdings_c' },      scheduleRefresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' },         scheduleRefresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'strategies_returns_c' },  scheduleRefresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' },             scheduleRefresh)
-        .subscribe();
-
-      /* Fallback: silent background poll every 60 s (catches anything Realtime misses) */
-      setInterval(refreshAllData, 60000);
     });
   </script>
 <div id="mintAppOverlay" style="display:none;position:fixed;inset:0;z-index:99998;background:#0f172a;">
