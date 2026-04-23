@@ -272,6 +272,16 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
     /* Cards */
     .card {
       background: var(--bg-card);
@@ -600,7 +610,7 @@
       padding: 20px 24px;
     }
 
-    .mint-message { margin-bottom: 16px; }
+    .mint-message { margin-bottom: 16px; animation: slideIn 0.3s ease-out; }
     .mint-message.user { text-align: right; }
 
     .mint-bubble {
@@ -1489,41 +1499,74 @@
         </div>
       </div>
 
-      <!-- Live RSI Signals + MA Chart Side by Side -->
+      <!-- Live RSI Signals + Portfolio Chart Side by Side -->
       <div class="grid-2">
         <div class="card">
           <div class="card-header">
             <h3 class="card-title">Live RSI Signals</h3>
             <span class="badge cyan">Live</span>
           </div>
-          <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <span style="font-size: 14px; font-weight: 600; color: var(--text-primary);">ZAR/USD</span>
-              <span class="badge" style="background: rgba(239, 68, 68, 0.15); color: var(--sell-red);">PREMIUM</span>
-            </div>
-            <div style="text-align: right;">
+          <!-- RSI Gauge for ZAR/USD -->
+          <div style="padding: 16px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 14px; font-weight: 600; color: var(--text-primary);">ZAR/USD</span>
+                <span class="badge" style="background: rgba(239, 68, 68, 0.15); color: var(--sell-red);">PREMIUM</span>
+              </div>
               <div style="font-size: 20px; font-weight: 700; color: var(--sell-red);">72</div>
-              <div style="font-size: 10px; color: var(--text-muted);">RSI (14)</div>
+            </div>
+            <div style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; position: relative;">
+              <div style="position: absolute; left: 0; width: 30%; height: 100%; background: rgba(16, 185, 129, 0.5);"></div>
+              <div style="position: absolute; left: 30%; width: 40%; height: 100%; background: rgba(245, 158, 11, 0.5);"></div>
+              <div style="position: absolute; left: 70%; width: 30%; height: 100%; background: rgba(239, 68, 68, 0.5);"></div>
+              <div style="position: absolute; left: 72%; top: -4px; width: 3px; height: 16px; background: white; border-radius: 2px; box-shadow: 0 0 8px rgba(255,255,255,0.8);"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 10px; color: var(--text-muted);">
+              <span>Oversold (0)</span>
+              <span>Neutral (50)</span>
+              <span>Overbought (100)</span>
             </div>
           </div>
-          <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <span style="font-size: 14px; font-weight: 600; color: var(--text-primary);">EUR/USD</span>
-              <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: var(--buy-green);">DISCOUNT</span>
-            </div>
-            <div style="text-align: right;">
+          <!-- RSI Gauge for EUR/USD -->
+          <div style="padding: 16px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 14px; font-weight: 600; color: var(--text-primary);">EUR/USD</span>
+                <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: var(--buy-green);">DISCOUNT</span>
+              </div>
               <div style="font-size: 20px; font-weight: 700; color: var(--buy-green);">28</div>
-              <div style="font-size: 10px; color: var(--text-muted);">RSI (14)</div>
+            </div>
+            <div style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; position: relative;">
+              <div style="position: absolute; left: 0; width: 30%; height: 100%; background: rgba(16, 185, 129, 0.5);"></div>
+              <div style="position: absolute; left: 30%; width: 40%; height: 100%; background: rgba(245, 158, 11, 0.5);"></div>
+              <div style="position: absolute; left: 70%; width: 30%; height: 100%; background: rgba(239, 68, 68, 0.5);"></div>
+              <div style="position: absolute; left: 28%; top: -4px; width: 3px; height: 16px; background: white; border-radius: 2px; box-shadow: 0 0 8px rgba(255,255,255,0.8);"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 10px; color: var(--text-muted);">
+              <span>Oversold (0)</span>
+              <span>Neutral (50)</span>
+              <span>Overbought (100)</span>
             </div>
           </div>
-          <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 0;">
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <span style="font-size: 14px; font-weight: 600; color: var(--text-primary);">GBP/USD</span>
-              <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: var(--gold);">NEUTRAL</span>
-            </div>
-            <div style="text-align: right;">
+          <!-- RSI Gauge for GBP/USD -->
+          <div style="padding: 16px 0;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 14px; font-weight: 600; color: var(--text-primary);">GBP/USD</span>
+                <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: var(--gold);">NEUTRAL</span>
+              </div>
               <div style="font-size: 20px; font-weight: 700; color: var(--gold);">51</div>
-              <div style="font-size: 10px; color: var(--text-muted);">RSI (14)</div>
+            </div>
+            <div style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; position: relative;">
+              <div style="position: absolute; left: 0; width: 30%; height: 100%; background: rgba(16, 185, 129, 0.5);"></div>
+              <div style="position: absolute; left: 30%; width: 40%; height: 100%; background: rgba(245, 158, 11, 0.5);"></div>
+              <div style="position: absolute; left: 70%; width: 30%; height: 100%; background: rgba(239, 68, 68, 0.5);"></div>
+              <div style="position: absolute; left: 51%; top: -4px; width: 3px; height: 16px; background: white; border-radius: 2px; box-shadow: 0 0 8px rgba(255,255,255,0.8);"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 10px; color: var(--text-muted);">
+              <span>Oversold (0)</span>
+              <span>Neutral (50)</span>
+              <span>Overbought (100)</span>
             </div>
           </div>
         </div>
@@ -1637,20 +1680,33 @@
 
     <!-- COMPLIANCE TAB -->
     <div class="tab-content" id="tab-compliance">
-      <div class="card" style="margin-bottom: 24px;">
-        <div class="card-header">
-          <h3 class="card-title">PFMA Compliance Status</h3>
-          <span class="badge green">100% Compliant</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 16px;">
-          <div class="compliance-percent">100%</div>
-          <div style="flex: 1;">
-            <div style="font-size: 16px; color: var(--text-primary); margin-bottom: 4px;">All requirements met for Q1 2026</div>
-            <div style="font-size: 12px; color: var(--text-muted);">Last audit: April 15, 2026 | Next review: May 15, 2026</div>
+      <div class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(6, 182, 212, 0.05)); border: 1px solid rgba(16, 185, 129, 0.3);">
+        <div style="display: flex; align-items: center; gap: 24px;">
+          <!-- Circular Progress -->
+          <div style="position: relative; width: 100px; height: 100px;">
+            <svg viewBox="0 0 100 100" style="transform: rotate(-90deg);">
+              <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="8"/>
+              <circle cx="50" cy="50" r="42" fill="none" stroke="url(#complianceGradient)" stroke-width="8" stroke-dasharray="264" stroke-dashoffset="0" stroke-linecap="round"/>
+              <defs>
+                <linearGradient id="complianceGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" style="stop-color:#10b981"/>
+                  <stop offset="100%" style="stop-color:#06b6d4"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+              <div style="font-size: 28px; font-weight: 700; color: var(--buy-green);">100%</div>
+              <div style="font-size: 10px; color: var(--text-muted);">Compliant</div>
+            </div>
           </div>
-        </div>
-        <div class="progress-bar" style="height: 12px;">
-          <div class="progress-fill" style="width: 100%; background: linear-gradient(90deg, var(--buy-green), var(--cyan));"></div>
+          <div style="flex: 1;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+              <span class="badge green" style="font-size: 12px; padding: 6px 12px;">✓ 100% Compliant</span>
+            </div>
+            <div style="font-size: 16px; color: var(--text-primary); margin-bottom: 4px;">All requirements met for Q1 2026</div>
+            <div style="font-size: 12px; color: var(--text-muted);">Last audit: April 15, 2026 · Next review: May 15, 2026</div>
+          </div>
+          <button class="btn btn-primary" style="padding: 12px 20px;">Generate Report</button>
         </div>
       </div>
 
@@ -1746,16 +1802,32 @@
 
     <!-- RISK TAB -->
     <div class="tab-content" id="tab-risk">
-      <div class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(124, 58, 237, 0.1)); border-color: var(--sell-red);">
-        <div style="display: flex; align-items: center; gap: 20px;">
-          <div style="width: 64px; height: 64px; background: var(--sell-red); border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 32px;">⚠️</div>
+      <div class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(124, 58, 237, 0.1)); border: 1px solid rgba(16, 185, 129, 0.3);">
+        <div style="display: flex; align-items: center; gap: 24px;">
+          <!-- Visual Risk Gauge -->
+          <div style="position: relative; width: 100px; height: 60px;">
+            <svg viewBox="0 0 100 60" style="width: 100px; height: 60px;">
+              <!-- Background arc -->
+              <path d="M 10 55 A 40 40 0 0 1 90 55" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="8" stroke-linecap="round"/>
+              <!-- Green zone (Low 0-33) -->
+              <path d="M 10 55 A 40 40 0 0 1 25 20" fill="none" stroke="rgba(16, 185, 129, 0.6)" stroke-width="8" stroke-linecap="round"/>
+              <!-- Amber zone (Medium 34-66) -->
+              <path d="M 25 20 A 40 40 0 0 1 75 20" fill="none" stroke="rgba(245, 158, 11, 0.6)" stroke-width="8" stroke-linecap="round"/>
+              <!-- Red zone (High 67-100) -->
+              <path d="M 75 20 A 40 40 0 0 1 90 55" fill="none" stroke="rgba(239, 68, 68, 0.6)" stroke-width="8" stroke-linecap="round"/>
+              <!-- Needle - pointing to Low -->
+              <line x1="50" y1="55" x2="30" y2="25" stroke="white" stroke-width="3" stroke-linecap="round"/>
+              <circle cx="50" cy="55" r="5" fill="white"/>
+            </svg>
+          </div>
           <div style="flex: 1;">
             <h3 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">Risk Dashboard</h3>
             <p style="font-size: 14px; color: var(--text-secondary);">Real-time monitoring of liquidity, market, and compliance risks</p>
           </div>
-          <div style="text-align: center; padding: 12px 20px; background: rgba(16, 185, 129, 0.1); border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.3);">
-            <div style="font-size: 28px; font-weight: 700; color: var(--buy-green);">Low</div>
-            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Risk Score</div>
+          <div style="text-align: center; padding: 16px 24px; background: rgba(16, 185, 129, 0.1); border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.3);">
+            <div style="font-size: 32px; font-weight: 700; color: var(--buy-green);">LOW</div>
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-top: 4px;">Overall Risk Score</div>
+            <div style="font-size: 10px; color: var(--buy-green); margin-top: 4px;">28 / 100</div>
           </div>
         </div>
       </div>
@@ -1964,37 +2036,6 @@
   </main>
 
   <script>
-    // ==================== TAB NAVIGATION ====================
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
-
-    tabBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const tabId = btn.dataset.tab;
-
-        tabBtns.forEach(b => b.classList.remove('active'));
-        tabContents.forEach(c => c.classList.remove('active'));
-
-        btn.classList.add('active');
-        document.getElementById('tab-' + tabId).classList.add('active');
-
-        // Reinit charts when switching tabs
-        if (tabId === 'overview') {
-          setTimeout(initLiquidityChart, 50);
-          initLiveFeed();
-        }
-        if (tabId === 'forex') {
-          setTimeout(initPortfolioChart, 50);
-        }
-        if (tabId === 'forecast') {
-          setTimeout(initForecastChart, 50);
-        }
-        if (tabId === 'transactions') {
-          setTimeout(initTransactionFeed, 50);
-        }
-      });
-    });
-
     // ==================== CHART TABS ====================
     document.querySelectorAll('.chart-tab').forEach(tab => {
       tab.addEventListener('click', () => {
@@ -2566,22 +2607,28 @@
 
     // ==================== TAB SWITCH HELPER ====================
     function switchTab(tabId) {
-      console.log('switchTab called:', tabId);
-      const tabBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+      console.log('switchTab called with:', tabId);
       const tabContent = document.getElementById('tab-' + tabId);
-      console.log('tabBtn:', tabBtn, 'tabContent:', tabContent);
-      if (!tabBtn || !tabContent) {
-        console.log('Tab or content not found!');
+      console.log('Found tab content:', tabContent);
+      if (!tabContent) {
+        console.log('ERROR: tab content not found!');
         return;
       }
 
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      // Remove active from all nav items and tab contents
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-      tabBtn.classList.add('active');
-      tabContent.classList.add('active');
-      console.log('Switched to:', tabId, 'active classes added');
+      // Add active to matching nav item
+      const navItem = document.querySelector(`.nav-item[data-page="${tabId}"]`);
+      console.log('Found nav item:', navItem);
+      if (navItem) navItem.classList.add('active');
 
+      // Show tab content
+      tabContent.classList.add('active');
+      console.log('Active class added to:', tabContent);
+
+      // Reinit charts when switching tabs
       if (tabId === 'overview') {
         setTimeout(initLiquidityChart, 50);
         initLiveFeed();
