@@ -401,9 +401,18 @@
         const qty   = Number(row.quantity) || 0;
         let fill    = Number(row.avg_fill) || 0;
         const mv    = Number(row.market_value) || 0;
-        if (fill * qty > 10 * mv && mv > 0) fill /= 100;
         const live  = secLiveMap[row.security_id];
         const meta  = secMetaMap[row.security_id] || {};
+        /* Unit detection: avg_fill is stored inconsistently — sometimes cents, sometimes rands.
+           Compare fill to the live price (always cents). Whichever interpretation is closer
+           to the current market price determines the unit. */
+        if (live && live.priceR > 0 && fill > 0) {
+          const diffAsRands = Math.abs(fill - live.priceR);
+          const diffAsCents = Math.abs(fill / 100 - live.priceR);
+          if (diffAsRands < diffAsCents) fill *= 100;  /* fill was in rands → convert to cents */
+        } else if (fill * qty > 10 * mv && mv > 0) {
+          fill /= 100;
+        }
         const investedR = (fill * qty) / 100;
         const currentR  = live ? live.priceR * qty : (mv / 100);
         byUser[uid].holdings.push({
