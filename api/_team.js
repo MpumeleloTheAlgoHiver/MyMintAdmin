@@ -110,7 +110,7 @@ const sendInviteEmail = async (toEmail, toName, inviterEmail) => {
         html: `
           <p>Hi ${toName || toEmail},</p>
           <p>You have been invited to the Mint Admin Portal by ${inviterEmail}.</p>
-          <p><a href="${baseUrl}/dashboard.html">Click here to access your dashboard</a></p>
+          <p><a href="${baseUrl}">Click here to access your dashboard</a></p>
           <p>Use the email address this was sent to when logging in.</p>
         `
       })
