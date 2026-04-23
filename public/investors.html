@@ -354,30 +354,11 @@
 
     /* ─── Data Load ─── */
     async function loadAll() {
-      const [
-        { data: holdings },
-        { data: strategies },
-        { data: stratHist },
-      ] = await Promise.all([
-        sb.from('stock_holdings_c').select('user_id, security_id, strategy_id, quantity, avg_fill, market_value, created_at').eq('is_active', true).eq('trade_side', 'BUY'),
-        sb.from('strategies_c').select('id, name, short_name, description, risk_level, sector'),
-        sb.from('strategies_returns_c').select('strategy_id, as_of_date, basket_value, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct, all_pct').order('as_of_date', { ascending: true }),
-      ]);
-
-      const userIds = [...new Set((holdings||[]).map(r=>r.user_id).filter(Boolean))];
-      const secIds  = [...new Set((holdings||[]).map(r=>r.security_id).filter(Boolean))];
-
-      const [
-        { data: profiles },
-        { data: secMeta },
-        { data: secLive },
-        { data: txns },
-      ] = await Promise.all([
-        userIds.length ? sb.from('profiles').select('id, first_name, last_name, email, mint_number').in('id', userIds) : Promise.resolve({ data: [] }),
-        secIds.length  ? sb.from('securities_c').select('id, symbol, name, sector, logo_url').in('id', secIds) : Promise.resolve({ data: [] }),
-        secIds.length  ? sb.from('stock_returns_c').select('security_id, symbol, current_price, 1d_pct, ytd_pct, 1y_pct, as_of_date').in('security_id', secIds).order('as_of_date', { ascending: false }) : Promise.resolve({ data: [] }),
-        userIds.length ? sb.from('transactions').select('user_id, amount, direction, name, description, status, transaction_date').in('user_id', userIds).order('transaction_date', { ascending: false }) : Promise.resolve({ data: [] }),
-      ]);
+      /* Fetch via server-side endpoint which uses the service role key,
+         bypassing Supabase RLS so ALL investors are always visible to admins. */
+      const resp = await fetch('/api/investors/data');
+      if (!resp.ok) throw new Error(`Investor data fetch failed: ${resp.status}`);
+      const { holdings, strategies, stratHist, profiles, secMeta, secLive, txns } = await resp.json();
 
       const profMap    = Object.fromEntries((profiles||[]).map(p => [p.id, p]));
       const stratMap   = Object.fromEntries((strategies||[]).map(s => [s.id, s]));
