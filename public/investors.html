@@ -328,23 +328,24 @@
     }
 
     /* Build calendar-returns table from daily NAV: monthKey → % return for that month */
-    function computeCalendar(navSeries) {
-      if (!navSeries || navSeries.length < 2) return {};
-      const monthLast = {};
-      navSeries.forEach(p => {
+    /* inceptionDate (optional YYYY-MM-DD): when provided, series is trimmed to that date
+       so the first partial month uses the investor's entry NAV, not the prior month-end. */
+    function computeCalendar(navSeries, inceptionDate) {
+      if (!navSeries || navSeries.length < 1) return {};
+      const incMs = inceptionDate ? new Date(inceptionDate).getTime() : 0;
+      const series = incMs ? navSeries.filter(p => new Date(p.date).getTime() >= incMs) : navSeries;
+      if (series.length < 1) return {};
+      const monthLast = {}, monthFirst = {};
+      series.forEach(p => {
         const d = new Date(p.date);
         const key = d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0');
         monthLast[key] = p.nav;
-      });
-      const sortedKeys = Object.keys(monthLast).sort();
-      const monthFirst = {};
-      navSeries.forEach(p => {
-        const d = new Date(p.date);
-        const key = d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0');
         if (monthFirst[key] == null) monthFirst[key] = p.nav;
       });
+      const sortedKeys = Object.keys(monthLast).sort();
       const out = {};
       sortedKeys.forEach((k, i) => {
+        /* First month (may be partial): start from the first nav on/after inception */
         const start = i === 0 ? monthFirst[k] : monthLast[sortedKeys[i-1]];
         const end   = monthLast[k];
         if (start > 0) out[k] = (end / start - 1) * 100;
@@ -599,10 +600,12 @@
       ];
       const topHoldings = i.holdings.slice(0, 5);
 
-      /* Calendar (filtered from user inception month) */
-      const cal = m.calendar || {};
-      const incKey = i.inception ? i.inception.slice(0, 7) : null; /* YYYY-MM */
-      const keys = Object.keys(cal).sort().filter(k => !incKey || k >= incKey);
+      /* Calendar — computed per-investor from their inception date so the first
+         partial month uses their entry NAV, not the prior month-end */
+      const incDate = i.inception ? i.inception.slice(0, 10) : null;
+      const cal = computeCalendar(stratNavMap[i.strategyId] || [], incDate);
+      const incKey = incDate ? incDate.slice(0, 7) : null; /* YYYY-MM */
+      const keys = Object.keys(cal).sort();
       const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       let calendarHtml;
       if (!keys.length) {
