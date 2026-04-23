@@ -613,6 +613,7 @@
     /* KPI BAR                                                 */
     /* ─────────────────────────────────────────────────────── */
     function renderKpiBar(investors) {
+      console.log('[KPI] Per-investor breakdown:', investors.map(i => ({ name: i.name, invested: i.invested, current: i.current, returnPct: i.returnPct })));
       const aum  = investors.reduce((s, i) => s + (i.current || 0), 0);
       const inv  = investors.reduce((s, i) => s + (i.invested || 0), 0);
       const pnl  = aum - inv;
