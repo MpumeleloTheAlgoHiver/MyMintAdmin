@@ -5509,20 +5509,17 @@
         }
 
         window.__dbgBreadcrumb('ovSelect:fetch-analytics');
-        const [{ data: analytics }, { data: stratRetRows }] = await Promise.all([
-          supabaseClient
-            .from('strategy_analytics')
-            .select('strategy_id, as_of_date, latest_value, ytd_return, summary, curves, computed_at')
-            .eq('strategy_id', strat.id)
-            .maybeSingle(),
-          supabaseClient
-            .from('strategies_returns_c')
-            .select('strategy_id, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct, basket_value, as_of_date')
-            .eq('strategy_id', strat.id)
-            .order('as_of_date', { ascending: false })
-            .limit(1),
-        ]);
-        const stratRet = (stratRetRows && stratRetRows[0]) || null;
+        const { data: _stratRetRow } = await supabaseClient
+          .from('strategies_returns_c')
+          .select('strategy_id, as_of_date, latest_value, basket_value, summary, curves, calendar_returns, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct')
+          .eq('strategy_id', strat.id)
+          .order('as_of_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const analytics = _stratRetRow
+          ? { ..._stratRetRow, ytd_return: _stratRetRow.ytd_pct ?? null, latest_value: _stratRetRow.latest_value ?? _stratRetRow.basket_value ?? null }
+          : null;
+        const stratRet = _stratRetRow || null;
 
         window.__dbgBreadcrumb('ovSelect:fetch-securities');
         const symbols = [...new Set(holdings.map(h => h.ticker || h.symbol || h).filter(s => typeof s === 'string' && s))];
@@ -7455,7 +7452,7 @@
                </div>`
             : "";
 
-          /* YTD — from strategy_analytics via strategyYtdMap */
+          /* YTD — from strategies_returns_c via strategyYtdMap */
           const ytd = strategyYtdMap.get(String(strategy.id)) ?? null;
           const ytdDisplay = fmtYtd(ytd);
           const ytdClr = ytdColor(ytd);
