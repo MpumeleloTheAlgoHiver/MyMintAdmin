@@ -268,7 +268,7 @@
 
     /* ─── State ─── */
     let allInvestors = [], allStrategies = [], stratNavMap = {}, stratMetricsMap = {};
-    let currentInvestor = null, currentTab = 'overview';
+    let currentInvestor = null, currentTab = 'performance';
     const _charts = new WeakMap();
     function disposeChart(el) {
       if (!el) return;
@@ -535,7 +535,7 @@
       const inv = allInvestors.find(i => i.userId === userId);
       if (!inv) return;
       currentInvestor = inv;
-      currentTab = 'overview';
+      currentTab = 'performance';
       renderList(allInvestors);
       renderDetail();
     }
@@ -548,9 +548,7 @@
       }
       const i = currentInvestor;
       const tabs = [
-        { id:'overview',     l:'Overview' },
         { id:'performance',  l:'Performance' },
-        { id:'calendar',     l:'Calendar Returns' },
         { id:'risk',         l:'Risk & Drawdown' },
         { id:'allocations',  l:'Allocations' },
         { id:'transactions', l:'Transactions' },
@@ -604,16 +602,14 @@
       const el = document.getElementById('tabContent');
       if (!el || !currentInvestor) return;
       const i = currentInvestor;
-      if (currentTab === 'overview')      el.innerHTML = renderOverviewTab(i);
-      else if (currentTab === 'performance')  { el.innerHTML = `<div id="perfChart" style="width:100%;height:380px;background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);"></div>`; setTimeout(() => renderPerfChart(i), 50); }
-      else if (currentTab === 'calendar')     el.innerHTML = renderCalendarTab(i);
+      if (currentTab === 'performance')       { el.innerHTML = renderPerformanceTab(i); setTimeout(() => renderUserPnlChart(i), 50); }
       else if (currentTab === 'risk')         el.innerHTML = renderRiskTab(i);
       else if (currentTab === 'allocations')  { el.innerHTML = renderAllocationsTab(i); setTimeout(() => renderSectorChart(i), 50); }
       else if (currentTab === 'transactions') el.innerHTML = renderTxnsTab(i);
     }
 
-    /* ─── Tab: Overview ─── */
-    function renderOverviewTab(i) {
+    /* ─── Tab: Performance (merged: user P&L chart + calendar + strategy stats + holdings) ─── */
+    function renderPerformanceTab(i) {
       const m = stratMetricsMap[i.strategyId] || {};
       const latest = m.latest || {};
       const periods = [
@@ -621,7 +617,67 @@
         ['6M', latest['6m_pct']], ['YTD', latest['ytd_pct']], ['1Y', latest['1y_pct']], ['ALL', latest.all_pct]
       ];
       const topHoldings = i.holdings.slice(0, 5);
+
+      /* Calendar (filtered from user inception month) */
+      const cal = m.calendar || {};
+      const incKey = i.inception ? i.inception.slice(0, 7) : null; /* YYYY-MM */
+      const keys = Object.keys(cal).sort().filter(k => !incKey || k >= incKey);
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      let calendarHtml;
+      if (!keys.length) {
+        calendarHtml = `<div style="padding:20px;text-align:center;color:#94a3b8;font-size:12px;">No monthly returns since investor's inception.</div>`;
+      } else {
+        const byYear = {};
+        keys.forEach(k => { const [y, mn] = k.split('-'); (byYear[y] = byYear[y] || {})[+mn] = cal[k]; });
+        const years = Object.keys(byYear).sort();
+        const incYear  = incKey ? +incKey.slice(0, 4) : null;
+        const incMonth = incKey ? +incKey.slice(5, 7) : null;
+        const cellColor = v => {
+          if (v == null) return '#f8fafc';
+          const a = Math.min(Math.abs(v) / 5, 1) * 0.5 + 0.1;
+          return v >= 0 ? `rgba(5,150,105,${a})` : `rgba(220,38,38,${a})`;
+        };
+        calendarHtml = `
+          <table class="ov-table">
+            <thead><tr><th>Year</th>${months.map(mn => `<th class="r" style="font-size:10px;">${mn}</th>`).join('')}<th class="r" style="font-weight:700;color:#0f172a;">YTD</th></tr></thead>
+            <tbody>
+              ${years.map(y => {
+                let cum = 1, hasAny = false;
+                months.forEach((_, idx) => { const v = byYear[y][idx+1]; if (v != null) { cum *= (1 + v/100); hasAny = true; } });
+                const ytd = hasAny ? (cum - 1) * 100 : null;
+                return `<tr>
+                  <td style="font-weight:700;">${y}</td>
+                  ${months.map((_, idx) => {
+                    const monthNum = idx + 1;
+                    /* Hide cells before investor inception */
+                    if (incYear && (+y < incYear || (+y === incYear && monthNum < incMonth))) {
+                      return `<td class="r ov-mono" style="background:#f8fafc;color:#e2e8f0;font-size:10.5px;">·</td>`;
+                    }
+                    const v = byYear[y][monthNum];
+                    return `<td class="r ov-mono" style="background:${cellColor(v)};color:${v==null?'#cbd5e1':'#0f172a'};font-weight:${v==null?'400':'600'};font-size:10.5px;">${v==null?'—':v.toFixed(1)}</td>`;
+                  }).join('')}
+                  <td class="r ov-mono" style="font-weight:700;color:${pctClr(ytd)};">${fmtPctNoSign(ytd)}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+
       return `
+        <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);margin-bottom:14px;">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
+            <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">INVESTOR P&L (R) — SINCE ${i.inception ? fmtDate(i.inception).toUpperCase() : 'INCEPTION'}</div>
+            <div style="font-size:11px;color:${pctClr(i.pnlR)};font-weight:700;font-family:ui-monospace,monospace;">${i.pnlR >= 0 ? '+' : ''}${fmtR2(i.pnlR)}</div>
+          </div>
+          <div id="userPnlChart" style="width:100%;height:320px;"></div>
+        </div>
+
+        <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);margin-bottom:14px;">
+          <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;margin-bottom:12px;">MONTHLY RETURNS (%)</div>
+          ${calendarHtml}
+        </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
           <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);">
             <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;margin-bottom:10px;">STRATEGY PERFORMANCE</div>
@@ -644,6 +700,7 @@
             </div>
           </div>
         </div>
+
         <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);margin-top:14px;">
           <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;margin-bottom:10px;">TOP HOLDINGS</div>
           <table class="ov-table">
@@ -664,68 +721,43 @@
       `;
     }
 
-    /* ─── Tab: Performance ─── */
-    function renderPerfChart(i) {
-      const series = stratNavMap[i.strategyId] || [];
-      const el = document.getElementById('perfChart');
-      if (!el) return;
-      if (series.length < 2) { el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:13px;">Not enough NAV data to chart</div>`; return; }
+    /* Build user P&L series: starts at (inception, 0), then strategy NAV ratio × invested */
+    function renderUserPnlChart(i) {
+      const el = document.getElementById('userPnlChart'); if (!el) return;
+      const navs = stratNavMap[i.strategyId] || [];
+      if (!i.inception || !i.investedR || navs.length < 1) {
+        el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:12px;">Not enough data to chart user P&L</div>`;
+        return;
+      }
+      const startMs = new Date(i.inception).getTime();
+      const after = navs.filter(p => new Date(p.date).getTime() >= startMs);
+      const baseNav = (after[0] || navs[navs.length - 1]).nav;
+      if (!baseNav) { el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:12px;">Not enough data to chart user P&L</div>`; return; }
+      const data = [[i.inception, 0]];
+      after.forEach(p => {
+        const pnl = i.investedR * (p.nav / baseNav - 1);
+        data.push([p.date, +pnl.toFixed(2)]);
+      });
+      /* If no NAV points after inception yet, append today at current P&L for a visible line */
+      if (data.length === 1) data.push([new Date().toISOString().slice(0,10), +i.pnlR.toFixed(2)]);
+
       disposeChart(el);
-      const chart = echarts.init(el);
-      _charts.set(el, chart);
-      const base = series[0].nav;
-      const data = series.map(p => [p.date, +(p.nav / base * 100).toFixed(2)]);
+      const chart = echarts.init(el); _charts.set(el, chart);
+      const lastPnl = data[data.length-1][1];
+      const lineColor = lastPnl >= 0 ? '#059669' : '#dc2626';
+      const fillTop   = lastPnl >= 0 ? 'rgba(5,150,105,0.30)' : 'rgba(220,38,38,0.30)';
       chart.setOption({
-        grid: { left: 50, right: 20, top: 30, bottom: 40 },
-        tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, formatter: p => `${p[0].axisValueLabel}<br/><b>Index:</b> ${p[0].value[1]}` },
-        xAxis: { type: 'time', axisLine: { lineStyle: { color: '#cbd5e1' } }, axisLabel: { color: '#64748b', fontSize: 10 } },
-        yAxis: { type: 'value', axisLine: { lineStyle: { color: '#cbd5e1' } }, splitLine: { lineStyle: { color: '#f1f5f9' } }, axisLabel: { color: '#64748b', fontSize: 10, formatter: v => v.toFixed(0) } },
+        grid: { left: 70, right: 20, top: 20, bottom: 40 },
+        tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, formatter: p => `${p[0].axisValueLabel}<br/><b>P&L:</b> ${(p[0].value[1] >= 0 ? '+' : '') + fmtR2(p[0].value[1])}` },
+        xAxis: { type: 'time', min: i.inception, axisLine: { lineStyle: { color: '#cbd5e1' } }, axisLabel: { color: '#64748b', fontSize: 10 } },
+        yAxis: { type: 'value', axisLine: { lineStyle: { color: '#cbd5e1' } }, splitLine: { lineStyle: { color: '#f1f5f9' } }, axisLabel: { color: '#64748b', fontSize: 10, formatter: v => fmtR(v) } },
         series: [{
           type: 'line', smooth: true, symbol: 'none', data,
-          lineStyle: { color: '#7c3aed', width: 2 },
-          areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(124,58,237,0.25)' }, { offset: 1, color: 'rgba(124,58,237,0)' }] } }
+          lineStyle: { color: lineColor, width: 2 },
+          areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: fillTop }, { offset: 1, color: 'rgba(0,0,0,0)' }] } },
+          markLine: { silent: true, symbol: 'none', lineStyle: { color: '#94a3b8', type: 'dashed', width: 1 }, data: [{ yAxis: 0 }] }
         }]
       });
-    }
-
-    /* ─── Tab: Calendar ─── */
-    function renderCalendarTab(i) {
-      const cal = (stratMetricsMap[i.strategyId] || {}).calendar || {};
-      const keys = Object.keys(cal).sort();
-      if (!keys.length) return `<div style="background:#fff;border-radius:10px;padding:30px;text-align:center;color:#94a3b8;">No NAV history available to compute calendar returns.</div>`;
-      /* Build year-month matrix */
-      const byYear = {};
-      keys.forEach(k => { const [y, m] = k.split('-'); (byYear[y] = byYear[y] || {})[+m] = cal[k]; });
-      const years = Object.keys(byYear).sort();
-      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      const cellColor = v => {
-        if (v == null) return '#f8fafc';
-        const a = Math.min(Math.abs(v) / 5, 1) * 0.5 + 0.1;
-        return v >= 0 ? `rgba(5,150,105,${a})` : `rgba(220,38,38,${a})`;
-      };
-      return `
-        <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);">
-          <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;margin-bottom:12px;">MONTHLY RETURNS (%)</div>
-          <table class="ov-table">
-            <thead><tr><th>Year</th>${months.map(m => `<th class="r" style="font-size:10px;">${m}</th>`).join('')}<th class="r" style="font-weight:700;color:#0f172a;">YTD</th></tr></thead>
-            <tbody>
-              ${years.map(y => {
-                let cum = 1, hasAny = false;
-                months.forEach((_, idx) => { const v = byYear[y][idx+1]; if (v != null) { cum *= (1 + v/100); hasAny = true; } });
-                const ytd = hasAny ? (cum - 1) * 100 : null;
-                return `<tr>
-                  <td style="font-weight:700;">${y}</td>
-                  ${months.map((_, idx) => {
-                    const v = byYear[y][idx+1];
-                    return `<td class="r ov-mono" style="background:${cellColor(v)};color:${v==null?'#cbd5e1':'#0f172a'};font-weight:${v==null?'400':'600'};font-size:10.5px;">${v==null?'—':v.toFixed(1)}</td>`;
-                  }).join('')}
-                  <td class="r ov-mono" style="font-weight:700;color:${pctClr(ytd)};">${fmtPctNoSign(ytd)}</td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
     }
 
     /* ─── Tab: Risk ─── */
