@@ -717,9 +717,8 @@
           .order('as_of_date', { ascending: false })
           .limit(1)
           .maybeSingle();
-        /* Normalise field names to match existing code expectations */
+        /* Normalise latest_value — fall back to basket_value if not set */
         if (analyticsRow) {
-          analyticsRow.ytd_return  = analyticsRow.ytd_pct   ?? null;
           analyticsRow.latest_value = analyticsRow.latest_value ?? analyticsRow.basket_value ?? null;
         }
         analytics = analyticsRow || null;
