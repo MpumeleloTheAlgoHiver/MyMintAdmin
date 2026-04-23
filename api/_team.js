@@ -86,27 +86,49 @@ const supabaseRequest = async (path, options = {}) => {
 
 const sendInviteEmail = async (toEmail, toName, inviterEmail) => {
   const resendApiKey = process.env.RESEND_API_KEY;
-  if (!resendApiKey) return;
+  const fromEmail = process.env.ORDERBOOK_EMAIL_FROM || 'admin@mintinvestments.co.za';
+  
+  if (!resendApiKey) {
+    console.error('[Email] Cannot send invite: RESEND_API_KEY is not configured');
+    throw new Error('Email service not configured (RESEND_API_KEY missing)');
+  }
 
-  const baseUrl = process.env.APP_BASE_URL || 'https://your-admin-portal.vercel.app';
-  await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${resendApiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: process.env.ORDERBOOK_EMAIL_FROM || 'admin@mintinvestments.co.za',
-      to: [toEmail],
-      subject: 'You have been invited to Mint Admin',
-      html: `
-        <p>Hi ${toName || toEmail},</p>
-        <p>You have been invited to the Mint Admin Portal by ${inviterEmail}.</p>
-        <p><a href="${baseUrl}/dashboard.html">Click here to access your dashboard</a></p>
-        <p>Use the email address this was sent to when logging in.</p>
-      `
-    })
-  });
+  const baseUrl = process.env.APP_BASE_URL || 'https://my-mint-admin.vercel.app';
+  console.log(`[Email] Sending invite to ${toEmail} from ${fromEmail} via ${baseUrl}`);
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: fromEmail,
+        to: [toEmail],
+        subject: 'You have been invited to Mint Admin',
+        html: `
+          <p>Hi ${toName || toEmail},</p>
+          <p>You have been invited to the Mint Admin Portal by ${inviterEmail}.</p>
+          <p><a href="${baseUrl}/dashboard.html">Click here to access your dashboard</a></p>
+          <p>Use the email address this was sent to when logging in.</p>
+        `
+      })
+    });
+
+    const data = await res.json().catch(() => ({}));
+    
+    if (!res.ok) {
+      console.error('[Email] Resend API error:', data.message || data.error || `Status ${res.status}`);
+      throw new Error(data.message || data.error || `Resend error ${res.status}`);
+    }
+
+    console.log('[Email] Invite sent successfully:', data.id);
+    return data;
+  } catch (err) {
+    console.error('[Email] Failed to send invite email:', err.message);
+    throw err;
+  }
 };
 
 module.exports = { sendJson, requireAuth, requireAdmin, supabaseRequest, sendInviteEmail };

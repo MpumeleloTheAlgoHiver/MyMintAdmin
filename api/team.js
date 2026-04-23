@@ -43,8 +43,14 @@ module.exports = async (req, res) => {
         method: 'POST',
         body: { email, full_name: full_name || null, role, page_access: role === 'admin' ? [] : page_access, invited_by: result.user.id }
       });
-      await sendInviteEmail(email, full_name, result.user.email).catch(() => {});
-      return sendJson(res, 200, { ok: true, member });
+      let emailSent = false;
+      try {
+        await sendInviteEmail(email, full_name, result.user.email);
+        emailSent = true;
+      } catch (err) {
+        console.error('[Invite] Email sending failed but member was created:', err.message);
+      }
+      return sendJson(res, 200, { ok: true, member, emailSent });
     }
     
     // UPDATE

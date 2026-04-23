@@ -342,6 +342,9 @@
 
       if (data.ok) {
         document.getElementById('inviteOverlay').classList.remove('open');
+        if (!data.emailSent) {
+          alert('Member added, but the invitation email could not be sent. Please check your email configuration (RESEND_API_KEY).');
+        }
         await loadTeam();
       } else {
         alert(data.error || 'Failed to invite member');
