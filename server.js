@@ -1040,6 +1040,39 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.url === '/api/debug/investor-breakdown' && req.method === 'GET') {
+    (async () => {
+      if (!supabaseUrl || !supabaseServiceRoleKey) return sendJson(res, 500, { error: 'Supabase not configured' });
+      const sbHeaders = { apikey: supabaseServiceRoleKey, Authorization: `Bearer ${supabaseServiceRoleKey}` };
+      const sbFetch = (path) => fetch(`${supabaseUrl}/rest/v1/${path}`, { headers: sbHeaders }).then(r => r.json());
+      const [holdings, profiles] = await Promise.all([
+        sbFetch('stock_holdings_c?is_active=eq.true&trade_side=eq.BUY&select=user_id,security_id,quantity,avg_fill,market_value,strategy_id'),
+        sbFetch('profiles?select=id,first_name,last_name,email'),
+      ]);
+      const profMap = Object.fromEntries(profiles.map(p => [p.id, p]));
+      const byUser = {};
+      for (const row of holdings) {
+        const uid = row.user_id; if (!uid) continue;
+        if (!byUser[uid]) byUser[uid] = { costBasis: 0, mvTotal: 0 };
+        const mv = Number(row.market_value) || 0;
+        const qty = Number(row.quantity) || 0;
+        let fill = Number(row.avg_fill) || 0;
+        if (fill * qty > 10 * mv && mv > 0) fill /= 100;
+        byUser[uid].costBasis += (fill * qty) / 100;
+        byUser[uid].mvTotal   += mv / 100;
+      }
+      const rows = Object.entries(byUser).map(([uid, u]) => {
+        const p = profMap[uid] || {};
+        const name = [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email || uid;
+        return { name, invested: +u.costBasis.toFixed(2), marketValue: +u.mvTotal.toFixed(2) };
+      }).sort((a, b) => b.invested - a.invested);
+      const totalInvested = +rows.reduce((s, r) => s + r.invested, 0).toFixed(2);
+      const totalMV       = +rows.reduce((s, r) => s + r.marketValue, 0).toFixed(2);
+      sendJson(res, 200, { totalInvested, totalMV, investors: rows });
+    })();
+    return;
+  }
+
   const urlWithoutQuery = req.url.split('?')[0];
   const requestPath = urlWithoutQuery === '/' ? '/dashboard.html' : urlWithoutQuery;
   const safePath = path.normalize(requestPath).replace(/^([/\\])+/, '');
