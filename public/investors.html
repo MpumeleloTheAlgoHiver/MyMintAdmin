@@ -707,15 +707,22 @@
       });
       investor.strategyHoldings = stratHoldings;
 
-      /* 2. Strategy analytics (real period returns, calendar data, risk metrics) */
+      /* 2. Strategy returns + analytics from strategies_returns_c (single source of truth) */
       let analytics = null;
       if (investor.strategyId) {
         const { data: analyticsRow } = await supabaseClient
-          .from('strategy_analytics')
-          .select('strategy_id, as_of_date, latest_value, ytd_return, summary, curves, calendar_returns, computed_at, error')
+          .from('strategies_returns_c')
+          .select('strategy_id, as_of_date, latest_value, ytd_pct, summary, curves, calendar_returns, 1d_pct, 5d_pct, 1m_pct, 6m_pct, 1y_pct, 5y_pct, basket_value')
           .eq('strategy_id', investor.strategyId)
+          .order('as_of_date', { ascending: false })
+          .limit(1)
           .maybeSingle();
-        analytics = (analyticsRow && !analyticsRow.error) ? analyticsRow : null;
+        /* Normalise field names to match existing code expectations */
+        if (analyticsRow) {
+          analyticsRow.ytd_return  = analyticsRow.ytd_pct   ?? null;
+          analyticsRow.latest_value = analyticsRow.latest_value ?? analyticsRow.basket_value ?? null;
+        }
+        analytics = analyticsRow || null;
       }
       investor.analytics = analytics;
 
@@ -1377,7 +1384,7 @@
         .channel('investors-live')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_holdings_c' },      scheduleRefresh)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' },         scheduleRefresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_analytics' },  scheduleRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'strategies_returns_c' },  scheduleRefresh)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' },             scheduleRefresh)
         .subscribe();
 
