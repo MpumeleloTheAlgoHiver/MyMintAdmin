@@ -1031,14 +1031,21 @@ const server = http.createServer((req, res) => {
         const sbH = { apikey: supabaseServiceRoleKey, Authorization: `Bearer ${supabaseServiceRoleKey}`, 'Content-Type': 'application/json' };
         const sbGet = (path) => fetch(`${supabaseUrl}/rest/v1/${path}`, { headers: sbH }).then(r => r.json());
 
-        const [holdings, strategies, stratHist] = await Promise.all([
+        const [holdings, strategies] = await Promise.all([
           sbGet('stock_holdings_c?select=user_id,security_id,strategy_id,quantity,avg_fill,market_value,created_at&is_active=eq.true&trade_side=eq.BUY'),
           sbGet('strategies_c?select=id,name,short_name,description,risk_level,sector'),
-          sbGet('strategies_returns_c?select=strategy_id,as_of_date,basket_value,1d_pct,5d_pct,1m_pct,6m_pct,ytd_pct,1y_pct,5y_pct,all_pct&order=as_of_date.asc'),
         ]);
 
-        const userIds = [...new Set((holdings || []).map(r => r.user_id).filter(Boolean))];
-        const secIds  = [...new Set((holdings || []).map(r => r.security_id).filter(Boolean))];
+        const userIds    = [...new Set((holdings || []).map(r => r.user_id).filter(Boolean))];
+        const secIds     = [...new Set((holdings || []).map(r => r.security_id).filter(Boolean))];
+        /* Fetch NAV history per strategy in parallel — each gets its own 1000-row budget avoiding the global limit */
+        const stratIds   = [...new Set((holdings || []).map(r => r.strategy_id).filter(Boolean))];
+        const stratHistArrays = stratIds.length
+          ? await Promise.all(stratIds.map(sid =>
+              sbGet(`strategies_returns_c?select=strategy_id,as_of_date,basket_value,1d_pct,5d_pct,1m_pct,6m_pct,ytd_pct,1y_pct,5y_pct,all_pct&strategy_id=eq.${sid}&order=as_of_date.asc`)
+            ))
+          : [];
+        const stratHist = stratHistArrays.flat();
 
         const [profiles, secMeta, secLive, txns] = await Promise.all([
           userIds.length ? sbGet(`profiles?select=id,first_name,last_name,email,mint_number&id=in.(${userIds.join(',')})`) : Promise.resolve([]),
