@@ -1068,7 +1068,30 @@ const server = http.createServer((req, res) => {
       }).sort((a, b) => b.invested - a.invested);
       const totalInvested = +rows.reduce((s, r) => s + r.invested, 0).toFixed(2);
       const totalMV       = +rows.reduce((s, r) => s + r.marketValue, 0).toFixed(2);
-      sendJson(res, 200, { totalInvested, totalMV, investors: rows });
+      // Also fetch raw holdings for zero-MV investors for diagnosis
+      const zeroUsers = rows.filter(r => r.marketValue < 1).map(r => r.name);
+      const zeroUids  = Object.entries(byUser)
+        .filter(([, u]) => u.mvTotal < 1)
+        .map(([uid]) => uid);
+
+      let rawHoldings = [];
+      if (zeroUids.length) {
+        const allHoldings = await sbFetch(
+          `stock_holdings_c?user_id=in.(${zeroUids.join(',')})&select=user_id,security_id,symbol,quantity,avg_fill,market_value,is_active,trade_side,created_at`
+        );
+        rawHoldings = allHoldings;
+      }
+
+      // Also check securities for those security_ids
+      const secIds = [...new Set(rawHoldings.map(h => h.security_id).filter(Boolean))];
+      let securities = [];
+      if (secIds.length) {
+        securities = await sbFetch(
+          `securities_c?id=in.(${secIds.join(',')})&select=id,symbol,last_price,name`
+        );
+      }
+
+      sendJson(res, 200, { totalInvested, totalMV, investors: rows, diagnosis: { zeroUsers, rawHoldings, securities } });
     })();
     return;
   }
