@@ -744,7 +744,7 @@
       chart.setOption({
         grid: { left: 60, right: 20, top: 20, bottom: 40 },
         tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, formatter: p => `${p[0].axisValueLabel}<br/><b>Since Inception:</b> ${(p[0].value[1] >= 0 ? '+' : '') + p[0].value[1].toFixed(2)}%` },
-        xAxis: { type: 'time', min: originDate, axisLine: { lineStyle: { color: '#cbd5e1' } }, axisLabel: { color: '#64748b', fontSize: 10 } },
+        xAxis: { type: 'time', min: originDate, boundaryGap: false, axisLine: { lineStyle: { color: '#cbd5e1' } }, axisLabel: { color: '#64748b', fontSize: 10 } },
         yAxis: { type: 'value', min: 0, axisLine: { lineStyle: { color: '#cbd5e1' } }, splitLine: { lineStyle: { color: '#f1f5f9' } }, axisLabel: { color: '#64748b', fontSize: 10, formatter: v => v.toFixed(1) + '%' } },
         series: [{
           type: 'line', smooth: true, symbol: 'none', data,
