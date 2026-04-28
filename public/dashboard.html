@@ -468,6 +468,14 @@
         background: #cbd5e1;
         border-radius: 999px;
       }
+      #newsModalBody table { border-collapse: collapse; width: 100%; font-size: 12px; margin: 12px 0; }
+      #newsModalBody table td, #newsModalBody table th { border: 1px solid #e2e8f0; padding: 6px 10px; text-align: left; vertical-align: top; }
+      #newsModalBody table th, #newsModalBody table .xl64 { font-weight: 700; background: #f8fafc; color: #0f172a; }
+      #newsModalBody table tr:nth-child(even) { background: #f8fafc; }
+      #newsModalBody p { margin: 0 0 10px; }
+      #newsModalBody h1,#newsModalBody h2,#newsModalBody h3 { font-family:'Space Grotesk',sans-serif; color:#0f172a; margin:16px 0 6px; }
+      #newsModalBody a { color:#7c3aed; text-decoration:underline; }
+      #newsModalBody strong, #newsModalBody b { color:#0f172a; }
 
       .marquee-scroll {
         overflow-x: auto;
@@ -10184,7 +10192,16 @@
         : '';
       const authorStr = a.author ? `By ${a.author}` : '';
       document.getElementById('newsModalMeta').innerHTML = [authorStr, dateStr].filter(Boolean).map(s=>`<span>${s}</span>`).join('<span style="color:#e2e8f0;">·</span>');
-      document.getElementById('newsModalBody').textContent = a.body_text || 'No content available.';
+      const bodyEl = document.getElementById('newsModalBody');
+      const bodyContent = a.body_text || 'No content available.';
+      const isHtml = /<[a-z][\s\S]*>/i.test(bodyContent);
+      if (isHtml) {
+        bodyEl.style.whiteSpace = 'normal';
+        bodyEl.innerHTML = bodyContent;
+      } else {
+        bodyEl.style.whiteSpace = 'pre-wrap';
+        bodyEl.textContent = bodyContent;
+      }
       const actionsEl = document.getElementById('newsModalActions');
       if (a.url) {
         actionsEl.innerHTML = `<a href="${a.url}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;background:#7c3aed;color:#fff;font-size:12.5px;font-weight:600;text-decoration:none;" onmouseenter="this.style.background='#6d28d9'" onmouseleave="this.style.background='#7c3aed'">
