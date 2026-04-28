@@ -1038,11 +1038,10 @@ const server = http.createServer((req, res) => {
 
         const userIds    = [...new Set((holdings || []).map(r => r.user_id).filter(Boolean))];
         const secIds     = [...new Set((holdings || []).map(r => r.security_id).filter(Boolean))];
-        /* Fetch NAV history per strategy in parallel — each gets its own 1000-row budget avoiding the global limit */
-        const stratIds   = [...new Set((holdings || []).map(r => r.strategy_id).filter(Boolean))];
-        const stratHistArrays = stratIds.length
-          ? await Promise.all(stratIds.map(sid =>
-              sbGet(`strategies_returns_c?select=strategy_id,as_of_date,basket_value,1d_pct,5d_pct,1m_pct,6m_pct,ytd_pct,1y_pct,5y_pct,all_pct&strategy_id=eq.${sid}&order=as_of_date.asc`)
+        /* Fetch per-investor NAV history from client_strategy_returns_c — keyed by user_id */
+        const stratHistArrays = userIds.length
+          ? await Promise.all(userIds.map(uid =>
+              sbGet(`client_strategy_returns_c?select=user_id,strategy_id,as_of_date,basket_value,1d_pct,5d_pct,1m_pct,6m_pct,ytd_pct,1y_pct,5y_pct,inception_pct&user_id=eq.${uid}&order=as_of_date.asc`)
             ))
           : [];
         const stratHist = stratHistArrays.flat();

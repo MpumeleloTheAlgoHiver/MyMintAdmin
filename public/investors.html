@@ -371,21 +371,21 @@
         secLiveMap[s.security_id] = { priceR: (Number(s.current_price)||0)/100, dayPct: Number(s['1d_pct'])||0, ytd: Number(s.ytd_pct)||0, y1: Number(s['1y_pct'])||0, asOf: s.as_of_date };
       });
 
-      /* Strategy NAV history & metrics */
+      /* Per-investor NAV history & metrics — keyed by user_id */
       stratNavMap = {}; stratMetricsMap = {};
       const stratLatest = {};
       (stratHist||[]).forEach(r => {
-        const sid = r.strategy_id;
-        if (!stratNavMap[sid]) stratNavMap[sid] = [];
+        const uid = r.user_id;
+        if (!stratNavMap[uid]) stratNavMap[uid] = [];
         const nav = Number(r.basket_value);
-        if (nav > 0) stratNavMap[sid].push({ date: r.as_of_date, nav });
-        stratLatest[sid] = r;  /* last one wins → most recent (asc order) */
+        if (nav > 0) stratNavMap[uid].push({ date: r.as_of_date, nav });
+        stratLatest[uid] = r;  /* last one wins → most recent (asc order) */
       });
-      Object.entries(stratNavMap).forEach(([sid, series]) => {
-        stratMetricsMap[sid] = {
+      Object.entries(stratNavMap).forEach(([uid, series]) => {
+        stratMetricsMap[uid] = {
           ...computeMetrics(series),
           calendar: computeCalendar(series),
-          latest: stratLatest[sid] || null,
+          latest: stratLatest[uid] || null,
         };
       });
 
@@ -601,18 +601,18 @@
 
     /* ─── Tab: Performance (merged: user P&L chart + calendar + strategy stats + holdings) ─── */
     function renderPerformanceTab(i) {
-      const m = stratMetricsMap[i.strategyId] || {};
+      const m = stratMetricsMap[i.userId] || {};
       const latest = m.latest || {};
       const periods = [
         ['1D', latest['1d_pct']], ['5D', latest['5d_pct']], ['1M', latest['1m_pct']],
-        ['6M', latest['6m_pct']], ['YTD', latest['ytd_pct']], ['1Y', latest['1y_pct']], ['ALL', latest.all_pct]
+        ['6M', latest['6m_pct']], ['YTD', latest['ytd_pct']], ['1Y', latest['1y_pct']], ['Inception', latest.inception_pct]
       ];
       const topHoldings = i.holdings.slice(0, 5);
 
       /* Calendar — computed per-investor from their inception date so the first
          partial month uses their entry NAV, not the prior month-end */
       const incDate = i.inception ? i.inception.slice(0, 10) : null;
-      const cal = computeCalendar(stratNavMap[i.strategyId] || [], incDate);
+      const cal = computeCalendar(stratNavMap[i.userId] || [], incDate);
       const incKey = incDate ? incDate.slice(0, 7) : null; /* YYYY-MM */
       const keys = Object.keys(cal).sort();
       const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -717,7 +717,7 @@
     /* Build user P&L series: starts at (inception, 0), then strategy NAV ratio × invested */
     function renderUserPnlChart(i) {
       const el = document.getElementById('userPnlChart'); if (!el) return;
-      const navs = stratNavMap[i.strategyId] || [];
+      const navs = stratNavMap[i.userId] || [];
       if (!i.inception || !i.invested || navs.length < 1) {
         el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:12px;">Not enough data to chart user P&L</div>`;
         return;
@@ -755,7 +755,7 @@
 
     /* ─── Tab: Risk ─── */
     function renderRiskTab(i) {
-      const m = stratMetricsMap[i.strategyId] || {};
+      const m = stratMetricsMap[i.userId] || {};
       const cards = [
         ['Sharpe Ratio',     m.sharpe,  'Annualised return per unit of total risk. Higher is better. > 1 is good.'],
         ['Sortino Ratio',    m.sortino, 'Like Sharpe but only counts downside risk. Higher is better.'],
@@ -782,7 +782,7 @@
 
     function renderDrawdownChart(i) {
       const el = document.getElementById('ddChart'); if (!el) return;
-      const series = (stratMetricsMap[i.strategyId] || {}).ddSeries || [];
+      const series = (stratMetricsMap[i.userId] || {}).ddSeries || [];
       if (series.length < 2) { el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:12px;">Not enough NAV data</div>`; return; }
       disposeChart(el);
       const chart = echarts.init(el); chart.__instanceFor = el;
@@ -928,7 +928,7 @@
           if (_refreshTimer) clearTimeout(_refreshTimer);
           _refreshTimer = setTimeout(doRefresh, 1500);
         };
-        ['stock_holdings_c','strategies_returns_c','stock_returns_c','transactions'].forEach(t => {
+        ['stock_holdings_c','client_strategy_returns_c','stock_returns_c','transactions'].forEach(t => {
           sb.channel('rt:'+t).on('postgres_changes', { event:'*', schema:'public', table:t }, scheduleRefresh).subscribe();
         });
         setInterval(scheduleRefresh, 60000);
