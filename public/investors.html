@@ -483,7 +483,8 @@
       const aum = investors.reduce((s,i)=>s+i.csrAum,0);
       const inv = investors.reduce((s,i)=>s+i.csrInvested,0);
       const pnl = investors.reduce((s,i)=>s+i.csrPnl,0);
-      const avg = investors.length ? investors.reduce((s,i)=>s+i.csrRetPct,0) / investors.length : 0;
+      /* Weighted average return — weight by each investor's AUM so small accounts don't distort the figure */
+      const avg = aum > 0 ? investors.reduce((s,i)=>s+(i.csrRetPct * i.csrAum), 0) / aum : 0;
       const sorted = [...investors].sort((a,b) => b.csrRetPct - a.csrRetPct);
       const best  = sorted[0];
       const worst = sorted[sorted.length-1];

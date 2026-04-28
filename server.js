@@ -1041,7 +1041,7 @@ const server = http.createServer((req, res) => {
         /* Fetch per-investor NAV history from client_strategy_returns_c — keyed by user_id */
         const stratHistArrays = userIds.length
           ? await Promise.all(userIds.map(uid =>
-              sbGet(`client_strategy_returns_c?select=user_id,strategy_id,as_of_date,basket_value,1d_pct,5d_pct,1m_pct,6m_pct,ytd_pct,1y_pct,5y_pct,inception_pct&user_id=eq.${uid}&order=as_of_date.asc`)
+              sbGet(`client_strategy_returns_c?select=user_id,strategy_id,as_of_date,basket_value,1d_pct,5d_pct,1m_pct,6m_pct,ytd_pct,1y_pct,5y_pct,inception_pct,inception_pnl&user_id=eq.${uid}&order=as_of_date.asc`)
             ))
           : [];
         const stratHist = stratHistArrays.flat();
