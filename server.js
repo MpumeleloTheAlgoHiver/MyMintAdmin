@@ -1046,15 +1046,18 @@ const server = http.createServer((req, res) => {
           : [];
         const stratHist = stratHistArrays.flat();
 
-        /* Recalculate inception_pnl and inception_pct from live holdings so any
-           unit mismatches in avg_fill are always corrected at query time */
+        /* Recalculate inception_pnl and inception_pct on the LATEST row per user only
+           (fixes avg_fill unit mismatches for the investor card without distorting chart history) */
         const investedByUser = {};
         (holdings || []).forEach(h => {
           const uid = h.user_id;
           const cost = Number(h.avg_fill) * Number(h.quantity);
           if (uid && cost > 0) investedByUser[uid] = (investedByUser[uid] || 0) + cost;
         });
-        stratHist.forEach(r => {
+        /* Find the latest row per user (stratHist is ordered asc, so last entry is latest) */
+        const latestRowByUser = {};
+        stratHist.forEach(r => { latestRowByUser[r.user_id] = r; });
+        Object.values(latestRowByUser).forEach(r => {
           const invested = investedByUser[r.user_id];
           if (invested > 0) {
             r.inception_pnl = r.basket_value - invested;
