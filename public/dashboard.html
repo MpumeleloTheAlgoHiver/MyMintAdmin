@@ -1859,6 +1859,7 @@
 
       let _browsePanelLoaded = false;
       let _returnInsightsData = []; /* cached asset return data */
+      let _riIntradayMap = {};      /* security_id → latest stock_intraday_c row */
       let _activeReturnTab = '1d';
       const ALERT_THRESHOLD = -4; /* alert when daily change <= -4% */
 
@@ -1970,9 +1971,15 @@
             const sAll = holdings.map(h => {
               const sym = h.ticker || h.symbol || '';
               const a   = dataBySym[sym] || {};
-              const r   = a[assetField] != null ? Number(a[assetField]) : null;
-              const w   = Number(h.weight) || 0;             /* may be 0..1 or 0..100 */
-              const wPct= wSum > 1.5 ? (w) : w;        /* normalize to fraction */
+              let r;
+              if (tab === '1d' && a.id && _riIntradayMap[a.id] != null) {
+                const iv = _riIntradayMap[a.id];
+                r = iv['1d_pct'] != null ? Number(iv['1d_pct']) : null;
+              } else {
+                r = a[assetField] != null ? Number(a[assetField]) : null;
+              }
+              const w   = Number(h.weight) || 0;
+              const wPct= wSum > 1.5 ? (w) : w;
               const contrib = (r != null) ? (r * wPct) : null;
               return { id: sym, name: sym.replace('.JO',''), logo_url: a.logo_url || null, _val: contrib };
             }).filter(x => x._val != null).sort((a, b) => b._val - a._val);
@@ -2025,9 +2032,30 @@
           }
 
           const strategies = (typeof allStrategiesFullData !== 'undefined' && Array.isArray(allStrategiesFullData)) ? allStrategiesFullData : [];
+          /* For 1D: build symbol→intraday pct map and compute weighted avg per strategy */
+          const _symToIntraday = {};
+          if (tab === '1d') {
+            (_returnInsightsData || []).forEach(a => {
+              const iv = _riIntradayMap[a.id];
+              if (iv && iv['1d_pct'] != null) _symToIntraday[a.symbol] = Number(iv['1d_pct']);
+            });
+          }
           const sAll = strategies.map(s => {
-            const row = strategyReturnsMap.get(String(s.id)) || {};
-            const v = row[sField] != null ? Number(row[sField]) : null;
+            let v;
+            if (tab === '1d' && Object.keys(_symToIntraday).length > 0) {
+              const hlds = Array.isArray(s.holdings) ? s.holdings : [];
+              const wTotal = hlds.reduce((acc, h) => acc + (Number(h.weight) || 0), 0) || 1;
+              let wSum = 0, wCount = 0;
+              hlds.forEach(h => {
+                const sym = h.ticker || h.symbol || '';
+                const pct = _symToIntraday[sym];
+                if (pct != null) { wSum += pct * (Number(h.weight) || 0) / wTotal; wCount++; }
+              });
+              v = wCount > 0 ? wSum : null;
+            } else {
+              const row = strategyReturnsMap.get(String(s.id)) || {};
+              v = row[sField] != null ? Number(row[sField]) : null;
+            }
             return { id: s.id, name: s.name || s.strategy_name || 'Strategy', logo_url: s.logo_url || null, _val: v };
           }).filter(x => x._val != null).sort((a, b) => b._val - a._val);
 
@@ -2100,7 +2128,16 @@
         const _riBase = (_returnInsightsData || []);
 
         const all = _riBase
-          .map(a => ({ ...a, _val: a[field] != null ? Number(a[field]) : null }))
+          .map(a => {
+            let _val;
+            if (tab === '1d' && _riIntradayMap[a.id] != null) {
+              const iv = _riIntradayMap[a.id];
+              _val = iv['1d_pct'] != null ? Number(iv['1d_pct']) : null;
+            } else {
+              _val = a[field] != null ? Number(a[field]) : null;
+            }
+            return { ...a, _val };
+          })
           .filter(a => a._val != null)
           .sort((a, b) => b._val - a._val);
 
@@ -2267,7 +2304,11 @@
           const { data: secData, error: secErr } = await q;
           if (secErr) throw secErr;
           const _riIds = (secData || []).map(s => s.id).filter(Boolean);
-          const _riStockRet = await fetchStockReturnsBySec(_riIds);
+          const [_riStockRet, _riIntraday] = await Promise.all([
+            fetchStockReturnsBySec(_riIds),
+            fetchIntradayBySec(_riIds),
+          ]);
+          _riIntradayMap = _riIntraday || {};
           _returnInsightsData = (secData || []).map(s => {
             const sr = _riStockRet[s.id] || {};
             return {
