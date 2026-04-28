@@ -378,7 +378,7 @@
         const uid = r.user_id;
         if (!stratNavMap[uid]) stratNavMap[uid] = [];
         const nav = Number(r.basket_value);
-        if (nav > 0) stratNavMap[uid].push({ date: r.as_of_date, nav });
+        if (nav > 0) stratNavMap[uid].push({ date: r.as_of_date, nav, incPct: r.inception_pct != null ? Number(r.inception_pct) : null });
         stratLatest[uid] = r;  /* last one wins → most recent (asc order) */
       });
       Object.entries(stratNavMap).forEach(([uid, series]) => {
@@ -669,8 +669,8 @@
       return `
         <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);margin-bottom:14px;">
           <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
-            <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">INVESTOR P&L (R) — SINCE ${i.inception ? fmtDate(i.inception).toUpperCase() : 'INCEPTION'}</div>
-            <div style="font-size:11px;color:${pctClr(i.pnl)};font-weight:700;font-family:ui-monospace,monospace;">${i.pnl >= 0 ? '+' : ''}${fmtR2(i.pnl)}</div>
+            <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">SINCE INCEPTION RETURN (%)</div>
+            <div style="font-size:11px;color:${pctClr(i.csrRetPct)};font-weight:700;font-family:ui-monospace,monospace;">${i.csrRetPct != null ? (i.csrRetPct >= 0 ? '+' : '') + Number(i.csrRetPct).toFixed(2) + '%' : '—'}</div>
           </div>
           <div id="userPnlChart" style="width:100%;height:320px;"></div>
         </div>
@@ -727,32 +727,23 @@
     function renderUserPnlChart(i) {
       const el = document.getElementById('userPnlChart'); if (!el) return;
       const navs = stratNavMap[i.userId] || [];
-      if (!i.inception || !i.invested || navs.length < 1) {
-        el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:12px;">Not enough data to chart user P&L</div>`;
+      const pts = navs.filter(p => p.incPct != null);
+      if (!pts.length) {
+        el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:12px;">Not enough data to chart inception return</div>`;
         return;
       }
-      const startMs = new Date(i.inception).getTime();
-      const after = navs.filter(p => new Date(p.date).getTime() >= startMs);
-      const baseNav = (after[0] || navs[navs.length - 1]).nav;
-      if (!baseNav) { el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:12px;">Not enough data to chart user P&L</div>`; return; }
-      const data = [[i.inception, 0]];
-      after.forEach(p => {
-        const pnl = i.invested * (p.nav / baseNav - 1);
-        data.push([p.date, +pnl.toFixed(2)]);
-      });
-      /* If no NAV points after inception yet, append today at current P&L for a visible line */
-      if (data.length === 1) data.push([new Date().toISOString().slice(0,10), +i.pnl.toFixed(2)]);
+      const data = pts.map(p => [p.date, +p.incPct.toFixed(4)]);
 
       disposeChart(el);
       const chart = echarts.init(el); _charts.set(el, chart);
-      const lastPnl = data[data.length-1][1];
-      const lineColor = lastPnl >= 0 ? '#059669' : '#dc2626';
-      const fillTop   = lastPnl >= 0 ? 'rgba(5,150,105,0.30)' : 'rgba(220,38,38,0.30)';
+      const lastVal = data[data.length-1][1];
+      const lineColor = lastVal >= 0 ? '#059669' : '#dc2626';
+      const fillTop   = lastVal >= 0 ? 'rgba(5,150,105,0.30)' : 'rgba(220,38,38,0.30)';
       chart.setOption({
-        grid: { left: 70, right: 20, top: 20, bottom: 40 },
-        tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, formatter: p => `${p[0].axisValueLabel}<br/><b>P&L:</b> ${(p[0].value[1] >= 0 ? '+' : '') + fmtR2(p[0].value[1])}` },
-        xAxis: { type: 'time', min: i.inception, axisLine: { lineStyle: { color: '#cbd5e1' } }, axisLabel: { color: '#64748b', fontSize: 10 } },
-        yAxis: { type: 'value', axisLine: { lineStyle: { color: '#cbd5e1' } }, splitLine: { lineStyle: { color: '#f1f5f9' } }, axisLabel: { color: '#64748b', fontSize: 10, formatter: v => fmtR(v) } },
+        grid: { left: 60, right: 20, top: 20, bottom: 40 },
+        tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, formatter: p => `${p[0].axisValueLabel}<br/><b>Since Inception:</b> ${(p[0].value[1] >= 0 ? '+' : '') + p[0].value[1].toFixed(2)}%` },
+        xAxis: { type: 'time', axisLine: { lineStyle: { color: '#cbd5e1' } }, axisLabel: { color: '#64748b', fontSize: 10 } },
+        yAxis: { type: 'value', axisLine: { lineStyle: { color: '#cbd5e1' } }, splitLine: { lineStyle: { color: '#f1f5f9' } }, axisLabel: { color: '#64748b', fontSize: 10, formatter: v => v.toFixed(1) + '%' } },
         series: [{
           type: 'line', smooth: true, symbol: 'none', data,
           lineStyle: { color: lineColor, width: 2 },
