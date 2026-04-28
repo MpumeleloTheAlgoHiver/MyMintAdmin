@@ -462,12 +462,13 @@
         const csrPnl      = csrLatest ? csrLatest.inception_pnl / 100 : pnl;
         const csrInvested = csrLatest ? (csrLatest.basket_value - csrLatest.inception_pnl) / 100 : invested;
         const csrRetPct   = csrLatest ? csrLatest.inception_pct : retPct;
+        const csrYtdPct   = csrLatest != null ? (csrLatest['ytd_pct'] ?? null) : null;
         return {
           userId: u.userId, name, email: prof.email, mintNo: prof.mint_number,
           strategy: strat.short_name || strat.name || '—', strategyId: u.strategyId,
           strategyDesc: strat.description, riskLevel: strat.risk_level,
           invested, current, pnl, retPct: +retPct.toFixed(2),
-          csrAum, csrInvested, csrPnl, csrRetPct,
+          csrAum, csrInvested, csrPnl, csrRetPct, csrYtdPct,
           days, annualised, inception,
           holdings: u.holdings,
           txns: userTxns,
@@ -573,7 +574,7 @@
             ${[
               ['Invested', fmtR(i.invested), '#64748b'],
               ['P&L',      (i.pnl>=0?'+':'')+fmtR(i.pnl), pctClr(i.pnl)],
-              ['Annualised', fmtPct(i.annualised), pctClr(i.annualised)],
+              ['YTD', i.csrYtdPct != null ? fmtPct(i.csrYtdPct) : '—', pctClr(i.csrYtdPct || 0)],
               ['Inception', fmtDate(i.inception)+' · '+i.days+'d', '#0f172a'],
             ].map(([l,v,c]) => `
               <div style="background:rgba(255,255,255,0.7);border-radius:8px;padding:8px 10px;">
