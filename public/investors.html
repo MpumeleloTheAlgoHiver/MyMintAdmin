@@ -456,11 +456,18 @@
         /* Add weights to holdings */
         u.holdings.forEach(h => { h.weight = current > 0 ? (h.currentR / current) * 100 : 0; });
         u.holdings.sort((a,b) => b.currentR - a.currentR);
+        /* Pull latest per-investor figures from client_strategy_returns_c */
+        const csrLatest = (stratMetricsMap[u.userId] || {}).latest || null;
+        const csrAum      = csrLatest ? csrLatest.basket_value / 100 : current;
+        const csrPnl      = csrLatest ? csrLatest.inception_pnl / 100 : pnl;
+        const csrInvested = csrLatest ? (csrLatest.basket_value - csrLatest.inception_pnl) / 100 : invested;
+        const csrRetPct   = csrLatest ? csrLatest.inception_pct : retPct;
         return {
           userId: u.userId, name, email: prof.email, mintNo: prof.mint_number,
           strategy: strat.short_name || strat.name || '—', strategyId: u.strategyId,
           strategyDesc: strat.description, riskLevel: strat.risk_level,
           invested, current, pnl, retPct: +retPct.toFixed(2),
+          csrAum, csrInvested, csrPnl, csrRetPct,
           days, annualised, inception,
           holdings: u.holdings,
           txns: userTxns,
@@ -473,11 +480,11 @@
 
     /* ─── KPI Bar ─── */
     function renderKpiBar(investors) {
-      const aum = investors.reduce((s,i)=>s+i.current,0);
-      const inv = investors.reduce((s,i)=>s+i.invested,0);
-      const pnl = aum - inv;
-      const avg = investors.length ? investors.reduce((s,i)=>s+i.retPct,0) / investors.length : 0;
-      const sorted = [...investors].sort((a,b) => b.retPct - a.retPct);
+      const aum = investors.reduce((s,i)=>s+i.csrAum,0);
+      const inv = investors.reduce((s,i)=>s+i.csrInvested,0);
+      const pnl = investors.reduce((s,i)=>s+i.csrPnl,0);
+      const avg = investors.length ? investors.reduce((s,i)=>s+i.csrRetPct,0) / investors.length : 0;
+      const sorted = [...investors].sort((a,b) => b.csrRetPct - a.csrRetPct);
       const best  = sorted[0];
       const worst = sorted[sorted.length-1];
       const kpis = [
@@ -485,8 +492,8 @@
         { l:'TOTAL INVESTED',  v: fmtR(inv), c:'#64748b' },
         { l:'TOTAL P&L',       v: (pnl>=0?'+':'')+fmtR(pnl), c: pctClr(pnl) },
         { l:'AVG RETURN',      v: fmtPct(avg), c: pctClr(avg) },
-        { l:'BEST PERFORMER',  v: best  ? `${best.name.split(' ')[0]} ${fmtPct(best.retPct)}`   : '—', c:'#059669' },
-        { l:'WORST PERFORMER', v: worst ? `${worst.name.split(' ')[0]} ${fmtPct(worst.retPct)}` : '—', c:'#dc2626' },
+        { l:'BEST PERFORMER',  v: best  ? `${best.name.split(' ')[0]} ${fmtPct(best.csrRetPct)}`   : '—', c:'#059669' },
+        { l:'WORST PERFORMER', v: worst ? `${worst.name.split(' ')[0]} ${fmtPct(worst.csrRetPct)}` : '—', c:'#dc2626' },
       ];
       document.getElementById('kpiBar').innerHTML = kpis.map(k =>
         `<div class="ov-kpi-card">
