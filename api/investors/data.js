@@ -49,6 +49,22 @@ module.exports = async (req, res) => {
       : [];
     const stratHist = stratHistArrays.flat();
 
+    /* Recalculate inception_pnl and inception_pct from live holdings so any
+       unit mismatches in avg_fill are always corrected at query time */
+    const investedByUser = {};
+    (holdings || []).forEach(h => {
+      const uid = h.user_id;
+      const cost = Number(h.avg_fill) * Number(h.quantity);
+      if (uid && cost > 0) investedByUser[uid] = (investedByUser[uid] || 0) + cost;
+    });
+    stratHist.forEach(r => {
+      const invested = investedByUser[r.user_id];
+      if (invested > 0) {
+        r.inception_pnl = r.basket_value - invested;
+        r.inception_pct = (r.inception_pnl / invested) * 100;
+      }
+    });
+
     const [profiles, secMeta, secLive, txns] = await Promise.all([
       userIds.length
         ? sbGet(`profiles?select=id,first_name,last_name,email,mint_number&id=in.(${userIds.join(',')})`)
