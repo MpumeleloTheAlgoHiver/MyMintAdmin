@@ -136,6 +136,50 @@ const listAuthUsers = async () => {
   return all;
 };
 
+// Send an invitation email via Supabase's built-in email service.
+// Supabase will create the auth user (if not existing) and email the invite link
+// using whatever SMTP/email provider is configured in the Supabase dashboard.
+const inviteUserViaSupabase = async (email, redirectTo, full_name) => {
+  const { supabaseUrl, serviceRoleKey } = getSupabaseCreds();
+  const url = `${supabaseUrl}/auth/v1/invite${redirectTo ? `?redirect_to=${encodeURIComponent(redirectTo)}` : ''}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'apikey': serviceRoleKey,
+      'Authorization': `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email, data: full_name ? { full_name } : {} })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data.msg || data.message || data.error_description || data.error || `Supabase invite failed (${res.status})`;
+    return { ok: false, error: msg, status: res.status };
+  }
+  return { ok: true, user: data };
+};
+
+// Send a password-reset email via Supabase's built-in email service.
+const recoverPasswordViaSupabase = async (email, redirectTo) => {
+  const { supabaseUrl, serviceRoleKey } = getSupabaseCreds();
+  const url = `${supabaseUrl}/auth/v1/recover${redirectTo ? `?redirect_to=${encodeURIComponent(redirectTo)}` : ''}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'apikey': serviceRoleKey,
+      'Authorization': `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email })
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const msg = data.msg || data.message || data.error_description || `Supabase recover failed (${res.status})`;
+    return { ok: false, error: msg, status: res.status };
+  }
+  return { ok: true };
+};
+
 // Generate a recovery / signup link via the admin endpoint (no email sent).
 const generateAuthLink = async (type, email, redirectTo) => {
   const { supabaseUrl, serviceRoleKey } = getSupabaseCreds();
@@ -350,6 +394,8 @@ module.exports = {
   generateAuthLink,
   newInviteToken,
   baseUrlFromReq,
+  inviteUserViaSupabase,
+  recoverPasswordViaSupabase,
   sendInviteEmail,
   sendWelcomeEmail,
   sendResetEmail

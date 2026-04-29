@@ -11,9 +11,8 @@ const {
   generateAuthLink,
   newInviteToken,
   baseUrlFromReq,
-  sendInviteEmail,
-  sendWelcomeEmail,
-  sendResetEmail
+  inviteUserViaSupabase,
+  recoverPasswordViaSupabase
 } = require('./_team');
 
 const normEmail = (e) => String(e || '').trim().toLowerCase();
@@ -95,10 +94,8 @@ module.exports = async (req, res) => {
       }
 
       const existing = await supabaseRequest(`/rest/v1/admin_team?email=eq.${encodeURIComponent(email)}`);
-      const invite_token = newInviteToken();
-      const invite_token_expires_at = new Date(Date.now() + INVITE_TTL_MS).toISOString();
       const baseUrl = baseUrlFromReq(req);
-      const signupLink = `${baseUrl}/signup.html?email=${encodeURIComponent(email)}&token=${invite_token}`;
+      const redirectTo = `${baseUrl}/signup.html`;
 
       let member;
       if (existing && existing.length > 0) {
@@ -110,7 +107,7 @@ module.exports = async (req, res) => {
         const [updated] = await supabaseRequest(`/rest/v1/admin_team?id=eq.${current.id}`, {
           method: 'PATCH',
           extraHeaders: { 'Prefer': 'return=representation' },
-          body: { full_name, role, page_access, invite_token, invite_token_expires_at, invited_by: result.user.id, updated_at: new Date().toISOString() }
+          body: { full_name, role, page_access, invited_by: result.user.id, updated_at: new Date().toISOString() }
         });
         member = updated;
       } else {
@@ -122,20 +119,15 @@ module.exports = async (req, res) => {
             role,
             page_access,
             status: 'pending',
-            invited_by: result.user.id,
-            invite_token,
-            invite_token_expires_at
+            invited_by: result.user.id
           }
         });
         member = created;
       }
 
-      const emailRes = await sendInviteEmail({
-        toEmail: email,
-        toName: full_name,
-        inviterEmail: result.user.email,
-        signupLink
-      });
+      // Ask Supabase to create the auth user (if not already) and send the invite email
+      // through whatever email provider is configured in the Supabase dashboard.
+      const emailRes = await inviteUserViaSupabase(email, redirectTo, full_name);
 
       await writeAudit({
         action: 'invite',
@@ -148,18 +140,23 @@ module.exports = async (req, res) => {
           page_access,
           full_name,
           reissue: existing && existing.length > 0,
-          email_sent: !emailRes.skipped,
-          email_reason: emailRes.reason || null
+          email_sent: emailRes.ok,
+          email_reason: emailRes.error || null,
+          via: 'supabase'
         }
       });
 
-      return sendJson(res, 200, {
-        ok: true,
-        member,
-        signupLink,
-        emailSent: !emailRes.skipped,
-        emailReason: emailRes.reason || null
-      });
+      if (!emailRes.ok) {
+        return sendJson(res, 200, {
+          ok: true,
+          member,
+          emailSent: false,
+          emailReason: emailRes.error,
+          warning: `Member added but Supabase could not send the email: ${emailRes.error}. Check your Supabase Auth email settings.`
+        });
+      }
+
+      return sendJson(res, 200, { ok: true, member, emailSent: true });
     }
 
     // RESEND — admin only. Re-issues a fresh invite token for a pending member
@@ -176,23 +173,17 @@ module.exports = async (req, res) => {
       if (!member) return sendJson(res, 404, { error: 'Member not found' });
       if (member.status === 'active') return sendJson(res, 400, { error: 'User is already active — no invite to resend' });
 
-      const invite_token = newInviteToken();
-      const invite_token_expires_at = new Date(Date.now() + INVITE_TTL_MS).toISOString();
       const baseUrl = baseUrlFromReq(req);
-      const signupLink = `${baseUrl}/signup.html?email=${encodeURIComponent(member.email)}&token=${invite_token}`;
+      const redirectTo = `${baseUrl}/signup.html`;
 
       const [updated] = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}`, {
         method: 'PATCH',
         extraHeaders: { 'Prefer': 'return=representation' },
-        body: { invite_token, invite_token_expires_at, invited_by: result.user.id, updated_at: new Date().toISOString() }
+        body: { invited_by: result.user.id, updated_at: new Date().toISOString() }
       });
 
-      const emailRes = await sendInviteEmail({
-        toEmail: member.email,
-        toName: member.full_name,
-        inviterEmail: result.user.email,
-        signupLink
-      });
+      // Ask Supabase to (re-)send the invite email
+      const emailRes = await inviteUserViaSupabase(member.email, redirectTo, member.full_name);
 
       await writeAudit({
         action: 'invite',
@@ -205,70 +196,45 @@ module.exports = async (req, res) => {
           page_access: member.page_access || [],
           full_name: member.full_name,
           reissue: true,
-          email_sent: !emailRes.skipped,
-          email_reason: emailRes.reason || null
+          email_sent: emailRes.ok,
+          email_reason: emailRes.error || null,
+          via: 'supabase'
         }
       });
 
-      return sendJson(res, 200, {
-        ok: true,
-        member: updated,
-        signupLink,
-        emailSent: !emailRes.skipped,
-        emailReason: emailRes.reason || null
-      });
-    }
-
-    // VERIFY-INVITE — public endpoint used by /signup.html to validate the token before showing the form.
-    if (action === 'verify-invite') {
-      if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
-      const email = normEmail(url.searchParams.get('email'));
-      const token = url.searchParams.get('token') || '';
-      if (!email || !token) return sendJson(res, 400, { error: 'Missing email or token' });
-
-      const rows = await supabaseRequest(`/rest/v1/admin_team?email=eq.${encodeURIComponent(email)}&limit=1`);
-      const member = rows && rows[0];
-      if (!member) return sendJson(res, 404, { error: 'Invitation not found' });
-      if (member.status === 'active') return sendJson(res, 400, { error: 'This account is already active. Please sign in.' });
-      if (!member.invite_token || member.invite_token !== token) return sendJson(res, 400, { error: 'Invalid invitation link' });
-      if (member.invite_token_expires_at && new Date(member.invite_token_expires_at).getTime() < Date.now()) {
-        return sendJson(res, 400, { error: 'This invitation has expired. Ask an admin to resend it.' });
+      if (!emailRes.ok) {
+        return sendJson(res, 200, {
+          ok: true,
+          member: updated,
+          emailSent: false,
+          emailReason: emailRes.error,
+          warning: `Could not resend via Supabase: ${emailRes.error}`
+        });
       }
-      return sendJson(res, 200, { ok: true, email: member.email, full_name: member.full_name, role: member.role });
+
+      return sendJson(res, 200, { ok: true, member: updated, emailSent: true });
     }
 
-    // SIGNUP — public endpoint used by /signup.html to finish account creation.
-    if (action === 'signup') {
+    // COMPLETE-SIGNUP — called by /signup.html after the invitee has set their password
+    // via Supabase. We just mark the admin_team row active and bind their user_id.
+    // The user MUST be authenticated (Supabase magic-link session in the Authorization header).
+    if (action === 'complete-signup') {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
-      const email = normEmail(req.body?.email);
-      const token = req.body?.token || '';
-      const password = req.body?.password || '';
+      const auth = await requireAuth(req, res);
+      if (!auth) return;
+      const email = normEmail(auth.user.email);
       const full_name = (req.body?.full_name || '').trim() || null;
 
-      if (!email || !token) return sendJson(res, 400, { error: 'Missing email or token' });
-      if (!isAllowedDomain(email)) return sendJson(res, 400, { error: `Only ${ALLOWED_DOMAIN} email addresses can sign up` });
-      if (!password || password.length < 8) return sendJson(res, 400, { error: 'Password must be at least 8 characters' });
-
       const rows = await supabaseRequest(`/rest/v1/admin_team?email=eq.${encodeURIComponent(email)}&limit=1`);
       const member = rows && rows[0];
-      if (!member) return sendJson(res, 404, { error: 'Invitation not found' });
-      if (member.status === 'active') return sendJson(res, 400, { error: 'This account is already active. Please sign in.' });
-      if (!member.invite_token || member.invite_token !== token) return sendJson(res, 400, { error: 'Invalid invitation link' });
-      if (member.invite_token_expires_at && new Date(member.invite_token_expires_at).getTime() < Date.now()) {
-        return sendJson(res, 400, { error: 'This invitation has expired. Ask an admin to resend it.' });
-      }
+      if (!member) return sendJson(res, 404, { error: 'No team membership found for this email. Ask an admin to invite you.' });
 
-      // Create the Supabase auth user
-      const created = await createAuthUser(email, password, full_name || member.full_name);
-      const newUserId = created?.id || created?.user?.id;
-
-      // Mark the team row active and clear the invite token
       const [updated] = await supabaseRequest(`/rest/v1/admin_team?id=eq.${member.id}`, {
         method: 'PATCH',
         extraHeaders: { 'Prefer': 'return=representation' },
         body: {
           status: 'active',
-          user_id: newUserId || null,
+          user_id: auth.user.id,
           full_name: full_name || member.full_name,
           invite_token: null,
           invite_token_expires_at: null,
@@ -276,23 +242,19 @@ module.exports = async (req, res) => {
         }
       });
 
-      const baseUrl = baseUrlFromReq(req);
-      const dashboardLink = `${baseUrl}/signin.html`;
-      await sendWelcomeEmail({ toEmail: email, toName: full_name, dashboardLink });
-
       await writeAudit({
         action: 'signup',
         target_email: email,
         target_member_id: updated?.id || member.id,
         actor_email: email,
-        actor_user_id: newUserId || null,
-        details: { full_name: full_name || member.full_name }
+        actor_user_id: auth.user.id,
+        details: { full_name: full_name || member.full_name, via: 'supabase' }
       });
 
       return sendJson(res, 200, { ok: true, member: updated });
     }
 
-    // FORGOT-PASSWORD — public. Generates a recovery link and emails it.
+    // FORGOT-PASSWORD — public. Asks Supabase to email a reset link.
     if (action === 'forgot-password') {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
       const email = normEmail(req.body?.email);
@@ -304,8 +266,8 @@ module.exports = async (req, res) => {
       if (member && member.status === 'active') {
         try {
           const baseUrl = baseUrlFromReq(req);
-          const link = await generateAuthLink('recovery', email, `${baseUrl}/reset-password.html`);
-          if (link) await sendResetEmail({ toEmail: email, resetLink: link });
+          const r = await recoverPasswordViaSupabase(email, `${baseUrl}/reset-password.html`);
+          if (!r.ok) console.error('[Forgot] Supabase recover failed:', r.error);
         } catch (err) {
           console.error('[Forgot] Failed:', err.message);
         }

@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
     body{font-family:'Inter',sans-serif;min-height:100vh;color:#111827;background:#f8f9fb;}
@@ -22,7 +23,6 @@
     input{width:100%;padding:11px 14px;border:1px solid #d1d5db;border-radius:12px;font-size:14px;color:#111827;outline:none;transition:border-color .15s;font-family:inherit;}
     input:focus{border-color:#7c3aed;}
     input:disabled{background:#f3f4f6;color:#6b7280;}
-    .hint{font-size:11px;color:#6b7280;margin-top:4px;}
     .btn{width:100%;padding:12px 18px;border-radius:12px;border:none;font-size:14px;font-weight:600;cursor:pointer;background:#0f172a;color:#fff;transition:opacity .15s;font-family:inherit;}
     .btn:hover{opacity:.9;}
     .btn:disabled{opacity:.5;cursor:not-allowed;}
@@ -66,11 +66,11 @@
           </div>
           <div class="group">
             <label>Password</label>
-            <input id="password" type="password" placeholder="At least 8 characters" minlength="8" required>
+            <input id="password" type="password" placeholder="At least 8 characters" minlength="8" required autocomplete="new-password">
           </div>
           <div class="group">
             <label>Confirm password</label>
-            <input id="confirmPassword" type="password" placeholder="Repeat password" minlength="8" required>
+            <input id="confirmPassword" type="password" placeholder="Repeat password" minlength="8" required autocomplete="new-password">
           </div>
           <button class="btn" id="submitBtn" type="submit">Create account</button>
         </form>
@@ -80,9 +80,9 @@
   </div>
 
   <script>
-    const params = new URLSearchParams(window.location.search);
-    const email = (params.get('email') || '').toLowerCase().trim();
-    const token = params.get('token') || '';
+    const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const $ = (id) => document.getElementById(id);
     const showError = (msg) => {
@@ -91,25 +91,36 @@
       $('errorState').style.display = 'block';
       $('errorMessage').textContent = msg || 'This invitation link is no longer valid.';
     };
-    const showForm = (data) => {
+    const showForm = (user) => {
       $('loadingState').style.display = 'none';
       $('formState').style.display = 'block';
-      $('email').value = data.email;
-      if (data.full_name) $('fullName').value = data.full_name;
+      $('email').value = user.email || '';
+      const meta = user.user_metadata || {};
+      if (meta.full_name) $('fullName').value = meta.full_name;
     };
     const showInline = (id, msg) => { const el = $(id); el.textContent = msg; el.style.display = 'block'; };
     const hideInline = (id) => { $(id).style.display = 'none'; };
 
+    // Supabase invite links arrive as #access_token=...&type=invite — supabase-js v2 absorbs that
+    // on its own (detectSessionInUrl is true by default). Wait for the session, then show the form.
     (async () => {
-      if (!email || !token) { showError('Missing invitation details.'); return; }
-      try {
-        const res = await fetch(`/api/team?action=verify-invite&email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`);
-        const data = await res.json();
-        if (!data.ok) { showError(data.error); return; }
-        showForm(data);
-      } catch {
-        showError('Could not reach the server. Please try again.');
-      }
+      let attempts = 0;
+      const tryReady = async () => {
+        const { data } = await supabaseClient.auth.getSession();
+        if (data?.session?.user) { showForm(data.session.user); return; }
+        const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        if (params.get('error_description')) {
+          showError(decodeURIComponent(params.get('error_description')));
+          return;
+        }
+        if (!params.get('access_token') && attempts > 0) {
+          showError('Missing invitation token. Please open the invite link from your email again.');
+          return;
+        }
+        if (++attempts < 12) setTimeout(tryReady, 200);
+        else showError('Could not validate the invitation link. Please ask your admin to resend it.');
+      };
+      tryReady();
     })();
 
     $('signupForm').addEventListener('submit', async (e) => {
@@ -124,24 +135,45 @@
       const btn = $('submitBtn');
       btn.disabled = true; btn.textContent = 'Creating account…';
 
+      // 1) Set the password on the Supabase auth user (we already have an authenticated session
+      //    from the invite magic link).
+      const updateRes = await supabaseClient.auth.updateUser({
+        password,
+        data: { full_name }
+      });
+      if (updateRes.error) {
+        showInline('errBox', updateRes.error.message || 'Could not set your password.');
+        btn.disabled = false; btn.textContent = 'Create account';
+        return;
+      }
+
+      // 2) Tell our backend to mark the admin_team row active for this user.
       try {
-        const res = await fetch('/api/team?action=signup', {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        const res = await fetch('/api/team?action=complete-signup', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, token, password, full_name })
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token || ''}`
+          },
+          body: JSON.stringify({ full_name })
         });
         const data = await res.json();
         if (!data.ok) {
-          showInline('errBox', data.error || 'Could not create your account.');
+          showInline('errBox', data.error || 'Could not finalize your account.');
           btn.disabled = false; btn.textContent = 'Create account';
           return;
         }
-        showInline('okBox', 'Account created! Redirecting to sign in…');
-        setTimeout(() => { window.location.href = '/signin.html?reason=signup-success&email=' + encodeURIComponent(email); }, 1100);
       } catch {
-        showInline('errBox', 'Could not reach the server. Please try again.');
+        showInline('errBox', 'Could not reach the server. Please try signing in directly.');
         btn.disabled = false; btn.textContent = 'Create account';
+        return;
       }
+
+      showInline('okBox', 'Account created! Redirecting to sign in…');
+      const email = $('email').value;
+      await supabaseClient.auth.signOut();
+      setTimeout(() => { window.location.href = '/signin.html?reason=signup-success&email=' + encodeURIComponent(email); }, 1100);
     });
   </script>
 </body>
