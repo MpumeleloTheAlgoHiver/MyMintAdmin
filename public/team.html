@@ -467,7 +467,7 @@
       `).join('');
     };
 
-    const loadAudit = async () => {
+    async function loadAudit() {
       const notice = document.getElementById('auditNotice');
       notice.style.display = 'none';
       document.getElementById('auditTableBody').innerHTML = '<tr><td colspan="5" class="empty-state">Loading...</td></tr>';
@@ -481,7 +481,7 @@
         notice.style.display = 'block';
       }
       renderAudit(data.entries || []);
-    };
+    }
 
     const loadTeam = async () => {
       const data = await api('GET', '/api/team?action=list');
