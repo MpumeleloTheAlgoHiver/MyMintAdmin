@@ -115,6 +115,27 @@ const createAuthUser = async (email, password, full_name) => {
   return data;
 };
 
+// List Supabase auth users (paginated). Returns array of { id, email, last_sign_in_at }.
+const listAuthUsers = async () => {
+  const { supabaseUrl, serviceRoleKey } = getSupabaseCreds();
+  const all = [];
+  let page = 1;
+  const perPage = 200;
+  while (true) {
+    const res = await fetch(`${supabaseUrl}/auth/v1/admin/users?page=${page}&per_page=${perPage}`, {
+      headers: { 'apikey': serviceRoleKey, 'Authorization': `Bearer ${serviceRoleKey}` }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.msg || data.message || `Failed to list users (${res.status})`);
+    const users = data.users || [];
+    all.push(...users);
+    if (users.length < perPage) break;
+    page += 1;
+    if (page > 25) break;
+  }
+  return all;
+};
+
 // Generate a recovery / signup link via the admin endpoint (no email sent).
 const generateAuthLink = async (type, email, redirectTo) => {
   const { supabaseUrl, serviceRoleKey } = getSupabaseCreds();
@@ -325,6 +346,7 @@ module.exports = {
   requireAdmin,
   supabaseRequest,
   createAuthUser,
+  listAuthUsers,
   generateAuthLink,
   newInviteToken,
   baseUrlFromReq,

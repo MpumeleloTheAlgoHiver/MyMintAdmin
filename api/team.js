@@ -7,6 +7,7 @@ const {
   requireAdmin,
   supabaseRequest,
   createAuthUser,
+  listAuthUsers,
   generateAuthLink,
   newInviteToken,
   baseUrlFromReq,
@@ -59,7 +60,23 @@ module.exports = async (req, res) => {
       const data = await supabaseRequest(
         '/rest/v1/admin_team?select=id,user_id,email,full_name,role,page_access,status,invited_by,created_at,updated_at&order=created_at.asc'
       );
-      return sendJson(res, 200, { ok: true, members: data });
+      // Enrich with last_sign_in_at from Supabase Auth (best-effort).
+      let signInByEmail = {};
+      let signInByUserId = {};
+      try {
+        const users = await listAuthUsers();
+        users.forEach(u => {
+          if (u.email) signInByEmail[String(u.email).toLowerCase()] = u.last_sign_in_at || null;
+          if (u.id) signInByUserId[u.id] = u.last_sign_in_at || null;
+        });
+      } catch (err) {
+        console.warn('[team] listAuthUsers failed:', err.message);
+      }
+      const enriched = (data || []).map(m => ({
+        ...m,
+        last_sign_in_at: (m.user_id && signInByUserId[m.user_id]) || signInByEmail[String(m.email || '').toLowerCase()] || null
+      }));
+      return sendJson(res, 200, { ok: true, members: enriched });
     }
 
     // INVITE — admin only. Stores token, returns signup link, tries to email it.
