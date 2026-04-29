@@ -59,6 +59,19 @@
     .badge-pending{background:#fff8e1;color:#c47f00;}
     .invite-link-box{background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:10px 12px;margin-top:10px;font-size:12px;color:#5b21b6;word-break:break-all;}
     .invite-link-box button{margin-left:6px;background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;cursor:pointer;}
+    .tabs{display:flex;gap:6px;border-bottom:1px solid #ececef;margin-bottom:16px;}
+    .tab-btn{background:transparent;border:none;padding:10px 14px;font-size:13px;font-weight:600;color:#8e8e93;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;}
+    .tab-btn.active{color:#1c1c1e;border-bottom-color:#7c3aed;}
+    .tab-pane{display:none;}
+    .tab-pane.active{display:block;}
+    .audit-action{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;}
+    .audit-invite{background:#e8e0fd;color:#5e35b1;}
+    .audit-update{background:#e8f4fd;color:#0071e3;}
+    .audit-remove{background:#fde8e8;color:#c0392b;}
+    .audit-signup{background:#e8f8ef;color:#28a745;}
+    .audit-when{font-size:11px;color:#8e8e93;}
+    .audit-detail{font-size:12px;color:#3c3c43;}
+    .audit-notice{background:#fff8e1;color:#7a4d00;border:1px solid #ffe0a3;padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:12px;display:none;}
     .page-chips{display:flex;flex-wrap:wrap;gap:4px;}
     .page-chip{background:#f2f2f7;color:#3c3c43;font-size:11px;padding:2px 8px;border-radius:6px;font-weight:500;}
     .td-actions{display:flex;gap:6px;align-items:center;}
@@ -123,28 +136,59 @@
         <div class="stat-card"><div class="stat-label">Pending</div><div class="stat-value" id="statPending">—</div></div>
       </div>
 
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Team Members</span>
-          <button class="btn btn-primary" id="inviteBtn">
-            <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#fff"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-            Invite Member
-          </button>
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="members">Members</button>
+        <button class="tab-btn" data-tab="audit">Audit Log</button>
+      </div>
+
+      <div class="tab-pane active" id="tab-members">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Team Members</span>
+            <button class="btn btn-primary" id="inviteBtn">
+              <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#fff"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+              Invite Member
+            </button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Role</th>
+                <th>Page Access</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="teamTableBody">
+              <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+            </tbody>
+          </table>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Member</th>
-              <th>Role</th>
-              <th>Page Access</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="teamTableBody">
-            <tr><td colspan="5" class="empty-state">Loading...</td></tr>
-          </tbody>
-        </table>
+      </div>
+
+      <div class="tab-pane" id="tab-audit">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Audit Log</span>
+            <button class="btn btn-ghost" id="auditRefreshBtn">Refresh</button>
+          </div>
+          <div class="audit-notice" id="auditNotice"></div>
+          <table>
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Action</th>
+                <th>Target</th>
+                <th>Performed by</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="auditTableBody">
+              <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </main>
@@ -316,6 +360,93 @@
       document.getElementById('statAdmins').textContent = members.filter(m => m.role === 'admin').length;
       document.getElementById('statActive').textContent = members.filter(m => m.status !== 'pending').length;
       document.getElementById('statPending').textContent = members.filter(m => m.status === 'pending').length;
+    };
+
+    // ── Tabs ────────────────────────────────────────────────────────────────
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.getAttribute('data-tab');
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+        if (tab === 'audit') loadAudit();
+      });
+    });
+
+    document.getElementById('auditRefreshBtn').addEventListener('click', loadAudit);
+
+    const fmtAuditWhen = (iso) => {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (isNaN(d)) return '';
+      const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+      if (diff < 60)    return diff + 's ago';
+      if (diff < 3600)  return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      return d.toLocaleString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    };
+
+    const describeAudit = (entry) => {
+      const d = entry.details || {};
+      const escape = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      switch (entry.action) {
+        case 'invite': {
+          const reissue = d.reissue ? ' (re-issued)' : '';
+          const role = d.role ? ` as <strong>${escape(d.role)}</strong>` : '';
+          const pages = (d.page_access && d.page_access.length) ? ` — pages: ${d.page_access.map(escape).join(', ')}` : '';
+          const sent = d.email_sent === false ? ' · email not sent' : '';
+          return `Invited${role}${reissue}${pages}${sent}`;
+        }
+        case 'update': {
+          const before = d.before || {};
+          const after = d.after || {};
+          const parts = [];
+          if (before.role !== after.role) parts.push(`role: ${escape(before.role || '—')} → <strong>${escape(after.role)}</strong>`);
+          const beforePages = (before.page_access || []).slice().sort().join(',');
+          const afterPages  = (after.page_access  || []).slice().sort().join(',');
+          if (beforePages !== afterPages) parts.push(`pages: ${escape(beforePages || '—')} → <strong>${escape(afterPages || '—')}</strong>`);
+          return parts.length ? parts.join(' · ') : 'No changes';
+        }
+        case 'remove':
+          return `Removed${d.role ? ' (was ' + escape(d.role) + ')' : ''}`;
+        case 'signup':
+          return `Completed signup${d.full_name ? ' as ' + escape(d.full_name) : ''}`;
+        default:
+          return escape(JSON.stringify(d));
+      }
+    };
+
+    const renderAudit = (entries) => {
+      const body = document.getElementById('auditTableBody');
+      if (!entries.length) {
+        body.innerHTML = '<tr><td colspan="5" class="empty-state">No activity yet.</td></tr>';
+        return;
+      }
+      const escape = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      body.innerHTML = entries.map(e => `
+        <tr>
+          <td><span class="audit-when">${fmtAuditWhen(e.created_at)}</span></td>
+          <td><span class="audit-action audit-${e.action}">${escape(e.action)}</span></td>
+          <td>${escape(e.target_email || '—')}</td>
+          <td>${escape(e.actor_email || (e.action === 'signup' ? 'self' : '—'))}</td>
+          <td><span class="audit-detail">${describeAudit(e)}</span></td>
+        </tr>
+      `).join('');
+    };
+
+    const loadAudit = async () => {
+      const notice = document.getElementById('auditNotice');
+      notice.style.display = 'none';
+      document.getElementById('auditTableBody').innerHTML = '<tr><td colspan="5" class="empty-state">Loading...</td></tr>';
+      const data = await api('GET', '/api/team?action=audit-list&limit=200');
+      if (!data.ok) {
+        document.getElementById('auditTableBody').innerHTML = `<tr><td colspan="5" class="empty-state">${data.error || 'Could not load audit log'}</td></tr>`;
+        return;
+      }
+      if (data.notice) {
+        notice.textContent = data.notice;
+        notice.style.display = 'block';
+      }
+      renderAudit(data.entries || []);
     };
 
     const loadTeam = async () => {

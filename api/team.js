@@ -17,6 +17,19 @@ const {
 
 const normEmail = (e) => String(e || '').trim().toLowerCase();
 
+// Best-effort audit log writer. Failures must NOT break the underlying action.
+const writeAudit = async (entry) => {
+  try {
+    await supabaseRequest('/rest/v1/admin_team_audit', {
+      method: 'POST',
+      extraHeaders: { 'Prefer': 'return=minimal' },
+      body: entry
+    });
+  } catch (err) {
+    console.error('[Audit] insert failed:', err.message);
+  }
+};
+
 module.exports = async (req, res) => {
   try {
     const url = new URL(req.url, 'http://x');
@@ -107,6 +120,22 @@ module.exports = async (req, res) => {
         signupLink
       });
 
+      await writeAudit({
+        action: 'invite',
+        target_email: email,
+        target_member_id: member?.id || null,
+        actor_email: result.user.email,
+        actor_user_id: result.user.id,
+        details: {
+          role,
+          page_access,
+          full_name,
+          reissue: existing && existing.length > 0,
+          email_sent: !emailRes.skipped,
+          email_reason: emailRes.reason || null
+        }
+      });
+
       return sendJson(res, 200, {
         ok: true,
         member,
@@ -177,6 +206,15 @@ module.exports = async (req, res) => {
       const dashboardLink = `${baseUrl}/signin.html`;
       await sendWelcomeEmail({ toEmail: email, toName: full_name, dashboardLink });
 
+      await writeAudit({
+        action: 'signup',
+        target_email: email,
+        target_member_id: updated?.id || member.id,
+        actor_email: email,
+        actor_user_id: newUserId || null,
+        details: { full_name: full_name || member.full_name }
+      });
+
       return sendJson(res, 200, { ok: true, member: updated });
     }
 
@@ -210,16 +248,34 @@ module.exports = async (req, res) => {
       if (!result) return;
       const { id, role, page_access } = req.body || {};
       if (!id) return sendJson(res, 400, { error: 'id is required' });
+
+      const beforeRows = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}&limit=1`);
+      const before = beforeRows && beforeRows[0];
+
       const safeRole = role === 'admin' ? 'admin' : 'staff';
+      const safePages = safeRole === 'admin' ? [] : (Array.isArray(page_access) ? page_access : []);
       const [updated] = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}`, {
         method: 'PATCH',
         extraHeaders: { 'Prefer': 'return=representation' },
         body: {
           role: safeRole,
-          page_access: safeRole === 'admin' ? [] : (Array.isArray(page_access) ? page_access : []),
+          page_access: safePages,
           updated_at: new Date().toISOString()
         }
       });
+
+      await writeAudit({
+        action: 'update',
+        target_email: updated?.email || before?.email || '',
+        target_member_id: id,
+        actor_email: result.user.email,
+        actor_user_id: result.user.id,
+        details: {
+          before: before ? { role: before.role, page_access: before.page_access || [] } : null,
+          after:  { role: safeRole, page_access: safePages }
+        }
+      });
+
       return sendJson(res, 200, { ok: true, member: updated });
     }
 
@@ -231,8 +287,39 @@ module.exports = async (req, res) => {
       const id = req.body?.id || url.searchParams.get('id');
       if (!id) return sendJson(res, 400, { error: 'id is required' });
       if (String(id) === String(result.member.id)) return sendJson(res, 400, { error: 'Cannot remove yourself' });
+
+      const beforeRows = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}&limit=1`);
+      const before = beforeRows && beforeRows[0];
+
       await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}`, { method: 'DELETE' });
+
+      await writeAudit({
+        action: 'remove',
+        target_email: before?.email || '',
+        target_member_id: id,
+        actor_email: result.user.email,
+        actor_user_id: result.user.id,
+        details: before ? { role: before.role, page_access: before.page_access || [], full_name: before.full_name } : {}
+      });
+
       return sendJson(res, 200, { ok: true });
+    }
+
+    // AUDIT-LIST — admin only
+    if (action === 'audit-list') {
+      if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
+      const result = await requireAdmin(req, res);
+      if (!result) return;
+      const limit = Math.min(parseInt(url.searchParams.get('limit') || '100', 10) || 100, 500);
+      try {
+        const rows = await supabaseRequest(
+          `/rest/v1/admin_team_audit?select=id,action,target_email,target_member_id,actor_email,actor_user_id,details,created_at&order=created_at.desc&limit=${limit}`
+        );
+        return sendJson(res, 200, { ok: true, entries: rows });
+      } catch (err) {
+        // If the table doesn't exist yet, return an actionable hint
+        return sendJson(res, 200, { ok: true, entries: [], notice: 'Audit table not yet created. Run sql/admin_team_audit.sql in your Supabase SQL editor.' });
+      }
     }
 
     sendJson(res, 404, { error: 'Not found' });
