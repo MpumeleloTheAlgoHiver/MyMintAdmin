@@ -335,6 +335,9 @@
         const status = m.status === 'pending'
           ? '<span class="badge badge-pending">Pending</span>'
           : '<span class="badge badge-active">Active</span>';
+        const resendBtn = m.status === 'pending'
+          ? `<button class="btn btn-sm btn-ghost" onclick='resendInvite(${JSON.stringify(m.id)},${JSON.stringify(m.email)})'>Resend</button>`
+          : '';
         return `
           <tr>
             <td>
@@ -346,6 +349,7 @@
             <td>${status}</td>
             <td>
               <div class="td-actions">
+                ${resendBtn}
                 <button class="btn btn-sm btn-ghost" onclick='openEdit(${JSON.stringify(m.id)},${JSON.stringify(m.role)},${JSON.stringify(perms)})'>Edit</button>
                 ${isSelf ? '' : `<button class="btn btn-sm btn-danger" onclick='removeMember(${JSON.stringify(m.id)},${JSON.stringify(m.full_name || m.email)})'>Remove</button>`}
               </div>
@@ -506,6 +510,19 @@
         alert(data.error || 'Failed to invite member');
       }
     });
+
+    // Resend invitation — re-issues the token and re-sends the email (or shows the new link).
+    window.resendInvite = async (id, email) => {
+      if (!confirm(`Resend invitation to ${email}? The previous link will stop working.`)) return;
+      const data = await api('POST', '/api/team?action=resend', { id });
+      if (!data.ok) { alert(data.error || 'Could not resend invitation'); return; }
+      await loadTeam();
+      if (!data.emailSent && data.signupLink) {
+        showInviteLink(email, data.signupLink, data.emailReason);
+      } else if (data.emailSent) {
+        alert('Invitation email sent to ' + email);
+      }
+    };
 
     // Modal that shows the signup link to copy when email delivery wasn't possible.
     function showInviteLink(email, link, reason) {

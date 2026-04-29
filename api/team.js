@@ -145,6 +145,63 @@ module.exports = async (req, res) => {
       });
     }
 
+    // RESEND — admin only. Re-issues a fresh invite token for a pending member
+    // and re-sends the invitation email (or returns the new link).
+    if (action === 'resend') {
+      if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+      const result = await requireAdmin(req, res);
+      if (!result) return;
+      const id = req.body?.id;
+      if (!id) return sendJson(res, 400, { error: 'id is required' });
+
+      const rows = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}&limit=1`);
+      const member = rows && rows[0];
+      if (!member) return sendJson(res, 404, { error: 'Member not found' });
+      if (member.status === 'active') return sendJson(res, 400, { error: 'User is already active — no invite to resend' });
+
+      const invite_token = newInviteToken();
+      const invite_token_expires_at = new Date(Date.now() + INVITE_TTL_MS).toISOString();
+      const baseUrl = baseUrlFromReq(req);
+      const signupLink = `${baseUrl}/signup.html?email=${encodeURIComponent(member.email)}&token=${invite_token}`;
+
+      const [updated] = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}`, {
+        method: 'PATCH',
+        extraHeaders: { 'Prefer': 'return=representation' },
+        body: { invite_token, invite_token_expires_at, invited_by: result.user.id, updated_at: new Date().toISOString() }
+      });
+
+      const emailRes = await sendInviteEmail({
+        toEmail: member.email,
+        toName: member.full_name,
+        inviterEmail: result.user.email,
+        signupLink
+      });
+
+      await writeAudit({
+        action: 'invite',
+        target_email: member.email,
+        target_member_id: id,
+        actor_email: result.user.email,
+        actor_user_id: result.user.id,
+        details: {
+          role: member.role,
+          page_access: member.page_access || [],
+          full_name: member.full_name,
+          reissue: true,
+          email_sent: !emailRes.skipped,
+          email_reason: emailRes.reason || null
+        }
+      });
+
+      return sendJson(res, 200, {
+        ok: true,
+        member: updated,
+        signupLink,
+        emailSent: !emailRes.skipped,
+        emailReason: emailRes.reason || null
+      });
+    }
+
     // VERIFY-INVITE — public endpoint used by /signup.html to validate the token before showing the form.
     if (action === 'verify-invite') {
       if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });

@@ -169,42 +169,132 @@ const sendResendEmail = async ({ to, subject, html, text }) => {
   }
 };
 
+// Shared email shell: gradient header, white card, button, footer.
+// Designed to render well in Gmail, Outlook, Apple Mail and on dark mode.
+const emailShell = ({ preheader, heading, intro, ctaLabel, ctaUrl, fallbackUrl, body, footer }) => `
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light only">
+  <title>${heading}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <span style="display:none!important;visibility:hidden;mso-hide:all;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${preheader || ''}</span>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#f4f4f7" style="background:#f4f4f7;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 8px 32px rgba(15,23,42,0.06);">
+          <tr>
+            <td style="background:linear-gradient(135deg,#5b21b6 0%,#7c3aed 100%);padding:36px 36px 28px 36px;text-align:left;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="vertical-align:middle;">
+                    <div style="display:inline-block;width:36px;height:36px;background:#ffffff;border-radius:10px;text-align:center;line-height:36px;font-weight:700;color:#7c3aed;font-size:18px;letter-spacing:-0.5px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">M</div>
+                  </td>
+                  <td style="vertical-align:middle;padding-left:12px;">
+                    <div style="color:#ffffff;font-weight:600;font-size:15px;letter-spacing:-0.2px;">Mint CRM</div>
+                    <div style="color:rgba(255,255,255,0.75);font-size:12px;font-weight:500;">Admin Portal</div>
+                  </td>
+                </tr>
+              </table>
+              <h1 style="margin:24px 0 0 0;color:#ffffff;font-size:24px;line-height:1.25;font-weight:700;letter-spacing:-0.4px;">${heading}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 36px 24px 36px;color:#1c1c1e;font-size:15px;line-height:1.6;">
+              ${intro ? `<p style="margin:0 0 20px 0;color:#3c3c43;">${intro}</p>` : ''}
+              ${body || ''}
+              ${ctaUrl ? `
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:28px 0 8px 0;">
+                  <tr>
+                    <td align="center" bgcolor="#0f172a" style="border-radius:12px;">
+                      <a href="${ctaUrl}" target="_blank" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;letter-spacing:-0.2px;border-radius:12px;background:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">${ctaLabel || 'Open Mint'}</a>
+                    </td>
+                  </tr>
+                </table>
+              ` : ''}
+              ${fallbackUrl ? `
+                <p style="margin:18px 0 0 0;font-size:12px;color:#8e8e93;line-height:1.55;">If the button doesn't work, copy and paste this link into your browser:<br>
+                  <a href="${fallbackUrl}" target="_blank" style="color:#5b21b6;word-break:break-all;text-decoration:underline;">${fallbackUrl}</a>
+                </p>
+              ` : ''}
+              ${footer ? `<p style="margin:24px 0 0 0;font-size:12px;color:#8e8e93;line-height:1.55;">${footer}</p>` : ''}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 36px 28px 36px;border-top:1px solid #f0f0f3;color:#8e8e93;font-size:11px;line-height:1.55;">
+              You're receiving this because someone with admin access at Mint added your email to the team.
+              <br>If this wasn't expected, you can safely ignore this email.
+            </td>
+          </tr>
+        </table>
+        <div style="max-width:600px;margin:14px auto 0;color:#a1a1aa;font-size:11px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+          © ${new Date().getFullYear()} Mint Investments &middot; Admin Portal
+        </div>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+
 const sendInviteEmail = async ({ toEmail, toName, inviterEmail, signupLink }) => {
+  const greet = toName ? `Hi ${toName},` : 'Hi there,';
   return sendResendEmail({
     to: toEmail,
     subject: 'You have been invited to Mint Admin',
-    text: `Hi ${toName || toEmail},\n\nYou have been invited to the Mint Admin Portal by ${inviterEmail}.\nFinish creating your account here: ${signupLink}\n\nThis invite link expires in 7 days.`,
-    html: `
-      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;color:#1c1c1e;">
-        <h2 style="color:#1c1c1e;">You have been invited to Mint Admin</h2>
-        <p>Hi ${toName || toEmail},</p>
-        <p><strong>${inviterEmail}</strong> has invited you to join the Mint Admin Portal. Click the button below to set your password and finish creating your account.</p>
-        <p style="text-align:center;margin:28px 0;">
-          <a href="${signupLink}" style="display:inline-block;padding:12px 22px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:10px;font-weight:600;">Accept Invitation</a>
-        </p>
-        <p style="font-size:12px;color:#8e8e93;">Or copy this link into your browser:<br><a href="${signupLink}">${signupLink}</a></p>
-        <p style="font-size:12px;color:#8e8e93;">This invite expires in 7 days. Use the email address it was sent to when signing up.</p>
-      </div>
-    `
+    text:
+`${greet}
+
+${inviterEmail} has invited you to join the Mint Admin Portal.
+
+Click the link below to set your password and finish creating your account:
+${signupLink}
+
+This link is valid for 7 days. Be sure to use the email address this message was sent to.
+
+— The Mint team`,
+    html: emailShell({
+      preheader: `${inviterEmail} invited you to the Mint Admin Portal — set your password to get started.`,
+      heading: 'You\'re invited to Mint Admin',
+      intro: `${greet} <strong>${inviterEmail}</strong> has invited you to join the Mint Admin Portal.`,
+      body: `
+        <p style="margin:0 0 20px 0;color:#3c3c43;">Click the button below to <strong>create your password</strong> and finish setting up your account. It only takes a moment.</p>
+        <div style="background:#faf7ff;border:1px solid #ede5ff;border-radius:12px;padding:16px 18px;margin:8px 0 4px 0;">
+          <div style="font-size:12px;font-weight:600;color:#5b21b6;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">What happens next</div>
+          <ol style="margin:0;padding-left:20px;color:#3c3c43;font-size:14px;line-height:1.7;">
+            <li>Open the secure signup page</li>
+            <li>Choose a password (at least 8 characters)</li>
+            <li>Sign in and start using the portal</li>
+          </ol>
+        </div>
+      `,
+      ctaLabel: 'Create your password',
+      ctaUrl: signupLink,
+      fallbackUrl: signupLink,
+      footer: 'This invitation expires in 7 days. For your security, only the email address it was sent to can complete signup.'
+    })
   });
 };
 
 const sendWelcomeEmail = async ({ toEmail, toName, dashboardLink }) => {
+  const greet = toName ? `Hi ${toName},` : 'Welcome,';
   return sendResendEmail({
     to: toEmail,
     subject: 'Welcome to Mint Admin',
-    text: `Hi ${toName || toEmail},\n\nYour Mint Admin account is ready. Sign in here: ${dashboardLink}`,
-    html: `
-      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;color:#1c1c1e;">
-        <h2 style="color:#1c1c1e;">Welcome to Mint Admin</h2>
-        <p>Hi ${toName || toEmail},</p>
-        <p>Your account has been created and is ready to use. You can now sign in to the admin portal.</p>
-        <p style="text-align:center;margin:28px 0;">
-          <a href="${dashboardLink}" style="display:inline-block;padding:12px 22px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:10px;font-weight:600;">Open Admin Portal</a>
-        </p>
-        <p style="font-size:12px;color:#8e8e93;">If you did not expect this email, please ignore it.</p>
-      </div>
-    `
+    text: `${greet}\n\nYour Mint Admin account is ready. Sign in here: ${dashboardLink}\n\n— The Mint team`,
+    html: emailShell({
+      preheader: 'Your Mint Admin account is ready — sign in to get started.',
+      heading: 'Welcome to Mint Admin',
+      intro: `${greet} your account is ready and you can sign in any time.`,
+      body: `<p style="margin:0;color:#3c3c43;">Bookmark the sign-in page so you can get back to the portal quickly.</p>`,
+      ctaLabel: 'Open Mint Admin',
+      ctaUrl: dashboardLink,
+      fallbackUrl: dashboardLink,
+      footer: 'If you didn\'t expect this email, please let your administrator know.'
+    })
   });
 };
 
@@ -212,17 +302,17 @@ const sendResetEmail = async ({ toEmail, resetLink }) => {
   return sendResendEmail({
     to: toEmail,
     subject: 'Reset your Mint Admin password',
-    text: `Reset your password using this link (valid for 1 hour): ${resetLink}`,
-    html: `
-      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;color:#1c1c1e;">
-        <h2 style="color:#1c1c1e;">Reset your password</h2>
-        <p>Click the button below to choose a new password. This link is valid for 1 hour.</p>
-        <p style="text-align:center;margin:28px 0;">
-          <a href="${resetLink}" style="display:inline-block;padding:12px 22px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:10px;font-weight:600;">Reset Password</a>
-        </p>
-        <p style="font-size:12px;color:#8e8e93;">If you didn't request this, you can ignore this email.</p>
-      </div>
-    `
+    text: `Reset your Mint Admin password using this link (valid for 1 hour): ${resetLink}\n\nIf you didn't request this, you can ignore this email.`,
+    html: emailShell({
+      preheader: 'Use this link to choose a new password for your Mint Admin account.',
+      heading: 'Reset your password',
+      intro: 'Click the button below to choose a new password for your Mint Admin account.',
+      body: `<p style="margin:0;color:#3c3c43;">For your security, this link is valid for <strong>1 hour</strong>. If it expires, you can request a new one from the sign-in page.</p>`,
+      ctaLabel: 'Reset password',
+      ctaUrl: resetLink,
+      fallbackUrl: resetLink,
+      footer: 'If you didn\'t ask to reset your password, you can safely ignore this email — your current password will keep working.'
+    })
   });
 };
 
