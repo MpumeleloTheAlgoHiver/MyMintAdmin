@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mint CRM — Create Account</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Inter',sans-serif;min-height:100vh;color:#111827;background:#f8f9fb;}
+    .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px 16px;}
+    .card{width:100%;max-width:440px;background:#fff;border-radius:24px;padding:36px;box-shadow:0 24px 60px rgba(15,23,42,.12);}
+    .brand{display:flex;align-items:center;gap:10px;margin-bottom:18px;}
+    .brand img{width:36px;height:36px;border-radius:10px;}
+    .brand-name{font-size:13px;font-weight:600;color:#6b7280;}
+    h1{font-size:26px;font-weight:600;color:#111827;margin-bottom:6px;}
+    .sub{font-size:14px;color:#6b7280;margin-bottom:24px;}
+    .group{margin-bottom:16px;}
+    label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px;}
+    input{width:100%;padding:11px 14px;border:1px solid #d1d5db;border-radius:12px;font-size:14px;color:#111827;outline:none;transition:border-color .15s;font-family:inherit;}
+    input:focus{border-color:#7c3aed;}
+    input:disabled{background:#f3f4f6;color:#6b7280;}
+    .hint{font-size:11px;color:#6b7280;margin-top:4px;}
+    .btn{width:100%;padding:12px 18px;border-radius:12px;border:none;font-size:14px;font-weight:600;cursor:pointer;background:#0f172a;color:#fff;transition:opacity .15s;font-family:inherit;}
+    .btn:hover{opacity:.9;}
+    .btn:disabled{opacity:.5;cursor:not-allowed;}
+    .err{background:#fee2e2;color:#991b1b;border-radius:10px;padding:11px 14px;font-size:13px;margin-bottom:14px;display:none;}
+    .ok{background:#dcfce7;color:#14532d;border-radius:10px;padding:11px 14px;font-size:13px;margin-bottom:14px;display:none;}
+    .center{text-align:center;font-size:13px;color:#6b7280;margin-top:18px;}
+    .center a{color:#111827;font-weight:600;text-decoration:none;}
+    .loading{text-align:center;padding:36px 16px;color:#6b7280;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="brand">
+        <img src="/icon.png" alt="Mint">
+        <div class="brand-name">Mint CRM</div>
+      </div>
+
+      <div id="loadingState" class="loading">Verifying your invitation…</div>
+
+      <div id="errorState" style="display:none">
+        <h1>Invitation problem</h1>
+        <p class="sub" id="errorMessage">This invitation link is no longer valid.</p>
+        <a href="/signin.html" class="btn" style="display:inline-block;text-decoration:none;text-align:center;">Back to sign in</a>
+      </div>
+
+      <div id="formState" style="display:none">
+        <h1>Create your account</h1>
+        <p class="sub">Set a password to finish joining the Mint Admin Portal.</p>
+        <div class="err" id="errBox"></div>
+        <div class="ok" id="okBox"></div>
+
+        <form id="signupForm">
+          <div class="group">
+            <label>Email</label>
+            <input id="email" type="email" disabled>
+          </div>
+          <div class="group">
+            <label>Full name</label>
+            <input id="fullName" type="text" placeholder="Your name" required>
+          </div>
+          <div class="group">
+            <label>Password</label>
+            <input id="password" type="password" placeholder="At least 8 characters" minlength="8" required>
+          </div>
+          <div class="group">
+            <label>Confirm password</label>
+            <input id="confirmPassword" type="password" placeholder="Repeat password" minlength="8" required>
+          </div>
+          <button class="btn" id="submitBtn" type="submit">Create account</button>
+        </form>
+        <p class="center">Already have an account? <a href="/signin.html">Sign in</a></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const email = (params.get('email') || '').toLowerCase().trim();
+    const token = params.get('token') || '';
+
+    const $ = (id) => document.getElementById(id);
+    const showError = (msg) => {
+      $('loadingState').style.display = 'none';
+      $('formState').style.display = 'none';
+      $('errorState').style.display = 'block';
+      $('errorMessage').textContent = msg || 'This invitation link is no longer valid.';
+    };
+    const showForm = (data) => {
+      $('loadingState').style.display = 'none';
+      $('formState').style.display = 'block';
+      $('email').value = data.email;
+      if (data.full_name) $('fullName').value = data.full_name;
+    };
+    const showInline = (id, msg) => { const el = $(id); el.textContent = msg; el.style.display = 'block'; };
+    const hideInline = (id) => { $(id).style.display = 'none'; };
+
+    (async () => {
+      if (!email || !token) { showError('Missing invitation details.'); return; }
+      try {
+        const res = await fetch(`/api/team?action=verify-invite&email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`);
+        const data = await res.json();
+        if (!data.ok) { showError(data.error); return; }
+        showForm(data);
+      } catch {
+        showError('Could not reach the server. Please try again.');
+      }
+    })();
+
+    $('signupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideInline('errBox'); hideInline('okBox');
+      const full_name = $('fullName').value.trim();
+      const password = $('password').value;
+      const confirmPassword = $('confirmPassword').value;
+      if (password.length < 8) return showInline('errBox', 'Password must be at least 8 characters.');
+      if (password !== confirmPassword) return showInline('errBox', 'Passwords do not match.');
+
+      const btn = $('submitBtn');
+      btn.disabled = true; btn.textContent = 'Creating account…';
+
+      try {
+        const res = await fetch('/api/team?action=signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, token, password, full_name })
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          showInline('errBox', data.error || 'Could not create your account.');
+          btn.disabled = false; btn.textContent = 'Create account';
+          return;
+        }
+        showInline('okBox', 'Account created! Redirecting to sign in…');
+        setTimeout(() => { window.location.href = '/signin.html?reason=signup-success&email=' + encodeURIComponent(email); }, 1100);
+      } catch {
+        showInline('errBox', 'Could not reach the server. Please try again.');
+        btn.disabled = false; btn.textContent = 'Create account';
+      }
+    });
+  </script>
+</body>
+</html>

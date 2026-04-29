@@ -144,14 +144,14 @@
               </div>
 
               <div class="mb-6 text-right">
-                <a href="#" class="text-sm text-gray-600 hover:text-gray-900">Forgot password?</a>
+                <a href="/forgot-password.html" class="text-sm text-gray-600 hover:text-gray-900">Forgot password?</a>
               </div>
 
               <button class="w-full bg-gray-900 text-white py-3 px-6 rounded-xl font-medium hover:bg-gray-800 transition-colors mb-6" type="submit">Sign in</button>
             </form>
 
             <p class="text-center text-sm text-gray-600">
-              Don't have an account? <a href="#" class="text-gray-900 font-medium hover:underline">Sign up</a>
+              New to Mint? Accounts are created by invitation only — ask an admin to invite you.
             </p>
 
             <div class="error-text" id="errorText"></div>
@@ -236,9 +236,19 @@
       }
     };
 
+    // Pre-fill email from URL (e.g. after signup-success) and show context messages
+    const params = new URLSearchParams(window.location.search);
+    const presetEmail = (params.get('email') || '').trim();
+    if (presetEmail) form.email.value = presetEmail;
+    const reason = params.get('reason');
+    if (reason === 'signup-success')   showStatus('Account created. Sign in to continue.');
+    else if (reason === 'reset-success') showStatus('Password updated. Sign in with your new password.');
+    else if (reason === 'no-access')     showError("You don't have access to that page.");
+    else if (reason === 'not-a-member')  showError('Your account is not on the team.');
+
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const email = form.email.value.trim();
+      const email = form.email.value.trim().toLowerCase();
       const password = form.password.value.trim();
 
       if (!email || !password) {
@@ -251,6 +261,24 @@
       if (error) {
         showError(error.message || 'Unable to sign in.');
         return;
+      }
+
+      // Confirm the user is actually a team member before redirecting,
+      // so non-members never see the app even briefly.
+      try {
+        const { data: sess } = await supabaseClient.auth.getSession();
+        const token = sess?.session?.access_token;
+        if (token) {
+          const r = await fetch('/api/team?action=me', { headers: { Authorization: 'Bearer ' + token } });
+          const data = await r.json();
+          if (!data.ok) {
+            await supabaseClient.auth.signOut();
+            showError(data.error || 'Your account is not on the team.');
+            return;
+          }
+        }
+      } catch (e) {
+        // Network glitch — let the access guard handle redirect after navigation
       }
 
       redirectToApp();
