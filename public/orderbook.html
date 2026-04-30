@@ -1237,6 +1237,7 @@
       <div class="orderbook-tabs" role="tablist" aria-label="Orderbook tabs">
         <button class="orderbook-tab-btn active" id="activeBooksTab" type="button" role="tab" aria-selected="true" aria-controls="activeBooksPanel">Active Books</button>
         <button class="orderbook-tab-btn" id="closedBooksTab" type="button" role="tab" aria-selected="false" aria-controls="closedBooksPanel">Closed Books</button>
+        <button class="orderbook-tab-btn" id="pendingRebalancesTab" type="button" role="tab" aria-selected="false" aria-controls="pendingRebalancesPanel">Rebalances</button>
         <button class="orderbook-tab-btn" id="strateBirTab" type="button" role="tab" aria-selected="false" aria-controls="strateBirPanel">Strate BIR</button>
         <div class="orderbook-tab-search">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13 11a5 5 0 10-1.41 1.41l3.54 3.55 1.41-1.42L13 11zm-5 1a4 4 0 110-8 4 4 0 010 8z"/></svg>
@@ -1307,6 +1308,16 @@
         </div>
       </div>
 
+      <div class="orderbook-tab-panel" id="pendingRebalancesPanel" role="tabpanel" aria-labelledby="pendingRebalancesTab">
+        <div class="closed-books-card">
+          <h2 class="closed-books-title">Rebalances</h2>
+          <p class="closed-books-subtitle">Standalone rebalance batches. These do not count as active or closed orderbook records.</p>
+          <div class="filled-orderbooks-list" id="rebalanceBooksList">
+            <div class="filled-orderbook-empty">No rebalance batches yet.</div>
+          </div>
+        </div>
+      </div>
+
       <div class="orderbook-tab-panel" id="strateBirPanel" role="tabpanel" aria-labelledby="strateBirTab">
         <div class="closed-books-card">
           <h2 class="closed-books-title">Strate BIR Export</h2>
@@ -1360,11 +1371,13 @@
     const activeBooksTab = document.getElementById('activeBooksTab');
     const strateBirTab = document.getElementById('strateBirTab');
     const closedBooksTab = document.getElementById('closedBooksTab');
+    const pendingRebalancesTab = document.getElementById('pendingRebalancesTab');
     const activeBooksPanel = document.getElementById('activeBooksPanel');
     const strateBirPanel = document.getElementById('strateBirPanel');
     const closedBooksPanel = document.getElementById('closedBooksPanel');
     const pendingRebalancesPanel = document.getElementById('pendingRebalancesPanel');
     const closedBooksList = document.getElementById('closedBooksList');
+    const rebalanceBooksList = document.getElementById('rebalanceBooksList');
     const strateBirCount = document.getElementById('strateBirCount');
     const exportStrateBirBtn = document.getElementById('exportStrateBirBtn');
     const toggleStrateBirViewBtn = document.getElementById('toggleStrateBirViewBtn');
@@ -1394,7 +1407,7 @@
     let strategyFillStateById = new Map();
     let showActiveBooksFilledColumn = false;
     let isArchiveBooksLoading = true;
-    let settledBatchesForClosedBooks = [];
+    let rebalanceBatchesForStandaloneList = [];
     let activeBooksSortOrder = 'newest'; // 'newest' | 'oldest' | 'as-is'
 
     const requireSession = async () => {
@@ -2305,6 +2318,7 @@
       const fileReference = `MINTBIR${fileDate}${fileTime}`;
 
       const activeRows = (allBirSourceRows || []).filter((row) => {
+        if (row?.rebalanceBatchId) return false;
         const quantity = Number(row?.quantityValue);
         const status = String(row?.holdingStatus || '').trim().toLowerCase();
         const isInactiveStatus = status.includes('exit') || status.includes('close');
@@ -3195,6 +3209,9 @@
       if (closedBooksList) {
         closedBooksList.innerHTML = archiveLoaderHtml;
       }
+      if (rebalanceBooksList) {
+        rebalanceBooksList.innerHTML = archiveLoaderHtml;
+      }
     };
 
     const formatBookTitle = (book) => {
@@ -3220,6 +3237,10 @@
       if (closedBooksTab) {
         closedBooksTab.classList.toggle('active', isClosedBooks);
         closedBooksTab.setAttribute('aria-selected', isClosedBooks ? 'true' : 'false');
+      }
+      if (pendingRebalancesTab) {
+        pendingRebalancesTab.classList.toggle('active', isPendingRebalances);
+        pendingRebalancesTab.setAttribute('aria-selected', isPendingRebalances ? 'true' : 'false');
       }
       if (strateBirTab) {
         strateBirTab.classList.toggle('active', isStrateBir);
@@ -3747,18 +3768,48 @@
       }
 
       renderClosedBooks(closedBooks);
+      renderRebalanceBooks();
     };
 
-    const renderClosedBooks = (closedBooks) => {
-      if (!closedBooksList) return;
+    const rebalanceStatusPill = (status) => {
+      const normalized = String(status || '').toUpperCase();
+      if (normalized === 'PENDING') {
+        return '<span style="background:#fffbeb;color:#92400e;border:1px solid #fcd34d;border-radius:999px;padding:3px 8px;font-size:0.72rem;font-weight:700;">Pending</span>';
+      }
+      if (normalized === 'REVERSED') {
+        return '<span style="background:#fef2f2;color:#991b1b;border:1px solid #fca5a5;border-radius:999px;padding:3px 8px;font-size:0.72rem;font-weight:700;">Reversed</span>';
+      }
+      return '<span style="background:#ecfdf3;color:#166534;border:1px solid #86efac;border-radius:999px;padding:3px 8px;font-size:0.72rem;font-weight:700;">Settled</span>';
+    };
 
-      // ── Render settled rebalance batches ──
-      const settledHtml = (settledBatchesForClosedBooks || []).map((sb) => {
-        const isReversed = sb.batchStatus === 'REVERSED';
-        const statusPill = isReversed
-          ? '<span style="background:#fef2f2;color:#991b1b;border:1px solid #fca5a5;border-radius:999px;padding:3px 8px;font-size:0.72rem;font-weight:700;">Reversed</span>'
-          : '<span style="background:#ecfdf3;color:#166534;border:1px solid #86efac;border-radius:999px;padding:3px 8px;font-size:0.72rem;font-weight:700;">Settled</span>';
-        const dateLabel = sb.settledAt ? new Date(sb.settledAt).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+    const renderRebalanceBooks = () => {
+      if (!rebalanceBooksList) return;
+      if (isArchiveBooksLoading) {
+        rebalanceBooksList.innerHTML = archiveLoaderHtml;
+        return;
+      }
+
+      const batches = Array.isArray(rebalanceBatchesForStandaloneList)
+        ? rebalanceBatchesForStandaloneList
+        : [];
+
+      if (!batches.length) {
+        rebalanceBooksList.innerHTML = '<div class="filled-orderbook-empty">No rebalance batches yet.</div>';
+        return;
+      }
+
+      rebalanceBooksList.innerHTML = batches.map((sb) => {
+        const dateValue = sb.displayAt || sb.createdAt || null;
+        const dateLabel = dateValue ? new Date(dateValue).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+        const isPending = String(sb.batchStatus || '').toUpperCase() === 'PENDING';
+        const actionHtml = isPending
+          ? `<span style="display:inline-flex;gap:6px;align-items:center;">
+              <button title="Fill &amp; Settle Batch" data-fill-settle-batch data-batch-id="${escapeHtml(sb.id || '')}"
+                style="background:#059669;color:white;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;">Fill &amp; Settle</button>
+              <button title="Reverse Batch" data-reverse-batch data-batch-id="${escapeHtml(sb.id || '')}"
+                style="background:#dc2626;color:white;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;">Reverse</button>
+            </span>`
+          : '';
         const evtBody = sb.events.length
           ? sb.events.map((r) => `
             <tr>
@@ -3778,9 +3829,10 @@
             <summary class="filled-orderbook-summary">
               <span>Rebalance — ${escapeHtml(sb.strategyName)} (${escapeHtml(sb.sellIsin)} → ${escapeHtml(sb.buyIsin)}${sb.extraBuyIsin ? ' + ' + escapeHtml(sb.extraBuyIsin) : ''})</span>
               <span class="filled-orderbook-meta">
-                ${statusPill}
+                ${rebalanceStatusPill(sb.batchStatus)}
                 <span>${sb.clientCount} client${sb.clientCount !== 1 ? 's' : ''}</span>
                 <span>${escapeHtml(dateLabel)}</span>
+                ${actionHtml}
               </span>
             </summary>
             <div class="filled-orderbook-details">
@@ -3804,8 +3856,12 @@
             </div>
           </details>`;
       }).join('');
+    };
 
-      if (!closedBooks.length && !settledBatchesForClosedBooks.length) {
+    const renderClosedBooks = (closedBooks) => {
+      if (!closedBooksList) return;
+
+      if (!closedBooks.length) {
         closedBooksList.innerHTML = '<div class="filled-orderbook-empty">No closed books yet.</div>';
         return;
       }
@@ -3881,7 +3937,7 @@
             </div>
           </details>
         `;
-      }).join('') + settledHtml;
+      }).join('');
     };
 
     const sendFilledOrderbookEmail = async (snapshot) => {
@@ -4156,7 +4212,7 @@
           .order('created_at', { ascending: false }),
         supabaseClient
           .from('rebalance_batch')
-          .select('id, strategy_id, status, sell_isin_code, buy_isin_code, extra_buy_isin_code, net_proceeds, strategy_name_snapshot, created_at, created_by, settled_at, is_reversed, reversed_at, reversed_reason, holdings_snapshot_before, wallet_snapshot_before')
+          .select('id, strategy_id, status, sell_isin_code, buy_isin_code, extra_buy_isin_code, net_proceeds, strategy_name_snapshot, created_at, created_by, settled_at, updated_at, is_reversed, reversed_at, reversed_reason, holdings_snapshot_before, wallet_snapshot_before')
           .order('created_at', { ascending: false }),
       ]);
 
@@ -4468,16 +4524,17 @@
       // Number pending rows starting after settled rows
       rebEventRows.forEach((row, i) => { row.line = rawRows.length + i + 1; });
 
-      // Separate pending rows — they must NOT be archived
+      // Keep pending rebalance rows out of the orderbook record set. They are
+      // rendered in the standalone Rebalances tab so they never affect counts,
+      // export, archive snapshots, Strate BIR, or orderbook email payloads.
       const settledRows = filteredRows.filter(r => !r.isPendingRebalance);
-      const pendingRows = rebEventRows;
 
       allBirSourceRows = rawRows;
       allOrderbookRawRows = settledRows;
 
-      // ── Build settled/reversed batches for Closed Books tab ──
-      settledBatchesForClosedBooks = rebBatches
-        .filter((b) => b.status === 'SETTLED' || b.status === 'REVERSED')
+      // ── Build standalone rebalance batches ──
+      rebalanceBatchesForStandaloneList = rebBatches
+        .filter((b) => ['PENDING', 'SETTLED', 'REVERSED'].includes(String(b.status || '').toUpperCase()))
         .map((b) => {
           const batchEvents = rebEvents.filter((e) => e.batch_id === b.id);
           const strategy = b.strategy_id ? (strategiesMap[b.strategy_id] || null) : null;
@@ -4501,7 +4558,8 @@
             id: b.id,
             batchStatus: b.status,
             strategyName: b.strategy_name_snapshot || strategy?.name || 'Unknown Strategy',
-            settledAt: b.settled_at || b.reversed_at || b.updated_at || b.created_at,
+            displayAt: b.settled_at || b.reversed_at || b.updated_at || b.created_at,
+            createdAt: b.created_at || null,
             sellIsin: b.sell_isin_code || '-',
             buyIsin: b.buy_isin_code || '-',
             extraBuyIsin: b.extra_buy_isin_code || null,
@@ -4509,9 +4567,9 @@
             clientCount: [...new Set(batchEvents.map((e) => e.user_id))].length,
           };
         })
-        .sort((a, b) => new Date(b.settledAt).getTime() - new Date(a.settledAt).getTime());
+        .sort((a, b) => new Date(b.displayAt || 0).getTime() - new Date(a.displayAt || 0).getTime());
 
-      const allDisplayRows = [...pendingRows, ...settledRows];
+      const allDisplayRows = settledRows;
       const aggregated = aggregateOrderbookRows(allDisplayRows);
       return groupByStrategy(aggregated, allDisplayRows);
     };
@@ -4579,6 +4637,15 @@
     if (closedBooksTab) {
       closedBooksTab.addEventListener('click', () => {
         setActiveTab('closed');
+        loadOrderbook().catch((error) => {
+          console.error('Orderbook refresh failed:', error?.message || error);
+        });
+      });
+    }
+
+    if (pendingRebalancesTab) {
+      pendingRebalancesTab.addEventListener('click', () => {
+        setActiveTab('pending-rebalances');
         loadOrderbook().catch((error) => {
           console.error('Orderbook refresh failed:', error?.message || error);
         });
@@ -5057,6 +5124,27 @@
 
         if (willOpen) {
           detailRow.classList.remove('is-hidden');
+        }
+      });
+    }
+
+    if (rebalanceBooksList) {
+      rebalanceBooksList.addEventListener('click', (event) => {
+        const fillSettleBtn = event.target.closest('[data-fill-settle-batch]');
+        if (fillSettleBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          const batchId = fillSettleBtn.dataset.batchId;
+          if (batchId) openFillSettleModal(batchId).catch((err) => alert('Error: ' + err.message));
+          return;
+        }
+
+        const reverseBtn = event.target.closest('[data-reverse-batch]');
+        if (reverseBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          const batchId = reverseBtn.dataset.batchId;
+          if (batchId) executeReverseRebalanceBatch(batchId).catch((err) => alert('Reversal error: ' + err.message));
         }
       });
     }
