@@ -157,12 +157,11 @@
                 <th>Role</th>
                 <th>Page Access</th>
                 <th>Status</th>
-                <th>Last sign-in</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="teamTableBody">
-              <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+              <tr><td colspan="5" class="empty-state">Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -264,6 +263,28 @@
     </div>
   </div>
 
+  <!-- Update Email Modal (migration: move a member to their @mymint address) -->
+  <div class="overlay" id="emailOverlay">
+    <div class="modal">
+      <div class="modal-title">Update Email Address</div>
+      <p style="font-size:13px;color:#3c3c43;margin-bottom:16px;">Change this member's email to their <strong>@mymint.co.za</strong> address. This updates both the team record and their sign-in credentials.</p>
+      <input type="hidden" id="emailMemberId">
+      <div class="form-group">
+        <label>Current Email</label>
+        <input type="email" id="emailCurrent" disabled style="background:#f3f4f6;color:#6b7280;">
+      </div>
+      <div class="form-group">
+        <label>New @mymint.co.za Email</label>
+        <input type="email" id="emailNew" placeholder="name@mymint.co.za" autocomplete="off">
+      </div>
+      <div id="emailError" style="background:#fee2e2;color:#991b1b;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:8px;display:none;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="emailCancelBtn">Cancel</button>
+        <button class="btn btn-primary" id="emailSubmitBtn">Update Email</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
@@ -319,33 +340,6 @@
         .map(cb => cb.value);
     };
 
-    // Human-friendly relative time, with absolute timestamp on hover.
-    const formatLastSignIn = (iso, status) => {
-      if (!iso) {
-        return status === 'pending'
-          ? '<span style="color:#8e8e93;font-size:12px;">Awaiting signup</span>'
-          : '<span style="color:#8e8e93;font-size:12px;">Never</span>';
-      }
-      const then = new Date(iso);
-      if (isNaN(then.getTime())) return '<span style="color:#8e8e93;font-size:12px;">—</span>';
-      const diffMs = Date.now() - then.getTime();
-      const sec = Math.max(1, Math.floor(diffMs / 1000));
-      const min = Math.floor(sec / 60);
-      const hr  = Math.floor(min / 60);
-      const day = Math.floor(hr / 24);
-      let label;
-      if (sec < 60)      label = 'just now';
-      else if (min < 60) label = `${min} min${min===1?'':'s'} ago`;
-      else if (hr  < 24) label = `${hr} hour${hr===1?'':'s'} ago`;
-      else if (day < 30) label = `${day} day${day===1?'':'s'} ago`;
-      else if (day < 365)label = `${Math.floor(day/30)} month${Math.floor(day/30)===1?'':'s'} ago`;
-      else               label = `${Math.floor(day/365)} year${Math.floor(day/365)===1?'':'s'} ago`;
-      const stale = day >= 30;
-      const color = stale ? '#ef4444' : (day >= 7 ? '#f59e0b' : '#10b981');
-      const tooltip = then.toLocaleString();
-      return `<span title="${tooltip}" style="font-size:12px;color:${color};">${label}</span>`;
-    };
-
     const renderTable = (members) => {
       const body = document.getElementById('teamTableBody');
       if (!members.length) {
@@ -366,7 +360,6 @@
         const resendBtn = m.status === 'pending'
           ? `<button class="btn btn-sm btn-ghost" onclick='resendInvite(${JSON.stringify(m.id)},${JSON.stringify(m.email)})'>Resend</button>`
           : '';
-        const lastSignIn = formatLastSignIn(m.last_sign_in_at, m.status);
         return `
           <tr>
             <td>
@@ -376,11 +369,11 @@
             <td><span class="badge badge-${m.role}">${m.role === 'admin' ? 'Admin' : 'Staff'}</span></td>
             <td>${pages}</td>
             <td>${status}</td>
-            <td>${lastSignIn}</td>
             <td>
               <div class="td-actions">
                 ${resendBtn}
                 <button class="btn btn-sm btn-ghost" onclick='openEdit(${JSON.stringify(m.id)},${JSON.stringify(m.role)},${JSON.stringify(perms)})'>Edit</button>
+                ${!m.email.endsWith('@mymint.co.za') ? `<button class="btn btn-sm" style="background:#fff8e1;color:#b45309;" onclick='openUpdateEmail(${JSON.stringify(m.id)},${JSON.stringify(m.email)})'>Update Email</button>` : ''}
                 ${isSelf ? '' : `<button class="btn btn-sm btn-danger" onclick='removeMember(${JSON.stringify(m.id)},${JSON.stringify(m.full_name || m.email)})'>Remove</button>`}
               </div>
             </td>
@@ -547,10 +540,12 @@
       const data = await api('POST', '/api/team?action=resend', { id });
       if (!data.ok) { alert(data.error || 'Could not resend invitation'); return; }
       await loadTeam();
-      if (!data.emailSent && data.signupLink) {
-        showInviteLink(email, data.signupLink, data.emailReason);
-      } else if (data.emailSent) {
+      if (data.emailSent) {
         alert('Invitation email sent to ' + email);
+      } else if (data.signupLink) {
+        showInviteLink(email, data.signupLink, data.emailReason);
+      } else {
+        alert(`Could not send invitation email to ${email}.\n\nReason: ${data.emailReason || 'Unknown error'}\n\nCheck that RESEND_API_KEY is set in your environment.`);
       }
     };
 
@@ -605,6 +600,51 @@
         await loadTeam();
       } else {
         alert(data.error || 'Failed to update member');
+      }
+    });
+
+    // Update Email modal
+    window.openUpdateEmail = (id, currentEmail) => {
+      document.getElementById('emailMemberId').value = id;
+      document.getElementById('emailCurrent').value = currentEmail;
+      document.getElementById('emailNew').value = '';
+      document.getElementById('emailError').style.display = 'none';
+      document.getElementById('emailOverlay').classList.add('open');
+    };
+
+    document.getElementById('emailCancelBtn').addEventListener('click', () => {
+      document.getElementById('emailOverlay').classList.remove('open');
+    });
+
+    document.getElementById('emailOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'emailOverlay') document.getElementById('emailOverlay').classList.remove('open');
+    });
+
+    document.getElementById('emailSubmitBtn').addEventListener('click', async () => {
+      const id = document.getElementById('emailMemberId').value;
+      const new_email = document.getElementById('emailNew').value.trim().toLowerCase();
+      const errBox = document.getElementById('emailError');
+      errBox.style.display = 'none';
+
+      if (!new_email) { errBox.textContent = 'Enter the new email address.'; errBox.style.display = 'block'; return; }
+      if (!new_email.endsWith('@mymint.co.za')) { errBox.textContent = 'Must be a @mymint.co.za address.'; errBox.style.display = 'block'; return; }
+
+      const btn = document.getElementById('emailSubmitBtn');
+      btn.disabled = true; btn.textContent = 'Updating…';
+
+      const data = await api('POST', '/api/team?action=update-email', { id, new_email });
+      btn.disabled = false; btn.textContent = 'Update Email';
+
+      if (data.ok) {
+        document.getElementById('emailOverlay').classList.remove('open');
+        await loadTeam();
+        const note = data.authUpdated
+          ? 'Email updated. The member can now sign in with their new address.'
+          : 'Team record updated. Note: no Supabase Auth account was found for this member — they may need to accept a fresh invitation.';
+        alert(note);
+      } else {
+        errBox.textContent = data.error || 'Failed to update email.';
+        errBox.style.display = 'block';
       }
     });
 

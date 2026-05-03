@@ -12,7 +12,9 @@ const {
   newInviteToken,
   baseUrlFromReq,
   inviteUserViaSupabase,
-  recoverPasswordViaSupabase
+  recoverPasswordViaSupabase,
+  updateAuthUserEmail,
+  sendInviteEmail
 } = require('./_team');
 
 const normEmail = (e) => String(e || '').trim().toLowerCase();
@@ -182,8 +184,31 @@ module.exports = async (req, res) => {
         body: { invited_by: result.user.id, updated_at: new Date().toISOString() }
       });
 
-      // Ask Supabase to (re-)send the invite email
-      const emailRes = await inviteUserViaSupabase(member.email, redirectTo, member.full_name);
+      // Try Supabase invite first; if user already exists fall back to a magic link via Resend.
+      let emailRes = await inviteUserViaSupabase(member.email, redirectTo, member.full_name);
+      let via = 'supabase';
+      let fallbackLink = null;
+
+      if (!emailRes.ok && emailRes.error && emailRes.error.toLowerCase().includes('already been registered')) {
+        // User exists in Supabase Auth — generate a magic link and email it ourselves.
+        try {
+          fallbackLink = await generateAuthLink('magiclink', member.email, redirectTo);
+          if (fallbackLink) {
+            const sendRes = await sendInviteEmail({
+              toEmail: member.email,
+              toName: member.full_name,
+              inviterEmail: result.user.email,
+              signupLink: fallbackLink
+            });
+            emailRes = sendRes.skipped
+              ? { ok: false, error: sendRes.reason }
+              : { ok: true };
+            via = 'resend-magic-link';
+          }
+        } catch (err) {
+          emailRes = { ok: false, error: err.message };
+        }
+      }
 
       await writeAudit({
         action: 'invite',
@@ -198,7 +223,7 @@ module.exports = async (req, res) => {
           reissue: true,
           email_sent: emailRes.ok,
           email_reason: emailRes.error || null,
-          via: 'supabase'
+          via
         }
       });
 
@@ -208,7 +233,8 @@ module.exports = async (req, res) => {
           member: updated,
           emailSent: false,
           emailReason: emailRes.error,
-          warning: `Could not resend via Supabase: ${emailRes.error}`
+          signupLink: fallbackLink || null,
+          warning: `Could not resend: ${emailRes.error}`
         });
       }
 
@@ -260,6 +286,9 @@ module.exports = async (req, res) => {
       const email = normEmail(req.body?.email);
       if (!email) return sendJson(res, 400, { error: 'Email is required' });
 
+      // Silently ignore non-@mymint addresses to prevent email enumeration.
+      if (!isAllowedDomain(email)) return sendJson(res, 200, { ok: true });
+
       // Always respond OK to prevent email enumeration, but only email known team members.
       const rows = await supabaseRequest(`/rest/v1/admin_team?email=eq.${encodeURIComponent(email)}&limit=1`);
       const member = rows && rows[0];
@@ -273,6 +302,62 @@ module.exports = async (req, res) => {
         }
       }
       return sendJson(res, 200, { ok: true });
+    }
+
+    // UPDATE-EMAIL — admin only. Migrates a team member to a @mymint email address.
+    // Updates both the admin_team row and the Supabase Auth user record.
+    if (action === 'update-email') {
+      if (req.method !== 'POST' && req.method !== 'PATCH') return sendJson(res, 405, { error: 'Method not allowed' });
+      const result = await requireAdmin(req, res);
+      if (!result) return;
+      const { id, new_email } = req.body || {};
+      if (!id || !new_email) return sendJson(res, 400, { error: 'id and new_email are required' });
+
+      const normNew = normEmail(new_email);
+      if (!isAllowedDomain(normNew)) {
+        return sendJson(res, 400, { error: `Only ${ALLOWED_DOMAIN} email addresses are allowed` });
+      }
+
+      // Conflict check — another member already has this email
+      const conflicts = await supabaseRequest(
+        `/rest/v1/admin_team?email=eq.${encodeURIComponent(normNew)}&id=neq.${id}&limit=1`
+      );
+      if (conflicts && conflicts.length > 0) {
+        return sendJson(res, 400, { error: 'That email is already used by another team member' });
+      }
+
+      const rows = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}&limit=1`);
+      const member = rows && rows[0];
+      if (!member) return sendJson(res, 404, { error: 'Member not found' });
+      const oldEmail = member.email;
+
+      // Update Supabase Auth email if the auth user is known
+      let authUpdated = false;
+      if (member.user_id) {
+        try {
+          await updateAuthUserEmail(member.user_id, normNew);
+          authUpdated = true;
+        } catch (err) {
+          return sendJson(res, 500, { error: `Could not update auth email: ${err.message}` });
+        }
+      }
+
+      const [updated] = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}`, {
+        method: 'PATCH',
+        extraHeaders: { 'Prefer': 'return=representation' },
+        body: { email: normNew, updated_at: new Date().toISOString() }
+      });
+
+      await writeAudit({
+        action: 'update',
+        target_email: normNew,
+        target_member_id: id,
+        actor_email: result.user.email,
+        actor_user_id: result.user.id,
+        details: { before: { email: oldEmail }, after: { email: normNew }, auth_updated: authUpdated }
+      });
+
+      return sendJson(res, 200, { ok: true, member: updated, authUpdated });
     }
 
     // UPDATE — admin only

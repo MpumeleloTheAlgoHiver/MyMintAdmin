@@ -180,6 +180,23 @@ const recoverPasswordViaSupabase = async (email, redirectTo) => {
   return { ok: true };
 };
 
+// Update a Supabase Auth user's email address without requiring confirmation.
+const updateAuthUserEmail = async (userId, newEmail) => {
+  const { supabaseUrl, serviceRoleKey } = getSupabaseCreds();
+  const res = await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
+    method: 'PATCH',
+    headers: {
+      'apikey': serviceRoleKey,
+      'Authorization': `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email: newEmail, email_confirm: true })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.msg || data.message || data.error || `Failed to update auth email (${res.status})`);
+  return data;
+};
+
 // Generate a recovery / signup link via the admin endpoint (no email sent).
 const generateAuthLink = async (type, email, redirectTo) => {
   const { supabaseUrl, serviceRoleKey } = getSupabaseCreds();
@@ -396,6 +413,7 @@ module.exports = {
   baseUrlFromReq,
   inviteUserViaSupabase,
   recoverPasswordViaSupabase,
+  updateAuthUserEmail,
   sendInviteEmail,
   sendWelcomeEmail,
   sendResetEmail
