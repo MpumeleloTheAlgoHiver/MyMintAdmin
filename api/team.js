@@ -127,9 +127,39 @@ module.exports = async (req, res) => {
         member = created;
       }
 
-      // Ask Supabase to create the auth user (if not already) and send the invite email
-      // through whatever email provider is configured in the Supabase dashboard.
-      const emailRes = await inviteUserViaSupabase(email, redirectTo, full_name);
+      // Try to generate an invite link and send via Resend (preferred).
+      // Fall back to Supabase's built-in invite email if Resend isn't configured.
+      let emailSent = false;
+      let emailReason = null;
+      let signupLink = null;
+      let via = 'supabase';
+
+      if (process.env.RESEND_API_KEY) {
+        try {
+          signupLink = await generateAuthLink('invite', email, redirectTo);
+          if (signupLink) {
+            const sendRes = await sendInviteEmail({
+              toEmail: email,
+              toName: full_name,
+              inviterEmail: result.user.email,
+              signupLink
+            });
+            emailSent = !sendRes.skipped;
+            emailReason = sendRes.skipped ? sendRes.reason : null;
+            via = 'resend';
+          }
+        } catch (err) {
+          emailReason = err.message;
+        }
+      }
+
+      // Fall back to Supabase invite email if Resend didn't send
+      if (!emailSent) {
+        const supabaseRes = await inviteUserViaSupabase(email, redirectTo, full_name);
+        emailSent = supabaseRes.ok;
+        emailReason = emailSent ? null : supabaseRes.error;
+        via = 'supabase';
+      }
 
       await writeAudit({
         action: 'invite',
@@ -142,19 +172,20 @@ module.exports = async (req, res) => {
           page_access,
           full_name,
           reissue: existing && existing.length > 0,
-          email_sent: emailRes.ok,
-          email_reason: emailRes.error || null,
-          via: 'supabase'
+          email_sent: emailSent,
+          email_reason: emailReason || null,
+          via
         }
       });
 
-      if (!emailRes.ok) {
+      if (!emailSent) {
         return sendJson(res, 200, {
           ok: true,
           member,
           emailSent: false,
-          emailReason: emailRes.error,
-          warning: `Member added but Supabase could not send the email: ${emailRes.error}. Check your Supabase Auth email settings.`
+          emailReason,
+          signupLink: signupLink || null,
+          warning: `Member added but email could not be sent: ${emailReason}. Share the link above manually.`
         });
       }
 
