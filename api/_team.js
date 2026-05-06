@@ -55,8 +55,33 @@ const requireAuth = async (req, res) => {
   const user = await verifyToken(token);
   if (!user) { sendJson(res, 401, { error: 'Invalid token' }); return null; }
 
-  const member = await getTeamMember(user.email);
+  // Check admin_team first
+  let member = await getTeamMember(user.email);
+
+  // If not in admin_team, check admin_profiles
+  if (!member) {
+    try {
+      const { supabaseUrl, serviceRoleKey } = getSupabaseCreds();
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/admin_profiles?email=eq.${encodeURIComponent(user.email)}&limit=1`,
+        {
+          headers: {
+            'apikey': serviceRoleKey,
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'Accept': 'application/json'
+          }
+        }
+      );
+      const rows = await res.json();
+      member = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    } catch (err) {
+      console.warn('[Auth] admin_profiles lookup failed:', err.message);
+    }
+  }
+
   if (!member) { sendJson(res, 403, { error: 'Not a team member' }); return null; }
+
+  // Check pending status only for admin_team members (admin_profiles don't have status field)
   if (member.status === 'pending') { sendJson(res, 403, { error: 'Your invite has not been accepted yet' }); return null; }
 
   return { user, member };
@@ -65,7 +90,8 @@ const requireAuth = async (req, res) => {
 const requireAdmin = async (req, res) => {
   const result = await requireAuth(req, res);
   if (!result) return null;
-  if (result.member.role !== 'admin') {
+  const role = result.member.role || 'staff';
+  if (role !== 'admin') {
     sendJson(res, 403, { error: 'Admin access required' });
     return null;
   }
