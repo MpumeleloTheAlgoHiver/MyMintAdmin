@@ -34,7 +34,7 @@ module.exports = async (req, res) => {
   try {
     // Validate the user's token with Supabase
     await fetchSupabaseJson('/auth/v1/user', token, false);
-    
+
     const body = typeof req.body === 'object' ? req.body : await readJsonBody(req);
     const { to, subject, html, walletId } = body;
 
