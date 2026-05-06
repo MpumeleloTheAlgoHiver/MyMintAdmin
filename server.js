@@ -1034,7 +1034,7 @@ const server = http.createServer((req, res) => {
       try {
         await fetchSupabaseJson('/auth/v1/user', token, false);
         const body = await readJsonBody(req);
-        const { user_id, amount } = body;
+        const { user_id, amount, account_type } = body;
 
         if (!user_id || typeof amount !== 'number' || amount <= 0) {
           sendJson(res, 400, { error: 'Invalid user_id or amount' });
@@ -1052,70 +1052,63 @@ const server = http.createServer((req, res) => {
           'Content-Type': 'application/json'
         };
 
-        const getWalletUrl = `${supabaseUrl}/rest/v1/wallets?user_id=eq.${user_id}&select=*`;
-        const getResponse = await fetch(getWalletUrl, { headers: sbHeaders });
-        const getResult = await getResponse.json();
+        // Handle child wallet payments
+        if (account_type === 'child') {
+          const getFamilyUrl = `${supabaseUrl}/rest/v1/family_members?id=eq.${user_id}&select=*`;
+          const getFamilyResponse = await fetch(getFamilyUrl, { headers: sbHeaders });
+          const getFamilyResult = await getFamilyResponse.json();
 
-        if (!getResponse.ok) {
-          throw new Error(`Failed to fetch wallet: ${getResult.message || JSON.stringify(getResult)}`);
-        }
-
-        if (Array.isArray(getResult) && getResult.length > 0) {
-          const wallet = getResult[0];
-          const newBalance = Number(wallet.balance) + amount;
-          const updateUrl = `${supabaseUrl}/rest/v1/wallets?id=eq.${wallet.id}`;
-          const updateResponse = await fetch(updateUrl, {
-            method: 'PATCH',
-            headers: sbHeaders,
-            body: JSON.stringify({ balance: newBalance, updated_at: new Date().toISOString() })
-          });
-          if (!updateResponse.ok && updateResponse.status !== 204) {
-            const updateResult = await updateResponse.json();
-            throw new Error(`Failed to update wallet: ${updateResult.message || JSON.stringify(updateResult)}`);
+          if (!getFamilyResponse.ok) {
+            throw new Error(`Failed to fetch child account: ${getFamilyResult.message || JSON.stringify(getFamilyResult)}`);
           }
 
-          // Record transaction
-          const txUrl = `${supabaseUrl}/rest/v1/wallet_transactions`;
-          await fetch(txUrl, {
-            method: 'POST',
-            headers: sbHeaders,
-            body: JSON.stringify({
-              wallet_id: wallet.id,
-              user_id,
-              amount,
-              transaction_type: 'manual',
-              reference: null,
-              created_at: new Date().toISOString()
-            })
-          });
+          if (Array.isArray(getFamilyResult) && getFamilyResult.length > 0) {
+            const childAccount = getFamilyResult[0];
+            const newBalance = Number(childAccount.available_balance || 0) + amount;
+            const updateFamilyUrl = `${supabaseUrl}/rest/v1/family_members?id=eq.${user_id}`;
+            const updateFamilyResponse = await fetch(updateFamilyUrl, {
+              method: 'PATCH',
+              headers: sbHeaders,
+              body: JSON.stringify({ available_balance: newBalance, updated_at: new Date().toISOString() })
+            });
+            if (!updateFamilyResponse.ok && updateFamilyResponse.status !== 204) {
+              const updateFamilyResult = await updateFamilyResponse.json();
+              throw new Error(`Failed to update child wallet: ${updateFamilyResult.message || JSON.stringify(updateFamilyResult)}`);
+            }
+          } else {
+            throw new Error('Child account not found');
+          }
         } else {
-          const insertUrl = `${supabaseUrl}/rest/v1/wallets`;
-          const insertResponse = await fetch(insertUrl, {
-            method: 'POST',
-            headers: sbHeaders,
-            body: JSON.stringify({
-              user_id,
-              balance: amount,
-              currency: 'ZAR',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-          });
-          if (!insertResponse.ok) {
-            const insertResult = await insertResponse.json();
-            throw new Error(`Failed to create wallet: ${insertResult.message || JSON.stringify(insertResult)}`);
+          // Handle parent wallet payments
+          const getWalletUrl = `${supabaseUrl}/rest/v1/wallets?user_id=eq.${user_id}&select=*`;
+          const getResponse = await fetch(getWalletUrl, { headers: sbHeaders });
+          const getResult = await getResponse.json();
+
+          if (!getResponse.ok) {
+            throw new Error(`Failed to fetch wallet: ${getResult.message || JSON.stringify(getResult)}`);
           }
 
-          // Get the newly created wallet and record transaction
-          const newWalletRes = await fetch(`${supabaseUrl}/rest/v1/wallets?user_id=eq.${user_id}&select=id`, { headers: sbHeaders });
-          const newWallets = await newWalletRes.json();
-          if (Array.isArray(newWallets) && newWallets.length > 0) {
+          if (Array.isArray(getResult) && getResult.length > 0) {
+            const wallet = getResult[0];
+            const newBalance = Number(wallet.balance) + amount;
+            const updateUrl = `${supabaseUrl}/rest/v1/wallets?id=eq.${wallet.id}`;
+            const updateResponse = await fetch(updateUrl, {
+              method: 'PATCH',
+              headers: sbHeaders,
+              body: JSON.stringify({ balance: newBalance, updated_at: new Date().toISOString() })
+            });
+            if (!updateResponse.ok && updateResponse.status !== 204) {
+              const updateResult = await updateResponse.json();
+              throw new Error(`Failed to update wallet: ${updateResult.message || JSON.stringify(updateResult)}`);
+            }
+
+            // Record transaction
             const txUrl = `${supabaseUrl}/rest/v1/wallet_transactions`;
             await fetch(txUrl, {
               method: 'POST',
               headers: sbHeaders,
               body: JSON.stringify({
-                wallet_id: newWallets[0].id,
+                wallet_id: wallet.id,
                 user_id,
                 amount,
                 transaction_type: 'manual',
@@ -1123,6 +1116,42 @@ const server = http.createServer((req, res) => {
                 created_at: new Date().toISOString()
               })
             });
+          } else {
+            const insertUrl = `${supabaseUrl}/rest/v1/wallets`;
+            const insertResponse = await fetch(insertUrl, {
+              method: 'POST',
+              headers: sbHeaders,
+              body: JSON.stringify({
+                user_id,
+                balance: amount,
+                currency: 'ZAR',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+            });
+            if (!insertResponse.ok) {
+              const insertResult = await insertResponse.json();
+              throw new Error(`Failed to create wallet: ${insertResult.message || JSON.stringify(insertResult)}`);
+            }
+
+            // Get the newly created wallet and record transaction
+            const newWalletRes = await fetch(`${supabaseUrl}/rest/v1/wallets?user_id=eq.${user_id}&select=id`, { headers: sbHeaders });
+            const newWallets = await newWalletRes.json();
+            if (Array.isArray(newWallets) && newWallets.length > 0) {
+              const txUrl = `${supabaseUrl}/rest/v1/wallet_transactions`;
+              await fetch(txUrl, {
+                method: 'POST',
+                headers: sbHeaders,
+                body: JSON.stringify({
+                  wallet_id: newWallets[0].id,
+                  user_id,
+                  amount,
+                  transaction_type: 'manual',
+                  reference: null,
+                  created_at: new Date().toISOString()
+                })
+              });
+            }
           }
         }
 

@@ -212,7 +212,12 @@ module.exports = async (req, res) => {
       const [updated] = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}`, {
         method: 'PATCH',
         extraHeaders: { 'Prefer': 'return=representation' },
-        body: { invited_by: result.user.id, updated_at: new Date().toISOString() }
+        body: {
+          invited_by: result.user.id,
+          updated_at: new Date().toISOString(),
+          invite_token: null,
+          invite_token_expires_at: null
+        }
       });
 
       // Try Supabase invite first; if user already exists fall back to a magic link via Resend.
