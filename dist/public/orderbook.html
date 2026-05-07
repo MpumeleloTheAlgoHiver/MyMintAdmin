@@ -4286,7 +4286,7 @@
         const lastPrice = Number(security.last_price);
         const hasLastPrice = Number.isFinite(lastPrice);
         const computedMarketValueNumber = (isQuantityNumeric && hasLastPrice)
-          ? ((quantityValue / 100) * lastPrice)
+          ? (quantityValue * lastPrice)
           : 0;
         const unrealizedPnlValue = Number(row.unrealized_pnl);
         const normalizedUnrealizedPnlNumber = Number.isFinite(unrealizedPnlValue) ? unrealizedPnlValue : 0;

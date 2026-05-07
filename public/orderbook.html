@@ -893,6 +893,12 @@
       height: 14px;
       fill: currentColor;
     }
+    .orderbook-editable-price {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
 
     /* Modal Styles */
     .price-modal-backdrop {
@@ -1663,11 +1669,19 @@
 
         return {
           line: index + 1,
+          sourceId: row.sourceId || '',
+          sourceIds: row.sourceId ? [String(row.sourceId)] : [],
+          instrumentName: row.instrumentName || targetRow.instrumentName || '',
+          ticker: row.ticker || targetRow.ticker || '',
+          side: row.side || targetRow.side || '',
           clientAccountId: accountId,
           bndReference,
           clientName: shortClientName(row.clientName),
           idRegNoFull: String(row.clientIdRegNo || '-'),
+          quantityValue: row.quantityValue,
           quantity: row.totalQuantity || '-',
+          avgFillNumber: row.avgFillNumber,
+          avgFill: row.avgFill,
           marketValue: asRandValue(row.marketValue || '-'),
           orderTimestamp: formatTimeOnly(row.timestamp),
           instructionType: row.orderType || 'Market',
@@ -1675,6 +1689,53 @@
         };
       });
     };
+
+    const editPriceIcon = '<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
+
+    const getEditableSourceIds = (row) => {
+      const ids = [];
+      if (Array.isArray(row?.sourceIds)) {
+        row.sourceIds.forEach((id) => {
+          if (id) ids.push(String(id));
+        });
+      }
+      if (row?.sourceId) ids.push(String(row.sourceId));
+      if (row?.id) ids.push(String(row.id));
+      return [...new Set(ids)];
+    };
+
+    const encodeEditSourceIds = (ids) => encodeURIComponent(JSON.stringify(ids || []));
+
+    const renderEditPriceButton = (row, label = 'Edit avg fill') => {
+      const sourceIds = getEditableSourceIds(row);
+      if (!sourceIds.length) return '';
+
+      return `
+        <button class="edit-price-btn" title="${escapeHtml(label)}" data-edit-price
+          data-source-ids="${escapeHtml(encodeEditSourceIds(sourceIds))}"
+          data-instrument="${escapeHtml(row?.instrumentName || '')}"
+          data-ticker="${escapeHtml(row?.ticker || '')}"
+          data-side="${escapeHtml(row?.side || row?.tradeSide || '')}"
+          data-avg-fill="${escapeHtml(String(row?.avgFillNumber ?? ''))}"
+          data-line="${escapeHtml(String(row?.line ?? ''))}">
+          ${editPriceIcon}
+        </button>
+      `;
+    };
+
+    const renderEditableAvgFill = (row) => `
+      <span class="orderbook-editable-price">
+        <span>${escapeHtml(asRandValue(row?.avgFill))}</span>
+        ${renderEditPriceButton(row)}
+      </span>
+    `;
+
+    const renderEditableTotalFill = (row) => `
+      <span class="orderbook-editable-price">
+        <span>${escapeHtml(asRandValue(row?.marketValue || '-'))}</span>
+        ${renderEditPriceButton(row, 'Edit avg fill for this record')}
+      </span>
+    `;
 
     const renderBndDetailsTable = (row) => {
       const bndRows = buildBndRowsForOrder(row);
@@ -1690,7 +1751,7 @@
           <td>${escapeHtml(detailRow.clientName)}</td>
           <td>${escapeHtml(maskIdentifier(detailRow.idRegNoFull || detailRow.idRegNo || '-'))}</td>
           <td>${escapeHtml(String(detailRow.quantity))}</td>
-          <td>${escapeHtml(asRandValue(detailRow.marketValue || '-'))}</td>
+          <td>${renderEditableTotalFill(detailRow)}</td>
           <td>${escapeHtml(detailRow.orderTimestamp)}</td>
           <td>${escapeHtml(detailRow.instructionType)}</td>
           <td>${escapeHtml(detailRow.settlementRef || '')}</td>
@@ -1946,7 +2007,7 @@
             <td class="orderbook-cell-muted">${escapeHtml(h.ticker || '-')}</td>
             <td>${escapeHtml(h.side || '-')}</td>
             <td>${escapeHtml(String(h.totalQuantity ?? '-'))}</td>
-            <td>${escapeHtml(asRandValue(h.avgFill))}</td>
+            <td>${renderEditableAvgFill(h)}</td>
             <td>${escapeHtml(asRandValue(h.marketValue))}</td>
             <td>${escapeHtml(String(h.unrealizedPnl ?? '-'))}</td>
           </tr>
@@ -2077,6 +2138,11 @@
           const seed = deterministicNumberFromText(item.userId || item.sourceId || item.clientName || `${index + 1}`);
           return {
             line: index + 1,
+            sourceId: item.sourceId || '',
+            sourceIds: item.sourceId ? [String(item.sourceId)] : [],
+            instrumentName: item.instrumentName || group.instrumentName || '',
+            ticker: item.ticker || group.ticker || '',
+            side: item.side || group.side || '',
             clientAccountId: item.clientAccountId || `MINT-${String(seed % 1000000).padStart(6, '0')}`,
             bndReference: item.bndReference || buildBndReference({
               timestamp: item.timestamp,
@@ -2085,7 +2151,10 @@
             }),
             clientName: shortClientName(item.clientName),
             idRegNoFull: String(item.clientIdRegNo || '-'),
+            quantityValue: item.quantityValue,
             quantity: item.totalQuantity || '-',
+            avgFillNumber: item.avgFillNumber,
+            avgFill: item.avgFill,
             marketValue: asRandValue(item.marketValue || '-'),
             orderTimestamp: formatTimeOnly(item.timestamp),
             instructionType: item.orderType || 'Market',
@@ -4119,14 +4188,8 @@
         let priceActionHtml = '';
         if (isPending) {
           priceActionHtml = escapeHtml(asRandValue(row.avgFill));
-        } else if (sideValue === 'SELL') {
-          priceActionHtml = `
-            ${escapeHtml(asRandValue(row.avgFill))}
-            <button class="edit-price-btn" title="Update Actual Exit Price" data-edit-price data-line="${lineKey}">
-              <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-            </button>`;
         } else {
-          priceActionHtml = escapeHtml(asRandValue(row.avgFill));
+          priceActionHtml = renderEditableAvgFill(row);
         }
 
         // Build Actions column (first column)
@@ -4341,8 +4404,10 @@
         const hasAvgFill = Number.isFinite(avgFillValue);
         const lastPrice = Number(security.last_price);
         const hasLastPrice = Number.isFinite(lastPrice);
-        const computedMarketValueNumber = (isQuantityNumeric && hasLastPrice)
-          ? ((quantityValue / 100) * lastPrice)
+        const totalFillPrice = hasAvgFill ? avgFillValue : (hasLastPrice ? lastPrice : NaN);
+        const hasTotalFillPrice = Number.isFinite(totalFillPrice);
+        const computedMarketValueNumber = (isQuantityNumeric && hasTotalFillPrice)
+          ? ((Math.abs(quantityValue) / 100) * totalFillPrice)
           : 0;
         const unrealizedPnlValue = Number(row.unrealized_pnl);
         const normalizedUnrealizedPnlNumber = Number.isFinite(unrealizedPnlValue) ? unrealizedPnlValue : 0;
@@ -4359,7 +4424,7 @@
         const avgFill = hasAvgFill
           ? `R ${avgFillValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : '-';
-        const marketValue = (isQuantityNumeric && hasLastPrice)
+        const marketValue = (isQuantityNumeric && hasTotalFillPrice)
           ? `R ${computedMarketValueNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : '-';
         const unrealizedPnl = Number.isFinite(unrealizedPnlValue)
@@ -5272,6 +5337,34 @@
     const batchToggleWrap = document.getElementById('batchToggleWrap');
     let currentEditRow = null;
 
+    const decodeEditSourceIds = (value) => {
+      try {
+        const parsed = JSON.parse(decodeURIComponent(String(value || '[]')));
+        return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const buildEditableRowFromButton = (button) => {
+      const sourceIds = decodeEditSourceIds(button.dataset.sourceIds);
+      const lineKey = button.dataset.line;
+      const avgFillRaw = button.dataset.avgFill;
+      const matchingRow = (allOrderbookRows || []).find(r => String(r.line) === String(lineKey));
+
+      return {
+        ...(matchingRow || {}),
+        sourceIds: sourceIds.length ? sourceIds : getEditableSourceIds(matchingRow),
+        sourceId: sourceIds[0] || matchingRow?.sourceId || '',
+        line: lineKey || matchingRow?.line || '',
+        instrumentName: button.dataset.instrument || matchingRow?.instrumentName || '',
+        ticker: button.dataset.ticker || matchingRow?.ticker || '',
+        side: button.dataset.side || matchingRow?.side || matchingRow?.tradeSide || '',
+        avgFillNumber: avgFillRaw != null && avgFillRaw !== '' ? Number(avgFillRaw) : matchingRow?.avgFillNumber,
+        rebalanceBatchId: matchingRow?.rebalanceBatchId || null
+      };
+    };
+
     const openPriceModal = (row) => {
       currentEditRow = row;
       const side = String(row.tradeSide || row.side || '').toUpperCase();
@@ -5292,7 +5385,8 @@
         labelEl.textContent = isBuy ? 'Broker Fill Price (R)' : 'Broker Exit Price (R)';
       }
 
-      priceInput.value = (Number(row.avgFill) || 0).toFixed(2);
+      const avgFillValue = Number(row.avgFillNumber);
+      priceInput.value = Number.isFinite(avgFillValue) ? avgFillValue.toFixed(2) : '';
       
       // Only show batch toggle if we have a rebalance batch ID
       if (row.rebalanceBatchId) {
@@ -5316,9 +5410,9 @@
       orderbookTableBody.addEventListener('click', async (event) => {
         const editBtn = event.target.closest('[data-edit-price]');
         if (editBtn) {
-          const lineKey = editBtn.dataset.line;
-          const row = (allOrderbookRows || []).find(r => String(r.line) === String(lineKey));
-          if (row) openPriceModal(row);
+          event.stopPropagation();
+          const row = buildEditableRowFromButton(editBtn);
+          if (getEditableSourceIds(row).length) openPriceModal(row);
           return;
         }
 
@@ -5360,22 +5454,32 @@
             // Find all matching rows in our current data
             idsToUpdate = (allOrderbookRawRows || [])
               .filter(r => r.rebalanceBatchId === currentEditRow.rebalanceBatchId)
-              .map(r => r.id);
+              .flatMap(r => getEditableSourceIds(r));
           } else {
-            idsToUpdate = [currentEditRow.id];
+            idsToUpdate = getEditableSourceIds(currentEditRow);
           }
 
+          idsToUpdate = [...new Set(idsToUpdate.map(String).filter(Boolean))];
           if (!idsToUpdate.length) throw new Error('No records to update.');
 
+          const nowIso = new Date().toISOString();
+          const fillDateStr = nowIso.split('T')[0];
+          const side = String(currentEditRow.tradeSide || currentEditRow.side || '').toUpperCase();
+          const payload = {
+            avg_fill: newPriceCents,
+            avg_exit: newPriceCents,
+            "Fill_date": fillDateStr,
+            updated_at: nowIso,
+            as_of_date: fillDateStr
+          };
+          if (side === 'SELL') {
+            payload["Exit_date"] = fillDateStr;
+          }
+
           // Perform Supabase update
-          // Note: We update both avg_fill and avg_exit to be safe, 
-          // though usually one applies per row type.
           const { error } = await supabaseClient
             .from('stock_holdings_c')
-            .update({ 
-              avg_fill: newPriceCents,
-              avg_exit: newPriceCents
-            })
+            .update(payload)
             .in('id', idsToUpdate);
 
           if (error) throw error;
