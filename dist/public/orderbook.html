@@ -5407,13 +5407,26 @@
             payload["Exit_date"] = fillDateStr;
           }
 
-          // Perform Supabase update
-          const { error } = await supabaseClient
-            .from('stock_holdings_c')
-            .update(payload)
-            .in('id', idsToUpdate);
+          const { data: sessionData } = await supabaseClient.auth.getSession();
+          const accessToken = sessionData?.session?.access_token;
+          if (!accessToken) throw new Error('Your session has expired. Please sign in again.');
 
-          if (error) throw error;
+          const response = await fetch('/api/orderbook/update-price', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify({ ids: idsToUpdate, payload })
+          });
+
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(result?.details || result?.error || 'Price update failed.');
+          }
+          if (!result?.updatedCount) {
+            throw new Error('No database rows were updated.');
+          }
 
           // Success - refresh orderbook
           closePriceModal();
