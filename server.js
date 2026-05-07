@@ -23,7 +23,7 @@ const mimeTypes = {
   '.ico': 'image/x-icon'
 };
 
-const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const resendApiKey = process.env.RESEND_API_KEY;
 const orderbookEmailFrom = process.env.ORDERBOOK_EMAIL_FROM;
@@ -600,6 +600,233 @@ const server = http.createServer((req, res) => {
       }
     })();
 
+    return;
+  }
+
+  if (req.url.startsWith('/api/orderbook/send-trade-confirmation') && req.method === 'POST') {
+    const token = parseBearerToken(req.headers.authorization);
+    if (!token) {
+      sendJson(res, 401, { error: 'Missing Authorization bearer token' });
+      return;
+    }
+
+    (async () => {
+      try {
+        await fetchSupabaseJson('/auth/v1/user', token, false);
+        const body = await readJsonBody(req);
+        const { holdingId, bndReference, forceResend } = body || {};
+        if (!holdingId) {
+          sendJson(res, 400, { error: 'Missing holdingId' });
+          return;
+        }
+
+        const emailsData = await fetchSupabaseJson(`/rest/v1/order_emails?holding_id=eq.${encodeURIComponent(holdingId)}&select=fill_sent_at`, token);
+        if (emailsData && emailsData.length > 0 && emailsData[0].fill_sent_at && !forceResend) {
+          sendJson(res, 400, { error: 'Email already sent for this holding.' });
+          return;
+        }
+
+        const holdingsData = await fetchSupabaseJson(`/rest/v1/stock_holdings_c?id=eq.${encodeURIComponent(holdingId)}`, token);
+        const holding = holdingsData && holdingsData[0];
+        if (!holding) {
+          sendJson(res, 404, { error: 'Holding not found' });
+          return;
+        }
+
+        const isBatch = !!holding.rebalance_batch_id;
+        
+        let profile = {};
+        if (holding.user_id) {
+          const profileData = await fetchSupabaseJson(`/rest/v1/profiles?id=eq.${encodeURIComponent(holding.user_id)}`, token);
+          if (profileData && profileData.length) profile = profileData[0];
+        }
+        
+        let clientEmail = profile.email;
+        if (!clientEmail) {
+          sendJson(res, 400, { error: 'Client email not found' });
+          return;
+        }
+
+        let subject = 'Trade Confirmation';
+        let htmlContent = '';
+
+        if (!isBatch) {
+          let security = {};
+          if (holding.security_id) {
+            const secData = await fetchSupabaseJson(`/rest/v1/securities_c?id=eq.${encodeURIComponent(holding.security_id)}`, token);
+            if (secData && secData.length) security = secData[0];
+          }
+
+          let strategyName = 'your portfolio';
+          if (holding.strategy_id) {
+            const stratData = await fetchSupabaseJson(`/rest/v1/strategies_c?id=eq.${encodeURIComponent(holding.strategy_id)}`, token);
+            if (stratData && stratData.length) strategyName = stratData[0].name;
+          } else if (holding.strategy_name_snapshot) {
+            strategyName = holding.strategy_name_snapshot;
+          }
+
+          const instrumentName = security.name || security.symbol || 'Instrument';
+          const ticker = security.symbol || '-';
+          const side = holding.trade_side || (holding.quantity < 0 ? 'SELL' : 'BUY');
+          const quantity = Math.abs(holding.quantity);
+          const avgFill = (holding.avg_fill / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          const marketValue = holding.market_value ? holding.market_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (quantity * holding.avg_fill / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          const ref = bndReference || `BND-${holding.id.substring(0,8).toUpperCase()}`;
+          const execDate = holding.fill_date ? new Date(holding.fill_date).toLocaleDateString() : new Date().toLocaleDateString();
+
+          htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: -apple-system, sans-serif; color: #1e293b; line-height: 1.6; }
+        .container { max-width: 600px; margin: 20px auto; padding: 40px; border: 1px solid #e2e8f0; border-radius: 16px; }
+        .header-img { width: 100%; border-radius: 12px; margin-bottom: 30px; }
+        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #ecfdf3; color: #166534; margin-bottom: 20px; text-transform: uppercase; }
+        .trade-card { background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 12px; padding: 24px; }
+        .trade-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #edf2f7; }
+        .label { font-size: 13px; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
+        .value { font-size: 14px; color: #0f172a; font-weight: 600; }
+        .footer { font-size: 11px; color: #94a3b8; text-align: center; margin-top: 40px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop" class="header-img" alt="Mint Banner">
+        <div class="status-badge">Executed</div>
+        <h1 style="font-size: 24px; color: #0f172a;">Trade Confirmation</h1>
+        <p>Your trade for <strong>${instrumentName}</strong> has been filled and allocated to your <strong>${strategyName}</strong> portfolio.</p>
+        <div class="trade-card">
+            <div class="trade-row"><span class="label">Reference</span><span class="value">${ref}</span></div>
+            <div class="trade-row"><span class="label">Instrument Ticker</span><span class="value">${ticker}</span></div>
+            <div class="trade-row"><span class="label">Side</span><span class="value">${side}</span></div>
+            <div class="trade-row"><span class="label">Quantity</span><span class="value">${quantity}</span></div>
+            <div class="trade-row"><span class="label">Execution Price (Avg Fill)</span><span class="value">R ${avgFill}</span></div>
+            <div class="trade-row"><span class="label">Execution Date</span><span class="value">${execDate}</span></div>
+            <div class="trade-row" style="border:none; margin-top:8px; padding-top:12px; border-top:2px solid #e2e8f0;">
+                <span class="label" style="color:#0f172a;">Total Market Value</span>
+                <span class="value" style="color:#7c3aed; font-size:16px;">R ${marketValue}</span>
+            </div>
+        </div>
+        <div class="footer">
+            Mint Financial Services is an authorized FSP.<br>&copy; 2026 Mint.
+        </div>
+    </div>
+</body>
+</html>`;
+        } else {
+          subject = 'Portfolio Realignment Summary';
+          const batchHoldings = await fetchSupabaseJson(`/rest/v1/stock_holdings_c?rebalance_batch_id=eq.${encodeURIComponent(holding.rebalance_batch_id)}&user_id=eq.${encodeURIComponent(holding.user_id)}`, token);
+          
+          let strategyName = holding.strategy_name_snapshot || 'your portfolio';
+          
+          let tradesHtml = '';
+          for (let bHolding of batchHoldings) {
+             let security = {};
+             if (bHolding.security_id) {
+               const secData = await fetchSupabaseJson(`/rest/v1/securities_c?id=eq.${encodeURIComponent(bHolding.security_id)}`, token);
+               if (secData && secData.length) security = secData[0];
+             }
+             const instrumentName = security.name || security.symbol || 'Instrument';
+             const ticker = security.symbol || '-';
+             const side = bHolding.trade_side || (bHolding.quantity < 0 ? 'SELL' : 'BUY');
+             const quantity = Math.abs(bHolding.quantity);
+             const avgFill = (bHolding.avg_fill / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+             const marketValue = bHolding.market_value ? bHolding.market_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (quantity * bHolding.avg_fill / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+             const execDate = bHolding.fill_date ? new Date(bHolding.fill_date).toLocaleDateString() : new Date().toLocaleDateString();
+             const ref = `BND-${bHolding.id.substring(0,8).toUpperCase()}`;
+
+             tradesHtml += `
+             <div class="trade-card" style="margin-bottom: 16px;">
+                <div style="font-weight: 700; margin-bottom: 12px; font-size: 16px; color: #0f172a;">${instrumentName}</div>
+                <div class="trade-row"><span class="label">Reference</span><span class="value">${ref}</span></div>
+                <div class="trade-row"><span class="label">Instrument Ticker</span><span class="value">${ticker}</span></div>
+                <div class="trade-row"><span class="label">Side</span><span class="value">${side}</span></div>
+                <div class="trade-row"><span class="label">Quantity</span><span class="value">${quantity}</span></div>
+                <div class="trade-row"><span class="label">Execution Price (Avg Fill)</span><span class="value">R ${avgFill}</span></div>
+                <div class="trade-row"><span class="label">Execution Date</span><span class="value">${execDate}</span></div>
+                <div class="trade-row" style="border:none; margin-top:8px; padding-top:12px; border-top:2px solid #e2e8f0;">
+                    <span class="label" style="color:#0f172a;">Total Market Value</span>
+                    <span class="value" style="color:#7c3aed; font-size:16px;">R ${marketValue}</span>
+                </div>
+             </div>`;
+          }
+
+          htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: -apple-system, sans-serif; color: #1e293b; line-height: 1.6; }
+        .container { max-width: 600px; margin: 20px auto; padding: 40px; border: 1px solid #e2e8f0; border-radius: 16px; }
+        .header-img { width: 100%; border-radius: 12px; margin-bottom: 30px; }
+        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #ecfdf3; color: #166534; margin-bottom: 20px; text-transform: uppercase; }
+        .trade-card { background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 12px; padding: 24px; }
+        .trade-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #edf2f7; }
+        .label { font-size: 13px; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
+        .value { font-size: 14px; color: #0f172a; font-weight: 600; }
+        .footer { font-size: 11px; color: #94a3b8; text-align: center; margin-top: 40px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop" class="header-img" alt="Mint Banner">
+        <div class="status-badge">Executed</div>
+        <h1 style="font-size: 24px; color: #0f172a;">Portfolio Realignment</h1>
+        <p>The realignment of your <strong>${strategyName}</strong> portfolio has been completed. The following trades were executed:</p>
+        ${tradesHtml}
+        <div class="footer">
+            Mint Financial Services is an authorized FSP.<br>&copy; 2026 Mint.
+        </div>
+    </div>
+</body>
+</html>`;
+        }
+
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: orderbookEmailFrom || 'notifications@mymint.co.za',
+            to: [clientEmail],
+            subject,
+            html: htmlContent
+          })
+        });
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.message || `Resend error: ${response.status}`);
+        }
+
+        await mutateSupabaseJson(
+          '/rest/v1/order_emails',
+          {
+             holding_id: holdingId,
+             fill_sent_at: new Date().toISOString(),
+             status: 'sent'
+          },
+          token,
+          'POST'
+        ).catch(async (e) => {
+          await mutateSupabaseJson(
+            `/rest/v1/order_emails?holding_id=eq.${encodeURIComponent(holdingId)}`,
+            { fill_sent_at: new Date().toISOString(), status: 'sent' },
+            token,
+            'PATCH'
+          );
+        });
+
+        sendJson(res, 200, { ok: true });
+      } catch (error) {
+        console.error('send-trade-confirmation error', error);
+        sendJson(res, 500, {
+          error: 'Could not send trade confirmation',
+          details: error?.message || 'Unknown error'
+        });
+      }
+    })();
     return;
   }
 

@@ -1266,7 +1266,7 @@
             <table class="orderbook-table">
               <thead>
                 <tr>
-                  <th style="width:110px;">Actions</th>
+                  <th style="width:190px;">Notification Status</th>
                   <th>Line</th>
                   <th>Instrument Name</th>
                   <th>Ticker</th>
@@ -4149,6 +4149,42 @@
       setInterval(renderOrderbookTimer, 1000);
     };
 
+    window.sendTradeConfirmation = async (holdingId, bndReference) => {
+      try {
+        const { data } = await supabaseClient.auth.getSession();
+        const token = data?.session?.access_token;
+        if (!token) return alert('No session token');
+
+        const btn = event.currentTarget;
+        const originalText = btn.textContent;
+        btn.textContent = 'Sending...';
+        btn.disabled = true;
+
+        const isResend = originalText.trim().toLowerCase() === 'resend';
+
+        const res = await fetch('/api/orderbook/send-trade-confirmation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ holdingId, bndReference, forceResend: isResend })
+        });
+        
+        btn.textContent = originalText;
+        btn.disabled = false;
+
+        const result = await res.json().catch(()=>({}));
+        if (res.ok) {
+          loadOrderbookClientSideFallback();
+        } else {
+          alert(`Error: ${result.error || result.details || 'Unknown error'}`);
+        }
+      } catch (error) {
+        alert(`Error: ${error.message}`);
+      }
+    };
+
     const renderOrderbookRows = (rows) => {
       if (!orderbookTableBody || !orderbookCount || !exportOrderbookBtn) return;
       orderbookCount.textContent = `${rows.length} record${rows.length === 1 ? '' : 's'}`;
@@ -4205,6 +4241,19 @@
                 style="background:#dc2626;color:white;border-radius:8px;padding:5px 14px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;letter-spacing:.02em;box-shadow:0 1px 3px rgba(220,38,38,.25);transition:background .15s;"
                 onmouseover="this.style.background='#b91c1c'" onmouseout="this.style.background='#dc2626'">Reverse</button>
             </div>`;
+        } else {
+          const isFilled = row.avgFillNumber > 0 && row.fillDate; 
+          const emailStatus = row.notificationStatus || 'pending';
+          const statusClass = emailStatus === 'sent' ? 'filled-status-pill is-filled' : 'filled-status-pill is-open';
+
+          actionsHtml = isFilled 
+            ? `<div style="display:flex; align-items:center; gap:8px;">
+                  <span class="${statusClass}">${emailStatus.toUpperCase()}</span>
+                  <button class="orderbook-export-btn" style="padding: 4px 10px; height: 28px; font-size: 11px;" onclick="sendTradeConfirmation('${row.sourceId}', '${row.bndReference}')">
+                    ${emailStatus === 'sent' ? 'Resend' : 'Send Confirm'}
+                  </button>
+               </div>`
+            : `<span class="filled-status-pill is-open" style="background:#f3f4f6; color:#4b5563; border-color:#d1d5db;">AWAITING FILL</span>`;
         }
 
         return `
@@ -4307,6 +4356,7 @@
       const profilesMap = {};
       const onboardingPackDetailsMap = {};
       const strategiesMap = {};
+      const orderEmailsMap = {};
       const strategyIds = [...new Set([
         ...holdings.map((row) => row.strategy_id),
         ...rebBatches.map((b) => b.strategy_id),
@@ -4349,6 +4399,20 @@
               (data || []).forEach((row) => {
                 if (row?.user_id) onboardingPackDetailsMap[row.user_id] = row.pack_details;
               });
+            })
+        );
+      }
+
+      const holdingIds = holdings.map(r => r.id).filter(Boolean);
+      if (holdingIds.length) {
+        parallelQueries.push(
+          supabaseClient
+            .from('order_emails')
+            .select('holding_id, status')
+            .in('holding_id', holdingIds)
+            .then(({ data, error }) => {
+              if (error) { console.error('order_emails load error:', error); return; }
+              (data || []).forEach(e => orderEmailsMap[e.holding_id] = e.status);
             })
         );
       }
@@ -4476,7 +4540,8 @@
           closedAt: row.closed_at || null,
           rebalanceBatchId: row.rebalance_batch_id || null,
           isPendingRebalance: false,
-          rebalanceBatchStatus: null
+          rebalanceBatchStatus: null,
+          notificationStatus: orderEmailsMap[row.id] || 'pending'
         };
       });
 
