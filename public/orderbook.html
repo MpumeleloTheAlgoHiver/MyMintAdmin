@@ -4245,8 +4245,24 @@
 
         const result = await res.json().catch(()=>({}));
         if (res.ok) {
-          allOrderbookRows = await loadOrderbookClientSideFallback();
-          applySearchFilter();
+          // Optimistically update the UI to bypass long-URL load delays
+          btn.textContent = 'Resend';
+          btn.disabled = false;
+          const statusContainer = btn.closest('div');
+          if (statusContainer) {
+            const pill = statusContainer.querySelector('.filled-status-pill');
+            if (pill) {
+              pill.textContent = 'SENT';
+              pill.className = 'filled-status-pill is-filled';
+              pill.style.background = '';
+              pill.style.color = '';
+              pill.style.borderColor = '';
+            }
+          }
+          // Optionally reload the data in the background
+          loadOrderbookClientSideFallback().then(rows => {
+            allOrderbookRows = rows;
+          }).catch(console.error);
         } else {
           alert(`Error: ${result.error || result.details || 'Unknown error'}`);
         }
@@ -4500,34 +4516,43 @@
 
       const holdingIds = holdings.map(r => r.id).filter(Boolean);
       if (holdingIds.length) {
-        parallelQueries.push(
-          supabaseClient
-            .from('investor_trade_confirmations')
-            .select('holding_id, status, sent_at')
-            .in('holding_id', holdingIds)
-            .then(({ data, error }) => {
-              if (error) { console.error('investor_trade_confirmations load error:', error); return; }
-              (data || []).forEach(e => {
-                // A holding is considered 'sent' if any confirmation record has status=sent
-                if (!orderEmailsMap[e.holding_id] || e.status === 'sent') {
-                  orderEmailsMap[e.holding_id] = e.status;
-                }
-              });
-            })
-        );
+        // Chunk holdingIds to avoid 414 URI Too Long error with Supabase GET requests
+        const chunkSize = 150;
+        for (let i = 0; i < holdingIds.length; i += chunkSize) {
+          const chunk = holdingIds.slice(i, i + chunkSize);
+          parallelQueries.push(
+            supabaseClient
+              .from('investor_trade_confirmations')
+              .select('holding_id, status, sent_at')
+              .in('holding_id', chunk)
+              .then(({ data, error }) => {
+                if (error) { console.error('investor_trade_confirmations load error:', error); return; }
+                (data || []).forEach(e => {
+                  // A holding is considered 'sent' if any confirmation record has status=sent
+                  if (!orderEmailsMap[e.holding_id] || e.status === 'sent') {
+                    orderEmailsMap[e.holding_id] = e.status;
+                  }
+                });
+              })
+          );
+        }
       }
 
       if (strategyIds.length) {
-        parallelQueries.push(
-          supabaseClient
-            .from('strategies_c')
-            .select('id, name, short_name, slug')
-            .in('id', strategyIds)
-            .then(({ data, error }) => {
-              if (error) { console.error('Strategies load error:', error); return; }
-              (data || []).forEach((s) => { strategiesMap[s.id] = s; });
-            })
-        );
+        const chunkSize = 150;
+        for (let i = 0; i < strategyIds.length; i += chunkSize) {
+          const chunk = strategyIds.slice(i, i + chunkSize);
+          parallelQueries.push(
+            supabaseClient
+              .from('strategies_c')
+              .select('id, name, short_name, slug')
+              .in('id', chunk)
+              .then(({ data, error }) => {
+                if (error) { console.error('Strategies load error:', error); return; }
+                (data || []).forEach((s) => { strategiesMap[s.id] = s; });
+              })
+          );
+        }
       }
 
       await Promise.all(parallelQueries);

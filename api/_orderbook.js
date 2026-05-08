@@ -240,13 +240,38 @@ const handleSendTradeConfirmation = async (req, res, token) => {
     const DASHBOARD_URL = 'https://app.mymint.co.za';
     const currentDateStr = new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
 
-    const buildTradeRow = (side, code, nominal) => {
-      const sideColor = side === 'SELL' ? '#dc2626' : '#059669';
-      return `<tr>
-        <td style="padding:12px 8px;font-size:14px;border-bottom:1px solid #f1f5f9;color:${sideColor};font-weight:700;">${side}</td>
-        <td style="padding:12px 8px;font-size:14px;border-bottom:1px solid #f1f5f9;color:#1e293b;font-weight:600;">${code}</td>
-        <td style="padding:12px 8px;font-size:14px;border-bottom:1px solid #f1f5f9;color:#1e293b;font-weight:600;">${nominal}</td>
-      </tr>`;
+    const buildTradeRow = ({ side, assetName, quantityDisplay, totalAmountStr, ref }) => {
+      const orderType = side === 'SELL' ? 'Stock Sale' : 'Stock Purchase';
+      return `
+        <tr>
+          <td style="padding:12px 8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;border-bottom:1px solid #f1f5f9;">Order Type</td>
+          <td style="padding:12px 8px;font-size:14px;color:#1e293b;font-weight:600;text-align:right;border-bottom:1px solid #f1f5f9;">${orderType}</td>
+        </tr>
+        <tr>
+          <td style="padding:12px 8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;border-bottom:1px solid #f1f5f9;">Funding Source</td>
+          <td style="padding:12px 8px;font-size:14px;color:#1e293b;font-weight:600;text-align:right;border-bottom:1px solid #f1f5f9;">Wallet</td>
+        </tr>
+        <tr>
+          <td style="padding:12px 8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;border-bottom:1px solid #f1f5f9;">Portfolio Asset</td>
+          <td style="padding:12px 8px;font-size:14px;color:#1e293b;font-weight:600;text-align:right;border-bottom:1px solid #f1f5f9;">${assetName}</td>
+        </tr>
+        <tr>
+          <td style="padding:12px 8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;border-bottom:1px solid #f1f5f9;">Total Amount</td>
+          <td style="padding:12px 8px;font-size:14px;color:#1e293b;font-weight:600;text-align:right;border-bottom:1px solid #f1f5f9;">${totalAmountStr}</td>
+        </tr>
+        <tr>
+          <td style="padding:12px 8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;border-bottom:1px solid #f1f5f9;">Quantity</td>
+          <td style="padding:12px 8px;font-size:14px;color:#1e293b;font-weight:600;text-align:right;border-bottom:1px solid #f1f5f9;">${quantityDisplay} shares</td>
+        </tr>
+        <tr>
+          <td style="padding:12px 8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;border-bottom:1px solid #f1f5f9;">Reference</td>
+          <td style="padding:12px 8px;font-size:14px;color:#1e293b;font-weight:600;text-align:right;border-bottom:1px solid #f1f5f9;">${ref}</td>
+        </tr>
+        <tr>
+          <td style="padding:12px 8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;border-bottom:1px solid #f1f5f9;">Status</td>
+          <td style="padding:12px 8px;font-size:14px;color:#1e293b;font-weight:600;text-align:right;border-bottom:1px solid #f1f5f9;">Pending Settlement</td>
+        </tr>
+      `;
     };
 
     const buildEmailHtml = ({ firstName, mintRef, orderDate, tableRowsHtml, subjectHeading, subjectIntro }) => `<!DOCTYPE html>
@@ -274,13 +299,6 @@ const handleSendTradeConfirmation = async (req, res, token) => {
           </div>
         </div>
         <table style="width:100%;border-collapse:collapse;margin-bottom:30px;">
-          <thead>
-            <tr>
-              <th style="text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;padding:12px 8px;border-bottom:2px solid #f1f5f9;">Buy / Sell</th>
-              <th style="text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;padding:12px 8px;border-bottom:2px solid #f1f5f9;">Equity Code</th>
-              <th style="text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;padding:12px 8px;border-bottom:2px solid #f1f5f9;">Nominal</th>
-            </tr>
-          </thead>
           <tbody>
             ${tableRowsHtml}
           </tbody>
@@ -290,7 +308,7 @@ const handleSendTradeConfirmation = async (req, res, token) => {
         </div>
       </div>
       <div style="padding:40px;background-color:#f8fafc;font-size:11px;color:#94a3b8;line-height:1.5;">
-        <p style="font-size:11px;margin-bottom:12px;">MINT (Pty) Ltd is an authorised Financial Services Provider (FSP 55118)...</p>
+        <p style="font-size:11px;margin-bottom:12px;">MINT (Pty) Ltd is an authorised Financial Services Provider (FSP 55118) regulated by the Financial Sector Conduct Authority and a registered Credit Provider (NCRCP22892) under the National Credit Act. All investment activity carries risk, including the possible loss of capital and liquidity constraints. Any information provided here is educational in nature, does not constitute personalised financial advice, and should not be relied on as a recommendation to buy or sell securities. Please consider whether investing is appropriate for your circumstances and consult an independent adviser where necessary.</p>
         <p style="font-size:11px;margin-bottom:0;">&copy; 2026 MINT. All rights reserved.<br>Date: ${currentDateStr}</p>
       </div>
     </div>
@@ -309,7 +327,7 @@ const handleSendTradeConfirmation = async (req, res, token) => {
         if (secData && secData.length) security = secData[0];
       }
 
-      let strategyName = 'your portfolio';
+      let strategyName = 'Mint';
       if (holding.strategy_id) {
         const stratData = await fetchSupabaseJson(`/rest/v1/strategies_c?id=eq.${encodeURIComponent(holding.strategy_id)}`, token);
         if (stratData && stratData.length) strategyName = stratData[0].name;
@@ -326,16 +344,17 @@ const handleSendTradeConfirmation = async (req, res, token) => {
         ? new Date(holding.fill_date).toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })
         : currentDateStr;
 
-      const quantityDisplay = parseFloat(quantity.toFixed(4)).toLocaleString('en-ZA');
-      const nominalDisplay = `${quantityDisplay} @ R ${avgFill}`;
+      const quantityDisplay = Number(quantity).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 4 });
+      const totalAmountValue = (quantity * (holding.avg_fill || 0)) / 100;
+      const totalAmountStr = `R ${totalAmountValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
       htmlContent = buildEmailHtml({
         firstName,
         mintRef: ref,
         orderDate: execDate,
-        tableRowsHtml: buildTradeRow(side, ticker, nominalDisplay),
+        tableRowsHtml: buildTradeRow({ side, assetName: security.name || ticker, quantityDisplay, totalAmountStr, ref }),
         subjectHeading: 'Order Executed.',
-        subjectIntro: `your trade for <strong>${security.name || ticker}</strong> has been successfully filled and allocated to your <strong>${strategyName}</strong> portfolio.`
+        subjectIntro: `Your trade for <strong>${security.name || ticker}</strong> has been successfully filled and allocated to your <strong>${strategyName}</strong> portfolio.`
       });
 
     } else {
@@ -345,7 +364,7 @@ const handleSendTradeConfirmation = async (req, res, token) => {
         token
       );
 
-      const strategyName = holding.strategy_name_snapshot || 'your portfolio';
+      const strategyName = holding.strategy_name_snapshot || 'Mint';
       const batchRef = `BND-${holding.rebalance_batch_id.substring(0, 8).toUpperCase()}`;
       const batchDate = holding.fill_date
         ? new Date(holding.fill_date).toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -362,9 +381,15 @@ const handleSendTradeConfirmation = async (req, res, token) => {
         const side = bHolding.trade_side || (bHolding.quantity < 0 ? 'SELL' : 'BUY');
         const quantity = Math.abs(bHolding.quantity);
         const avgFill = (bHolding.avg_fill / 100).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        const quantityDisplay = parseFloat(quantity.toFixed(4)).toLocaleString('en-ZA');
-        const nominalDisplay = `${quantityDisplay} @ R ${avgFill}`;
-        tableRowsHtml += buildTradeRow(side, ticker, nominalDisplay);
+        const quantityDisplay = Number(quantity).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 4 });
+        const totalAmountValue = (quantity * (bHolding.avg_fill || 0)) / 100;
+        const totalAmountStr = `R ${totalAmountValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const refBatch = `BND-${bHolding.id.substring(0, 8).toUpperCase()}`;
+
+        if (tableRowsHtml !== '') {
+          tableRowsHtml += `<tr><td colspan="2" style="height:20px;border-bottom:1px solid #e2e8f0;background:#f8fafc;"></td></tr>`;
+        }
+        tableRowsHtml += buildTradeRow({ side, assetName: security.name || ticker, quantityDisplay, totalAmountStr, ref: refBatch });
       }
 
       htmlContent = buildEmailHtml({
@@ -373,7 +398,7 @@ const handleSendTradeConfirmation = async (req, res, token) => {
         orderDate: batchDate,
         tableRowsHtml,
         subjectHeading: 'Orders Executed.',
-        subjectIntro: `the realignment of your <strong>${strategyName}</strong> portfolio has been completed. The following trades were executed:`
+        subjectIntro: `The realignment of your <strong>${strategyName}</strong> portfolio has been completed. The following trades were executed:`
       });
     }
 
