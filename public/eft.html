@@ -345,7 +345,7 @@
 
       <!-- Clients with Wallet Balance Section -->
       <div class="card">
-        <div class="card-title">Clients with Wallet Balance</div>
+        <div class="card-title">Client's with Wallet Balance</div>
 
         <div style="overflow-x:auto;border-radius:12px;border:1px solid #f1f5f9;">
           <table>
@@ -555,7 +555,7 @@
 
       try {
         const { data: { session } } = await supabaseClient.auth.getSession();
-        const response = await fetch('/api/add-wallet', {
+        const response = await fetch('/api/send-eft-email?action=add-wallet', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
           body: JSON.stringify({ user_id: clientId, amount, account_type: accountType }),
