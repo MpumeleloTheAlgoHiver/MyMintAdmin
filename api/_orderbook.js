@@ -194,16 +194,7 @@ const loadLiveOrderbookRows = async (sinceIso = null) => {
   return buildOrderbookRows(holdings || [], securitiesRows || []);
 };
 
-module.exports = {
-  sendJson,
-  requestSupabaseJson,
-  fetchSupabaseJson,
-  buildInFilter,
-  toOrderbookCsvContent,
-  sendOrderbookCsvEmail,
-  loadLiveOrderbookRows,
-  handleSendTradeConfirmation
-};
+
 
 const handleSendTradeConfirmation = async (req, res, token) => {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
@@ -448,3 +439,4 @@ const handleSendTradeConfirmation = async (req, res, token) => {
     });
   }
 };
+module.exports = { sendJson, requestSupabaseJson, fetchSupabaseJson, buildInFilter, toOrderbookCsvContent, sendOrderbookCsvEmail, loadLiveOrderbookRows, handleSendTradeConfirmation };
