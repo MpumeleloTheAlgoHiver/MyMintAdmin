@@ -81,8 +81,8 @@ module.exports = async (req, res) => {
   try {
     await fetchSupabaseJson('/auth/v1/user', token, false);
 
-    const url = new URL(req.url, 'http://localhost');
-    if (url.searchParams.get('action') === 'add-wallet') {
+    const reqUrl = req.url || '';
+    if (reqUrl.includes('action=add-wallet')) {
       return handleAddWallet(req, res, token);
     }
 
