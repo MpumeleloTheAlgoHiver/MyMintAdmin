@@ -309,7 +309,7 @@ const handleSendTradeConfirmation = async (req, res, token) => {
         if (secData && secData.length) security = secData[0];
       }
 
-      let strategyName = 'your portfolio';
+      let strategyName = 'Mint';
       if (holding.strategy_id) {
         const stratData = await fetchSupabaseJson(`/rest/v1/strategies_c?id=eq.${encodeURIComponent(holding.strategy_id)}`, token);
         if (stratData && stratData.length) strategyName = stratData[0].name;
@@ -345,7 +345,7 @@ const handleSendTradeConfirmation = async (req, res, token) => {
         token
       );
 
-      const strategyName = holding.strategy_name_snapshot || 'your portfolio';
+      const strategyName = holding.strategy_name_snapshot || 'Mint';
       const batchRef = `BND-${holding.rebalance_batch_id.substring(0, 8).toUpperCase()}`;
       const batchDate = holding.fill_date
         ? new Date(holding.fill_date).toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })
