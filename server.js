@@ -654,7 +654,7 @@ const server = http.createServer((req, res) => {
 
         // ── Shared template builder ────────────────────────────────────────────
         const HEADER_IMAGE_URL = 'https://my-mint-admin.vercel.app/images/OrderBookMail.avif';
-        const DASHBOARD_URL = 'https://www.mymint.co.za/dashboard';
+        const DASHBOARD_URL = 'https://app.mymint.co.za';
         const currentDateStr = new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
 
         const buildTradeRow = (side, code, nominal) => {
@@ -682,7 +682,8 @@ const server = http.createServer((req, res) => {
       <!-- Body Content -->
       <div style="padding:40px;">
         <h1 style="font-size:28px;font-weight:800;color:#1e293b;margin-top:0;margin-bottom:16px;letter-spacing:-0.02em;">${subjectHeading}</h1>
-        <p style="font-size:16px;color:#475569;margin-bottom:24px;">Hi <strong>${firstName}</strong>, ${subjectIntro}</p>
+        <p style="font-size:16px;color:#475569;margin-bottom:8px;">Hello <strong>${firstName}</strong>,</p>
+        <p style="font-size:16px;color:#475569;margin-bottom:24px;">${subjectIntro}</p>
 
         <!-- Client Meta Bar -->
         <div style="border-top:1px solid #f1f5f9;border-bottom:1px solid #f1f5f9;padding:20px 0;margin-bottom:30px;display:flex;">
@@ -759,7 +760,8 @@ const server = http.createServer((req, res) => {
             ? new Date(holding.fill_date).toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })
             : currentDateStr;
 
-          const nominalDisplay = `${quantity.toLocaleString()} @ R ${avgFill}`;
+          const quantityDisplay = parseFloat(quantity.toFixed(4)).toLocaleString('en-ZA');
+          const nominalDisplay = `${quantityDisplay} @ R ${avgFill}`;
 
           htmlContent = buildEmailHtml({
             firstName,
@@ -795,7 +797,8 @@ const server = http.createServer((req, res) => {
             const side = bHolding.trade_side || (bHolding.quantity < 0 ? 'SELL' : 'BUY');
             const quantity = Math.abs(bHolding.quantity);
             const avgFill = (bHolding.avg_fill / 100).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const nominalDisplay = `${quantity.toLocaleString()} @ R ${avgFill}`;
+            const quantityDisplay = parseFloat(quantity.toFixed(4)).toLocaleString('en-ZA');
+            const nominalDisplay = `${quantityDisplay} @ R ${avgFill}`;
             tableRowsHtml += buildTradeRow(side, ticker, nominalDisplay);
           }
 

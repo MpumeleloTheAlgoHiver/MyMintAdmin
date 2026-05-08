@@ -3765,76 +3765,110 @@
           sorted = activeBooks.slice().sort((a, b) => (b.sequence || 0) - (a.sequence || 0));
         }
 
-      filledOrderbooksList.innerHTML = sorted.map((book) => {
-        const rows = Array.isArray(book.rows) ? book.rows : [];
-        const body = rows.length
-          ? rows.map((row, rowIndex) => {
-            const rowKey = `${String(book.id || 'book')}-${rowIndex}`;
-            const rowFillStatus = getRowFillStatus(row);
-            return `
-            <tr class="orderbook-main-row" data-archive-main-row data-archive-line-key="${escapeHtml(rowKey)}">
-              <td>${escapeHtml(String(row.line ?? '-'))}</td>
-              <td>${escapeHtml(row.instrumentName || '-')}</td>
-              <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
-              <td>${escapeHtml(row.side || '-')}</td>
-              <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
-              <td>${escapeHtml(asRandValue(row.avgFill))}</td>
-              <td>${escapeHtml(asRandValue(row.marketValue))}</td>
-              <td>${escapeHtml(row.orderType || '-')}</td>
-              <td>${escapeHtml(row.settlementAccount || '')}</td>
-              <td>${escapeHtml(row.brokerRef || '')}</td>
-              <td>${escapeHtml(String(row.unrealizedPnl ?? '-'))}</td>
-              ${showActiveBooksFilledColumn ? `<td><span class="filled-status-pill ${rowFillStatus.filled ? 'is-filled' : 'is-open'}">${escapeHtml(rowFillStatus.text)}</span></td>` : ''}
-            </tr>
-            <tr class="orderbook-detail-row is-hidden" data-archive-detail-row data-archive-line-key="${escapeHtml(rowKey)}">
-              <td colspan="${showActiveBooksFilledColumn ? '12' : '11'}">
-                <div class="orderbook-detail-wrap">
-                  ${row.isStrategy ? renderStrategyDetailsTable(row) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderSnapshotBndDetailsTable(rows, row, book.sequence)}`}
-                </div>
-              </td>
-            </tr>
-          `;
-          }).join('')
-          : '<tr><td class="orderbook-empty-row" colspan="11">No rows captured.</td></tr>';
+        filledOrderbooksList.innerHTML = sorted.map((book) => {
+          const rows = Array.isArray(book.rows) ? book.rows : [];
+          const body = rows.length
+            ? rows.map((row, rowIndex) => {
+              const rowKey = `${String(book.id || 'book')}-${rowIndex}`;
+              const rowFillStatus = getRowFillStatus(row);
 
-        return `
-          <details class="filled-orderbook-item">
-            <summary class="filled-orderbook-summary">
-              <span>${escapeHtml(formatBookTitle(book))}</span>
-              <span class="filled-orderbook-meta">
-                <span>${escapeHtml(book.dateLabel || '-')}</span>
-                ${book.sentAt ? `<span>Sent: ${escapeHtml(new Date(book.sentAt).toLocaleString())}</span>` : ''}
-                <span data-book-id="${escapeHtml(String(book.id || ''))}">${emailStatusChip(book.emailStatus)}</span>
-              </span>
-            </summary>
-            <div class="filled-orderbook-details">
-              <div class="orderbook-table-wrap">
-                <table class="orderbook-table">
-                  <thead>
-                    <tr>
-                      <th>Line</th>
-                      <th>Instrument Name</th>
-                      <th>Ticker</th>
-                      <th>Side</th>
-                      <th>Total QYT</th>
-                      <th>Avg Fill</th>
-                      <th>Total Fill</th>
-                      <th>Order Type</th>
-                      <th>Settlement Account</th>
-                      <th>Broker Ref</th>
-                      <th>Unrealized PnL <span class="orderbook-plus-toggle" data-toggle-filled-col title="Toggle filled status">+</span></th>
-                      ${showActiveBooksFilledColumn ? '<th>Filled</th>' : ''}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${body}
-                  </tbody>
-                </table>
+              // --- Email Actions Logic for Active Snapshot Books ---
+              const emailStatus = row.notificationStatus || 'pending';
+              let pillClass, pillLabel;
+              if (emailStatus === 'sent') {
+                pillClass = 'filled-status-pill is-filled';
+                pillLabel = 'SENT';
+              } else if (emailStatus === 'failed') {
+                pillClass = 'filled-status-pill';
+                pillLabel = 'FAILED';
+              } else {
+                pillClass = 'filled-status-pill is-open';
+                pillLabel = 'PENDING';
+              }
+
+              // Only show the Send Confirm button if there's an actual fill price
+              let actionsHtml = '';
+              if (row.avgFillNumber != null && row.avgFillNumber > 0) {
+                actionsHtml = `
+                  <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;">
+                    <span class="${pillClass}"${emailStatus === 'failed' ? ' style="background:#fee2e2;color:#991b1b;border-color:#fca5a5;"' : ''}>${pillLabel}</span>
+                    <button class="orderbook-export-btn"
+                      style="padding:4px 10px;height:28px;font-size:11px;"
+                      onclick="sendTradeConfirmation(event, '${escapeHtml(row.sourceId)}', '${escapeHtml(row.bndReference || '')}')">
+                      ${emailStatus === 'sent' ? 'Resend' : 'Send Confirm'}
+                    </button>
+                  </div>`;
+              } else {
+                actionsHtml = `<span class="filled-status-pill is-open" style="background:#f3f4f6;color:#6b7280;border-color:#d1d5db;font-size:0.7rem;">No price set</span>`;
+              }
+              // ---------------------------------------------------
+
+              return `
+              <tr class="orderbook-main-row" data-archive-main-row data-archive-line-key="${escapeHtml(rowKey)}">
+                <td style="white-space:nowrap;">${actionsHtml}</td>
+                <td>${escapeHtml(String(row.line ?? '-'))}</td>
+                <td>${escapeHtml(row.instrumentName || '-')}</td>
+                <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
+                <td>${escapeHtml(row.side || '-')}</td>
+                <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
+                <td>${escapeHtml(asRandValue(row.avgFill))}</td>
+                <td>${escapeHtml(asRandValue(row.marketValue))}</td>
+                <td>${escapeHtml(row.orderType || '-')}</td>
+                <td>${escapeHtml(row.settlementAccount || '')}</td>
+                <td>${escapeHtml(row.brokerRef || '')}</td>
+                <td>${escapeHtml(String(row.unrealizedPnl ?? '-'))}</td>
+                ${showActiveBooksFilledColumn ? `<td><span class="filled-status-pill ${rowFillStatus.filled ? 'is-filled' : 'is-open'}">${escapeHtml(rowFillStatus.text)}</span></td>` : ''}
+              </tr>
+              <tr class="orderbook-detail-row is-hidden" data-archive-detail-row data-archive-line-key="${escapeHtml(rowKey)}">
+                <td colspan="${showActiveBooksFilledColumn ? '13' : '12'}">
+                  <div class="orderbook-detail-wrap">
+                    ${row.isStrategy ? renderStrategyDetailsTable(row) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderSnapshotBndDetailsTable(rows, row, book.sequence)}`}
+                  </div>
+                </td>
+              </tr>
+            `;
+            }).join('')
+            : '<tr><td class="orderbook-empty-row" colspan="12">No rows captured.</td></tr>';
+
+          return `
+            <details class="filled-orderbook-item">
+              <summary class="filled-orderbook-summary">
+                <span>${escapeHtml(formatBookTitle(book))}</span>
+                <span class="filled-orderbook-meta">
+                  <span>${escapeHtml(book.dateLabel || '-')}</span>
+                  ${book.sentAt ? `<span>Sent: ${escapeHtml(new Date(book.sentAt).toLocaleString())}</span>` : ''}
+                  <span data-book-id="${escapeHtml(String(book.id || ''))}">${emailStatusChip(book.emailStatus)}</span>
+                </span>
+              </summary>
+              <div class="filled-orderbook-details">
+                <div class="orderbook-table-wrap">
+                  <table class="orderbook-table">
+                    <thead>
+                      <tr>
+                        <th style="width:190px;">Client Email</th>
+                        <th>Line</th>
+                        <th>Instrument Name</th>
+                        <th>Ticker</th>
+                        <th>Side</th>
+                        <th>Total QYT</th>
+                        <th>Avg Fill</th>
+                        <th>Total Fill</th>
+                        <th>Order Type</th>
+                        <th>Settlement Account</th>
+                        <th>Broker Ref</th>
+                        <th>Unrealized PnL <span class="orderbook-plus-toggle" data-toggle-filled-col title="Toggle filled status">+</span></th>
+                        ${showActiveBooksFilledColumn ? '<th>Filled</th>' : ''}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${body}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          </details>
-        `;
-      }).join('');
+            </details>
+          `;
+        }).join('');
       }
 
       renderClosedBooks(closedBooks);
