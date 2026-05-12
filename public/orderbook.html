@@ -131,6 +131,78 @@
     .orderbook-tab-search input::-webkit-search-cancel-button,
     .orderbook-tab-search input::-webkit-search-decoration { display: none; }
 
+    .orderbook-cleanup-btn {
+      flex-shrink: 0;
+      margin-left: 4px;
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      border: 1px solid #ddd6fe;
+      background: #ffffff;
+      color: #7c3aed;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.55);
+      animation: cleanupPulse 1.8s infinite;
+    }
+    .orderbook-cleanup-btn:hover {
+      background: #f5f3ff;
+      border-color: #c4b5fd;
+    }
+    .orderbook-cleanup-btn svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .orderbook-cleanup-btn.is-active {
+      background: #7c3aed;
+      color: #ffffff;
+      border-color: #6d28d9;
+      animation: none;
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18);
+    }
+    @keyframes cleanupPulse {
+      0%   { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.55); }
+      70%  { box-shadow: 0 0 0 10px rgba(124, 58, 237, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); }
+    }
+
+    .cleanup-delete-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      border: 1px solid #fecaca;
+      background: #fef2f2;
+      color: #b91c1c;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      padding: 0;
+      transition: all 0.15s ease;
+    }
+    .cleanup-delete-btn:hover {
+      background: #dc2626;
+      border-color: #dc2626;
+      color: #ffffff;
+    }
+    .cleanup-delete-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .cleanup-delete-col { width: 36px; text-align: center; }
+
     .signout-btn {
       padding: 8px 14px;
       border-radius: 10px;
@@ -1249,6 +1321,9 @@
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13 11a5 5 0 10-1.41 1.41l3.54 3.55 1.41-1.42L13 11zm-5 1a4 4 0 110-8 4 4 0 010 8z"/></svg>
           <input id="orderbookSearch" type="search" placeholder="Search instrument, ticker, side…" aria-label="Search orderbook">
         </div>
+        <button id="cleanupModeBtn" class="orderbook-cleanup-btn" type="button" title="Cleanup mode — remove investors from snapshot JSON" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/><path d="M10 11v6M14 11v6"/></svg>
+        </button>
       </div>
 
       <div class="orderbook-tab-panel active" id="activeBooksPanel" role="tabpanel" aria-labelledby="activeBooksTab">
@@ -1415,6 +1490,8 @@
     let isArchiveBooksLoading = true;
     let rebalanceBatchesForStandaloneList = [];
     let activeBooksSortOrder = 'newest'; // 'newest' | 'oldest' | 'as-is'
+    let cleanupMode = false;
+    let cleanupVerified = false;
 
     const requireSession = async () => {
       const { data } = await supabaseClient.auth.getSession();
@@ -1996,6 +2073,9 @@
 
     const renderStrategyDetailsTable = (row, options = {}) => {
       const editable = options.editable !== false;
+      const cleanup = options.cleanup === true && options.bookId != null && options.rowIndex != null;
+      const cleanupBookId = options.bookId != null ? String(options.bookId) : '';
+      const cleanupRowIndex = options.rowIndex != null ? String(options.rowIndex) : '';
       const holdings = row.strategyHoldings || [];
       const users = row.strategyUsers || [];
 
@@ -2040,7 +2120,11 @@
 
       let usersHtml = '';
       if (users.length) {
-        const uBody = users.map((u, i) => `
+        const uBody = users.map((u, i) => {
+          const deleteCell = cleanup
+            ? `<td class="cleanup-delete-col"><button type="button" class="cleanup-delete-btn" data-cleanup-delete data-book-id="${escapeHtml(cleanupBookId)}" data-row-index="${escapeHtml(cleanupRowIndex)}" data-user-id="${escapeHtml(String(u.userId || ''))}" title="Remove this investor from this orderbook snapshot">&times;</button></td>`
+            : '';
+          return `
           <tr>
             <td>${escapeHtml(String(i + 1))}</td>
             <td>${escapeHtml(u.clientName || '-')}</td>
@@ -2048,8 +2132,12 @@
             <td>${escapeHtml(maskIdentifier(u.clientIdRegNo || '-'))}</td>
             <td>${escapeHtml(formatMoney(u.totalMarketValue))}</td>
             <td>${escapeHtml(String(u.holdingsCount))}</td>
+            ${deleteCell}
           </tr>
-        `).join('');
+        `;
+        }).join('');
+
+        const deleteHeader = cleanup ? '<th class="cleanup-delete-col" aria-label="Remove"></th>' : '';
 
         usersHtml = `
           <div class="orderbook-detail-title" style="margin-top: 16px;">Investors in ${escapeHtml(row.strategyName || 'Strategy')}</div>
@@ -2063,6 +2151,7 @@
                   <th>ID / Reg No</th>
                   <th>Total Fill</th>
                   <th>Holdings</th>
+                  ${deleteHeader}
                 </tr>
               </thead>
               <tbody>${uBody}</tbody>
@@ -3834,7 +3923,7 @@
               <tr class="orderbook-detail-row is-hidden" data-archive-detail-row data-archive-line-key="${escapeHtml(rowKey)}">
                 <td colspan="${showActiveBooksFilledColumn ? '13' : '12'}">
                   <div class="orderbook-detail-wrap">
-                    ${row.isStrategy ? renderStrategyDetailsTable(row) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderSnapshotBndDetailsTable(rows, row, book.sequence)}`}
+                    ${row.isStrategy ? renderStrategyDetailsTable(row, { cleanup: cleanupMode, bookId: book.id, rowIndex }) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderSnapshotBndDetailsTable(rows, row, book.sequence)}`}
                   </div>
                 </td>
               </tr>
@@ -4036,7 +4125,7 @@
             <tr class="orderbook-detail-row is-hidden" data-closed-detail-row data-closed-line-key="${escapeHtml(rowKey)}">
               <td colspan="12">
                 <div class="orderbook-detail-wrap">
-                  ${row.isStrategy ? renderStrategyDetailsTable(row, { editable: false }) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderSnapshotBndDetailsTable(rows, row, book.sequence)}`}
+                  ${row.isStrategy ? renderStrategyDetailsTable(row, { editable: false, cleanup: cleanupMode, bookId: book.id, rowIndex }) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderSnapshotBndDetailsTable(rows, row, book.sequence)}`}
                 </div>
               </td>
             </tr>
@@ -5302,8 +5391,120 @@
       };
   
 
+    const cleanupModeBtn = document.getElementById('cleanupModeBtn');
+    const applyCleanupButtonState = () => {
+      if (!cleanupModeBtn) return;
+      cleanupModeBtn.classList.toggle('is-active', !!cleanupMode);
+      cleanupModeBtn.setAttribute('aria-pressed', cleanupMode ? 'true' : 'false');
+      cleanupModeBtn.title = cleanupMode
+        ? 'Cleanup mode ON — click X next to investors to remove them. Click here to exit.'
+        : 'Cleanup mode — remove investors from snapshot JSON';
+    };
+
+    const promptForCleanupPassword = async () => {
+      const password = window.prompt('Cleanup mode is destructive (snapshot JSON only). Enter your password to enable:');
+      if (password == null) return false;
+      try {
+        await verifyModalPassword(password);
+        cleanupVerified = true;
+        return true;
+      } catch (err) {
+        alert(err?.message || 'Password verification failed.');
+        return false;
+      }
+    };
+
+    const toggleCleanupMode = async () => {
+      if (cleanupMode) {
+        cleanupMode = false;
+        applyCleanupButtonState();
+        renderFilledOrderbooks();
+        return;
+      }
+      if (!cleanupVerified) {
+        const ok = await promptForCleanupPassword();
+        if (!ok) return;
+      }
+      cleanupMode = true;
+      applyCleanupButtonState();
+      renderFilledOrderbooks();
+    };
+
+    if (cleanupModeBtn) {
+      applyCleanupButtonState();
+      cleanupModeBtn.addEventListener('click', () => {
+        toggleCleanupMode().catch((err) => alert('Cleanup toggle failed: ' + (err?.message || err)));
+      });
+    }
+
+    const handleCleanupDeleteClick = async (event) => {
+      const btn = event.target.closest('[data-cleanup-delete]');
+      if (!btn) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (!cleanupMode) return;
+
+      const bookId = btn.dataset.bookId;
+      const rowIndex = Number(btn.dataset.rowIndex);
+      const userId = btn.dataset.userId;
+      if (!bookId || !Number.isFinite(rowIndex) || !userId) return;
+
+      const book = filledOrderbooksArchive.find((b) => String(b.id) === String(bookId));
+      if (!book || !Array.isArray(book.rows)) return;
+      const row = book.rows[rowIndex];
+      if (!row || !Array.isArray(row.strategyUsers)) return;
+
+      const target = row.strategyUsers.find((u) => String(u.userId) === String(userId));
+      const userName = target?.clientName || 'this investor';
+
+      const isLast = row.strategyUsers.length <= 1;
+      const message = isLast
+        ? `Remove ${userName} from this orderbook?\n\nThis is the last investor in "${row.strategyName || 'Strategy'}", so the whole row will be removed from the snapshot.`
+        : `Remove ${userName} from this orderbook snapshot?`;
+      if (!window.confirm(message)) return;
+
+      btn.disabled = true;
+
+      const removedMv = Number(target?.totalMarketValue || 0);
+      row.strategyUsers = row.strategyUsers.filter((u) => String(u.userId) !== String(userId));
+
+      if (Array.isArray(row.bndRows) && row.bndRows.length) {
+        row.bndRows = row.bndRows.filter((b) => String(b.userId || '') !== String(userId));
+      }
+
+      if (Number.isFinite(removedMv) && removedMv) {
+        const currentMv = Number(row.marketValueNumber || 0);
+        const nextMv = currentMv - removedMv;
+        row.marketValueNumber = nextMv;
+        row.marketValue = `R ${nextMv.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      }
+
+      if (row.strategyUsers.length === 0) {
+        book.rows = book.rows.filter((_, idx) => idx !== rowIndex);
+      }
+
+      try {
+        await upsertFilledArchiveToDb(book);
+      } catch (err) {
+        alert('Failed to save cleanup to server: ' + (err?.message || err));
+        btn.disabled = false;
+        return;
+      }
+
+      if (!book.rows.length) {
+        filledOrderbooksArchive = filledOrderbooksArchive.filter((b) => String(b.id) !== String(book.id));
+      }
+
+      persistFilledArchive();
+      renderFilledOrderbooks();
+    };
+
     if (filledOrderbooksList) {
+      filledOrderbooksList.addEventListener('click', handleCleanupDeleteClick);
       filledOrderbooksList.addEventListener('click', async (event) => {
+        if (event.target.closest('[data-cleanup-delete]')) return;
+
         const toggleFilledColumn = event.target.closest('[data-toggle-filled-col]');
         if (toggleFilledColumn) {
           showActiveBooksFilledColumn = !showActiveBooksFilledColumn;
@@ -5366,7 +5567,9 @@
     }
 
     if (closedBooksList) {
+      closedBooksList.addEventListener('click', handleCleanupDeleteClick);
       closedBooksList.addEventListener('click', (event) => {
+        if (event.target.closest('[data-cleanup-delete]')) return;
         if (event.target.closest('button, a, input, select, summary')) {
           return;
         }
