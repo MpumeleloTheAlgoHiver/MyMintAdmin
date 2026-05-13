@@ -5660,12 +5660,8 @@
           const targetName = payload.context === 'strategy'
             ? payload.strategyName
             : (payload.instrument || payload.ticker);
-          const matchId = payload.context === 'strategy'
-            ? String(payload.strategyId || '')
-            : String(payload.securityId || '');
 
-          // Transactions are RLS-restricted to the row owner, so we must fetch
-          // them via the API endpoint that uses the service-role key.
+          // transactions.user_id is RLS-restricted — use the API (service-role key) to read.
           const { data: sessionData } = await supabaseClient.auth.getSession();
           const apiToken = sessionData?.session?.access_token;
           if (!apiToken) throw new Error('Your session has expired. Please sign in again.');
@@ -5682,16 +5678,8 @@
           });
           const txnRespJson = await txnResp.json().catch(() => ({}));
           if (!txnResp.ok) throw new Error(txnRespJson?.error || 'Failed to load transactions');
-          const candidates = Array.isArray(txnRespJson.transactions) ? txnRespJson.transactions : [];
-
-          const lowerTarget = String(targetName || '').toLowerCase().trim();
-          const matchedTxns = (candidates || []).filter((t) => {
-            const desc = String(t.description || '');
-            if (matchId && desc.includes(matchId)) return true;
-            const tn = String(t.name || '').toLowerCase();
-            if (lowerTarget && tn && (tn.includes(lowerTarget) || lowerTarget.includes(tn))) return true;
-            return false;
-          });
+          // All transactions for this user_id in the window — no secondary filter needed.
+          const matchedTxns = Array.isArray(txnRespJson.transactions) ? txnRespJson.transactions : [];
           _reverseState.txns = matchedTxns;
           // transactions.amount is stored in cents → convert to Rand for refund math.
           const refundCents = matchedTxns.reduce((s, t) => s + Number(t.amount || 0), 0);
@@ -5739,7 +5727,7 @@
 
           if (refund <= 0) {
             els.warning.style.display = 'block';
-            els.warning.textContent = `No matching transactions found for "${targetName || 'this order'}" (looking for description containing ${matchId || 'id'}). Refund will be R 0.00 — the reversal will only delete the holdings.`;
+            els.warning.textContent = `No transactions found for this investor in the selected date window. Refund will be R 0.00 — the reversal will only delete the holdings.`;
           } else if (!_reverseState.walletId) {
             els.warning.style.display = 'block';
             els.warning.textContent = `This investor has no existing wallet — a new wallet row will be created with the refund as the balance.`;
