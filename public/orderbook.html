@@ -1183,6 +1183,13 @@
     }
     .reverse-holdings-list th { background: #f8fafc; color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.04em; }
     .reverse-holdings-list tr:last-child td { border-bottom: none; }
+    .reverse-holdings-list tr[data-txn-row]:hover td { background: #f5f3ff; }
+    .reverse-holdings-list tr.is-selected-txn td {
+      background: #ede9fe;
+      color: #5b21b6;
+      font-weight: 600;
+      box-shadow: inset 3px 0 0 #7c3aed;
+    }
     .reverse-empty {
       padding: 12px;
       font-size: 12px;
@@ -5552,7 +5559,7 @@
       };
 
       /* ── Reverse Investor Order (per-user, per-strategy or per-security) ── */
-      const _reverseState = { payload: null, holdings: [], txns: [], walletId: null, walletBefore: 0, refund: 0 };
+      const _reverseState = { payload: null, holdings: [], txns: [], walletId: null, walletBefore: 0, refund: 0, refundCents: 0, selectedTxnId: null };
 
       const getReverseModalEls = () => ({
         modal: document.getElementById('orderbookReverseModal'),
@@ -5594,6 +5601,7 @@
         _reverseState.walletBefore = 0;
         _reverseState.refund = 0;
         _reverseState.refundCents = 0;
+        _reverseState.selectedTxnId = null;
       };
 
       const openReverseInvestorModal = async (payload) => {
@@ -5668,8 +5676,8 @@
 
           const txnBody = { userId: payload.userId };
           if (minDate && maxDate) {
-            txnBody.dateFrom = new Date(minDate - 14 * 24 * 60 * 60 * 1000).toISOString();
-            txnBody.dateTo   = new Date(maxDate + 14 * 24 * 60 * 60 * 1000).toISOString();
+            txnBody.dateFrom = new Date(minDate - 10 * 24 * 60 * 60 * 1000).toISOString();
+            txnBody.dateTo   = new Date(maxDate + 10 * 24 * 60 * 60 * 1000).toISOString();
           }
           const txnResp = await fetch('/api/orderbook/send-csv?action=get-user-transactions', {
             method: 'POST',
@@ -5678,14 +5686,11 @@
           });
           const txnRespJson = await txnResp.json().catch(() => ({}));
           if (!txnResp.ok) throw new Error(txnRespJson?.error || 'Failed to load transactions');
-          // All transactions for this user_id in the window — no secondary filter needed.
           const matchedTxns = Array.isArray(txnRespJson.transactions) ? txnRespJson.transactions : [];
           _reverseState.txns = matchedTxns;
-          // transactions.amount is stored in cents → convert to Rand for refund math.
-          const refundCents = matchedTxns.reduce((s, t) => s + Number(t.amount || 0), 0);
-          const refund = refundCents / 100;
-          _reverseState.refund = refund;
-          _reverseState.refundCents = refundCents;
+          _reverseState.selectedTxnId = null;
+          _reverseState.refund = 0;
+          _reverseState.refundCents = 0;
 
           const holdingsHtml = `
             <table>
@@ -5701,22 +5706,21 @@
             </table>`;
           els.holdingsList.innerHTML = holdingsHtml;
 
-          els.refundAmount.textContent = formatRand(refund);
+          // Render selectable transaction list. Refund updates only when a row is clicked.
+          els.refundAmount.textContent = formatRand(0);
           els.walletBefore.textContent = formatRand(_reverseState.walletBefore);
-          els.walletAfter.textContent = formatRand(_reverseState.walletBefore + refund);
+          els.walletAfter.textContent = formatRand(_reverseState.walletBefore);
 
-          // Append matched transactions list under the holdings list so the admin
-          // can verify which rows contributed to the refund total.
           if (matchedTxns.length) {
             const txnRows = matchedTxns.map((t) => `
-              <tr>
+              <tr data-txn-row data-txn-id="${escapeHtml(String(t.id || ''))}" style="cursor:pointer;">
                 <td>${escapeHtml(String(t.name || '-'))}</td>
                 <td>${escapeHtml(formatRand(Number(t.amount || 0) / 100))}</td>
                 <td>${escapeHtml(String(t.direction || '-'))}</td>
                 <td>${escapeHtml(String(t.transaction_date || '').slice(0, 10))}</td>
               </tr>`).join('');
             els.holdingsList.insertAdjacentHTML('afterend', `
-              <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin:14px 0 6px;">Matched transactions</div>
+              <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin:14px 0 6px;">Select a transaction to refund</div>
               <div class="reverse-holdings-list" data-matched-txns>
                 <table>
                   <thead><tr><th>Name</th><th>Amount</th><th>Dir</th><th>Date</th></tr></thead>
@@ -5725,9 +5729,11 @@
               </div>`);
           }
 
-          if (refund <= 0) {
+          if (!matchedTxns.length) {
             els.warning.style.display = 'block';
-            els.warning.textContent = `No transactions found for this investor in the selected date window. Refund will be R 0.00 — the reversal will only delete the holdings.`;
+            els.warning.textContent = `No transactions found for this investor in the ±10 day window. Holdings can still be deleted but no refund will be issued.`;
+            // Allow execute (no refund, just delete) when there's nothing to choose.
+            els.confirmBtn.disabled = false;
           } else if (!_reverseState.walletId) {
             els.warning.style.display = 'block';
             els.warning.textContent = `This investor has no existing wallet — a new wallet row will be created with the refund as the balance.`;
@@ -5735,11 +5741,28 @@
 
           els.loading.style.display = 'none';
           els.details.style.display = 'flex';
-          els.confirmBtn.disabled = false;
+          // Execute stays disabled until the admin picks a transaction (or there are none).
         } catch (err) {
           els.loading.textContent = 'Error loading details: ' + (err?.message || err);
           els.loading.style.color = '#dc2626';
         }
+      };
+
+      const selectReverseTxn = (txnId) => {
+        const els = getReverseModalEls();
+        const txn = (_reverseState.txns || []).find((t) => String(t.id) === String(txnId));
+        if (!txn) return;
+        _reverseState.selectedTxnId = txn.id;
+        const refundCents = Number(txn.amount || 0);
+        const refund = refundCents / 100;
+        _reverseState.refund = refund;
+        _reverseState.refundCents = refundCents;
+        els.refundAmount.textContent = formatRand(refund);
+        els.walletAfter.textContent = formatRand(_reverseState.walletBefore + refund);
+        document.querySelectorAll('#orderbookReverseModal [data-txn-row]').forEach((tr) => {
+          tr.classList.toggle('is-selected-txn', String(tr.dataset.txnId) === String(txnId));
+        });
+        els.confirmBtn.disabled = false;
       };
 
       const executeReverseInvestor = async () => {
@@ -5800,7 +5823,7 @@
               symbol: payload.ticker || null,
               name: targetName || null,
               holdingIdsDeleted: holdingIds,
-              sourceTxnIds: (_reverseState.txns || []).map((t) => t.id),
+              sourceTxnId: _reverseState.selectedTxnId || null,
             });
             const { error: txnErr } = await supabaseClient
               .from('transactions')
@@ -6327,7 +6350,7 @@
       openReverseInvestorModal(payload).catch((err) => alert('Reverse modal error: ' + (err?.message || err)));
     });
 
-    // Reverse modal close / cancel / confirm
+    // Reverse modal close / cancel / confirm / select-txn
     document.addEventListener('click', (event) => {
       if (event.target.closest('#reverseModalClose') || event.target.closest('#reverseModalCancel')) {
         event.preventDefault();
@@ -6339,6 +6362,13 @@
         event.preventDefault();
         event.stopPropagation();
         executeReverseInvestor().catch((err) => alert('Reverse error: ' + (err?.message || err)));
+        return;
+      }
+      const txnRow = event.target.closest('#orderbookReverseModal [data-txn-row]');
+      if (txnRow) {
+        event.preventDefault();
+        event.stopPropagation();
+        selectReverseTxn(txnRow.dataset.txnId);
       }
     });
 
