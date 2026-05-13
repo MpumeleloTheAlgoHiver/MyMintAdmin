@@ -1969,7 +1969,29 @@
       `;
     };
 
-    const renderSnapshotBndDetailsTable = (snapshotRows, targetRow, parentSequence = null) => {
+    const buildSnapshotReverseCell = (row, allowReverse) => {
+      const userId = row?.userId || '';
+      const sourceId = row?.sourceId || (Array.isArray(row?.sourceIds) ? row.sourceIds[0] : '') || '';
+      const securityId = row?.securityId || '';
+      if (!allowReverse || !userId || !sourceId) return '<td class="reverse-investor-col"></td>';
+      return `<td class="reverse-investor-col">
+        <button type="button" class="reverse-investor-btn" data-reverse-investor
+          data-context="security"
+          data-user-id="${escapeHtml(String(userId))}"
+          data-user-name="${escapeHtml(row?.clientNameFull || row?.clientName || '')}"
+          data-source-id="${escapeHtml(String(sourceId))}"
+          data-security-id="${escapeHtml(String(securityId))}"
+          data-instrument="${escapeHtml(row?.instrumentName || '')}"
+          data-ticker="${escapeHtml(row?.ticker || '')}"
+          title="Reverse this order and refund the wallet">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+        </button>
+      </td>`;
+    };
+
+    const renderSnapshotBndDetailsTable = (snapshotRows, targetRow, parentSequence = null, options = {}) => {
+      const allowReverse = options.allowReverse === true;
+      const reverseHeader = allowReverse ? '<th class="reverse-investor-col" aria-label="Reverse"></th>' : '';
       if (Array.isArray(targetRow?.bndRows) && targetRow.bndRows.length) {
         const body = targetRow.bndRows.map((row) => `
           <tr>
@@ -1983,6 +2005,7 @@
             <td>${escapeHtml(row.orderTimestamp || '-')}</td>
             <td>${escapeHtml(row.instructionType || 'Market')}</td>
             <td>${escapeHtml(row.settlementRef || '')}</td>
+            ${allowReverse ? buildSnapshotReverseCell(row, allowReverse) : ''}
           </tr>
         `).join('');
 
@@ -2001,6 +2024,7 @@
                   <th>Order Timestamp</th>
                   <th>Instruction Type</th>
                   <th>Settlement Ref</th>
+                  ${reverseHeader}
                 </tr>
               </thead>
               <tbody>
@@ -2056,6 +2080,7 @@
             <td>${escapeHtml(formatTimeOnly(row.timestamp))}</td>
             <td>${escapeHtml(row.orderType || 'Market')}</td>
             <td>${escapeHtml(row.settlementRef || '')}</td>
+            ${allowReverse ? buildSnapshotReverseCell(row, allowReverse) : ''}
           </tr>
         `;
       }).join('');
@@ -2075,6 +2100,7 @@
                 <th>Order Timestamp</th>
                 <th>Instruction Type</th>
                 <th>Settlement Ref</th>
+                ${reverseHeader}
               </tr>
             </thead>
             <tbody>
@@ -4058,7 +4084,7 @@
               <tr class="orderbook-detail-row is-hidden" data-archive-detail-row data-archive-line-key="${escapeHtml(rowKey)}">
                 <td colspan="${showActiveBooksFilledColumn ? '13' : '12'}">
                   <div class="orderbook-detail-wrap">
-                    ${row.isStrategy ? renderStrategyDetailsTable(row, { cleanup: cleanupMode, bookId: book.id, rowIndex }) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderSnapshotBndDetailsTable(rows, row, book.sequence)}`}
+                    ${row.isStrategy ? renderStrategyDetailsTable(row, { cleanup: cleanupMode, bookId: book.id, rowIndex, allowReverse: true }) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderSnapshotBndDetailsTable(rows, row, book.sequence, { allowReverse: true })}`}
                   </div>
                 </td>
               </tr>
@@ -5555,12 +5581,19 @@
         if (els.warning) { els.warning.style.display = 'none'; els.warning.textContent = ''; }
         if (els.loading) { els.loading.style.color = ''; els.loading.textContent = 'Loading order details...'; }
         if (els.confirmBtn) { els.confirmBtn.disabled = true; els.confirmBtn.textContent = 'Execute Reversal'; }
+        // Remove the dynamically-inserted matched-txns blocks so reopening doesn't stack copies.
+        document.querySelectorAll('#orderbookReverseModal [data-matched-txns]').forEach((n) => {
+          const label = n.previousElementSibling;
+          if (label && label.textContent && label.textContent.trim().toLowerCase() === 'matched transactions') label.remove();
+          n.remove();
+        });
         _reverseState.payload = null;
         _reverseState.holdings = [];
         _reverseState.txns = [];
         _reverseState.walletId = null;
         _reverseState.walletBefore = 0;
         _reverseState.refund = 0;
+        _reverseState.refundCents = 0;
       };
 
       const openReverseInvestorModal = async (payload) => {
@@ -5627,15 +5660,20 @@
           const targetName = payload.context === 'strategy'
             ? payload.strategyName
             : (payload.instrument || payload.ticker);
+          const matchId = payload.context === 'strategy'
+            ? String(payload.strategyId || '')
+            : String(payload.securityId || '');
 
+          // Pull all of the user's transactions in a wide window. The id-in-description
+          // match is the source of truth (description JSON has strategyId/securityId);
+          // we keep a name-substring fallback for legacy rows without that JSON.
           let txnQuery = supabaseClient
             .from('transactions')
-            .select('id, amount, name, direction, status, transaction_date, created_at')
-            .eq('user_id', payload.userId)
-            .eq('direction', 'debit');
+            .select('id, amount, name, description, direction, status, transaction_date, created_at')
+            .eq('user_id', payload.userId);
           if (minDate && maxDate) {
-            const winStart = new Date(minDate - 7 * 24 * 60 * 60 * 1000).toISOString();
-            const winEnd = new Date(maxDate + 7 * 24 * 60 * 60 * 1000).toISOString();
+            const winStart = new Date(minDate - 14 * 24 * 60 * 60 * 1000).toISOString();
+            const winEnd = new Date(maxDate + 14 * 24 * 60 * 60 * 1000).toISOString();
             txnQuery = txnQuery.gte('transaction_date', winStart).lte('transaction_date', winEnd);
           }
           const { data: candidates, error: tErr } = await txnQuery.order('transaction_date', { ascending: false });
@@ -5643,13 +5681,18 @@
 
           const lowerTarget = String(targetName || '').toLowerCase().trim();
           const matchedTxns = (candidates || []).filter((t) => {
+            const desc = String(t.description || '');
+            if (matchId && desc.includes(matchId)) return true;
             const tn = String(t.name || '').toLowerCase();
-            if (!lowerTarget || !tn) return false;
-            return tn.includes(lowerTarget) || lowerTarget.includes(tn);
+            if (lowerTarget && tn && (tn.includes(lowerTarget) || lowerTarget.includes(tn))) return true;
+            return false;
           });
           _reverseState.txns = matchedTxns;
-          const refund = matchedTxns.reduce((s, t) => s + Number(t.amount || 0), 0);
+          // transactions.amount is stored in cents → convert to Rand for refund math.
+          const refundCents = matchedTxns.reduce((s, t) => s + Number(t.amount || 0), 0);
+          const refund = refundCents / 100;
           _reverseState.refund = refund;
+          _reverseState.refundCents = refundCents;
 
           const holdingsHtml = `
             <table>
@@ -5669,9 +5712,29 @@
           els.walletBefore.textContent = formatRand(_reverseState.walletBefore);
           els.walletAfter.textContent = formatRand(_reverseState.walletBefore + refund);
 
+          // Append matched transactions list under the holdings list so the admin
+          // can verify which rows contributed to the refund total.
+          if (matchedTxns.length) {
+            const txnRows = matchedTxns.map((t) => `
+              <tr>
+                <td>${escapeHtml(String(t.name || '-'))}</td>
+                <td>${escapeHtml(formatRand(Number(t.amount || 0) / 100))}</td>
+                <td>${escapeHtml(String(t.direction || '-'))}</td>
+                <td>${escapeHtml(String(t.transaction_date || '').slice(0, 10))}</td>
+              </tr>`).join('');
+            els.holdingsList.insertAdjacentHTML('afterend', `
+              <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin:14px 0 6px;">Matched transactions</div>
+              <div class="reverse-holdings-list" data-matched-txns>
+                <table>
+                  <thead><tr><th>Name</th><th>Amount</th><th>Dir</th><th>Date</th></tr></thead>
+                  <tbody>${txnRows}</tbody>
+                </table>
+              </div>`);
+          }
+
           if (refund <= 0) {
             els.warning.style.display = 'block';
-            els.warning.textContent = `No matching debit transactions found for "${targetName || 'this order'}". Refund will be R 0.00 — the reversal will only delete the holdings.`;
+            els.warning.textContent = `No matching transactions found for "${targetName || 'this order'}" (looking for description containing ${matchId || 'id'}). Refund will be R 0.00 — the reversal will only delete the holdings.`;
           } else if (!_reverseState.walletId) {
             els.warning.style.display = 'block';
             els.warning.textContent = `This investor has no existing wallet — a new wallet row will be created with the refund as the balance.`;
@@ -5720,6 +5783,7 @@
           }
 
           if (refund > 0) {
+            // wallets.balance is in Rand; refund is already in Rand here.
             if (_reverseState.walletId) {
               const newBalance = _reverseState.walletBefore + refund;
               const { error: wErr } = await supabaseClient
@@ -5734,15 +5798,26 @@
               if (wErr) throw new Error('Failed to create wallet: ' + wErr.message);
             }
 
+            // transactions.amount is stored in cents — convert Rand → cents before inserting.
+            const auditDescription = JSON.stringify({
+              type: 'reversal',
+              context: payload.context,
+              strategyId: payload.strategyId || null,
+              securityId: payload.securityId || null,
+              symbol: payload.ticker || null,
+              name: targetName || null,
+              holdingIdsDeleted: holdingIds,
+              sourceTxnIds: (_reverseState.txns || []).map((t) => t.id),
+            });
             const { error: txnErr } = await supabaseClient
               .from('transactions')
               .insert({
                 user_id: payload.userId,
-                amount: refund,
+                amount: Math.round(refund * 100),
                 direction: 'credit',
                 status: 'posted',
                 name: `Reversal: ${targetName || 'Order'}`,
-                description: `Reversed ${payload.context === 'strategy' ? 'strategy' : 'security'} order. ${holdingIds.length} holding(s) deleted.`,
+                description: auditDescription,
                 currency: 'ZAR',
                 transaction_date: nowIso,
               });
