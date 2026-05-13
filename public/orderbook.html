@@ -1127,6 +1127,83 @@
       opacity: 0.5;
       cursor: not-allowed;
     }
+    .reverse-investor-col { width: 36px; text-align: center; }
+    .reverse-investor-btn {
+      background: none;
+      border: none;
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #b91c1c;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+    }
+    .reverse-investor-btn:hover {
+      background: #fef2f2;
+      color: #7f1d1d;
+      transform: rotate(-12deg);
+    }
+    .reverse-investor-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .reverse-investor-btn svg { width: 14px; height: 14px; }
+    .reverse-summary-block {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .reverse-summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: #475569;
+    }
+    .reverse-summary-row strong { color: #0f172a; font-weight: 600; }
+    .reverse-holdings-list {
+      max-height: 160px;
+      overflow-y: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      background: white;
+    }
+    .reverse-holdings-list table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .reverse-holdings-list th, .reverse-holdings-list td {
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .reverse-holdings-list th { background: #f8fafc; color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.04em; }
+    .reverse-holdings-list tr:last-child td { border-bottom: none; }
+    .reverse-empty {
+      padding: 12px;
+      font-size: 12px;
+      color: #94a3b8;
+      text-align: center;
+    }
+    .reverse-warning {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      font-size: 12px;
+      padding: 8px 12px;
+      border-radius: 8px;
+    }
+    .reverse-btn-confirm {
+      background: #dc2626;
+      border: 1px solid #dc2626;
+      color: white;
+    }
+    .reverse-btn-confirm:hover { background: #b91c1c; }
+    .reverse-btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -1755,12 +1832,17 @@
           line: index + 1,
           sourceId: row.sourceId || '',
           sourceIds: row.sourceId ? [String(row.sourceId)] : [],
+          userId: row.userId || '',
+          securityId: row.securityId || targetRow.securityId || '',
+          strategyId: row.strategyId || null,
+          strategyName: row.strategyName || null,
           instrumentName: row.instrumentName || targetRow.instrumentName || '',
           ticker: row.ticker || targetRow.ticker || '',
           side: row.side || targetRow.side || '',
           clientAccountId: accountId,
           bndReference,
           clientName: shortClientName(row.clientName),
+          clientNameFull: row.clientName || '',
           idRegNoFull: String(row.clientIdRegNo || '-'),
           quantityValue: row.quantityValue,
           quantity: row.totalQuantity || '-',
@@ -1827,20 +1909,39 @@
         return '<div class="filled-orderbook-empty">No BND buyer rows for this entry.</div>';
       }
 
-      const body = bndRows.map((detailRow) => `
-        <tr>
-          <td>${escapeHtml(String(detailRow.line))}</td>
-          <td>${escapeHtml(detailRow.clientAccountId)}</td>
-          <td>${escapeHtml(detailRow.bndReference)}</td>
-          <td>${escapeHtml(detailRow.clientName)}</td>
-          <td>${escapeHtml(maskIdentifier(detailRow.idRegNoFull || detailRow.idRegNo || '-'))}</td>
-          <td>${escapeHtml(String(detailRow.quantity))}</td>
-          <td>${renderEditableTotalFill(detailRow)}</td>
-          <td>${escapeHtml(detailRow.orderTimestamp)}</td>
-          <td>${escapeHtml(detailRow.instructionType)}</td>
-          <td>${escapeHtml(detailRow.settlementRef || '')}</td>
-        </tr>
-      `).join('');
+      const body = bndRows.map((detailRow) => {
+        const canReverse = !!detailRow.userId && !!detailRow.sourceId;
+        const reverseCell = canReverse
+          ? `<td class="reverse-investor-col">
+              <button type="button" class="reverse-investor-btn" data-reverse-investor
+                data-context="security"
+                data-user-id="${escapeHtml(String(detailRow.userId || ''))}"
+                data-user-name="${escapeHtml(detailRow.clientNameFull || detailRow.clientName || '')}"
+                data-source-id="${escapeHtml(String(detailRow.sourceId || ''))}"
+                data-security-id="${escapeHtml(String(detailRow.securityId || ''))}"
+                data-instrument="${escapeHtml(detailRow.instrumentName || '')}"
+                data-ticker="${escapeHtml(detailRow.ticker || '')}"
+                title="Reverse this order and refund the wallet">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+              </button>
+            </td>`
+          : '<td class="reverse-investor-col"></td>';
+        return `
+          <tr>
+            <td>${escapeHtml(String(detailRow.line))}</td>
+            <td>${escapeHtml(detailRow.clientAccountId)}</td>
+            <td>${escapeHtml(detailRow.bndReference)}</td>
+            <td>${escapeHtml(detailRow.clientName)}</td>
+            <td>${escapeHtml(maskIdentifier(detailRow.idRegNoFull || detailRow.idRegNo || '-'))}</td>
+            <td>${escapeHtml(String(detailRow.quantity))}</td>
+            <td>${renderEditableTotalFill(detailRow)}</td>
+            <td>${escapeHtml(detailRow.orderTimestamp)}</td>
+            <td>${escapeHtml(detailRow.instructionType)}</td>
+            <td>${escapeHtml(detailRow.settlementRef || '')}</td>
+            ${reverseCell}
+          </tr>
+        `;
+      }).join('');
 
       return `
         <div class="orderbook-detail-table-wrap">
@@ -1857,6 +1958,7 @@
                 <th>Order Timestamp</th>
                 <th>Instruction Type</th>
                 <th>Settlement Ref</th>
+                <th class="reverse-investor-col" aria-label="Reverse"></th>
               </tr>
             </thead>
             <tbody>
@@ -2022,12 +2124,15 @@
             userMap.set(r.userId, {
               userId: r.userId, clientName: r.clientName,
               clientAccountId: r.clientAccountId, clientIdRegNo: r.clientIdRegNo,
-              totalMarketValue: 0, holdingsCount: 0
+              totalMarketValue: 0, holdingsCount: 0,
+              sourceIds: [], securityIds: []
             });
           }
           const u = userMap.get(r.userId);
           u.totalMarketValue += r.marketValueNumber || 0;
           u.holdingsCount += 1;
+          if (r.sourceId) u.sourceIds.push(String(r.sourceId));
+          if (r.securityId) u.securityIds.push(String(r.securityId));
         });
 
         const hasPendingRebalance = holdings.some((h) => !!h.isPendingRebalance);
@@ -2081,6 +2186,7 @@
     const renderStrategyDetailsTable = (row, options = {}) => {
       const editable = options.editable !== false;
       const cleanup = options.cleanup === true && options.bookId != null && options.rowIndex != null;
+      const allowReverseOpt = options.allowReverse === true;
       const cleanupBookId = options.bookId != null ? String(options.bookId) : '';
       const cleanupRowIndex = options.rowIndex != null ? String(options.rowIndex) : '';
       const holdings = row.strategyHoldings || [];
@@ -2127,9 +2233,23 @@
 
       let usersHtml = '';
       if (users.length) {
+        const allowReverse = allowReverseOpt && editable && !cleanup && !!row.strategyId;
         const uBody = users.map((u, i) => {
           const deleteCell = cleanup
             ? `<td class="cleanup-delete-col"><button type="button" class="cleanup-delete-btn" data-cleanup-delete data-book-id="${escapeHtml(cleanupBookId)}" data-row-index="${escapeHtml(cleanupRowIndex)}" data-user-id="${escapeHtml(String(u.userId || ''))}" title="Remove this investor from this orderbook snapshot">&times;</button></td>`
+            : '';
+          const reverseCell = allowReverse
+            ? `<td class="reverse-investor-col">
+                <button type="button" class="reverse-investor-btn" data-reverse-investor
+                  data-context="strategy"
+                  data-user-id="${escapeHtml(String(u.userId || ''))}"
+                  data-user-name="${escapeHtml(u.clientName || '')}"
+                  data-strategy-id="${escapeHtml(String(row.strategyId || ''))}"
+                  data-strategy-name="${escapeHtml(row.strategyName || '')}"
+                  title="Reverse this investor's order and refund their wallet">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+                </button>
+              </td>`
             : '';
           return `
           <tr>
@@ -2140,11 +2260,13 @@
             <td>${escapeHtml(formatMoney(u.totalMarketValue))}</td>
             <td>${escapeHtml(String(u.holdingsCount))}</td>
             ${deleteCell}
+            ${reverseCell}
           </tr>
         `;
         }).join('');
 
         const deleteHeader = cleanup ? '<th class="cleanup-delete-col" aria-label="Remove"></th>' : '';
+        const reverseHeader = allowReverse ? '<th class="reverse-investor-col" aria-label="Reverse"></th>' : '';
 
         usersHtml = `
           <div class="orderbook-detail-title" style="margin-top: 16px;">Investors in ${escapeHtml(row.strategyName || 'Strategy')}</div>
@@ -2159,6 +2281,7 @@
                   <th>Total Fill</th>
                   <th>Holdings</th>
                   ${deleteHeader}
+                  ${reverseHeader}
                 </tr>
               </thead>
               <tbody>${uBody}</tbody>
@@ -2237,6 +2360,10 @@
             line: index + 1,
             sourceId: item.sourceId || '',
             sourceIds: item.sourceId ? [String(item.sourceId)] : [],
+            userId: item.userId || '',
+            securityId: item.securityId || group.securityId || '',
+            strategyId: item.strategyId || group.strategyId || null,
+            strategyName: item.strategyName || group.strategyName || null,
             instrumentName: item.instrumentName || group.instrumentName || '',
             ticker: item.ticker || group.ticker || '',
             side: item.side || group.side || '',
@@ -2247,6 +2374,7 @@
               lineNumber: index + 1
             }),
             clientName: shortClientName(item.clientName),
+            clientNameFull: item.clientName || '',
             idRegNoFull: String(item.clientIdRegNo || '-'),
             quantityValue: item.quantityValue,
             quantity: item.totalQuantity || '-',
@@ -4500,7 +4628,7 @@
           <tr class="orderbook-detail-row is-hidden" data-orderbook-detail-row data-line-key="${lineKey}">
             <td colspan="12">
               <div class="orderbook-detail-wrap">
-                ${row.isStrategy ? renderStrategyDetailsTable(row) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderBndDetailsTable(row)}`}
+                ${row.isStrategy ? renderStrategyDetailsTable(row, { allowReverse: true }) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderBndDetailsTable(row)}`}
               </div>
             </td>
           </tr>
@@ -5396,7 +5524,242 @@
           alert('Reversal failed: ' + err.message);
         }
       };
-  
+
+      /* ── Reverse Investor Order (per-user, per-strategy or per-security) ── */
+      const _reverseState = { payload: null, holdings: [], txns: [], walletId: null, walletBefore: 0, refund: 0 };
+
+      const getReverseModalEls = () => ({
+        modal: document.getElementById('orderbookReverseModal'),
+        confirmBtn: document.getElementById('reverseModalConfirm'),
+        passwordInput: document.getElementById('reversePasswordInput'),
+        context: document.getElementById('reverseModalContext'),
+        loading: document.getElementById('reverseModalLoading'),
+        details: document.getElementById('reverseModalDetails'),
+        investorName: document.getElementById('reverseInvestorName'),
+        targetLabel: document.getElementById('reverseTargetLabel'),
+        targetName: document.getElementById('reverseTargetName'),
+        holdingsList: document.getElementById('reverseHoldingsList'),
+        refundAmount: document.getElementById('reverseRefundAmount'),
+        walletBefore: document.getElementById('reverseWalletBefore'),
+        walletAfter: document.getElementById('reverseWalletAfter'),
+        warning: document.getElementById('reverseWarning'),
+      });
+
+      const formatRand = (n) => `R ${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+      const closeReverseModal = () => {
+        const els = getReverseModalEls();
+        if (!els.modal) return;
+        els.modal.classList.remove('is-active');
+        if (els.passwordInput) els.passwordInput.value = '';
+        if (els.warning) { els.warning.style.display = 'none'; els.warning.textContent = ''; }
+        if (els.loading) { els.loading.style.color = ''; els.loading.textContent = 'Loading order details...'; }
+        if (els.confirmBtn) { els.confirmBtn.disabled = true; els.confirmBtn.textContent = 'Execute Reversal'; }
+        _reverseState.payload = null;
+        _reverseState.holdings = [];
+        _reverseState.txns = [];
+        _reverseState.walletId = null;
+        _reverseState.walletBefore = 0;
+        _reverseState.refund = 0;
+      };
+
+      const openReverseInvestorModal = async (payload) => {
+        const els = getReverseModalEls();
+        if (!els.modal) return;
+
+        _reverseState.payload = payload;
+        els.investorName.textContent = payload.userName || '-';
+        if (payload.context === 'strategy') {
+          els.targetLabel.textContent = 'Strategy';
+          els.targetName.textContent = payload.strategyName || '-';
+          els.context.textContent = 'Delete this investor\'s holdings under the strategy and refund their wallet.';
+        } else {
+          els.targetLabel.textContent = 'Security';
+          els.targetName.textContent = payload.instrument || payload.ticker || '-';
+          els.context.textContent = 'Delete this holding and refund the investor\'s wallet.';
+        }
+        els.loading.style.display = 'block';
+        els.loading.style.color = '';
+        els.loading.textContent = 'Loading order details...';
+        els.details.style.display = 'none';
+        els.confirmBtn.disabled = true;
+        els.confirmBtn.textContent = 'Execute Reversal';
+        els.modal.classList.add('is-active');
+
+        try {
+          let holdingsQuery = supabaseClient
+            .from('stock_holdings_c')
+            .select('id, user_id, security_id, quantity, avg_fill, market_value, strategy_id, strategy_name_snapshot, created_at, updated_at, status:"Status", fill_date:"Fill_date", trade_side')
+            .eq('user_id', payload.userId);
+          if (payload.context === 'strategy') {
+            holdingsQuery = holdingsQuery.eq('strategy_id', payload.strategyId);
+          } else {
+            holdingsQuery = holdingsQuery.eq('id', payload.sourceId);
+          }
+          const { data: holdings, error: hErr } = await holdingsQuery;
+          if (hErr) throw new Error(hErr.message);
+          if (!holdings || !holdings.length) throw new Error('No holdings found for this investor.');
+          _reverseState.holdings = holdings;
+
+          const securityIds = [...new Set(holdings.map((h) => h.security_id).filter(Boolean))];
+          const securityNameById = {};
+          if (securityIds.length) {
+            const { data: secs } = await supabaseClient
+              .from('securities_c')
+              .select('id, name, symbol')
+              .in('id', securityIds);
+            (secs || []).forEach((s) => { securityNameById[s.id] = s.name || s.symbol || s.id; });
+          }
+
+          const { data: walletRow, error: wErr } = await supabaseClient
+            .from('wallets')
+            .select('id, balance')
+            .eq('user_id', payload.userId)
+            .maybeSingle();
+          if (wErr) throw new Error(wErr.message);
+          _reverseState.walletId = walletRow?.id || null;
+          _reverseState.walletBefore = Number(walletRow?.balance || 0);
+
+          const dates = holdings.map((h) => new Date(h.created_at || 0).getTime()).filter((n) => Number.isFinite(n) && n > 0);
+          const minDate = dates.length ? Math.min(...dates) : 0;
+          const maxDate = dates.length ? Math.max(...dates) : 0;
+
+          const targetName = payload.context === 'strategy'
+            ? payload.strategyName
+            : (payload.instrument || payload.ticker);
+
+          let txnQuery = supabaseClient
+            .from('transactions')
+            .select('id, amount, name, direction, status, transaction_date, created_at')
+            .eq('user_id', payload.userId)
+            .eq('direction', 'debit');
+          if (minDate && maxDate) {
+            const winStart = new Date(minDate - 7 * 24 * 60 * 60 * 1000).toISOString();
+            const winEnd = new Date(maxDate + 7 * 24 * 60 * 60 * 1000).toISOString();
+            txnQuery = txnQuery.gte('transaction_date', winStart).lte('transaction_date', winEnd);
+          }
+          const { data: candidates, error: tErr } = await txnQuery.order('transaction_date', { ascending: false });
+          if (tErr) throw new Error(tErr.message);
+
+          const lowerTarget = String(targetName || '').toLowerCase().trim();
+          const matchedTxns = (candidates || []).filter((t) => {
+            const tn = String(t.name || '').toLowerCase();
+            if (!lowerTarget || !tn) return false;
+            return tn.includes(lowerTarget) || lowerTarget.includes(tn);
+          });
+          _reverseState.txns = matchedTxns;
+          const refund = matchedTxns.reduce((s, t) => s + Number(t.amount || 0), 0);
+          _reverseState.refund = refund;
+
+          const holdingsHtml = `
+            <table>
+              <thead><tr><th>Security</th><th>Qty</th><th>Status</th><th>Created</th></tr></thead>
+              <tbody>${holdings.map((h) => `
+                <tr>
+                  <td>${escapeHtml(securityNameById[h.security_id] || h.strategy_name_snapshot || h.security_id || '-')}</td>
+                  <td>${escapeHtml(String(h.quantity ?? '-'))}</td>
+                  <td>${escapeHtml(String(h.status || '-'))}</td>
+                  <td>${escapeHtml(String(h.created_at || '').slice(0, 10))}</td>
+                </tr>
+              `).join('')}</tbody>
+            </table>`;
+          els.holdingsList.innerHTML = holdingsHtml;
+
+          els.refundAmount.textContent = formatRand(refund);
+          els.walletBefore.textContent = formatRand(_reverseState.walletBefore);
+          els.walletAfter.textContent = formatRand(_reverseState.walletBefore + refund);
+
+          if (refund <= 0) {
+            els.warning.style.display = 'block';
+            els.warning.textContent = `No matching debit transactions found for "${targetName || 'this order'}". Refund will be R 0.00 — the reversal will only delete the holdings.`;
+          } else if (!_reverseState.walletId) {
+            els.warning.style.display = 'block';
+            els.warning.textContent = `This investor has no existing wallet — a new wallet row will be created with the refund as the balance.`;
+          }
+
+          els.loading.style.display = 'none';
+          els.details.style.display = 'flex';
+          els.confirmBtn.disabled = false;
+        } catch (err) {
+          els.loading.textContent = 'Error loading details: ' + (err?.message || err);
+          els.loading.style.color = '#dc2626';
+        }
+      };
+
+      const executeReverseInvestor = async () => {
+        const els = getReverseModalEls();
+        const payload = _reverseState.payload;
+        if (!payload) return;
+
+        const password = els.passwordInput.value;
+        if (!password) {
+          alert('Please enter your password to authorize this reversal.');
+          return;
+        }
+
+        els.confirmBtn.disabled = true;
+        els.confirmBtn.textContent = 'Verifying...';
+
+        try {
+          await verifyModalPassword(password);
+          els.confirmBtn.textContent = 'Executing...';
+
+          const nowIso = new Date().toISOString();
+          const holdingIds = _reverseState.holdings.map((h) => h.id).filter(Boolean);
+          const refund = _reverseState.refund;
+          const targetName = payload.context === 'strategy'
+            ? payload.strategyName
+            : (payload.instrument || payload.ticker);
+
+          if (holdingIds.length) {
+            const { error: delErr } = await supabaseClient
+              .from('stock_holdings_c')
+              .delete()
+              .in('id', holdingIds);
+            if (delErr) throw new Error('Failed to delete holdings: ' + delErr.message);
+          }
+
+          if (refund > 0) {
+            if (_reverseState.walletId) {
+              const newBalance = _reverseState.walletBefore + refund;
+              const { error: wErr } = await supabaseClient
+                .from('wallets')
+                .update({ balance: newBalance, updated_at: nowIso })
+                .eq('id', _reverseState.walletId);
+              if (wErr) throw new Error('Failed to update wallet: ' + wErr.message);
+            } else {
+              const { error: wErr } = await supabaseClient
+                .from('wallets')
+                .insert({ user_id: payload.userId, balance: refund, currency: 'ZAR', updated_at: nowIso });
+              if (wErr) throw new Error('Failed to create wallet: ' + wErr.message);
+            }
+
+            const { error: txnErr } = await supabaseClient
+              .from('transactions')
+              .insert({
+                user_id: payload.userId,
+                amount: refund,
+                direction: 'credit',
+                status: 'posted',
+                name: `Reversal: ${targetName || 'Order'}`,
+                description: `Reversed ${payload.context === 'strategy' ? 'strategy' : 'security'} order. ${holdingIds.length} holding(s) deleted.`,
+                currency: 'ZAR',
+                transaction_date: nowIso,
+              });
+            if (txnErr) console.error('Audit transaction failed:', txnErr.message);
+          }
+
+          closeReverseModal();
+          alert(`Order reversed successfully. Refunded ${formatRand(refund)} to ${payload.userName || 'the investor'}.`);
+          await loadOrderbook();
+        } catch (err) {
+          console.error('Reverse failed:', err);
+          alert('Failed to reverse: ' + (err?.message || 'Unknown error'));
+          els.confirmBtn.disabled = false;
+          els.confirmBtn.textContent = 'Execute Reversal';
+        }
+      };
+
 
     const cleanupModeBtn = document.getElementById('cleanupModeBtn');
     const applyCleanupButtonState = () => {
@@ -5872,6 +6235,45 @@
       }
     });
 
+    // Reverse-investor buttons appear in strategy/BND detail tables.
+    document.addEventListener('click', (event) => {
+      const reverseInvestorBtn = event.target.closest('[data-reverse-investor]');
+      if (!reverseInvestorBtn) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const d = reverseInvestorBtn.dataset;
+      const payload = {
+        context: d.context || 'strategy',
+        userId: d.userId || '',
+        userName: d.userName || '',
+        strategyId: d.strategyId || null,
+        strategyName: d.strategyName || '',
+        sourceId: d.sourceId || null,
+        securityId: d.securityId || '',
+        instrument: d.instrument || '',
+        ticker: d.ticker || '',
+      };
+      if (!payload.userId) { alert('Missing user id on this row.'); return; }
+      if (payload.context === 'strategy' && !payload.strategyId) { alert('Missing strategy id on this row.'); return; }
+      if (payload.context === 'security' && !payload.sourceId) { alert('Missing source id on this row.'); return; }
+      openReverseInvestorModal(payload).catch((err) => alert('Reverse modal error: ' + (err?.message || err)));
+    });
+
+    // Reverse modal close / cancel / confirm
+    document.addEventListener('click', (event) => {
+      if (event.target.closest('#reverseModalClose') || event.target.closest('#reverseModalCancel')) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeReverseModal();
+        return;
+      }
+      if (event.target.closest('#reverseModalConfirm')) {
+        event.preventDefault();
+        event.stopPropagation();
+        executeReverseInvestor().catch((err) => alert('Reverse error: ' + (err?.message || err)));
+      }
+    });
+
     if (orderbookTableBody) {
       orderbookTableBody.addEventListener('click', async (event) => {
         const editBtn = event.target.closest('[data-edit-price]');
@@ -6080,6 +6482,44 @@
     <button onclick="mintAppClose()" style="background:#1e293b;color:#94a3b8;border:none;border-radius:8px;padding:5px 14px;cursor:pointer;font-size:12px;font-weight:500;">&#8592; Back to Admin</button>
   </div>
   <iframe id="mintAppFrame" src="" style="position:absolute;top:44px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 44px);border:none;background:white;" allowfullscreen></iframe>
+</div>
+
+<!-- Reverse Investor Modal -->
+<div id="orderbookReverseModal" class="price-modal-backdrop">
+  <div class="price-modal-content" style="max-width:480px;">
+    <div class="price-modal-header">
+      <h3 class="price-modal-title">Reverse Investor Order</h3>
+      <button id="reverseModalClose" style="background:none;border:none;color:#94a3b8;cursor:pointer;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="price-modal-body">
+      <div id="reverseModalContext" style="font-size:13px;color:#64748b;"></div>
+      <div id="reverseModalLoading" style="font-size:13px;color:#94a3b8;">Loading order details...</div>
+      <div id="reverseModalDetails" style="display:none;flex-direction:column;gap:14px;">
+        <div class="reverse-summary-block">
+          <div class="reverse-summary-row"><span>Investor</span><strong id="reverseInvestorName">-</strong></div>
+          <div class="reverse-summary-row"><span id="reverseTargetLabel">Strategy</span><strong id="reverseTargetName">-</strong></div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Holdings to be reversed</div>
+          <div class="reverse-holdings-list" id="reverseHoldingsList"></div>
+        </div>
+        <div class="reverse-summary-block">
+          <div class="reverse-summary-row"><span>Refund amount</span><strong id="reverseRefundAmount">R 0.00</strong></div>
+          <div class="reverse-summary-row"><span>Wallet balance (before)</span><strong id="reverseWalletBefore">R 0.00</strong></div>
+          <div class="reverse-summary-row"><span>Wallet balance (after)</span><strong id="reverseWalletAfter" style="color:#15803d;">R 0.00</strong></div>
+        </div>
+        <div id="reverseWarning" class="reverse-warning" style="display:none;"></div>
+        <div class="price-input-group">
+          <label class="price-input-label" for="reversePasswordInput">Confirm Password</label>
+          <input type="password" id="reversePasswordInput" class="price-input" placeholder="Enter your password" autocomplete="current-password">
+        </div>
+      </div>
+    </div>
+    <div class="price-modal-footer">
+      <button id="reverseModalCancel" class="price-modal-btn price-btn-cancel">Cancel</button>
+      <button id="reverseModalConfirm" class="price-modal-btn reverse-btn-confirm" disabled>Execute Reversal</button>
+    </div>
+  </div>
 </div>
 
 <!-- Price Update Modal -->
