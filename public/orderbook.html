@@ -5664,20 +5664,25 @@
             ? String(payload.strategyId || '')
             : String(payload.securityId || '');
 
-          // Pull all of the user's transactions in a wide window. The id-in-description
-          // match is the source of truth (description JSON has strategyId/securityId);
-          // we keep a name-substring fallback for legacy rows without that JSON.
-          let txnQuery = supabaseClient
-            .from('transactions')
-            .select('id, amount, name, description, direction, status, transaction_date, created_at')
-            .eq('user_id', payload.userId);
+          // Transactions are RLS-restricted to the row owner, so we must fetch
+          // them via the API endpoint that uses the service-role key.
+          const { data: sessionData } = await supabaseClient.auth.getSession();
+          const apiToken = sessionData?.session?.access_token;
+          if (!apiToken) throw new Error('Your session has expired. Please sign in again.');
+
+          const txnBody = { userId: payload.userId };
           if (minDate && maxDate) {
-            const winStart = new Date(minDate - 14 * 24 * 60 * 60 * 1000).toISOString();
-            const winEnd = new Date(maxDate + 14 * 24 * 60 * 60 * 1000).toISOString();
-            txnQuery = txnQuery.gte('transaction_date', winStart).lte('transaction_date', winEnd);
+            txnBody.dateFrom = new Date(minDate - 14 * 24 * 60 * 60 * 1000).toISOString();
+            txnBody.dateTo   = new Date(maxDate + 14 * 24 * 60 * 60 * 1000).toISOString();
           }
-          const { data: candidates, error: tErr } = await txnQuery.order('transaction_date', { ascending: false });
-          if (tErr) throw new Error(tErr.message);
+          const txnResp = await fetch('/api/orderbook/send-csv?action=get-user-transactions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` },
+            body: JSON.stringify(txnBody)
+          });
+          const txnRespJson = await txnResp.json().catch(() => ({}));
+          if (!txnResp.ok) throw new Error(txnRespJson?.error || 'Failed to load transactions');
+          const candidates = Array.isArray(txnRespJson.transactions) ? txnRespJson.transactions : [];
 
           const lowerTarget = String(targetName || '').toLowerCase().trim();
           const matchedTxns = (candidates || []).filter((t) => {

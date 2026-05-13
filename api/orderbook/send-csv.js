@@ -20,6 +20,21 @@ module.exports = async (req, res) => {
       return handleSendTradeConfirmation(req, res, token);
     }
 
+    // Fetch a user's transactions using service-role key (bypasses RLS).
+    // Used by the reverse-investor modal to find the refund amount.
+    if (action === 'get-user-transactions') {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const userId = String(body.userId || '').trim();
+      if (!userId) return sendJson(res, 400, { error: 'userId required' });
+
+      let qs = `user_id=eq.${encodeURIComponent(userId)}&select=id,amount,name,description,direction,status,transaction_date,created_at&order=transaction_date.desc`;
+      if (body.dateFrom) qs += `&transaction_date=gte.${encodeURIComponent(body.dateFrom)}`;
+      if (body.dateTo)   qs += `&transaction_date=lte.${encodeURIComponent(body.dateTo)}`;
+
+      const rows = await fetchSupabaseJson(`/rest/v1/transactions?${qs}`);
+      return sendJson(res, 200, { transactions: Array.isArray(rows) ? rows : [] });
+    }
+
     // Fetch confirmation statuses using service-role key (bypasses RLS)
     if (action === 'get-confirmation-statuses') {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
