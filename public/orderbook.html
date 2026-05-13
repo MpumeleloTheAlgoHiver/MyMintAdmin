@@ -5674,11 +5674,9 @@
           const apiToken = sessionData?.session?.access_token;
           if (!apiToken) throw new Error('Your session has expired. Please sign in again.');
 
+          // No date filter — the deposit often pre-dates the holding's created_at.
+          // Server caps at 200 most-recent rows.
           const txnBody = { userId: payload.userId };
-          if (minDate && maxDate) {
-            txnBody.dateFrom = new Date(minDate - 10 * 24 * 60 * 60 * 1000).toISOString();
-            txnBody.dateTo   = new Date(maxDate + 10 * 24 * 60 * 60 * 1000).toISOString();
-          }
           const txnResp = await fetch('/api/orderbook/send-csv?action=get-user-transactions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` },
@@ -5783,65 +5781,42 @@
           await verifyModalPassword(password);
           els.confirmBtn.textContent = 'Executing...';
 
-          const nowIso = new Date().toISOString();
-          const holdingIds = _reverseState.holdings.map((h) => h.id).filter(Boolean);
-          const refund = _reverseState.refund;
           const targetName = payload.context === 'strategy'
             ? payload.strategyName
             : (payload.instrument || payload.ticker);
 
-          if (holdingIds.length) {
-            const { error: delErr } = await supabaseClient
-              .from('stock_holdings_c')
-              .delete()
-              .in('id', holdingIds);
-            if (delErr) throw new Error('Failed to delete holdings: ' + delErr.message);
-          }
+          const { data: sessionData } = await supabaseClient.auth.getSession();
+          const apiToken = sessionData?.session?.access_token;
+          if (!apiToken) throw new Error('Your session has expired. Please sign in again.');
 
-          if (refund > 0) {
-            // wallets.balance is in Rand; refund is already in Rand here.
-            if (_reverseState.walletId) {
-              const newBalance = _reverseState.walletBefore + refund;
-              const { error: wErr } = await supabaseClient
-                .from('wallets')
-                .update({ balance: newBalance, updated_at: nowIso })
-                .eq('id', _reverseState.walletId);
-              if (wErr) throw new Error('Failed to update wallet: ' + wErr.message);
-            } else {
-              const { error: wErr } = await supabaseClient
-                .from('wallets')
-                .insert({ user_id: payload.userId, balance: refund, currency: 'ZAR', updated_at: nowIso });
-              if (wErr) throw new Error('Failed to create wallet: ' + wErr.message);
-            }
-
-            // transactions.amount is stored in cents — convert Rand → cents before inserting.
-            const auditDescription = JSON.stringify({
-              type: 'reversal',
+          const resp = await fetch('/api/orderbook/reverse-investor', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` },
+            body: JSON.stringify({
+              userId: payload.userId,
               context: payload.context,
               strategyId: payload.strategyId || null,
-              securityId: payload.securityId || null,
-              symbol: payload.ticker || null,
-              name: targetName || null,
-              holdingIdsDeleted: holdingIds,
-              sourceTxnId: _reverseState.selectedTxnId || null,
-            });
-            const { error: txnErr } = await supabaseClient
-              .from('transactions')
-              .insert({
-                user_id: payload.userId,
-                amount: Math.round(refund * 100),
-                direction: 'credit',
-                status: 'posted',
-                name: `Reversal: ${targetName || 'Order'}`,
-                description: auditDescription,
-                currency: 'ZAR',
-                transaction_date: nowIso,
-              });
-            if (txnErr) console.error('Audit transaction failed:', txnErr.message);
+              sourceId: payload.sourceId || null,
+              selectedTxnId: _reverseState.selectedTxnId || null,
+              targetName: targetName || 'Order',
+            })
+          });
+          const result = await resp.json().catch(() => ({}));
+          if (!resp.ok || !result?.ok) {
+            throw new Error(result?.details || result?.error || `Server returned ${resp.status}`);
           }
 
+          // Accurate summary built from server's actual counts/balances.
+          const lines = [
+            `Reversal for ${payload.userName || 'investor'}:`,
+            `• Holdings deleted: ${result.deletedCount} of ${(result.requestedHoldingIds || []).length}`,
+            `• Refund: ${formatRand(result.refund || 0)}`,
+            `• Wallet: ${formatRand(result.balanceBefore || 0)} → ${formatRand(result.balanceAfter || 0)}${result.walletUpdated ? '' : ' (no wallet change)'}`,
+          ];
+          if (result.auditTxnId) lines.push(`• Audit txn: ${result.auditTxnId}`);
+
           closeReverseModal();
-          alert(`Order reversed successfully. Refunded ${formatRand(refund)} to ${payload.userName || 'the investor'}.`);
+          alert(lines.join('\n'));
           await loadOrderbook();
         } catch (err) {
           console.error('Reverse failed:', err);

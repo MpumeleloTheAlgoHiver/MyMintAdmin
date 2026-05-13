@@ -358,6 +358,33 @@ const startMarketDataScheduler = () => {
   }, 60000);
 };
 
+const requestSupabaseJson = async (path, options = {}) => {
+  const { method = 'GET', token = null, useServiceRoleAuth = true, body = null, extraHeaders = {} } = options;
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    throw new Error('Supabase server credentials are not configured');
+  }
+  const authToken = useServiceRoleAuth ? supabaseServiceRoleKey : token;
+  if (!authToken) throw new Error('Auth token missing');
+  const response = await fetch(`${supabaseUrl}${path}`, {
+    method,
+    headers: {
+      'apikey': supabaseServiceRoleKey,
+      'Authorization': `Bearer ${authToken}`,
+      'Accept': 'application/json',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      ...extraHeaders
+    },
+    ...(body ? { body: JSON.stringify(body) } : {})
+  });
+  let payload = null;
+  try { payload = await response.json(); } catch { payload = null; }
+  if (!response.ok) {
+    const message = payload?.message || payload?.error || `Supabase request failed with status ${response.status}`;
+    throw new Error(message);
+  }
+  return payload;
+};
+
 const fetchSupabaseJson = async (path, token, useServiceRoleAuth = true) => {
   if (!supabaseUrl || !supabaseServiceRoleKey) {
     throw new Error('Supabase server credentials are not configured');
@@ -586,6 +613,20 @@ const server = http.createServer((req, res) => {
       try {
         await fetchSupabaseJson('/auth/v1/user', token, false);
         const body = await readJsonBody(req);
+        const action = new URL(req.url, `http://${req.headers.host}`).searchParams.get('action');
+
+        // Action: fetch a user's transactions using service-role key (bypasses RLS).
+        if (action === 'get-user-transactions') {
+          const userId = String(body?.userId || '').trim();
+          if (!userId) { sendJson(res, 400, { error: 'userId required' }); return; }
+          let qs = `user_id=eq.${encodeURIComponent(userId)}&select=id,amount,name,description,direction,status,transaction_date,created_at&order=transaction_date.desc&limit=200`;
+          if (body?.dateFrom) qs += `&transaction_date=gte.${encodeURIComponent(body.dateFrom)}`;
+          if (body?.dateTo)   qs += `&transaction_date=lte.${encodeURIComponent(body.dateTo)}`;
+          const rows = await fetchSupabaseJson(`/rest/v1/transactions?${qs}`);
+          sendJson(res, 200, { transactions: Array.isArray(rows) ? rows : [] });
+          return;
+        }
+
         await sendOrderbookCsvEmail({
           subject: body?.subject,
           csvContent: body?.csvContent,
@@ -600,6 +641,151 @@ const server = http.createServer((req, res) => {
       }
     })();
 
+    return;
+  }
+
+  if (req.url.startsWith('/api/orderbook/reverse-investor') && req.method === 'POST') {
+    const token = parseBearerToken(req.headers.authorization);
+    if (!token) {
+      sendJson(res, 401, { error: 'Missing Authorization bearer token' });
+      return;
+    }
+
+    (async () => {
+      try {
+        await fetchSupabaseJson('/auth/v1/user', token, false);
+        const body = await readJsonBody(req);
+
+        const userId = String(body?.userId || '').trim();
+        const context = body?.context === 'security' ? 'security' : 'strategy';
+        const strategyId = String(body?.strategyId || '').trim();
+        const sourceId = String(body?.sourceId || '').trim();
+        const selectedTxnId = String(body?.selectedTxnId || '').trim();
+        const targetName = String(body?.targetName || 'Order');
+
+        if (!userId) { sendJson(res, 400, { error: 'userId required' }); return; }
+        if (context === 'strategy' && !strategyId) { sendJson(res, 400, { error: 'strategyId required' }); return; }
+        if (context === 'security' && !sourceId) { sendJson(res, 400, { error: 'sourceId required' }); return; }
+
+        // 1. Holdings to delete.
+        const holdingsPath = context === 'strategy'
+          ? `/rest/v1/stock_holdings_c?user_id=eq.${encodeURIComponent(userId)}&strategy_id=eq.${encodeURIComponent(strategyId)}&select=id`
+          : `/rest/v1/stock_holdings_c?id=eq.${encodeURIComponent(sourceId)}&select=id`;
+        const holdingsRows = await fetchSupabaseJson(holdingsPath);
+        const holdingIds = Array.isArray(holdingsRows) ? holdingsRows.map((r) => r.id).filter(Boolean) : [];
+
+        // 2. Resolve refund from the selected transaction.
+        let refundCents = 0;
+        let selectedTxn = null;
+        if (selectedTxnId) {
+          const txns = await fetchSupabaseJson(
+            `/rest/v1/transactions?id=eq.${encodeURIComponent(selectedTxnId)}&user_id=eq.${encodeURIComponent(userId)}&select=id,amount,name,description`
+          );
+          selectedTxn = Array.isArray(txns) && txns[0] ? txns[0] : null;
+          if (!selectedTxn) { sendJson(res, 400, { error: 'Selected transaction not found for this user' }); return; }
+          refundCents = Math.round(Number(selectedTxn.amount || 0));
+        }
+        const refundRand = refundCents / 100;
+
+        // 3. Current wallet (if any).
+        const walletRows = await fetchSupabaseJson(
+          `/rest/v1/wallets?user_id=eq.${encodeURIComponent(userId)}&select=id,balance`
+        );
+        const wallet = Array.isArray(walletRows) && walletRows[0] ? walletRows[0] : null;
+        const balanceBefore = Number(wallet?.balance || 0);
+        const balanceAfter = balanceBefore + refundRand;
+        const nowIso = new Date().toISOString();
+
+        // 4. Delete holdings (service-role bypasses RLS).
+        let deletedCount = 0;
+        if (holdingIds.length) {
+          const deleted = await requestSupabaseJson(
+            `/rest/v1/stock_holdings_c?id=in.(${buildInFilter(holdingIds)})&select=id`,
+            { method: 'DELETE', useServiceRoleAuth: true, extraHeaders: { Prefer: 'return=representation' } }
+          );
+          deletedCount = Array.isArray(deleted) ? deleted.length : 0;
+        }
+
+        // 5. Apply refund.
+        let walletUpdated = false;
+        if (refundRand > 0) {
+          if (wallet) {
+            const updated = await requestSupabaseJson(
+              `/rest/v1/wallets?id=eq.${encodeURIComponent(wallet.id)}&select=id,balance`,
+              {
+                method: 'PATCH',
+                useServiceRoleAuth: true,
+                body: { balance: balanceAfter, updated_at: nowIso },
+                extraHeaders: { Prefer: 'return=representation' }
+              }
+            );
+            walletUpdated = Array.isArray(updated) && updated.length > 0;
+          } else {
+            const created = await requestSupabaseJson(
+              `/rest/v1/wallets?select=id,balance`,
+              {
+                method: 'POST',
+                useServiceRoleAuth: true,
+                body: { user_id: userId, balance: balanceAfter, currency: 'ZAR', updated_at: nowIso },
+                extraHeaders: { Prefer: 'return=representation' }
+              }
+            );
+            walletUpdated = Array.isArray(created) && created.length > 0;
+          }
+        }
+
+        // 6. Audit credit transaction (amount in cents).
+        let auditTxnId = null;
+        if (refundCents > 0) {
+          const auditDescription = JSON.stringify({
+            type: 'reversal',
+            context,
+            strategyId: strategyId || null,
+            sourceId: sourceId || null,
+            name: targetName,
+            holdingIdsDeleted: holdingIds,
+            sourceTxnId: selectedTxn?.id || null,
+          });
+          const created = await requestSupabaseJson(
+            `/rest/v1/transactions?select=id`,
+            {
+              method: 'POST',
+              useServiceRoleAuth: true,
+              body: {
+                user_id: userId,
+                amount: refundCents,
+                direction: 'credit',
+                status: 'posted',
+                name: `Reversal: ${targetName}`,
+                description: auditDescription,
+                currency: 'ZAR',
+                transaction_date: nowIso,
+              },
+              extraHeaders: { Prefer: 'return=representation' }
+            }
+          );
+          auditTxnId = Array.isArray(created) && created[0] ? created[0].id : null;
+        }
+
+        sendJson(res, 200, {
+          ok: true,
+          deletedCount,
+          requestedHoldingIds: holdingIds,
+          refund: refundRand,
+          refundCents,
+          walletUpdated,
+          balanceBefore,
+          balanceAfter: refundRand > 0 ? balanceAfter : balanceBefore,
+          auditTxnId,
+          selectedTxnId: selectedTxn?.id || null,
+        });
+      } catch (error) {
+        sendJson(res, 500, {
+          error: 'Could not reverse investor order',
+          details: error?.message || 'Unknown error'
+        });
+      }
+    })();
     return;
   }
 
