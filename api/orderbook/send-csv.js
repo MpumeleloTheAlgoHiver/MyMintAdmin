@@ -27,12 +27,21 @@ module.exports = async (req, res) => {
       const userId = String(body.userId || '').trim();
       if (!userId) return sendJson(res, 400, { error: 'userId required' });
 
-      // Only "Strategy Investment ..." txns that haven't been reversed yet.
-      let qs = `user_id=eq.${encodeURIComponent(userId)}&name=ilike.${encodeURIComponent('%Strategy Investment%')}&reversed=eq.false&select=id,amount,name,description,direction,status,transaction_date,created_at&order=transaction_date.desc&limit=200`;
-      if (body.dateFrom) qs += `&transaction_date=gte.${encodeURIComponent(body.dateFrom)}`;
-      if (body.dateTo)   qs += `&transaction_date=lte.${encodeURIComponent(body.dateTo)}`;
+      const baseQs = () => {
+        let qs = `user_id=eq.${encodeURIComponent(userId)}&name=ilike.${encodeURIComponent('%Strategy Investment%')}&select=id,amount,name,description,direction,status,transaction_date,created_at&order=transaction_date.desc&limit=200`;
+        if (body.dateFrom) qs += `&transaction_date=gte.${encodeURIComponent(body.dateFrom)}`;
+        if (body.dateTo)   qs += `&transaction_date=lte.${encodeURIComponent(body.dateTo)}`;
+        return qs;
+      };
 
-      const rows = await fetchSupabaseJson(`/rest/v1/transactions?${qs}`);
+      // Try with reversed=eq.false filter first; fall back without it if the
+      // column doesn't exist yet (ALTER TABLE not yet run on this database).
+      let rows;
+      try {
+        rows = await fetchSupabaseJson(`/rest/v1/transactions?${baseQs()}&reversed=eq.false`);
+      } catch (_) {
+        rows = await fetchSupabaseJson(`/rest/v1/transactions?${baseQs()}`);
+      }
       return sendJson(res, 200, { transactions: Array.isArray(rows) ? rows : [] });
     }
 

@@ -622,14 +622,21 @@ const server = http.createServer((req, res) => {
         }
 
         // Action: fetch a user's strategy-investment transactions (service-role bypasses RLS).
-        // Only "Strategy Investment ..." rows that haven't already been reversed.
         if (action === 'get-user-transactions') {
           const userId = String(body?.userId || '').trim();
           if (!userId) { sendJson(res, 400, { error: 'userId required' }); return; }
-          let qs = `user_id=eq.${encodeURIComponent(userId)}&name=ilike.${encodeURIComponent('%Strategy Investment%')}&reversed=eq.false&select=id,amount,name,description,direction,status,transaction_date,created_at&order=transaction_date.desc&limit=200`;
-          if (body?.dateFrom) qs += `&transaction_date=gte.${encodeURIComponent(body.dateFrom)}`;
-          if (body?.dateTo)   qs += `&transaction_date=lte.${encodeURIComponent(body.dateTo)}`;
-          const rows = await fetchSupabaseJson(`/rest/v1/transactions?${qs}`);
+          const buildTxnQs = () => {
+            let qs = `user_id=eq.${encodeURIComponent(userId)}&name=ilike.${encodeURIComponent('%Strategy Investment%')}&select=id,amount,name,description,direction,status,transaction_date,created_at&order=transaction_date.desc&limit=200`;
+            if (body?.dateFrom) qs += `&transaction_date=gte.${encodeURIComponent(body.dateFrom)}`;
+            if (body?.dateTo)   qs += `&transaction_date=lte.${encodeURIComponent(body.dateTo)}`;
+            return qs;
+          };
+          let rows;
+          try {
+            rows = await fetchSupabaseJson(`/rest/v1/transactions?${buildTxnQs()}&reversed=eq.false`);
+          } catch (_) {
+            rows = await fetchSupabaseJson(`/rest/v1/transactions?${buildTxnQs()}`);
+          }
           sendJson(res, 200, { transactions: Array.isArray(rows) ? rows : [] });
           return;
         }
