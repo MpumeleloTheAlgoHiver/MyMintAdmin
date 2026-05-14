@@ -5670,9 +5670,14 @@
           const apiToken = sessionData?.session?.access_token;
           if (!apiToken) throw new Error('Your session has expired. Please sign in again.');
 
-          // No date filter — the deposit often pre-dates the holding's created_at.
-          // Server caps at 200 most-recent rows.
+          const dates = holdings.map((h) => new Date(h.created_at || 0).getTime()).filter((n) => Number.isFinite(n) && n > 0);
+          const minDate = dates.length ? Math.min(...dates) : 0;
+          const maxDate = dates.length ? Math.max(...dates) : 0;
           const txnBody = { userId: payload.userId };
+          if (minDate && maxDate) {
+            txnBody.dateFrom = new Date(minDate - 10 * 24 * 60 * 60 * 1000).toISOString();
+            txnBody.dateTo   = new Date(maxDate + 10 * 24 * 60 * 60 * 1000).toISOString();
+          }
           const txnResp = await fetch('/api/orderbook/send-csv?action=get-user-transactions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` },
