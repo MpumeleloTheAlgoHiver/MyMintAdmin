@@ -615,6 +615,12 @@ const server = http.createServer((req, res) => {
         const body = await readJsonBody(req);
         const action = new URL(req.url, `http://${req.headers.host}`).searchParams.get('action');
 
+        // Action: full reverse-investor operation (delete holdings, refund, audit).
+        if (action === 'reverse-investor') {
+          await runReverseInvestor(res, body);
+          return;
+        }
+
         // Action: fetch a user's strategy-investment transactions (service-role bypasses RLS).
         // Only "Strategy Investment ..." rows that haven't already been reversed.
         if (action === 'get-user-transactions') {
@@ -656,7 +662,19 @@ const server = http.createServer((req, res) => {
       try {
         await fetchSupabaseJson('/auth/v1/user', token, false);
         const body = await readJsonBody(req);
+        await runReverseInvestor(res, body);
+      } catch (error) {
+        sendJson(res, 500, {
+          error: 'Could not reverse investor order',
+          details: error?.message || 'Unknown error'
+        });
+      }
+    })();
+    return;
+  }
 
+  // Helper used by both /api/orderbook/reverse-investor and /api/orderbook/send-csv?action=reverse-investor.
+  async function runReverseInvestor(res, body) {
         const userId = String(body?.userId || '').trim();
         const context = body?.context === 'security' ? 'security' : 'strategy';
         const strategyId = String(body?.strategyId || '').trim();
@@ -810,14 +828,6 @@ const server = http.createServer((req, res) => {
           selectedTxnId: selectedTxn?.id || null,
           sourceTxnReversed,
         });
-      } catch (error) {
-        sendJson(res, 500, {
-          error: 'Could not reverse investor order',
-          details: error?.message || 'Unknown error'
-        });
-      }
-    })();
-    return;
   }
 
   if (req.url.startsWith('/system/orderbook/send-trade-confirmation') && req.method === 'POST') {

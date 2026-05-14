@@ -5812,7 +5812,7 @@
           const apiToken = sessionData?.session?.access_token;
           if (!apiToken) throw new Error('Your session has expired. Please sign in again.');
 
-          const resp = await fetch('/api/orderbook/reverse-investor', {
+          const resp = await fetch('/api/orderbook/send-csv?action=reverse-investor', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` },
             body: JSON.stringify({
