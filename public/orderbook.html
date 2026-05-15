@@ -1446,11 +1446,11 @@
                   <th>Side</th>
                   <th>Total QYT</th>
                   <th>Avg Fill</th>
-                  <th>Total Fill</th>
+                  <th>Expected Fill</th>
                   <th>Order Type</th>
                   <th>Settlement Account</th>
                   <th>Broker Ref</th>
-                  <th>Unrealized PnL</th>
+                  <th>Initial PnL</th>
                 </tr>
               </thead>
               <tbody id="orderbookTableBody">
@@ -1970,7 +1970,7 @@
                 <th>Client Name</th>
                 <th>ID / Reg No</th>
                 <th>Quantity</th>
-                <th>Total Fill</th>
+                <th>Expected Fill</th>
                 <th>Order Timestamp</th>
                 <th>Instruction Type</th>
                 <th>Settlement Ref</th>
@@ -2036,7 +2036,7 @@
                   <th>Client Name</th>
                   <th>ID / Reg No</th>
                   <th>Quantity</th>
-                  <th>Total Fill</th>
+                  <th>Expected Fill</th>
                   <th>Order Timestamp</th>
                   <th>Instruction Type</th>
                   <th>Settlement Ref</th>
@@ -2112,7 +2112,7 @@
                 <th>Client Name</th>
                 <th>ID / Reg No</th>
                 <th>Quantity</th>
-                <th>Total Fill</th>
+                <th>Expected Fill</th>
                 <th>Order Timestamp</th>
                 <th>Instruction Type</th>
                 <th>Settlement Ref</th>
@@ -2251,7 +2251,7 @@
             <td>${escapeHtml(String(h.totalQuantity ?? '-'))}</td>
             <td>${editable ? renderEditableAvgFill(h) : escapeHtml(asRandValue(h.avgFill))}</td>
             <td>${escapeHtml(asRandValue(h.marketValue))}</td>
-            <td>${escapeHtml(String(h.unrealizedPnl ?? '-'))}</td>
+            ${renderInitialPnlCell(h.unrealizedPnlNumber, h.unrealizedPnl)}
           </tr>
         `).join('');
 
@@ -2267,8 +2267,8 @@
                   <th>Side</th>
                   <th>Total QYT</th>
                   <th>Avg Fill</th>
-                  <th>Total Fill</th>
-                  <th>Unrealized PnL</th>
+                  <th>Expected Fill</th>
+                  <th>Initial PnL</th>
                 </tr>
               </thead>
               <tbody>${hBody}</tbody>
@@ -2327,7 +2327,7 @@
                   <th>Client Name</th>
                   <th>Account ID</th>
                   <th>ID / Reg No</th>
-                  <th>Total Fill</th>
+                  <th>Expected Fill</th>
                   <th>Holdings</th>
                   ${deleteHeader}
                   ${reverseHeader}
@@ -2791,7 +2791,7 @@
         'Security Description',
         'Quantity',
         'Balance Type',
-        'Total Fill',
+        'Expected Fill',
         'Record Date',
         'Settlement Ref',
         'Trailer Total Records'
@@ -3023,6 +3023,13 @@
       return `R ${numeric.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
+    const renderInitialPnlCell = (pnlNumber, pnlText) => {
+      const n = Number(pnlNumber);
+      const color = Number.isFinite(n) && n > 0 ? '#059669' : (Number.isFinite(n) && n < 0 ? '#dc2626' : '#64748b');
+      const display = pnlText !== undefined && pnlText !== null ? String(pnlText) : '-';
+      return `<td style="color:${color};font-weight:600;">${escapeHtml(display)}</td>`;
+    };
+
     const buildStrateBirIndividuals = (lines) => {
       const parsedRows = lines.map((line, index) => parseStrateBirLine(line, index + 1));
       const byOwnerRef = {};
@@ -3101,7 +3108,7 @@
           <th>Account</th>
           <th>Owner Type</th>
           <th>Holdings</th>
-          <th>Total Fill</th>
+          <th>Expected Fill</th>
           <th>Country</th>
         </tr>
       `;
@@ -3170,7 +3177,7 @@
                         <th>Security</th>
                         <th>Quantity</th>
                         <th>Balance Type</th>
-                        <th>Total Fill</th>
+                        <th>Expected Fill</th>
                         <th>Record Date</th>
                         <th>Settlement Ref</th>
                       </tr>
@@ -4102,7 +4109,7 @@
                 <td>${escapeHtml(row.orderType || '-')}</td>
                 <td>${escapeHtml(row.settlementAccount || '')}</td>
                 <td>${escapeHtml(row.brokerRef || '')}</td>
-                <td>${escapeHtml(String(row.unrealizedPnl ?? '-'))}</td>
+                ${renderInitialPnlCell(row.unrealizedPnlNumber, row.unrealizedPnl)}
                 ${showActiveBooksFilledColumn ? `<td><span class="filled-status-pill ${rowFillStatus.filled ? 'is-filled' : 'is-open'}">${escapeHtml(rowFillStatus.text)}</span></td>` : ''}
               </tr>
               <tr class="orderbook-detail-row is-hidden" data-archive-detail-row data-archive-line-key="${escapeHtml(rowKey)}">
@@ -4138,11 +4145,11 @@
                         <th>Side</th>
                         <th>Total QYT</th>
                         <th>Avg Fill</th>
-                        <th>Total Fill</th>
+                        <th>Expected Fill</th>
                         <th>Order Type</th>
                         <th>Settlement Account</th>
                         <th>Broker Ref</th>
-                        <th>Unrealized PnL <span class="orderbook-plus-toggle" data-toggle-filled-col title="Toggle filled status">+</span></th>
+                        <th>Initial PnL <span class="orderbook-plus-toggle" data-toggle-filled-col title="Toggle filled status">+</span></th>
                         ${showActiveBooksFilledColumn ? '<th>Filled</th>' : ''}
                       </tr>
                     </thead>
@@ -4305,7 +4312,7 @@
               <td>${escapeHtml(row.orderType || '-')}</td>
               <td>${escapeHtml(row.settlementAccount || '')}</td>
               <td>${escapeHtml(row.brokerRef || '')}</td>
-              <td>${escapeHtml(String(row.unrealizedPnl ?? '-'))}</td>
+              ${renderInitialPnlCell(row.unrealizedPnlNumber, row.unrealizedPnl)}
             </tr>
             <tr class="orderbook-detail-row is-hidden" data-closed-detail-row data-closed-line-key="${escapeHtml(rowKey)}">
               <td colspan="12">
@@ -4340,11 +4347,11 @@
                       <th>Side</th>
                       <th>Total QYT</th>
                       <th>Avg Fill</th>
-                      <th>Total Fill</th>
+                      <th>Expected Fill</th>
                       <th>Order Type</th>
                       <th>Settlement Account</th>
                       <th>Broker Ref</th>
-                      <th>Unrealized PnL</th>
+                      <th>Initial PnL</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -4673,7 +4680,7 @@
                 ${brokerRefOptions}
               </select>
             </td>
-            <td>${escapeHtml(String(row.unrealizedPnl ?? '-'))}</td>
+            ${renderInitialPnlCell(row.unrealizedPnlNumber, row.unrealizedPnl)}
           </tr>
           <tr class="orderbook-detail-row is-hidden" data-orderbook-detail-row data-line-key="${lineKey}">
             <td colspan="12">
@@ -4900,13 +4907,17 @@
         const hasAvgFill = Number.isFinite(avgFillValue);
         const lastPrice = Number(security.last_price);
         const hasLastPrice = Number.isFinite(lastPrice);
-        const totalFillPrice = hasAvgFill ? avgFillValue : (hasLastPrice ? lastPrice : NaN);
-        const hasTotalFillPrice = Number.isFinite(totalFillPrice);
-        const computedMarketValueNumber = (isQuantityNumeric && hasTotalFillPrice)
-          ? (Math.abs(quantityValue) * totalFillPrice)
+        // Expected Fill uses current market price primarily, falls back to avg fill.
+        const expectedFillPrice = hasLastPrice ? lastPrice : (hasAvgFill ? avgFillValue : NaN);
+        const hasExpectedFillPrice = Number.isFinite(expectedFillPrice);
+        const computedMarketValueNumber = (isQuantityNumeric && hasExpectedFillPrice)
+          ? (Math.abs(quantityValue) * expectedFillPrice)
           : 0;
-        const unrealizedPnlValue = Number(row.unrealized_pnl);
-        const normalizedUnrealizedPnlNumber = Number.isFinite(unrealizedPnlValue) ? unrealizedPnlValue : 0;
+        // Initial PnL = qty × (lastPrice − avgFill). Only meaningful when both prices are known.
+        const computedInitialPnlNumber = (isQuantityNumeric && hasAvgFill && hasLastPrice)
+          ? (Math.abs(quantityValue) * (lastPrice - avgFillValue))
+          : 0;
+        const normalizedUnrealizedPnlNumber = computedInitialPnlNumber;
         const explicitSide = String(row.trade_side || '').trim().toUpperCase();
         const side = (explicitSide === 'BUY' || explicitSide === 'SELL')
           ? explicitSide
@@ -4920,12 +4931,12 @@
         const avgFill = hasAvgFill
           ? `R ${avgFillValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : '-';
-        const marketValue = (isQuantityNumeric && hasTotalFillPrice)
+        const marketValue = (isQuantityNumeric && hasExpectedFillPrice)
           ? `R ${computedMarketValueNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : '-';
-        const unrealizedPnl = Number.isFinite(unrealizedPnlValue)
-          ? normalizedUnrealizedPnlNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-          : (row.unrealized_pnl ?? '-');
+        const unrealizedPnl = (isQuantityNumeric && hasAvgFill && hasLastPrice)
+          ? computedInitialPnlNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : '-';
 
         return {
           sourceId: row.id || '',
