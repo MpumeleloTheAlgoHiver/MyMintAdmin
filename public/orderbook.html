@@ -4796,7 +4796,7 @@
               (data || []).forEach((row) => {
                 if (row.security_id && !seen.has(row.security_id) && row.current_price != null) {
                   seen.add(row.security_id);
-                  intradayPriceMap[row.security_id] = Number(row.current_price);
+                  intradayPriceMap[row.security_id] = Number(row.current_price) / 100;
                 }
               });
             })
