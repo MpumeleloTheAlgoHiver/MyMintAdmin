@@ -94,7 +94,8 @@ module.exports = async (req, res) => {
         );
         familyMember = Array.isArray(fmRows) && fmRows[0] ? fmRows[0] : null;
         if (!familyMember) return sendJson(res, 400, { error: 'Family member not found' });
-        balanceBefore = Number(familyMember.available_balance || 0);
+        // available_balance is in cents — work in Rands to stay consistent with wallets.
+        balanceBefore = Number(familyMember.available_balance || 0) / 100;
       } else {
         const walletRows = await fetchSupabaseJson(
           `/rest/v1/wallets?user_id=eq.${encodeURIComponent(userId)}&select=id,balance`
@@ -135,7 +136,7 @@ module.exports = async (req, res) => {
         if (familyMember) {
           const updated = await requestSupabaseJson(
             `/rest/v1/family_members?id=eq.${encodeURIComponent(familyMember.id)}&select=id,available_balance`,
-            { method: 'PATCH', useServiceRoleAuth: true, body: { available_balance: balanceAfter, updated_at: nowIso }, extraHeaders: { Prefer: 'return=representation' } }
+            { method: 'PATCH', useServiceRoleAuth: true, body: { available_balance: Math.round(balanceAfter * 100), updated_at: nowIso }, extraHeaders: { Prefer: 'return=representation' } }
           );
           walletUpdated = Array.isArray(updated) && updated.length > 0;
         } else if (wallet) {

@@ -728,7 +728,8 @@ const server = http.createServer((req, res) => {
           );
           familyMember = Array.isArray(fmRows) && fmRows[0] ? fmRows[0] : null;
           if (!familyMember) { sendJson(res, 400, { error: 'Family member not found' }); return; }
-          balanceBefore = Number(familyMember.available_balance || 0);
+          // available_balance is in cents — work in Rands to stay consistent with wallets.
+          balanceBefore = Number(familyMember.available_balance || 0) / 100;
         } else {
           const walletRows = await fetchSupabaseJson(
             `/rest/v1/wallets?user_id=eq.${encodeURIComponent(userId)}&select=id,balance`
@@ -772,7 +773,7 @@ const server = http.createServer((req, res) => {
               {
                 method: 'PATCH',
                 useServiceRoleAuth: true,
-                body: { available_balance: balanceAfter, updated_at: nowIso },
+                body: { available_balance: Math.round(balanceAfter * 100), updated_at: nowIso },
                 extraHeaders: { Prefer: 'return=representation' }
               }
             );

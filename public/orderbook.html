@@ -5711,7 +5711,8 @@
               .maybeSingle();
             if (fmErr) throw new Error(fmErr.message);
             _reverseState.walletId = fmRow?.id || null;
-            _reverseState.walletBefore = Number(fmRow?.available_balance || 0);
+            // available_balance is stored in cents — convert to Rands for display.
+            _reverseState.walletBefore = Number(fmRow?.available_balance || 0) / 100;
           } else {
             const { data: walletRow, error: wErr } = await supabaseClient
               .from('wallets')
