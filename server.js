@@ -1016,17 +1016,29 @@ const server = http.createServer((req, res) => {
             ? new Date(holding.fill_date).toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })
             : currentDateStr;
 
+          const isStrategy = !!holding.strategy_id;
           const quantityDisplay = parseFloat(quantity.toFixed(4)).toLocaleString('en-ZA');
           const nominalDisplay = `${quantityDisplay} @ R ${avgFill}`;
 
-          htmlContent = buildEmailHtml({
-            firstName,
-            mintRef: ref,
-            orderDate: execDate,
-            tableRowsHtml: buildTradeRow(side, ticker, nominalDisplay),
-            subjectHeading: 'Order Executed.',
-            subjectIntro: `your trade for <strong>${security.name || ticker}</strong> has been successfully filled and allocated to your <strong>${strategyName}</strong> portfolio.`
-          });
+          if (isStrategy) {
+            htmlContent = buildEmailHtml({
+              firstName,
+              mintRef: ref,
+              orderDate: execDate,
+              tableRowsHtml: buildTradeRow(side, ticker, nominalDisplay),
+              subjectHeading: 'Basket Purchased.',
+              subjectIntro: `You have successfully purchased the <strong>${strategyName}</strong> basket. Your trade for <strong>${security.name || ticker}</strong> has been filled as part of this allocation.`
+            });
+          } else {
+            htmlContent = buildEmailHtml({
+              firstName,
+              mintRef: ref,
+              orderDate: execDate,
+              tableRowsHtml: buildTradeRow(side, ticker, nominalDisplay),
+              subjectHeading: 'Asset Purchased.',
+              subjectIntro: `You have successfully purchased a single asset. Your trade for <strong>${security.name || ticker}</strong> has been successfully filled.`
+            });
+          }
 
         } else {
           // ── Portfolio realignment (batch) ──────────────────────────────────
@@ -1063,8 +1075,8 @@ const server = http.createServer((req, res) => {
             mintRef: batchRef,
             orderDate: batchDate,
             tableRowsHtml,
-            subjectHeading: 'Orders Executed.',
-            subjectIntro: `the realignment of your <strong>${strategyName}</strong> portfolio has been completed. The following trades were executed:`
+            subjectHeading: 'Basket Purchased.',
+            subjectIntro: `You have successfully purchased the <strong>${strategyName}</strong> basket. The following trades were executed to build your portfolio:`
           });
         }
 

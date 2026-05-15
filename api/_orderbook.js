@@ -269,10 +269,6 @@ const handleSendTradeConfirmation = async (req, res, token) => {
           <td style="padding:12px 16px;font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:#64748b;border-bottom:1px solid #e2e8f0;font-weight:700;">Reference</td>
           <td style="padding:12px 16px;font-size:13px;color:#7c3aed;font-weight:700;text-align:right;border-bottom:1px solid #e2e8f0;font-family:monospace;">${ref}</td>
         </tr>
-        <tr style="background:#fffbeb;">
-          <td style="padding:12px 16px;font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:#64748b;border-bottom:1px solid #e2e8f0;font-weight:700;">Status</td>
-          <td style="padding:12px 16px;font-size:13px;color:#d97706;font-weight:700;text-align:right;border-bottom:1px solid #e2e8f0;">Pending Settlement</td>
-        </tr>
       `;
     };
 
@@ -346,18 +342,30 @@ const handleSendTradeConfirmation = async (req, res, token) => {
         ? new Date(holding.fill_date).toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })
         : currentDateStr;
 
+      const isStrategy = !!holding.strategy_id;
       const quantityDisplay = Number(quantity).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 4 });
       const totalAmountValue = (quantity * (holding.avg_fill || 0)) / 100;
       const totalAmountStr = `R ${totalAmountValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-      htmlContent = buildEmailHtml({
-        firstName,
-        mintRef: ref,
-        orderDate: execDate,
-        tableRowsHtml: buildTradeRow({ side, assetName: security.name || ticker, quantityDisplay, totalAmountStr, ref }),
-        subjectHeading: 'Order Executed.',
-        subjectIntro: `Your trade for <strong>${security.name || ticker}</strong> has been successfully filled and allocated to your <strong>${strategyName}</strong> portfolio.`
-      });
+      if (isStrategy) {
+        htmlContent = buildEmailHtml({
+          firstName,
+          mintRef: ref,
+          orderDate: execDate,
+          tableRowsHtml: buildTradeRow({ side, assetName: security.name || ticker, quantityDisplay, totalAmountStr, ref }),
+          subjectHeading: 'Basket Purchased.',
+          subjectIntro: `You have successfully purchased the <strong>${strategyName}</strong> basket. Your trade for <strong>${security.name || ticker}</strong> has been filled as part of this allocation.`
+        });
+      } else {
+        htmlContent = buildEmailHtml({
+          firstName,
+          mintRef: ref,
+          orderDate: execDate,
+          tableRowsHtml: buildTradeRow({ side, assetName: security.name || ticker, quantityDisplay, totalAmountStr, ref }),
+          subjectHeading: 'Asset Purchased.',
+          subjectIntro: `You have successfully purchased a single asset. Your trade for <strong>${security.name || ticker}</strong> has been successfully filled.`
+        });
+      }
 
     } else {
       subject = 'Portfolio Realignment — MINT';
@@ -399,8 +407,8 @@ const handleSendTradeConfirmation = async (req, res, token) => {
         mintRef: batchRef,
         orderDate: batchDate,
         tableRowsHtml,
-        subjectHeading: 'Orders Executed.',
-        subjectIntro: `The realignment of your <strong>${strategyName}</strong> portfolio has been completed. The following trades were executed:`
+        subjectHeading: 'Basket Purchased.',
+        subjectIntro: `You have successfully purchased the <strong>${strategyName}</strong> basket. The following trades were executed to build your portfolio:`
       });
     }
 
