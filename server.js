@@ -806,15 +806,7 @@ const server = http.createServer((req, res) => {
         // 6. Audit credit transaction (amount in cents).
         let auditTxnId = null;
         if (refundCents > 0) {
-          const auditDescription = JSON.stringify({
-            type: 'reversal',
-            context,
-            strategyId: strategyId || null,
-            sourceId: sourceId || null,
-            name: targetName,
-            holdingIdsDeleted: holdingIds,
-            sourceTxnId: selectedTxn?.id || null,
-          });
+          const auditDescription = `Order reversal for ${targetName}. ${holdingIds.length} holding(s) removed.`;
           const created = await requestSupabaseJson(
             `/rest/v1/transactions?select=id`,
             {
