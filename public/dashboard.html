@@ -3400,7 +3400,7 @@
           const intradayChangeAbs = iv['1d_abs'] != null ? Number(iv['1d_abs']) / 100 : null;
           const intradayChangePct = iv['1d_pct'] != null ? Number(iv['1d_pct']) : null;
           metricsMap[secId] = {
-            last_price:       intradayPrice ?? (sr.current_price != null ? Number(sr.current_price) / 100 : null),
+            last_price:       intradayPrice,
             change_percent:   intradayChangePct,
             ytd_performance:  sr.ytd_pct       ?? null,
             mtd_performance:  sr['1m_pct']     ?? null,
@@ -8509,7 +8509,6 @@
 
         rebBuySecuritiesPromise = (async () => {
           const selectVariants = [
-            "id, symbol, name, logo_url, last_price",
             "id, symbol, name, logo_url",
             "id, symbol, name",
           ];
@@ -8527,10 +8526,29 @@
             }
           }
 
+          /* Latest intraday price per symbol — chunked .in queries, first-write-wins on DESC timestamp */
+          const intradayBySymbol = {};
+          const symbols = (rows || []).map(s => String(s.symbol || "")).filter(Boolean);
+          const CHUNK = 50;
+          for (let i = 0; i < symbols.length; i += CHUNK) {
+            const chunk = symbols.slice(i, i + CHUNK);
+            const { data: rs } = await supabaseClient
+              .from("stock_intraday_c")
+              .select("symbol, current_price, timestamp")
+              .in("symbol", chunk)
+              .order("timestamp", { ascending: false });
+            (rs || []).forEach(r => {
+              if (r.symbol && intradayBySymbol[r.symbol] == null) {
+                intradayBySymbol[r.symbol] = Number(r.current_price);
+              }
+            });
+          }
+
           rebBuySecuritiesCache = (rows || []).map((s) => {
             const rawSymbol = String(s.symbol || "");
             const code = rawSymbol.replace(/\.[A-Z]+$/, "") || rawSymbol || "-";
-            const currentPrice = Number(s.last_price || 0);
+            const priceCents = intradayBySymbol[rawSymbol];
+            const currentPrice = priceCents != null ? priceCents / 100 : 0;
             return {
               id: String(s.id || code),
               code,
@@ -8582,10 +8600,9 @@
           .filter(h => h.symbol || h.ticker)
           .map(h => {
             const sym = h.symbol || h.ticker || "";
-            const price = h.last_price ? h.last_price : 0;
             const units = Math.max(1, Math.round(Number(h.shares) || 1));
             const code = sym.replace(/\.[A-Z]+$/, "");
-            return { code, fullSymbol: sym, description: h.name || sym, unitsPerLot: units, currentPrice: price, weightPercent: Number(h.weight) || 0 };
+            return { code, fullSymbol: sym, description: h.name || sym, unitsPerLot: units, currentPrice: 0, weightPercent: Number(h.weight) || 0 };
           });
 
         /* Fetch actual client holdings from Supabase */
@@ -8606,12 +8623,9 @@
             rebIsins = rebIsins.map((isin) => {
               const sec = secBySymbol.get(isin.fullSymbol);
               const secPrice = Number(sec?.last_price || 0);
-              const resolvedPrice = isin.currentPrice > 0
-                ? isin.currentPrice
-                : (Number.isFinite(secPrice) && secPrice > 0 ? secPrice : 0);
               return {
                 ...isin,
-                currentPrice: resolvedPrice,
+                currentPrice: Number.isFinite(secPrice) && secPrice > 0 ? secPrice : 0,
                 description: isin.description || sec?.name || isin.code,
               };
             });
