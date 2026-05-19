@@ -5311,22 +5311,25 @@
               <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;color:#f1f5f9;">Fill &amp; Settle Rebalance</h3>
               <p style="margin:0 0 20px;font-size:13px;color:#94a3b8;">${batch.strategy_name_snapshot || batch.strategy_id} — ${events.length} events for ${[...new Set(events.map((e)=>e.user_id))].length} clients</p>
               <div style="display:grid;gap:14px;">
+                ${sellEvts.length ? `
                 <div>
                   <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">SELL Fill Price (R) — ${totalSellQty} units · committed ${fmtRand(sellEvts[0]?.price_at_commit)}</label>
                   <input id="fillSellPrice" type="number" step="0.01" min="0" value="${sellCommitR}" placeholder="e.g. 142.50"
                     style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
-                </div>
+                </div>` : ''}
+                ${buyEvts.length ? `
                 <div>
                   <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">BUY Fill Price (R) — ${totalBuyQty} units · committed ${fmtRand(buyEvts[0]?.price_at_commit)}</label>
                   <input id="fillBuyPrice" type="number" step="0.01" min="0" value="${buyCommitR}" placeholder="e.g. 98.20"
                     style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
-                </div>
+                </div>` : ''}
                 ${walletBuyEvts.length ? `
                 <div>
                   <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">Extra BUY Fill Price (R) — ${totalExtraQty} units · committed ${fmtRand(walletBuyEvts[0]?.price_at_commit)}</label>
                   <input id="fillExtraBuyPrice" type="number" step="0.01" min="0" value="${extraCommitR}" placeholder="e.g. 98.20"
                     style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
                 </div>` : ''}
+                ${!sellEvts.length && !buyEvts.length && !walletBuyEvts.length ? '<p style="color:#fca5a5;font-size:13px;">No events to settle in this batch.</p>' : ''}
               </div>
               <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:24px;">
                 <button id="fillSettleCancelBtn" style="padding:10px 20px;background:transparent;border:1px solid #475569;border-radius:8px;color:#94a3b8;font-size:14px;cursor:pointer;">Cancel</button>
@@ -5342,12 +5345,14 @@
 
           const confirmBtn = document.getElementById('fillSettleConfirmBtn');
           confirmBtn.addEventListener('click', async () => {
-            const sellR = parseFloat(document.getElementById('fillSellPrice')?.value || '0');
-            const buyR = parseFloat(document.getElementById('fillBuyPrice')?.value || '0');
+            const sellInput = document.getElementById('fillSellPrice');
+            const buyInput = document.getElementById('fillBuyPrice');
             const extraBuyInput = document.getElementById('fillExtraBuyPrice');
+            const sellR = sellInput ? parseFloat(sellInput.value || '0') : 0;
+            const buyR = buyInput ? parseFloat(buyInput.value || '0') : 0;
             const extraBuyR = extraBuyInput ? parseFloat(extraBuyInput.value || '0') : 0;
-            if (!sellR || sellR <= 0) { alert('Enter a valid SELL fill price.'); return; }
-            if (!buyR || buyR <= 0) { alert('Enter a valid BUY fill price.'); return; }
+            if (sellEvts.length && (!sellR || sellR <= 0)) { alert('Enter a valid SELL fill price.'); return; }
+            if (buyEvts.length && (!buyR || buyR <= 0)) { alert('Enter a valid BUY fill price.'); return; }
             if (walletBuyEvts.length && (!extraBuyR || extraBuyR <= 0)) { alert('Enter a valid Extra BUY fill price.'); return; }
             confirmBtn.disabled = true;
             confirmBtn.textContent = 'Settling…';
