@@ -1375,10 +1375,11 @@
                           <th class="text-right px-4 py-2">Current</th>
                           <th class="text-right px-4 py-2">New</th>
                           <th class="text-right px-4 py-2">Δ</th>
+                          <th class="text-right px-4 py-2">P/L</th>
                         </tr>
                       </thead>
                       <tbody id="rebImpactBody">
-                        <tr><td colspan="5" class="px-4 py-8 text-center text-slate-400">No impact data yet</td></tr>
+                        <tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">No impact data yet</td></tr>
                       </tbody>
                     </table>
                   </div>
@@ -8451,6 +8452,8 @@
             // Use floor so a client with fewer shares than one full lot gets 0 lots
             // (not inflated to 1) — then filter those out entirely
             lots: Math.floor(r.quantity / isin.unitsPerLot),
+            quantity: Number(r.quantity) || 0,
+            avgFillR: (Number(r.avgFillCents) || 0) / 100,
           }))
           .filter(r => r.lots > 0);
       }
@@ -8623,7 +8626,7 @@
             if (secIds.length) {
               let holdingsQuery = supabaseClient
                 .from("stock_holdings_c")
-                .select("security_id, user_id, quantity, strategy_id")
+                .select("security_id, user_id, quantity, avg_fill, strategy_id")
                 .eq("is_active", true)
                 .eq("trade_side", "BUY")
                 .in("security_id", secIds);
@@ -8716,9 +8719,20 @@
                 if (!code) return;
                 if (!rebRawHoldings[code]) rebRawHoldings[code] = [];
                 const uid = String(r.user_id);
+                const qty = Number(r.quantity) || 0;
+                /* avg_fill stored in cents (consistent with orderbook PnL convention) */
+                const fillCents = Number(r.avg_fill) || 0;
                 const existing = rebRawHoldings[code].find(x => x.userId === uid);
-                if (existing) { existing.quantity += Number(r.quantity) || 0; }
-                else { rebRawHoldings[code].push({ userId: uid, name: nameById[uid] || uid, quantity: Number(r.quantity) || 0 }); }
+                if (existing) {
+                  /* Weighted-average the fill across multiple rows for the same client */
+                  const totalQty = existing.quantity + qty;
+                  existing.avgFillCents = totalQty > 0
+                    ? ((existing.avgFillCents * existing.quantity) + (fillCents * qty)) / totalQty
+                    : 0;
+                  existing.quantity = totalQty;
+                } else {
+                  rebRawHoldings[code].push({ userId: uid, name: nameById[uid] || uid, quantity: qty, avgFillCents: fillCents });
+                }
               });
             }
         } catch (e) { console.warn("rebLoadStrategy: holdings fetch failed", e); }
@@ -8914,8 +8928,21 @@
             <th class="text-right px-4 py-2">Current</th>
             <th class="text-right px-4 py-2">New</th>
             <th class="text-right px-4 py-2">Δ</th>
+            <th class="text-right px-4 py-2">P/L</th>
           `;
         };
+
+        /* PnL per client per ISIN: quantity × (currentPriceR - avgFillR) */
+        const rebPnlForIsinClient = (isin, client) => {
+          if (!isin || !client) return null;
+          const price = Number(isin.currentPrice) || 0;
+          const fill = Number(client.avgFillR) || 0;
+          const qty = Number(client.quantity) || 0;
+          if (price <= 0 || fill <= 0 || qty <= 0) return null;
+          return qty * (price - fill);
+        };
+        const rebPnlClass = (v) => v == null ? 'text-slate-400' : v > 0 ? 'text-green-600' : v < 0 ? 'text-red-600' : 'text-slate-500';
+        const rebPnlFmt   = (v) => v == null ? '—' : (v > 0 ? '+' : '') + rebFmtZAR(v);
 
         const setChangeHeaders = () => {
           if (!headerRow) return;
@@ -8940,7 +8967,7 @@
         const residualClients = rebResidualClientsForStrategy();
         if (!rebSelectedIsin) {
           const strategyClients = rebClientsForStrategy();
-          const colSpan = rebImpactChangeView ? 6 : 5;
+          const colSpan = 6;
           if (!strategyClients.length) {
             tbody.innerHTML = `<tr><td colspan="${colSpan}" class="px-4 py-8 text-center text-slate-400">${
               rebIsins.length ? "No clients hold this strategy" : "Select a strategy"
@@ -8978,11 +9005,27 @@
           }
           const pendingLabel = pendingUserIds.size > 0 ? ` · ${pendingUserIds.size} pending` : '';
           if (metaEl) metaEl.textContent = `Strategy-level preview · ${strategyClients.length} clients${pendingLabel} · select instrument + step for impact`;
+          /* Total PnL per client across all securities they hold in this strategy */
+          const isinByCode = Object.fromEntries((rebIsins || []).map(i => [i.code, i]));
+          const totalPnlByClient = {};
+          Object.entries(rebRawHoldings || {}).forEach(([code, rows]) => {
+            const isin = isinByCode[code];
+            if (!isin || !(Number(isin.currentPrice) > 0)) return;
+            (rows || []).forEach((r) => {
+              const fillR = (Number(r.avgFillCents) || 0) / 100;
+              const qty = Number(r.quantity) || 0;
+              if (fillR <= 0 || qty <= 0) return;
+              const pnl = qty * (Number(isin.currentPrice) - fillR);
+              totalPnlByClient[String(r.userId)] = (totalPnlByClient[String(r.userId)] || 0) + pnl;
+            });
+          });
           tbody.innerHTML = strategyClients.map(client => {
             const isPendingClient = pendingUserIds.has(String(client.id));
             const rowBg = isPendingClient ? 'bg-amber-50' : 'hover:bg-slate-50';
             const rowStyle = isPendingClient ? 'style="border-left:3px solid #f59e0b;"' : '';
             const nameBadge = isPendingClient ? ' <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;">Pending</span>' : '';
+            const pnl = totalPnlByClient[String(client.id)];
+            const pnlVal = pnl != null ? pnl : null;
             return `
           <tr class="${rowBg}" ${rowStyle}>
             <td class="px-4 py-2.5">
@@ -8993,13 +9036,14 @@
             <td class="px-4 py-2.5 text-right font-mono tabular-nums ${isPendingClient ? 'text-amber-700' : 'text-slate-700'}">${client.totalCurrentHolding.toLocaleString()}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold ${isPendingClient ? 'text-amber-700' : 'text-slate-700'}">${client.totalCurrentHolding.toLocaleString()}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-400">0</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold ${rebPnlClass(pnlVal)}">${rebPnlFmt(pnlVal)}</td>
           </tr>`;
           }).join("");
           return;
         }
 
         if (!clients.length) {
-          tbody.innerHTML = `<tr><td colspan="${rebImpactChangeView ? 6 : 5}" class="px-4 py-8 text-center text-slate-400">${
+          tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">${
             "No clients hold this instrument"
           }</td></tr>`;
           if (metaEl) metaEl.textContent = "No holders";
@@ -9017,6 +9061,7 @@
             const rowCls = isPend ? 'bg-amber-50' : 'hover:bg-slate-50';
             const rowSty = isPend ? 'style="border-left:3px solid #f59e0b;"' : '';
             const badge = isPend ? ' <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;">Pending</span>' : '';
+            const pnl = rebPnlForIsinClient(rebSelectedIsin, client);
             return `
           <tr class="${rowCls}" ${rowSty}>
             <td class="px-4 py-2.5">
@@ -9027,6 +9072,7 @@
             <td class="px-4 py-2.5 text-right font-mono tabular-nums ${isPend ? 'text-amber-700' : 'text-slate-700'}">${currentHolding.toLocaleString()}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold ${isPend ? 'text-amber-700' : 'text-slate-700'}">${currentHolding.toLocaleString()}</td>
             <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-slate-400">0</td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold ${rebPnlClass(pnl)}">${rebPnlFmt(pnl)}</td>
           </tr>`;
           }).join("");
           return;
@@ -9080,11 +9126,13 @@
         if (rebPendingRebalance) rebPendingRebalance.events.forEach(ev => pendingUids2.add(String(ev.user_id)));
         if (metaEl) metaEl.textContent = `${rebSelectedIsin.code} · ${impacts.length} clients${hasErrors ? " · ⚠ Negative holdings" : ""}`;
 
+        const clientById = Object.fromEntries((clients || []).map(c => [String(c.id), c]));
         tbody.innerHTML = impacts.map(imp => {
           const isPend = pendingUids2.has(String(imp.clientId));
           const rowCls = imp.hasNegative ? "bg-red-50" : isPend ? "bg-amber-50" : "hover:bg-slate-50";
           const rowSty = isPend ? 'style="border-left:3px solid #f59e0b;"' : '';
           const badge = isPend ? ' <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;">Pending</span>' : '';
+          const pnl = rebPnlForIsinClient(rebSelectedIsin, clientById[String(imp.clientId)]);
           return `
           <tr class="${rowCls}" ${rowSty}>
             <td class="px-4 py-2.5">
@@ -9097,6 +9145,7 @@
             <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold ${imp.delta < 0 ? "text-red-600" : imp.delta > 0 ? "text-green-600" : "text-slate-400"}">
               ${imp.delta > 0 ? "+" : ""}${imp.delta.toLocaleString()}
             </td>
+            <td class="px-4 py-2.5 text-right font-mono tabular-nums font-semibold ${rebPnlClass(pnl)}">${rebPnlFmt(pnl)}</td>
           </tr>`;
         }).join("");
       }
