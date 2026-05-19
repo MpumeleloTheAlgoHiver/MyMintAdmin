@@ -1158,6 +1158,26 @@
       cursor: not-allowed;
     }
     .reverse-investor-btn svg { width: 14px; height: 14px; }
+    .investor-row { cursor: pointer; transition: background 0.12s ease; }
+    .investor-row:hover { background: #f5f3ff; }
+    .investor-row.selected { background: #ede9fe; box-shadow: inset 4px 0 0 #7c3aed; }
+    .investor-row.selected td { color: #5b21b6; font-weight: 600; }
+    .investor-detail-panel { background: linear-gradient(180deg,#faf5ff,#fff); border: 1px solid #ddd6fe; border-radius: 12px; padding: 14px 16px; margin-top: 12px; }
+    .investor-detail-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e9d5ff; }
+    .investor-detail-panel-title { font-size: 13px; font-weight: 700; color: #5b21b6; }
+    .investor-detail-panel-sub { font-size: 11px; color: #7c3aed; font-weight: 500; margin-top: 2px; }
+    .investor-detail-panel-close { background: none; border: none; color: #7c3aed; cursor: pointer; font-size: 12px; padding: 4px 8px; border-radius: 6px; }
+    .investor-detail-panel-close:hover { background: #ede9fe; }
+    .investor-detail-panel table { width: 100%; font-size: 11px; border-collapse: collapse; }
+    .investor-detail-panel th { text-align: left; padding: 6px 8px; font-weight: 500; color: #94a3b8; border-bottom: 1px solid #e9d5ff; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .investor-detail-panel td { padding: 6px 8px; color: #1e293b; border-bottom: 1px solid #f1f5f9; }
+    .investor-detail-panel td.r { text-align: right; font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+    .investor-detail-pnl-pos { color: #059669; font-weight: 600; }
+    .investor-detail-pnl-neg { color: #dc2626; font-weight: 600; }
+    .investor-detail-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+    .investor-detail-summary-card { background: rgba(255,255,255,0.7); border-radius: 8px; padding: 8px 10px; }
+    .investor-detail-summary-label { font-size: 9px; color: #94a3b8; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+    .investor-detail-summary-value { font-size: 13px; font-weight: 700; color: #0f172a; font-family: ui-monospace, monospace; margin-top: 2px; }
     .reverse-summary-block {
       background: #f8fafc;
       border: 1px solid #e2e8f0;
@@ -2231,6 +2251,97 @@
         .map((row, i) => ({ ...row, line: i + 1 }));
     };
 
+    /* Selected investor in the per-user fill panel — keyed by `${userId}|${familyMemberId}` */
+    let selectedInvestorKey = null;
+
+    /* Walk allOrderbookRawRows to find the selected investor's individual
+       holdings under the strategy. Each user's avg_fill and PnL is preserved
+       per stock_holdings_c row in the raw rows. */
+    const collectInvestorHoldings = (strategyId, userId, familyMemberId) => {
+      if (!strategyId || !userId) return [];
+      const targetFm = familyMemberId || '';
+      return (allOrderbookRawRows || [])
+        .filter((r) => {
+          if (String(r.strategyId || '') !== String(strategyId)) return;
+          if (String(r.userId || '') !== String(userId)) return;
+          return String(r.familyMemberId || '') === String(targetFm);
+        })
+        .sort((a, b) => String(a.instrumentName || '').localeCompare(String(b.instrumentName || '')));
+    };
+
+    const renderInvestorDetailPanel = (strategyRow) => {
+      if (!selectedInvestorKey) return '';
+      const users = strategyRow?.strategyUsers || [];
+      const selected = users.find((u) => `${u.userId || ''}|${u.familyMemberId || ''}` === selectedInvestorKey);
+      if (!selected) return '';
+
+      const holdings = collectInvestorHoldings(strategyRow.strategyId, selected.userId, selected.familyMemberId);
+      const totalInvested = holdings.reduce((s, h) => s + ((Number(h.avgFillNumber || 0) * Math.abs(Number(h.quantityValue || 0))) || 0), 0);
+      const totalCurrent  = holdings.reduce((s, h) => s + (Number(h.marketValueNumber || 0)), 0);
+      const totalPnl = holdings.reduce((s, h) => s + (Number(h.unrealizedPnlNumber || 0)), 0);
+      const subtitle = selected.familyMemberRelationship
+        ? `${selected.clientName} (family member: ${selected.familyMemberRelationship}) · ${holdings.length} position${holdings.length !== 1 ? 's' : ''}`
+        : `${selected.clientName} · ${holdings.length} position${holdings.length !== 1 ? 's' : ''}`;
+
+      const pnlClass = totalPnl > 0 ? 'investor-detail-pnl-pos' : totalPnl < 0 ? 'investor-detail-pnl-neg' : '';
+      const summaryHtml = `
+        <div class="investor-detail-summary">
+          <div class="investor-detail-summary-card">
+            <div class="investor-detail-summary-label">Account</div>
+            <div class="investor-detail-summary-value" style="font-size:11px;">${escapeHtml(selected.clientAccountId || '-')}</div>
+          </div>
+          <div class="investor-detail-summary-card">
+            <div class="investor-detail-summary-label">Invested</div>
+            <div class="investor-detail-summary-value">${escapeHtml(formatMoney(totalInvested))}</div>
+          </div>
+          <div class="investor-detail-summary-card">
+            <div class="investor-detail-summary-label">Current Value</div>
+            <div class="investor-detail-summary-value">${escapeHtml(formatMoney(totalCurrent))}</div>
+          </div>
+          <div class="investor-detail-summary-card">
+            <div class="investor-detail-summary-label">Unrealized PnL</div>
+            <div class="investor-detail-summary-value ${pnlClass}">${totalPnl >= 0 ? '+' : ''}${escapeHtml(formatMoney(totalPnl))}</div>
+          </div>
+        </div>`;
+
+      const tableBody = holdings.map((h) => {
+        const pnl = Number(h.unrealizedPnlNumber || 0);
+        const pnlCls = pnl > 0 ? 'investor-detail-pnl-pos' : pnl < 0 ? 'investor-detail-pnl-neg' : '';
+        return `
+          <tr>
+            <td>${escapeHtml(h.instrumentName || '-')}</td>
+            <td class="orderbook-cell-muted">${escapeHtml(h.ticker || '-')}</td>
+            <td>${escapeHtml(h.side || '-')}</td>
+            <td class="r">${escapeHtml(String(h.totalQuantity ?? '-'))}</td>
+            <td class="r">${escapeHtml(asRandValue(h.avgFill))}</td>
+            <td class="r">${escapeHtml(asRandValue(h.marketValue))}</td>
+            <td class="r ${pnlCls}">${pnl >= 0 ? '+' : ''}${escapeHtml(formatMoney(pnl))}</td>
+          </tr>`;
+      }).join('');
+
+      const tableHtml = holdings.length
+        ? `<table>
+            <thead>
+              <tr><th>Instrument</th><th>Ticker</th><th>Side</th><th class="r">Qty</th><th class="r">Avg Fill</th><th class="r">Market Value</th><th class="r">PnL</th></tr>
+            </thead>
+            <tbody>${tableBody}</tbody>
+          </table>`
+        : '<p style="color:#94a3b8;font-size:11px;text-align:center;padding:12px 0;">No individual holdings found for this investor in raw orderbook data.</p>';
+
+      return `
+        <div class="investor-detail-panel">
+          <div class="investor-detail-panel-header">
+            <div>
+              <div class="investor-detail-panel-title">Individual fills & PnL</div>
+              <div class="investor-detail-panel-sub">${escapeHtml(subtitle)}</div>
+            </div>
+            <button type="button" class="investor-detail-panel-close" data-investor-detail-close>✕ Close</button>
+          </div>
+          ${summaryHtml}
+          ${tableHtml}
+        </div>`;
+    };
+
     const renderStrategyDetailsTable = (row, options = {}) => {
       const editable = options.editable !== false;
       const cleanup = options.cleanup === true && options.bookId != null && options.rowIndex != null;
@@ -2300,8 +2411,10 @@
                 </button>
               </td>`
             : '';
+          const investorKey = `${u.userId || ''}|${u.familyMemberId || ''}`;
+          const isSelected = selectedInvestorKey === investorKey;
           return `
-          <tr>
+          <tr class="investor-row ${isSelected ? 'selected' : ''}" data-investor-row data-investor-key="${escapeHtml(investorKey)}" data-user-id="${escapeHtml(String(u.userId || ''))}" data-family-member-id="${escapeHtml(String(u.familyMemberId || ''))}" data-strategy-id="${escapeHtml(String(row.strategyId || ''))}">
             <td>${escapeHtml(String(i + 1))}</td>
             <td>${escapeHtml(u.clientName || '-')}</td>
             <td>${escapeHtml(u.clientAccountId || '-')}</td>
@@ -2318,8 +2431,8 @@
         const reverseHeader = allowReverse ? '<th class="reverse-investor-col" aria-label="Reverse"></th>' : '';
 
         usersHtml = `
-          <div class="orderbook-detail-title" style="margin-top: 16px;">Investors in ${escapeHtml(row.strategyName || 'Strategy')}</div>
-          <div class="orderbook-detail-table-wrap">
+          <div class="orderbook-detail-title" style="margin-top: 16px;">Investors in ${escapeHtml(row.strategyName || 'Strategy')} <span style="font-size:11px;font-weight:400;color:#94a3b8;margin-left:8px;">(click a row to see this client's individual fills)</span></div>
+          <div class="orderbook-detail-table-wrap" data-investors-table data-strategy-id="${escapeHtml(String(row.strategyId || ''))}">
             <table class="orderbook-detail-table">
               <thead>
                 <tr>
@@ -2336,6 +2449,7 @@
               <tbody>${uBody}</tbody>
             </table>
           </div>
+          <div id="investorDetailPanel-${escapeHtml(String(row.strategyId || 'na'))}" data-investor-detail-panel data-strategy-id="${escapeHtml(String(row.strategyId || ''))}">${renderInvestorDetailPanel(row)}</div>
         `;
       }
 
@@ -6511,6 +6625,54 @@
       if (payload.context === 'strategy' && !payload.strategyId) { alert('Missing strategy id on this row.'); return; }
       if (payload.context === 'security' && !payload.sourceId) { alert('Missing source id on this row.'); return; }
       openReverseInvestorModal(payload).catch((err) => alert('Reverse modal error: ' + (err?.message || err)));
+    });
+
+    /* Investor row click → select, highlight purple, render detail panel.
+       Detail panel close button clears the selection. */
+    document.addEventListener('click', (event) => {
+      const closeBtn = event.target.closest('[data-investor-detail-close]');
+      if (closeBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        selectedInvestorKey = null;
+        document.querySelectorAll('.investor-row.selected').forEach((r) => r.classList.remove('selected'));
+        document.querySelectorAll('[data-investor-detail-panel]').forEach((p) => { p.innerHTML = ''; });
+        return;
+      }
+
+      const investorRow = event.target.closest('[data-investor-row]');
+      if (!investorRow) return;
+      /* Ignore clicks on action buttons inside the row */
+      if (event.target.closest('.reverse-investor-btn, .cleanup-delete-btn')) return;
+      event.stopPropagation();
+
+      const key = investorRow.dataset.investorKey || '';
+      const strategyId = investorRow.dataset.strategyId || '';
+      if (!key) return;
+
+      /* Toggle off if clicking same row */
+      if (selectedInvestorKey === key) {
+        selectedInvestorKey = null;
+      } else {
+        selectedInvestorKey = key;
+      }
+
+      /* Update highlight on all rows in this strategy's investors table */
+      const tableWrap = investorRow.closest('[data-investors-table]');
+      if (tableWrap) {
+        tableWrap.querySelectorAll('.investor-row').forEach((r) => {
+          if (r.dataset.investorKey === selectedInvestorKey) r.classList.add('selected');
+          else r.classList.remove('selected');
+        });
+      }
+
+      /* Re-render the detail panel for this strategy */
+      const panel = document.querySelector(`[data-investor-detail-panel][data-strategy-id="${CSS.escape(strategyId)}"]`);
+      if (panel) {
+        /* Look up the strategy row in the orderbook to feed the panel */
+        const stratRow = (allOrderbookRows || []).find((r) => r.isStrategy && String(r.strategyId || '') === String(strategyId));
+        panel.innerHTML = stratRow ? renderInvestorDetailPanel(stratRow) : '';
+      }
     });
 
     // Reverse modal close / cancel / confirm / select-txn
