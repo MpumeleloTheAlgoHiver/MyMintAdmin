@@ -884,7 +884,7 @@
             </div>
 
             <!-- ── KPI Strip (7 cols) ── -->
-            <div id="ovKpiStrip" style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:14px;">
+            <div id="ovKpiStrip" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">
               <!-- populated by JS -->
             </div>
 
@@ -1094,7 +1094,6 @@
                       <button id="riTab6m"  onclick="window.switchReturnTab('6m')"     style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">6M</button>
                       <button id="riTabYtd" onclick="window.switchReturnTab('ytd')"    style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">YTD</button>
                       <button id="riTab1y"  onclick="window.switchReturnTab('1y')"     style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">1Y</button>
-                      <button id="riTab5y"  onclick="window.switchReturnTab('5y')"     style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">5Y</button>
                       <button id="riTabAll" onclick="window.switchReturnTab('all')"    style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">All</button>
                       <button id="riTabAlerts" onclick="window.switchReturnTab('alerts')" style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0;">
                         Alerts
@@ -1909,8 +1908,9 @@
             ? (_returnInsightsData || []).filter(a => _riFilterSymbols.has(a.symbol))
             : (_returnInsightsData || []);
           const alerts = _alertBase
-            .filter(a => a.change_percent != null && Number(a.change_percent) <= ALERT_THRESHOLD)
-            .sort((a, b) => Number(a.change_percent) - Number(b.change_percent));
+            .map(a => ({ ...a, _live1d: (_riIntradayMap[a.id]?.['1d_pct'] != null ? Number(_riIntradayMap[a.id]['1d_pct']) : (a.change_percent != null ? Number(a.change_percent) : null)) }))
+            .filter(a => a._live1d != null && a._live1d <= ALERT_THRESHOLD)
+            .sort((a, b) => a._live1d - b._live1d);
 
           if (!alerts.length) {
             listEl.innerHTML = `
@@ -1923,7 +1923,7 @@
           }
 
           listEl.innerHTML = alerts.map(a => {
-            const chg = Number(a.change_percent);
+            const chg = a._live1d;
             const chgStr = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
             const sym = (a.symbol || '').replace('.JO', '');
             const init = sym.slice(0, 2).toUpperCase();
@@ -1976,21 +1976,37 @@
             const holdings = (strat && Array.isArray(strat.holdings)) ? strat.holdings : [];
             const dataBySym = {};
             (_returnInsightsData || []).forEach(a => { dataBySym[a.symbol] = a; });
-            const wSum = holdings.reduce((acc, h) => acc + (Number(h.weight) || 0), 0) || 1;
+            /* For 1D: pre-compute today_basket (cents) = Σ(current_price_cents × shares) */
+            let _todayBasket1d = 0;
+            const _stratBvRow = strategyReturnsMap.get(_riSelectedStratId) || {};
+            const _stratBv = _stratBvRow.basket_value != null ? Number(_stratBvRow.basket_value) : null;
+            if (tab === '1d') {
+              holdings.forEach(h => {
+                const sym = h.ticker || h.symbol || '';
+                const a = dataBySym[sym] || {};
+                const iv = a.id ? _riIntradayMap[a.id] : null;
+                const cp = iv?.current_price != null ? Number(iv.current_price) : null;
+                const shares = Number(h.shares || h.quantity) || 0;
+                if (cp != null && shares > 0) _todayBasket1d += cp * shares;
+              });
+            }
             const sAll = holdings.map(h => {
               const sym = h.ticker || h.symbol || '';
               const a   = dataBySym[sym] || {};
               let r;
               if (tab === '1d') {
+                /* contribution (%) = (current_price_cents × shares × 1d_pct) / basket_value_cents */
                 const iv = a.id ? _riIntradayMap[a.id] : null;
-                r = (iv && iv['1d_pct'] != null) ? Number(iv['1d_pct']) : null;
+                const cp = iv?.current_price != null ? Number(iv.current_price) : null;
+                const shares = Number(h.shares || h.quantity) || 0;
+                const iv1d = iv?.['1d_pct'] != null ? Number(iv['1d_pct']) : null;
+                r = (cp != null && shares > 0 && _stratBv && _stratBv > 0 && iv1d != null)
+                  ? (cp * shares * iv1d) / _stratBv
+                  : null;
               } else {
                 r = a[assetField] != null ? Number(a[assetField]) : null;
               }
-              const w   = Number(h.weight) || 0;
-              const wPct= wSum > 1.5 ? (w) : w;
-              const contrib = (r != null) ? (r * wPct) : null;
-              return { id: sym, name: sym.replace('.JO',''), logo_url: a.logo_url || null, _val: contrib };
+              return { id: sym, name: sym.replace('.JO',''), logo_url: a.logo_url || null, _val: r };
             }).filter(x => x._val != null).sort((a, b) => b._val - a._val);
 
             if (!sAll.length) {
@@ -2041,26 +2057,29 @@
           }
 
           const strategies = (typeof allStrategiesFullData !== 'undefined' && Array.isArray(allStrategiesFullData)) ? allStrategiesFullData : [];
-          /* For 1D: build symbol→intraday pct map and compute weighted avg per strategy */
-          const _symToIntraday = {};
+          /* For 1D: build symbol→current_price_cents map for basket-value calculation */
+          const _symToIntradayPrice = {};
           if (tab === '1d') {
             (_returnInsightsData || []).forEach(a => {
               const iv = _riIntradayMap[a.id];
-              if (iv && iv['1d_pct'] != null) _symToIntraday[a.symbol] = Number(iv['1d_pct']);
+              if (iv?.current_price != null) _symToIntradayPrice[a.symbol] = Number(iv.current_price);
             });
           }
           const sAll = strategies.map(s => {
             let v;
             if (tab === '1d') {
               const hlds = Array.isArray(s.holdings) ? s.holdings : [];
-              const wTotal = hlds.reduce((acc, h) => acc + (Number(h.weight) || 0), 0) || 1;
-              let wSum = 0, wCount = 0;
+              /* today_basket (cents) = Σ(current_price_cents × shares) */
+              let todayBasket = 0, hasPrice = 0;
               hlds.forEach(h => {
                 const sym = h.ticker || h.symbol || '';
-                const pct = _symToIntraday[sym];
-                if (pct != null) { wSum += pct * (Number(h.weight) || 0) / wTotal; wCount++; }
+                const cp = _symToIntradayPrice[sym];
+                const shares = Number(h.shares || h.quantity) || 0;
+                if (cp != null && shares > 0) { todayBasket += cp * shares; hasPrice++; }
               });
-              v = wCount > 0 ? wSum : null;
+              const row = strategyReturnsMap.get(String(s.id)) || {};
+              const bv = row.basket_value != null ? Number(row.basket_value) : null;
+              v = (hasPrice > 0 && bv && bv > 0) ? (todayBasket - bv) / bv * 100 : null;
             } else {
               const row = strategyReturnsMap.get(String(s.id)) || {};
               v = row[sField] != null ? Number(row[sField]) : null;
@@ -2271,7 +2290,7 @@
         _activeReturnTab = tab;
         const tabBtns = {
           '1d': 'riTab1d', '5d': 'riTab5d', '1m': 'riTab1m', '6m': 'riTab6m',
-          ytd: 'riTabYtd', '1y': 'riTab1y', '5y': 'riTab5y', all: 'riTabAll',
+          ytd: 'riTabYtd', '1y': 'riTab1y', all: 'riTabAll',
           alerts: 'riTabAlerts'
         };
         Object.entries(tabBtns).forEach(([key, id]) => {
@@ -2335,7 +2354,10 @@
           /* Sort by daily change descending */
           _returnInsightsData.sort((a, b) => (b.change_percent ?? -Infinity) - (a.change_percent ?? -Infinity));
           /* Compute alert count and update badges */
-          const alertCount = _returnInsightsData.filter(a => a.change_percent != null && Number(a.change_percent) <= ALERT_THRESHOLD).length;
+          const alertCount = _returnInsightsData.filter(a => {
+            const live = _riIntradayMap[a.id]?.['1d_pct'] != null ? Number(_riIntradayMap[a.id]['1d_pct']) : (a.change_percent != null ? Number(a.change_percent) : null);
+            return live != null && live <= ALERT_THRESHOLD;
+          }).length;
           _updateAlertBadges(alertCount);
           _renderReturnInsights(_activeReturnTab);
         } catch(e) {
@@ -3312,14 +3334,25 @@
       const fetchStockReturnsBySec = async (secIds) => {
         if (!secIds || !secIds.length) return {};
         const map = {};
+        const uniqIds = [...new Set(secIds.filter(Boolean))];
+        /* Step 1: get the latest as_of_date so we fetch only that snapshot (avoids 1000-row limit) */
+        const { data: dateRow } = await supabaseClient
+          .from('stock_returns_c')
+          .select('as_of_date')
+          .order('as_of_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const latestDate = dateRow?.as_of_date;
+        if (!latestDate) return map;
+        /* Step 2: fetch all securities for that single date in chunks — now exactly 1 row per security */
         const chunks = [];
-        for (let i = 0; i < secIds.length; i += 50) chunks.push(secIds.slice(i, i + 50));
+        for (let i = 0; i < uniqIds.length; i += 200) chunks.push(uniqIds.slice(i, i + 200));
         const results = await Promise.all(
           chunks.map(chunk =>
             supabaseClient.from('stock_returns_c')
               .select('security_id, symbol, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct, all_pct, current_price, as_of_date')
               .in('security_id', chunk)
-              .order('as_of_date', { ascending: false })
+              .eq('as_of_date', latestDate)
           )
         );
         results.forEach(({ data }) => {
@@ -5559,15 +5592,40 @@
         }
 
         window.__dbgBreadcrumb('ovSelect:fetch-analytics');
-        const { data: _stratRetRow } = await supabaseClient
+        const { data: _stratRetHistory } = await supabaseClient
           .from('strategies_returns_c')
-          .select('strategy_id, as_of_date, latest_value, basket_value, summary, curves, calendar_returns, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct')
+          .select('strategy_id, as_of_date, basket_value, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct')
           .eq('strategy_id', strat.id)
-          .order('as_of_date', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .order('as_of_date', { ascending: true });
+        const _stratRetRow = (_stratRetHistory && _stratRetHistory.length)
+          ? _stratRetHistory[_stratRetHistory.length - 1]
+          : null;
+
+        /* ── Compute annualised volatility from daily returns (std dev × √252) ── */
+        let calcVolatility = null;
+        let calcMaxDrawdown = null;
+        if (_stratRetHistory && _stratRetHistory.length >= 2) {
+          const dailyPcts = _stratRetHistory.map(r => Number(r['1d_pct'])).filter(v => !isNaN(v));
+          if (dailyPcts.length >= 2) {
+            const mean = dailyPcts.reduce((a, b) => a + b, 0) / dailyPcts.length;
+            const variance = dailyPcts.reduce((s, v) => s + (v - mean) ** 2, 0) / (dailyPcts.length - 1);
+            calcVolatility = Math.sqrt(variance) * Math.sqrt(252);
+          }
+          /* ── Compute max drawdown from basket_value series ── */
+          const navs = _stratRetHistory.map(r => Number(r.basket_value)).filter(v => v > 0);
+          if (navs.length >= 2) {
+            let peak = navs[0], maxDD = 0;
+            navs.forEach(v => {
+              if (v > peak) peak = v;
+              const dd = (peak - v) / peak * 100;
+              if (dd > maxDD) maxDD = dd;
+            });
+            calcMaxDrawdown = maxDD;
+          }
+        }
+
         const analytics = _stratRetRow
-          ? { ..._stratRetRow, ytd_return: _stratRetRow.ytd_pct ?? null, latest_value: _stratRetRow.latest_value ?? _stratRetRow.basket_value ?? null }
+          ? { ..._stratRetRow, ytd_return: _stratRetRow.ytd_pct ?? null, latest_value: _stratRetRow.basket_value ?? null }
           : null;
         const stratRet = _stratRetRow || null;
 
@@ -5601,7 +5659,9 @@
         window.__dbgBreadcrumb('ovSelect:fetch-profiles');
         let profiles = {};
         let txnInceptionMap = {};  /* userId → earliest transaction_date */
-        let secPriceMap = {};      /* security_id → last_price (ZAR cents) */
+        let secPriceMap = {};      /* security_id → last_price (ZAR rands) */
+        let secYtdMap = {};        /* security_id → ytd_pct (%) */
+        let sec1yMap = {};         /* security_id → 1y_pct (%) */
         if (investRows.length) {
           const uids = [...new Set(investRows.map(r => r.user_id).filter(Boolean))];
           const sids = [...new Set(investRows.map(r => r.security_id).filter(Boolean))];
@@ -5614,7 +5674,7 @@
               .eq('status', 'posted')
               .gte('amount', 10000),
             sids.length
-              ? supabaseClient.from('stock_returns_c').select('security_id, current_price, as_of_date').in('security_id', sids).order('as_of_date', { ascending: false })
+              ? supabaseClient.from('stock_returns_c').select('security_id, current_price, ytd_pct, 1y_pct, as_of_date').in('security_id', sids).order('as_of_date', { ascending: false })
               : Promise.resolve({ data: [] })
           ];
           const [{ data: profs }, { data: txnRows }, { data: secRows }] = await Promise.all(fetches);
@@ -5630,6 +5690,8 @@
             if (_seenSec.has(s.security_id)) return;
             _seenSec.add(s.security_id);
             secPriceMap[s.security_id] = s.current_price != null ? Number(s.current_price) / 100 : 0;
+            if (s.ytd_pct != null) secYtdMap[s.security_id] = Number(s.ytd_pct);
+            if (s['1y_pct'] != null) sec1yMap[s.security_id] = Number(s['1y_pct']);
           });
         }
 
@@ -5641,16 +5703,34 @@
           if (lp > 0) {
             totalAum += (qty * lp);
           } else {
-            let fill = Number(r.avg_fill) || 0;
-            if (fill * qty > 10 * (Number(r.market_value) || 0) && Number(r.market_value) > 0) fill /= 100;
+            const fill = (Number(r.avg_fill) || 0) / 100;
             totalAum += (fill * qty);
           }
         });
 
+        /* ── Weighted portfolio YTD/1Y from security-level returns (fallback when strategies_returns_c is empty) ── */
+        let calcYtd = null, calc1y = null;
+        if (investRows.length) {
+          let ytdSum = 0, ytdWeight = 0, r1ySum = 0, r1yWeight = 0;
+          investRows.forEach(r => {
+            const qty = Number(r.quantity) || 0;
+            const lp = secPriceMap[r.security_id] || 0;
+            const mv = qty * lp;
+            if (mv <= 0) return;
+            if (secYtdMap[r.security_id] != null) { ytdSum += mv * secYtdMap[r.security_id]; ytdWeight += mv; }
+            if (sec1yMap[r.security_id] != null)  { r1ySum += mv * sec1yMap[r.security_id];  r1yWeight += mv; }
+          });
+          if (ytdWeight > 0) calcYtd = ytdSum / ytdWeight;
+          if (r1yWeight > 0) calc1y  = r1ySum / r1yWeight;
+        }
+        const stratRetMerged = stratRet
+          ? { ...stratRet, ytd_pct: stratRet.ytd_pct ?? calcYtd, '1y_pct': stratRet['1y_pct'] ?? calc1y }
+          : (calcYtd != null || calc1y != null ? { ytd_pct: calcYtd, '1y_pct': calc1y } : null);
+
         window.__dbgBreadcrumb('ovSelect:render-titlebar');
         ovRenderTitleBar(strat, analytics, totalAum, investRows.length);
         window.__dbgBreadcrumb('ovSelect:render-kpi');
-        ovRenderKpiStrip(analytics, stratRet);
+        ovRenderKpiStrip(analytics, stratRetMerged, calcVolatility, calcMaxDrawdown);
         window.__dbgBreadcrumb('ovSelect:render-perfchart');
         ovRenderPerfChart(analytics, strat.name || 'Strategy');
         window.__dbgBreadcrumb('ovSelect:render-sectorchart');
@@ -5890,7 +5970,7 @@
         if (navEl) navEl.textContent = navVal != null ? Number(navVal).toFixed(2) : '—';
       };
 
-      const ovRenderKpiStrip = (analytics, stratRet) => {
+      const ovRenderKpiStrip = (analytics, stratRet, calcVolatility, calcMaxDrawdown) => {
         const strip = document.getElementById('ovKpiStrip');
         if (!strip) return;
         const summary = analytics?.summary || {};
@@ -5898,21 +5978,21 @@
         const sr = stratRet || {};
         const ytd = sr.ytd_pct != null ? Number(sr.ytd_pct) : null;
         const r1y = sr['1y_pct'] != null ? Number(sr['1y_pct']) : null;
+        /* Volatility: computed annualised std-dev of daily returns (calcVolatility is already in % units) */
+        const vol = calcVolatility != null ? calcVolatility
+          : (summary.volatility != null ? Number(summary.volatility) * 100 : null);
+        /* Max Drawdown: computed from basket_value series (calcMaxDrawdown is in % e.g. 5.3 = 5.3%) */
+        const mdd = calcMaxDrawdown != null ? calcMaxDrawdown
+          : (summary.max_drawdown != null ? Number(summary.max_drawdown) * 100 : null);
         const kpis = [
           { label: 'YTD Return', value: ovFmtPct(ytd), positive: ytd != null ? ytd > 0 : null,
             icon: '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>' },
           { label: '1Y Return', value: r1y != null ? ovFmtPct(r1y) : '—', positive: r1y != null ? r1y > 0 : null,
             icon: '<path d="M12 2v20M2 12h20"/>' },
-          { label: 'Sharpe Ratio', value: summary.sharpe_ratio != null ? Number(summary.sharpe_ratio).toFixed(2) : '—', positive: summary.sharpe_ratio > 1,
-            icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
-          { label: 'Max Drawdown', value: summary.max_drawdown != null ? ovFmtPct(Number(summary.max_drawdown)*100) : '—', positive: false,
+          { label: 'Max Drawdown', value: mdd != null ? ovFmtPct(-Math.abs(mdd)) : '—', positive: false,
             icon: '<polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/>' },
-          { label: 'Volatility', value: summary.volatility != null ? ovFmtPct(Number(summary.volatility)*100) : '—', positive: null,
+          { label: 'Volatility', value: vol != null ? ovFmtPct(vol) : '—', positive: null,
             icon: '<polyline points="2 12 6 8 10 14 14 10 18 14 22 12"/>' },
-          { label: 'Beta', value: summary.beta != null ? Number(summary.beta).toFixed(2) : '—', positive: null,
-            icon: '<path d="M3 3v18h18"/><path d="M3 9l4 4 4-4 4 4 4-4"/>' },
-          { label: 'Alpha', value: summary.alpha != null ? ovFmtPct(Number(summary.alpha)*100) : '—', positive: summary.alpha > 0,
-            icon: '<path d="M6 18L18 6M8 6h10v10"/>' },
         ];
         strip.innerHTML = kpis.map(k => {
           const col = k.positive === true ? '#059669' : k.positive === false ? '#dc2626' : '#0f172a';
@@ -6256,10 +6336,8 @@
           const uid = r.user_id;
           if (!byUser[uid]) byUser[uid] = { costBasis: 0, currentVal: 0, inception: r.created_at, pending: false };
           const qty = Number(r.quantity) || 0;
-          /* Cost basis: avg_fill × qty (cents → rands) */
-          let fill = Number(r.avg_fill) || 0;
-          const mv = Number(r.market_value) || 0;
-          if (fill * qty > 10 * mv && mv > 0) fill /= 100;
+          /* Cost basis: avg_fill is in ZAc cents → divide by 100 to get rands */
+          const fill = (Number(r.avg_fill) || 0) / 100;
           byUser[uid].costBasis += (fill * qty);
           /* Live current value: qty × last_price (cents → rands) */
           const lp = secPriceMap[r.security_id] || 0;
