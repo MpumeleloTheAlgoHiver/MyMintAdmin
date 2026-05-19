@@ -5558,15 +5558,40 @@
         }
 
         window.__dbgBreadcrumb('ovSelect:fetch-analytics');
-        const { data: _stratRetRow } = await supabaseClient
+        const { data: _stratRetHistory } = await supabaseClient
           .from('strategies_returns_c')
-          .select('strategy_id, as_of_date, latest_value, basket_value, summary, curves, calendar_returns, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct')
+          .select('strategy_id, as_of_date, basket_value, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct')
           .eq('strategy_id', strat.id)
-          .order('as_of_date', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .order('as_of_date', { ascending: true });
+        const _stratRetRow = (_stratRetHistory && _stratRetHistory.length)
+          ? _stratRetHistory[_stratRetHistory.length - 1]
+          : null;
+
+        /* ── Compute annualised volatility from daily returns (std dev × √252) ── */
+        let calcVolatility = null;
+        let calcMaxDrawdown = null;
+        if (_stratRetHistory && _stratRetHistory.length >= 2) {
+          const dailyPcts = _stratRetHistory.map(r => Number(r['1d_pct'])).filter(v => !isNaN(v));
+          if (dailyPcts.length >= 2) {
+            const mean = dailyPcts.reduce((a, b) => a + b, 0) / dailyPcts.length;
+            const variance = dailyPcts.reduce((s, v) => s + (v - mean) ** 2, 0) / (dailyPcts.length - 1);
+            calcVolatility = Math.sqrt(variance) * Math.sqrt(252);
+          }
+          /* ── Compute max drawdown from basket_value series ── */
+          const navs = _stratRetHistory.map(r => Number(r.basket_value)).filter(v => v > 0);
+          if (navs.length >= 2) {
+            let peak = navs[0], maxDD = 0;
+            navs.forEach(v => {
+              if (v > peak) peak = v;
+              const dd = (peak - v) / peak * 100;
+              if (dd > maxDD) maxDD = dd;
+            });
+            calcMaxDrawdown = maxDD;
+          }
+        }
+
         const analytics = _stratRetRow
-          ? { ..._stratRetRow, ytd_return: _stratRetRow.ytd_pct ?? null, latest_value: _stratRetRow.latest_value ?? _stratRetRow.basket_value ?? null }
+          ? { ..._stratRetRow, ytd_return: _stratRetRow.ytd_pct ?? null, latest_value: _stratRetRow.basket_value ?? null }
           : null;
         const stratRet = _stratRetRow || null;
 
@@ -5671,7 +5696,7 @@
         window.__dbgBreadcrumb('ovSelect:render-titlebar');
         ovRenderTitleBar(strat, analytics, totalAum, investRows.length);
         window.__dbgBreadcrumb('ovSelect:render-kpi');
-        ovRenderKpiStrip(analytics, stratRetMerged);
+        ovRenderKpiStrip(analytics, stratRetMerged, calcVolatility, calcMaxDrawdown);
         window.__dbgBreadcrumb('ovSelect:render-perfchart');
         ovRenderPerfChart(analytics, strat.name || 'Strategy');
         window.__dbgBreadcrumb('ovSelect:render-sectorchart');
@@ -5911,7 +5936,7 @@
         if (navEl) navEl.textContent = navVal != null ? Number(navVal).toFixed(2) : '—';
       };
 
-      const ovRenderKpiStrip = (analytics, stratRet) => {
+      const ovRenderKpiStrip = (analytics, stratRet, calcVolatility, calcMaxDrawdown) => {
         const strip = document.getElementById('ovKpiStrip');
         if (!strip) return;
         const summary = analytics?.summary || {};
@@ -5919,14 +5944,20 @@
         const sr = stratRet || {};
         const ytd = sr.ytd_pct != null ? Number(sr.ytd_pct) : null;
         const r1y = sr['1y_pct'] != null ? Number(sr['1y_pct']) : null;
+        /* Volatility: computed annualised std-dev of daily returns (calcVolatility is already in % units) */
+        const vol = calcVolatility != null ? calcVolatility
+          : (summary.volatility != null ? Number(summary.volatility) * 100 : null);
+        /* Max Drawdown: computed from basket_value series (calcMaxDrawdown is in % e.g. 5.3 = 5.3%) */
+        const mdd = calcMaxDrawdown != null ? calcMaxDrawdown
+          : (summary.max_drawdown != null ? Number(summary.max_drawdown) * 100 : null);
         const kpis = [
           { label: 'YTD Return', value: ovFmtPct(ytd), positive: ytd != null ? ytd > 0 : null,
             icon: '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>' },
           { label: '1Y Return', value: r1y != null ? ovFmtPct(r1y) : '—', positive: r1y != null ? r1y > 0 : null,
             icon: '<path d="M12 2v20M2 12h20"/>' },
-          { label: 'Max Drawdown', value: summary.max_drawdown != null ? ovFmtPct(Number(summary.max_drawdown)*100) : '—', positive: false,
+          { label: 'Max Drawdown', value: mdd != null ? ovFmtPct(-Math.abs(mdd)) : '—', positive: false,
             icon: '<polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/>' },
-          { label: 'Volatility', value: summary.volatility != null ? ovFmtPct(Number(summary.volatility)*100) : '—', positive: null,
+          { label: 'Volatility', value: vol != null ? ovFmtPct(vol) : '—', positive: null,
             icon: '<polyline points="2 12 6 8 10 14 14 10 18 14 22 12"/>' },
         ];
         strip.innerHTML = kpis.map(k => {
