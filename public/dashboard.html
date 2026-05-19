@@ -1094,7 +1094,6 @@
                       <button id="riTab6m"  onclick="window.switchReturnTab('6m')"     style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">6M</button>
                       <button id="riTabYtd" onclick="window.switchReturnTab('ytd')"    style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">YTD</button>
                       <button id="riTab1y"  onclick="window.switchReturnTab('1y')"     style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">1Y</button>
-                      <button id="riTab5y"  onclick="window.switchReturnTab('5y')"     style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">5Y</button>
                       <button id="riTabAll" onclick="window.switchReturnTab('all')"    style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;white-space:nowrap;flex-shrink:0;">All</button>
                       <button id="riTabAlerts" onclick="window.switchReturnTab('alerts')" style="padding:9px 9px;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;letter-spacing:0.03em;transition:all 0.15s;display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0;">
                         Alerts
@@ -2270,7 +2269,7 @@
         _activeReturnTab = tab;
         const tabBtns = {
           '1d': 'riTab1d', '5d': 'riTab5d', '1m': 'riTab1m', '6m': 'riTab6m',
-          ytd: 'riTabYtd', '1y': 'riTab1y', '5y': 'riTab5y', all: 'riTabAll',
+          ytd: 'riTabYtd', '1y': 'riTab1y', all: 'riTabAll',
           alerts: 'riTabAlerts'
         };
         Object.entries(tabBtns).forEach(([key, id]) => {
