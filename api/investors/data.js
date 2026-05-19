@@ -30,12 +30,13 @@ module.exports = async (req, res) => {
       fetch(`${supabaseUrl}/rest/v1/${path}`, { headers: sbH }).then((r) => r.json());
 
     const [holdings, strategies] = await Promise.all([
-      sbGet('stock_holdings_c?select=user_id,security_id,strategy_id,quantity,avg_fill,market_value,created_at&is_active=eq.true&trade_side=eq.BUY'),
+      sbGet('stock_holdings_c?select=user_id,family_member_id,security_id,strategy_id,quantity,avg_fill,market_value,created_at&is_active=eq.true&trade_side=eq.BUY'),
       sbGet('strategies_c?select=id,name,short_name,description,risk_level,sector'),
     ]);
 
     const userIds  = [...new Set((holdings || []).map((r) => r.user_id).filter(Boolean))];
     const secIds   = [...new Set((holdings || []).map((r) => r.security_id).filter(Boolean))];
+    const famIds   = [...new Set((holdings || []).map((r) => r.family_member_id).filter(Boolean))];
 
     /* Fetch per-investor NAV history from client_strategy_returns_c — keyed by user_id */
     const stratHistArrays = userIds.length
@@ -67,7 +68,7 @@ module.exports = async (req, res) => {
       }
     });
 
-    const [profiles, secMeta, secLive, txns] = await Promise.all([
+    const [profiles, secMeta, secLive, txns, familyMembers] = await Promise.all([
       userIds.length
         ? sbGet(`profiles?select=id,first_name,last_name,email,mint_number&id=in.(${userIds.join(',')})`)
         : Promise.resolve([]),
@@ -80,10 +81,13 @@ module.exports = async (req, res) => {
       userIds.length
         ? sbGet(`transactions?select=user_id,amount,direction,name,description,status,transaction_date&user_id=in.(${userIds.join(',')})&order=transaction_date.desc`)
         : Promise.resolve([]),
+      famIds.length
+        ? sbGet(`family_members?select=id,first_name,last_name&id=in.(${famIds.join(',')})`)
+        : Promise.resolve([]),
     ]);
 
     res.statusCode = 200;
-    res.end(JSON.stringify({ holdings, strategies, stratHist, profiles, secMeta, secLive, txns }));
+    res.end(JSON.stringify({ holdings, strategies, stratHist, profiles, secMeta, secLive, txns, familyMembers }));
   } catch (err) {
     res.statusCode = 500;
     res.end(JSON.stringify({ error: err.message }));

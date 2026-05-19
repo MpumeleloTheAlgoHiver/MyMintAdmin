@@ -359,9 +359,10 @@
          bypassing Supabase RLS so ALL investors are always visible to admins. */
       const resp = await fetch('/api/investors/data');
       if (!resp.ok) throw new Error(`Investor data fetch failed: ${resp.status}`);
-      const { holdings, strategies, stratHist, profiles, secMeta, secLive, txns } = await resp.json();
+      const { holdings, strategies, stratHist, profiles, secMeta, secLive, txns, familyMembers } = await resp.json();
 
       const profMap    = Object.fromEntries((profiles||[]).map(p => [p.id, p]));
+      const famMap     = Object.fromEntries((familyMembers||[]).map(fm => [fm.id, fm]));
       const stratMap   = Object.fromEntries((strategies||[]).map(s => [s.id, s]));
       const secMetaMap = Object.fromEntries((secMeta||[]).map(s => [s.id, s]));
       /* First-write-wins (rows are sorted DESC by as_of_date → first row is latest per security) */
@@ -397,7 +398,9 @@
       const byUser = {};
       (holdings||[]).forEach(row => {
         const uid = row.user_id; if (!uid) return;
-        if (!byUser[uid]) byUser[uid] = { userId: uid, strategyId: row.strategy_id, holdings: [], inception: row.created_at };
+        const fmId = row.family_member_id || '';
+        const key = `${uid}:${fmId}`;
+        if (!byUser[key]) byUser[key] = { userId: uid, familyMemberId: fmId || null, strategyId: row.strategy_id, holdings: [], inception: row.created_at };
         const qty   = Number(row.quantity) || 0;
         let fill    = Number(row.avg_fill) || 0;
         const mv    = Number(row.market_value) || 0;
@@ -415,7 +418,7 @@
         }
         const investedR = (fill * qty) / 100;
         const currentR  = live ? live.priceR * qty : (mv / 100);
-        byUser[uid].holdings.push({
+        byUser[key].holdings.push({
           securityId: row.security_id,
           symbol: meta.symbol || '—',
           name:   meta.name   || meta.symbol || '—',
@@ -428,15 +431,24 @@
           dayPct: live ? live.dayPct : null,
           ytdPct: live ? live.ytd : null,
         });
-        if (!byUser[uid].strategyId && row.strategy_id) byUser[uid].strategyId = row.strategy_id;
-        if (row.created_at && row.created_at < byUser[uid].inception) byUser[uid].inception = row.created_at;
+        if (!byUser[key].strategyId && row.strategy_id) byUser[key].strategyId = row.strategy_id;
+        if (row.created_at && row.created_at < byUser[key].inception) byUser[key].inception = row.created_at;
       });
 
       const investors = Object.values(byUser).map(u => {
         if (!u.strategyId) return null;
         const prof = profMap[u.userId] || {};
         const strat = stratMap[u.strategyId] || {};
-        const name = [prof.first_name, prof.last_name].filter(Boolean).join(' ') || prof.email || u.userId.slice(0, 8);
+        const parentName = [prof.first_name, prof.last_name].filter(Boolean).join(' ') || prof.email || u.userId.slice(0, 8);
+        let name;
+        if (u.familyMemberId) {
+          const fm = famMap[u.familyMemberId] || {};
+          const childName = [fm.first_name, fm.last_name].filter(Boolean).join(' ') || u.familyMemberId.slice(0, 8);
+          name = `${parentName} (${childName})`;
+        } else {
+          name = parentName;
+        }
+        const investorKey = `${u.userId}:${u.familyMemberId || ''}`;
         const invested = u.holdings.reduce((s,h)=>s+h.investedR, 0);
         const current  = u.holdings.reduce((s,h)=>s+h.currentR, 0);
         const pnl = current - invested;
@@ -464,7 +476,7 @@
         const csrRetPct   = csrLatest ? csrLatest.inception_pct : retPct;
         const csrYtdPct   = csrLatest != null ? (csrLatest['ytd_pct'] ?? null) : null;
         return {
-          userId: u.userId, name, email: prof.email, mintNo: prof.mint_number,
+          userId: u.userId, investorKey, familyMemberId: u.familyMemberId, name, email: prof.email, mintNo: prof.mint_number,
           strategy: strat.short_name || strat.name || '—', strategyId: u.strategyId,
           strategyDesc: strat.description, riskLevel: strat.risk_level,
           invested, current, pnl, retPct: +retPct.toFixed(2),
@@ -514,10 +526,10 @@
       );
       document.getElementById('investorCount').textContent = list.length;
       document.getElementById('investorList').innerHTML = list.map(i => `
-        <div onclick="selectInvestor('${i.userId}')"
+        <div onclick="selectInvestor('${i.investorKey}')"
           style="display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-radius:8px;cursor:pointer;
-            border-left:3px solid ${currentInvestor?.userId===i.userId?'#7c3aed':'transparent'};
-            background:${currentInvestor?.userId===i.userId?'#ede9fe':'transparent'};transition:background 0.12s;">
+            border-left:3px solid ${currentInvestor?.investorKey===i.investorKey?'#7c3aed':'transparent'};
+            background:${currentInvestor?.investorKey===i.investorKey?'#ede9fe':'transparent'};transition:background 0.12s;">
           <div style="min-width:0;flex:1;">
             <div style="font-size:12px;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${i.name}</div>
             <div style="font-size:10px;color:#94a3b8;margin-top:1px;">${i.strategy}</div>
@@ -531,8 +543,8 @@
     }
 
     /* ─── Detail panel ─── */
-    function selectInvestor(userId) {
-      const inv = allInvestors.find(i => i.userId === userId);
+    function selectInvestor(investorKey) {
+      const inv = allInvestors.find(i => i.investorKey === investorKey);
       if (!inv) return;
       currentInvestor = inv;
       currentTab = 'performance';
