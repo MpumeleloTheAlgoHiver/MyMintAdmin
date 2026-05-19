@@ -5595,22 +5595,16 @@
             if (stratErr) errors.push('Strategy restore: ' + stratErr.message);
           }
 
-          // 4. Restore wallet balances from snapshot
-          if (batch.strategy_id && batch.wallet_snapshot_before && typeof batch.wallet_snapshot_before === 'object') {
-            const walletRows = Object.entries(batch.wallet_snapshot_before)
-              .map(([userId, balance]) => ({
-                strategy_id: batch.strategy_id,
-                user_id: userId,
-                balance: Number(balance) || 0,
-                updated_at: nowIso,
-              }))
-              .filter((r) => r.user_id);
-            if (walletRows.length) {
+          // 4. Restore rebalance_residual balances from snapshot
+          if (batch.wallet_snapshot_before && typeof batch.wallet_snapshot_before === 'object') {
+            await Promise.all(Object.entries(batch.wallet_snapshot_before).map(async ([userId, balance]) => {
+              if (!userId) return;
               const { error: walletErr } = await supabaseClient
-                .from('strategy_client_wallet_credits')
-                .upsert(walletRows, { onConflict: 'strategy_id,user_id' });
+                .from('wallets')
+                .update({ rebalance_residual: Number(balance) || 0, updated_at: nowIso })
+                .eq('user_id', userId);
               if (walletErr) errors.push('Wallet restore: ' + walletErr.message);
-            }
+            }));
           }
 
           // 5. Delete any stock_holdings_c rows that were created by this batch's settlement

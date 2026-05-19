@@ -7881,7 +7881,7 @@
       /* ── Constants ── */
       const REB_BROKERAGE_RATE = 0.005; // 0.5%
       const REB_OFF_CUSTODY_FEE = 69;   // R69
-      const REB_WALLET_TABLE = "strategy_client_wallet_credits";
+      const REB_WALLET_TABLE = "wallets";
 
       /* ── Engine functions ── */
       function rebGetDivisors(n) {
@@ -8391,20 +8391,19 @@
 
       async function rebLoadWalletBalances(strategyId, userIds) {
         const ids = [...new Set((userIds || []).map((id) => String(id)).filter(Boolean))];
-        if (!strategyId || !ids.length) return {};
+        if (!ids.length) return {};
 
         try {
           const { data, error } = await supabaseClient
             .from(REB_WALLET_TABLE)
-            .select("user_id, balance")
-            .eq("strategy_id", strategyId)
+            .select("user_id, rebalance_residual")
             .in("user_id", ids);
 
           if (error) throw error;
           return (data || []).reduce((acc, row) => {
             const userId = String(row.user_id || "");
             if (!userId) return acc;
-            acc[userId] = rebRoundMoney(row.balance || 0);
+            acc[userId] = rebRoundMoney(row.rebalance_residual || 0);
             return acc;
           }, {});
         } catch (err) {
@@ -8414,26 +8413,16 @@
       }
 
       async function rebUpsertWalletBalances(strategyId, balancesByUser) {
-        const strategyKey = String(strategyId || "");
-        if (!strategyKey) return;
-        const rows = Object.entries(balancesByUser || {})
-          .map(([userId, balance]) => ({
-            strategy_id: strategyKey,
-            user_id: String(userId),
-            balance: rebRoundMoney(balance || 0),
-            updated_at: new Date().toISOString(),
-          }))
-          .filter((row) => row.user_id);
+        const entries = Object.entries(balancesByUser || {}).filter(([userId]) => userId);
+        if (!entries.length) return;
 
-        if (!rows.length) return;
-
-        const { error } = await supabaseClient
-          .from(REB_WALLET_TABLE)
-          .upsert(rows, { onConflict: "strategy_id,user_id" });
-
-        if (error) {
-          throw new Error(`${error.message || "Wallet balance update failed"}. Ensure SQL migration for ${REB_WALLET_TABLE} is applied.`);
-        }
+        await Promise.all(entries.map(async ([userId, balance]) => {
+          const { error } = await supabaseClient
+            .from(REB_WALLET_TABLE)
+            .update({ rebalance_residual: rebRoundMoney(balance || 0), updated_at: new Date().toISOString() })
+            .eq("user_id", userId);
+          if (error) throw new Error(`Wallet residual update failed for ${userId}: ${error.message}`);
+        }));
       }
 
       /* ── State ── */
