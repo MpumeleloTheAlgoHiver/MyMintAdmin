@@ -1907,8 +1907,9 @@
             ? (_returnInsightsData || []).filter(a => _riFilterSymbols.has(a.symbol))
             : (_returnInsightsData || []);
           const alerts = _alertBase
-            .filter(a => a.change_percent != null && Number(a.change_percent) <= ALERT_THRESHOLD)
-            .sort((a, b) => Number(a.change_percent) - Number(b.change_percent));
+            .map(a => ({ ...a, _live1d: (_riIntradayMap[a.id]?.['1d_pct'] != null ? Number(_riIntradayMap[a.id]['1d_pct']) : (a.change_percent != null ? Number(a.change_percent) : null)) }))
+            .filter(a => a._live1d != null && a._live1d <= ALERT_THRESHOLD)
+            .sort((a, b) => a._live1d - b._live1d);
 
           if (!alerts.length) {
             listEl.innerHTML = `
@@ -1921,7 +1922,7 @@
           }
 
           listEl.innerHTML = alerts.map(a => {
-            const chg = Number(a.change_percent);
+            const chg = a._live1d;
             const chgStr = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
             const sym = (a.symbol || '').replace('.JO', '');
             const init = sym.slice(0, 2).toUpperCase();
@@ -2352,7 +2353,10 @@
           /* Sort by daily change descending */
           _returnInsightsData.sort((a, b) => (b.change_percent ?? -Infinity) - (a.change_percent ?? -Infinity));
           /* Compute alert count and update badges */
-          const alertCount = _returnInsightsData.filter(a => a.change_percent != null && Number(a.change_percent) <= ALERT_THRESHOLD).length;
+          const alertCount = _returnInsightsData.filter(a => {
+            const live = _riIntradayMap[a.id]?.['1d_pct'] != null ? Number(_riIntradayMap[a.id]['1d_pct']) : (a.change_percent != null ? Number(a.change_percent) : null);
+            return live != null && live <= ALERT_THRESHOLD;
+          }).length;
           _updateAlertBadges(alertCount);
           _renderReturnInsights(_activeReturnTab);
         } catch(e) {
