@@ -2179,12 +2179,18 @@
           return t > l ? t : l;
         }, 0);
 
-        // Key by (user_id|family_member_id) so a parent's own holdings and the
-        // holdings they bought for each child appear as separate investor rows.
+        // Key by (user_id|family_member_id|created_at minute bucket) so a
+        // single investor's separate buys of the same strategy at different
+        // times stay as separate investor rows — they're independent events
+        // and should each be reversible on their own. Holdings inserted within
+        // the same minute are treated as one buy (the strategy purchase fans
+        // out across N stock_holdings_c rows but they share a minute).
+        const minuteBucket = (iso) => String(iso || '').slice(0, 16); // YYYY-MM-DDTHH:mm
         const userMap = new Map();
         (rawRows || []).filter((r) => r.strategyId === strategyId).forEach((r) => {
           if (!r.userId) return;
-          const key = `${r.userId}|${r.familyMemberId || ''}`;
+          const bucket = minuteBucket(r.createdAt);
+          const key = `${r.userId}|${r.familyMemberId || ''}|${bucket}`;
           if (!userMap.has(key)) {
             userMap.set(key, {
               userId: r.userId,
@@ -2193,7 +2199,10 @@
               clientName: r.clientName,
               clientAccountId: r.clientAccountId, clientIdRegNo: r.clientIdRegNo,
               totalMarketValue: 0, holdingsCount: 0,
-              sourceIds: [], securityIds: []
+              sourceIds: [], securityIds: [],
+              createdAtBucket: bucket,
+              createdAtFrom: r.createdAt,
+              createdAtTo: r.createdAt,
             });
           }
           const u = userMap.get(key);
@@ -2201,6 +2210,12 @@
           u.holdingsCount += 1;
           if (r.sourceId) u.sourceIds.push(String(r.sourceId));
           if (r.securityId) u.securityIds.push(String(r.securityId));
+          // Widen the timestamp window slightly so range filters still catch
+          // every holding row from this buy event (clock skew, fan-out delay).
+          if (r.createdAt) {
+            if (!u.createdAtFrom || r.createdAt < u.createdAtFrom) u.createdAtFrom = r.createdAt;
+            if (!u.createdAtTo   || r.createdAt > u.createdAtTo)   u.createdAtTo   = r.createdAt;
+          }
         });
 
         const hasPendingRebalance = holdings.some((h) => !!h.isPendingRebalance);
@@ -2406,17 +2421,24 @@
                   data-family-member-id="${escapeHtml(String(u.familyMemberId || ''))}"
                   data-strategy-id="${escapeHtml(String(row.strategyId || ''))}"
                   data-strategy-name="${escapeHtml(row.strategyName || '')}"
-                  title="Reverse this investor's order and refund their wallet">
+                  data-created-at-from="${escapeHtml(String(u.createdAtFrom || ''))}"
+                  data-created-at-to="${escapeHtml(String(u.createdAtTo || ''))}"
+                  title="Reverse only this specific purchase (${escapeHtml(u.createdAtBucket || 'unknown time')}) and refund their wallet">
                   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
                 </button>
               </td>`
             : '';
-          const investorKey = `${u.userId || ''}|${u.familyMemberId || ''}`;
+          const investorKey = `${u.userId || ''}|${u.familyMemberId || ''}|${u.createdAtBucket || ''}`;
           const isSelected = selectedInvestorKey === investorKey;
+          // Show purchase time so two buys of the same strategy by the same
+          // user are visually distinguishable.
+          const buyTime = u.createdAtBucket
+            ? `<span class="orderbook-cell-muted" style="font-size:10.5px;display:block;">${escapeHtml(u.createdAtBucket.replace('T', ' '))}</span>`
+            : '';
           return `
-          <tr class="investor-row ${isSelected ? 'selected' : ''}" data-investor-row data-investor-key="${escapeHtml(investorKey)}" data-user-id="${escapeHtml(String(u.userId || ''))}" data-family-member-id="${escapeHtml(String(u.familyMemberId || ''))}" data-strategy-id="${escapeHtml(String(row.strategyId || ''))}">
+          <tr class="investor-row ${isSelected ? 'selected' : ''}" data-investor-row data-investor-key="${escapeHtml(investorKey)}" data-user-id="${escapeHtml(String(u.userId || ''))}" data-family-member-id="${escapeHtml(String(u.familyMemberId || ''))}" data-strategy-id="${escapeHtml(String(row.strategyId || ''))}" data-created-at-from="${escapeHtml(String(u.createdAtFrom || ''))}" data-created-at-to="${escapeHtml(String(u.createdAtTo || ''))}">
             <td>${escapeHtml(String(i + 1))}</td>
-            <td>${escapeHtml(u.clientName || '-')}</td>
+            <td>${escapeHtml(u.clientName || '-')}${buyTime}</td>
             <td>${escapeHtml(u.clientAccountId || '-')}</td>
             <td>${escapeHtml(maskIdentifier(u.clientIdRegNo || '-'))}</td>
             <td>${escapeHtml(formatMoney(u.totalMarketValue))}</td>
@@ -5123,7 +5145,8 @@
           rebalanceBatchId: row.rebalance_batch_id || null,
           isPendingRebalance: false,
           rebalanceBatchStatus: null,
-          notificationStatus: orderEmailsMap[row.rebalance_batch_id] || orderEmailsMap[row.id] || 'pending'
+          notificationStatus: orderEmailsMap[row.rebalance_batch_id] || orderEmailsMap[row.id] || 'pending',
+          createdAt: row.created_at || null,
         };
       });
 
@@ -5902,6 +5925,27 @@
             .eq('user_id', payload.userId);
           if (payload.context === 'strategy') {
             holdingsQuery = holdingsQuery.eq('strategy_id', payload.strategyId);
+            // Scope to the exact purchase (created_at minute window) so two
+            // separate buys of the same strategy don't get reversed together.
+            // Widen the window by ±5 seconds to absorb fan-out jitter when a
+            // single purchase fans out across multiple stock_holdings_c rows.
+            if (payload.createdAtFrom) {
+              const fromMs = new Date(payload.createdAtFrom).getTime() - 5000;
+              if (Number.isFinite(fromMs)) {
+                holdingsQuery = holdingsQuery.gte('created_at', new Date(fromMs).toISOString());
+              }
+            }
+            if (payload.createdAtTo) {
+              const toMs = new Date(payload.createdAtTo).getTime() + 5000;
+              if (Number.isFinite(toMs)) {
+                holdingsQuery = holdingsQuery.lte('created_at', new Date(toMs).toISOString());
+              }
+            }
+            if (payload.familyMemberId) {
+              holdingsQuery = holdingsQuery.eq('family_member_id', payload.familyMemberId);
+            } else {
+              holdingsQuery = holdingsQuery.is('family_member_id', null);
+            }
           } else {
             holdingsQuery = holdingsQuery.eq('id', payload.sourceId);
           }
@@ -6100,6 +6144,11 @@
               sourceId: payload.sourceId || null,
               selectedTxnId: _reverseState.selectedTxnId || null,
               targetName: targetName || 'Order',
+              /* Scope to the specific buy event when present (set by the
+                 investors-panel reverse button). Optional — falls back to
+                 the whole strategy if missing. */
+              createdAtFrom: payload.createdAtFrom || null,
+              createdAtTo: payload.createdAtTo || null,
             })
           });
           const result = await resp.json().catch(() => ({}));
@@ -6620,6 +6669,10 @@
         securityId: d.securityId || '',
         instrument: d.instrument || '',
         ticker: d.ticker || '',
+        /* Scope reversal to the specific purchase (created_at minute bucket)
+           when present — otherwise it falls back to the whole strategy. */
+        createdAtFrom: d.createdAtFrom || null,
+        createdAtTo: d.createdAtTo || null,
       };
       if (!payload.userId) { alert('Missing user id on this row.'); return; }
       if (payload.context === 'strategy' && !payload.strategyId) { alert('Missing strategy id on this row.'); return; }

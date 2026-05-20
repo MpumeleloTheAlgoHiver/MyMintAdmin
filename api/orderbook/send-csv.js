@@ -58,15 +58,39 @@ module.exports = async (req, res) => {
       const sourceId = String(body.sourceId || '').trim();
       const selectedTxnId = String(body.selectedTxnId || '').trim();
       const targetName = String(body.targetName || 'Order');
+      // Scope to a specific buy event by created_at window (the investors
+      // panel passes the minute bucket ±5s of the original purchase).
+      // Optional — falls back to whole-strategy when missing.
+      const createdAtFrom = String(body.createdAtFrom || '').trim();
+      const createdAtTo = String(body.createdAtTo || '').trim();
 
       if (!userId) return sendJson(res, 400, { error: 'userId required' });
       if (context === 'strategy' && !strategyId) return sendJson(res, 400, { error: 'strategyId required for strategy context' });
       if (context === 'security' && !sourceId) return sendJson(res, 400, { error: 'sourceId required for security context' });
 
-      // 1. Holdings to delete — all holdings for this user under the strategy.
-      const holdingsPath = context === 'strategy'
-        ? `/rest/v1/stock_holdings_c?user_id=eq.${encodeURIComponent(userId)}&strategy_id=eq.${encodeURIComponent(strategyId)}&select=id`
-        : `/rest/v1/stock_holdings_c?id=eq.${encodeURIComponent(sourceId)}&select=id`;
+      // 1. Holdings to delete — for strategy context, scope by user + strategy
+      //    and optionally by created_at window so two separate buys of the
+      //    same strategy by the same user don't get reversed together.
+      let holdingsPath;
+      if (context === 'strategy') {
+        let qs = `user_id=eq.${encodeURIComponent(userId)}&strategy_id=eq.${encodeURIComponent(strategyId)}`;
+        if (familyMemberId) {
+          qs += `&family_member_id=eq.${encodeURIComponent(familyMemberId)}`;
+        } else {
+          qs += `&family_member_id=is.null`;
+        }
+        if (createdAtFrom) {
+          const fromMs = new Date(createdAtFrom).getTime() - 5000;
+          if (Number.isFinite(fromMs)) qs += `&created_at=gte.${encodeURIComponent(new Date(fromMs).toISOString())}`;
+        }
+        if (createdAtTo) {
+          const toMs = new Date(createdAtTo).getTime() + 5000;
+          if (Number.isFinite(toMs)) qs += `&created_at=lte.${encodeURIComponent(new Date(toMs).toISOString())}`;
+        }
+        holdingsPath = `/rest/v1/stock_holdings_c?${qs}&select=id`;
+      } else {
+        holdingsPath = `/rest/v1/stock_holdings_c?id=eq.${encodeURIComponent(sourceId)}&select=id`;
+      }
       const holdingsRows = await fetchSupabaseJson(holdingsPath);
       const holdingIds = Array.isArray(holdingsRows) ? holdingsRows.map((r) => r.id).filter(Boolean) : [];
 
