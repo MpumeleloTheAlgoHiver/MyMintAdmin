@@ -8498,6 +8498,9 @@
         };
       }
 
+      /* wallets.rebalance_residual is stored in CENTS to stay consistent with
+         the rest of the money columns in this schema (avg_fill, etc.). All
+         in-app math here works in Rands, so we ÷100 on read and ×100 on write. */
       async function rebLoadWalletBalances(strategyId, userIds) {
         const ids = [...new Set((userIds || []).map((id) => String(id)).filter(Boolean))];
         if (!ids.length) return {};
@@ -8512,7 +8515,7 @@
           return (data || []).reduce((acc, row) => {
             const userId = String(row.user_id || "");
             if (!userId) return acc;
-            acc[userId] = rebRoundMoney(row.rebalance_residual || 0);
+            acc[userId] = rebRoundMoney((Number(row.rebalance_residual) || 0) / 100);
             return acc;
           }, {});
         } catch (err) {
@@ -8526,9 +8529,10 @@
         if (!entries.length) return;
 
         await Promise.all(entries.map(async ([userId, balance]) => {
+          const cents = Math.round((Number(balance) || 0) * 100);
           const { error } = await supabaseClient
             .from(REB_WALLET_TABLE)
-            .update({ rebalance_residual: rebRoundMoney(balance || 0), updated_at: new Date().toISOString() })
+            .update({ rebalance_residual: cents, updated_at: new Date().toISOString() })
             .eq("user_id", userId);
           if (error) throw new Error(`Wallet residual update failed for ${userId}: ${error.message}`);
         }));

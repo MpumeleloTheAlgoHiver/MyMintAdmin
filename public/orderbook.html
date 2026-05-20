@@ -5578,66 +5578,11 @@
 
         const errors = [];
 
-        /* ── Cost basis carryover prep ──
-           Read each user's pre-sell SBK avg_fill (weighted across multiple rows)
-           and total sold quantity → used later to compute the carried-over
-           avg_fill on the new NED rows so PnL is preserved across the swap. */
-        const costBasisCentsByUser = {};
-        const soldQtyByUser = {};
-        sellEvts.forEach((e) => {
-          const uid = String(e.user_id || '');
-          if (!uid) return;
-          soldQtyByUser[uid] = (soldQtyByUser[uid] || 0) + (Number(e.quantity) || 0);
-        });
-        const sellSecurityId = sellEvts[0]?.security_id || null;
-        const sellUserIds = Object.keys(soldQtyByUser);
-        if (sellSecurityId && sellUserIds.length) {
-          const { data: sellHoldings, error: sellHoldingsErr } = await supabaseClient
-            .from('stock_holdings_c')
-            .select('user_id, quantity, avg_fill')
-            .eq('strategy_id', strategyId)
-            .eq('security_id', sellSecurityId)
-            .eq('is_active', true)
-            .eq('trade_side', 'BUY')
-            .in('user_id', sellUserIds);
-          if (sellHoldingsErr) {
-            errors.push(`Cost basis lookup: ${sellHoldingsErr.message}`);
-          } else {
-            const aggByUser = {};
-            (sellHoldings || []).forEach((r) => {
-              const uid = String(r.user_id);
-              const qty = Number(r.quantity) || 0;
-              const fill = Number(r.avg_fill) || 0;
-              if (qty <= 0 || fill <= 0) return;
-              if (!aggByUser[uid]) aggByUser[uid] = { totalQty: 0, totalCostCents: 0 };
-              aggByUser[uid].totalQty += qty;
-              aggByUser[uid].totalCostCents += qty * fill;
-            });
-            Object.entries(aggByUser).forEach(([uid, data]) => {
-              if (data.totalQty > 0) {
-                costBasisCentsByUser[uid] = data.totalCostCents / data.totalQty;
-              }
-            });
-          }
-        }
-
-        /* Per-user carried avg_fill for the primary BUY (NED).
-           For each user: total_cost_carried = soldQty × oldAvgFill,
-           new NED avg_fill_per_share = total_cost_carried / newQty.
-           Falls back to defaultFillCents inside applyBuySettlement if missing
-           (e.g. user had no recorded cost basis on the sold security). */
-        const carriedAvgFillByUser = {};
-        buyEvts.forEach((evt) => {
-          const uid = String(evt.user_id || '');
-          if (!uid) return;
-          const newQty = Number(evt.quantity) || 0;
-          const soldQty = soldQtyByUser[uid] || 0;
-          const costBasisCents = costBasisCentsByUser[uid];
-          if (newQty > 0 && soldQty > 0 && costBasisCents != null && costBasisCents > 0) {
-            const totalCarriedCents = soldQty * costBasisCents;
-            carriedAvgFillByUser[uid] = Math.round(totalCarriedCents / newQty);
-          }
-        });
+        /* Cost basis carryover was removed in favour of clean per-trade
+           recording: each new BUY lands at its actual market fill price.
+           Realized gain from the SELL flows into wallets.rebalance_residual.
+           See docs/rebalance-cost-basis-carryover.md for the rationale and
+           how to reinstate carryover if the decision changes. */
 
         // ── 1. Close / reduce existing SELL positions for every user ──
         for (const evt of sellEvts) {
@@ -5808,10 +5753,12 @@
           }
         };
 
-        await applyBuySettlement(buyEvts, buyFillCents, 'BUY', carriedAvgFillByUser);
+        // No cost basis carryover: both primary and wallet-funded buys land
+        // at their actual market fill price (see docs/rebalance-cost-basis-
+        // carryover.md for the rationale). Realized gain from the sell side
+        // flows into wallets.rebalance_residual via the commit handler.
+        await applyBuySettlement(buyEvts, buyFillCents, 'BUY', null);
         if (walletBuyEvts.length) {
-          // Wallet-funded buys are a clean buy (no sell-side cost basis to carry)
-          // — use the actual fill price.
           await applyBuySettlement(walletBuyEvts, extraBuyFillCents || buyFillCents, 'WALLET_BUY', null);
         }
 
@@ -5867,13 +5814,16 @@
             if (stratErr) errors.push('Strategy restore: ' + stratErr.message);
           }
 
-          // 4. Restore rebalance_residual balances from snapshot
+          // 4. Restore rebalance_residual balances from snapshot.
+          // Snapshot stores Rand amounts (as seen in-app); the column itself
+          // is stored in cents, so we ×100 on write.
           if (batch.wallet_snapshot_before && typeof batch.wallet_snapshot_before === 'object') {
             await Promise.all(Object.entries(batch.wallet_snapshot_before).map(async ([userId, balance]) => {
               if (!userId) return;
+              const cents = Math.round((Number(balance) || 0) * 100);
               const { error: walletErr } = await supabaseClient
                 .from('wallets')
-                .update({ rebalance_residual: Number(balance) || 0, updated_at: nowIso })
+                .update({ rebalance_residual: cents, updated_at: nowIso })
                 .eq('user_id', userId);
               if (walletErr) errors.push('Wallet restore: ' + walletErr.message);
             }));
