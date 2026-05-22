@@ -2357,6 +2357,51 @@
         </div>`;
     };
 
+    /* Snapshot strategyHoldings are aggregated per-security across every
+       investor and every purchase, so the avg_fill on them is a quantity-
+       weighted blend — which means clicking line 1 (filled) vs line 2 (not
+       filled) of the same user's separate buys would show identical numbers.
+       For archived books we fetch the actual current avg_fill per source-id
+       directly from stock_holdings_c using the user's purchase-bucket
+       sourceIds, then merge instrument metadata from the snapshot. */
+    const loadArchivedInvestorHoldings = async (sourceIds, snapshotHoldings) => {
+      if (!Array.isArray(sourceIds) || !sourceIds.length) return [];
+      const ids = sourceIds.map(String).filter(Boolean);
+      if (!ids.length) return [];
+
+      const { data, error } = await supabaseClient
+        .from('stock_holdings_c')
+        .select('id, quantity, avg_fill, security_id, side')
+        .in('id', ids);
+      if (error) throw new Error(error.message || 'Failed to load investor holdings');
+
+      const meta = {};
+      (snapshotHoldings || []).forEach((h) => {
+        (h.sourceIds || []).forEach((id) => { meta[String(id)] = h; });
+      });
+
+      return (data || []).map((db, i) => {
+        const m = meta[String(db.id)] || {};
+        const avgFillCents = Number(db.avg_fill || 0);
+        const avgFillRand = avgFillCents > 0 ? avgFillCents / 100 : null;
+        const qty = Number(db.quantity || 0);
+        return {
+          ...m,
+          line: i + 1,
+          totalQuantity: qty,
+          quantityValue: qty,
+          avgFillNumber: avgFillRand,
+          avgFill: avgFillRand != null
+            ? `R ${avgFillRand.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : '-',
+          side: db.side || m.side || '-',
+          sourceIds: [String(db.id)],
+          sourceId: String(db.id),
+        };
+      }).sort((a, b) => String(a.instrumentName || '').localeCompare(String(b.instrumentName || '')))
+        .map((r, i) => ({ ...r, line: i + 1 }));
+    };
+
     /* Build the per-investor view of the strategy's holdings: only the rows
        belonging to the selected user|fmId|created_at-bucket. Returns synthetic
        holding objects that carry the user's specific sourceId, avg_fill, qty,
@@ -2396,7 +2441,12 @@
 
       let titleSuffix = '';
       let holdings = aggregateHoldings;
-      if (selectedInvestorKey) {
+      /* Caller-supplied override (used for archived snapshots where per-source-id
+         data has to come from the DB rather than the aggregated snapshot). */
+      if (options.overrideHoldings) {
+        holdings = options.overrideHoldings;
+        titleSuffix = options.overrideTitleSuffix || '';
+      } else if (selectedInvestorKey) {
         const users = row.strategyUsers || [];
         const sel = users.find((u) => `${u.userId || ''}|${u.familyMemberId || ''}|${u.createdAtBucket || ''}` === selectedInvestorKey);
         if (sel) {
@@ -6707,7 +6757,7 @@
        row that lives on the snapshot, not in the live orderbook) and scope
        the panel queries to the right instance when the same strategy appears
        in multiple books on the page. */
-    const refreshStrategyDetailViews = (strategyId, bookId = null, rowIndex = null) => {
+    const refreshStrategyDetailViews = async (strategyId, bookId = null, rowIndex = null) => {
       if (!strategyId) return;
       let stratRow = null;
       if (bookId != null && rowIndex != null) {
@@ -6725,6 +6775,32 @@
       if (holdingsPanel) holdingsPanel.innerHTML = renderStrategyHoldingsHtml(stratRow);
       const detailPanel = document.querySelector(`[data-investor-detail-panel][data-strategy-id="${CSS.escape(strategyId)}"]${archiveScope}`);
       if (detailPanel) detailPanel.innerHTML = renderInvestorDetailPanel(stratRow);
+
+      /* Archive context + an investor selected: the snapshot's aggregated
+         avg_fill collapses every purchase into one number, so we fetch the
+         actual per-source-id fills for this user's specific purchase bucket
+         and re-render the Holdings panel with them. Two buys of the same
+         strategy at different times then show their own real fill state. */
+      if (selectedInvestorKey && bookId != null && holdingsPanel) {
+        const sel = (stratRow.strategyUsers || []).find((u) =>
+          `${u.userId || ''}|${u.familyMemberId || ''}|${u.createdAtBucket || ''}` === selectedInvestorKey
+        );
+        if (!sel?.sourceIds?.length) return;
+        try {
+          const realHoldings = await loadArchivedInvestorHoldings(sel.sourceIds, stratRow.strategyHoldings);
+          if (!realHoldings.length) return;
+          const stillSelected = selectedInvestorKey === `${sel.userId || ''}|${sel.familyMemberId || ''}|${sel.createdAtBucket || ''}`;
+          if (!stillSelected) return;
+          const overrideTitleSuffix = ` <span style="font-size:11px;font-weight:400;color:#7c3aed;margin-left:8px;">· filtered to ${escapeHtml(sel.clientName || '')}${sel.createdAtBucket ? ' @ ' + escapeHtml(sel.createdAtBucket.replace('T', ' ')) : ''}</span>`;
+          holdingsPanel.innerHTML = renderStrategyHoldingsHtml(stratRow, {
+            editable: false,
+            overrideHoldings: realHoldings,
+            overrideTitleSuffix,
+          });
+        } catch (err) {
+          console.error('Archived investor fills fetch failed:', err);
+        }
+      }
     };
 
     document.addEventListener('click', (event) => {
