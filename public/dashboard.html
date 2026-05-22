@@ -5680,7 +5680,7 @@
         window.__dbgBreadcrumb('ovSelect:fetch-investors');
         const { data: investorRows } = await supabaseClient
           .from('stock_holdings_c')
-          .select('user_id, quantity, avg_fill, market_value, strategy_id, trade_side, is_active, created_at, security_id')
+          .select('user_id, family_member_id, quantity, avg_fill, market_value, strategy_id, trade_side, is_active, created_at, security_id')
           .eq('is_active', true)
           .eq('trade_side', 'BUY')
           .eq('strategy_id', strat.id);
@@ -5688,6 +5688,7 @@
 
         window.__dbgBreadcrumb('ovSelect:fetch-profiles');
         let profiles = {};
+        let familyMembers = {};    /* family_member_id → { first_name, last_name, relationship } */
         let txnInceptionMap = {};  /* userId → earliest transaction_date */
         let secPriceMap = {};      /* security_id → last_price (ZAR rands) */
         let secYtdMap = {};        /* security_id → ytd_pct (%) */
@@ -5695,6 +5696,7 @@
         if (investRows.length) {
           const uids = [...new Set(investRows.map(r => r.user_id).filter(Boolean))];
           const sids = [...new Set(investRows.map(r => r.security_id).filter(Boolean))];
+          const fmIds = [...new Set(investRows.map(r => r.family_member_id).filter(Boolean))];
           const fetches = [
             supabaseClient.from('profiles').select('id, first_name, last_name, email').in('id', uids.length ? uids : ['_']),
             supabaseClient.from('transactions')
@@ -5705,10 +5707,14 @@
               .gte('amount', 10000),
             sids.length
               ? supabaseClient.from('stock_returns_c').select('security_id, current_price, ytd_pct, 1y_pct, as_of_date').in('security_id', sids).order('as_of_date', { ascending: false })
-              : Promise.resolve({ data: [] })
+              : Promise.resolve({ data: [] }),
+            fmIds.length
+              ? supabaseClient.from('family_members').select('id, first_name, last_name, relationship').in('id', fmIds)
+              : Promise.resolve({ data: [] }),
           ];
-          const [{ data: profs }, { data: txnRows }, { data: secRows }] = await Promise.all(fetches);
+          const [{ data: profs }, { data: txnRows }, { data: secRows }, { data: fmRows }] = await Promise.all(fetches);
           if (profs) profs.forEach(p => { profiles[p.id] = p; });
+          (fmRows || []).forEach((fm) => { familyMembers[fm.id] = fm; });
           (txnRows || []).forEach(t => {
             const d = t.transaction_date ? t.transaction_date.split('T')[0] : null;
             if (d && (!txnInceptionMap[t.user_id] || d < txnInceptionMap[t.user_id]))
@@ -5804,7 +5810,7 @@
         window.__dbgBreadcrumb('ovSelect:render-holdings');
         ovRenderHoldings(holdings, secMap, pendingRebalance);
         window.__dbgBreadcrumb('ovSelect:render-investors');
-        ovRenderInvestors(investRows, profiles, strat, analytics, txnInceptionMap, secPriceMap, pendingRebalance);
+        ovRenderInvestors(investRows, profiles, strat, analytics, txnInceptionMap, secPriceMap, pendingRebalance, familyMembers);
         fetchNewsInsights();
         window.__dbgBreadcrumb('ovSelect:done');
         } catch (err) {
@@ -6348,7 +6354,7 @@
         </tr></tfoot></table>`;
       };
 
-      const ovRenderInvestors = (investRows, profiles, strat, analytics, txnInceptionMap = {}, secPriceMap = {}, pendingRebalance = null) => {
+      const ovRenderInvestors = (investRows, profiles, strat, analytics, txnInceptionMap = {}, secPriceMap = {}, pendingRebalance = null, familyMembers = {}) => {
         const el = document.getElementById('ovInvestorsTable');
         const badge = document.getElementById('ovInvestorCountBadge');
         const aumLabel = document.getElementById('ovInvestorsTotalAUM');
@@ -6360,20 +6366,26 @@
           return;
         }
 
-        /* ── Aggregate holdings per (user, minute-of-purchase) so two separate
-              buys of the same strategy at different minutes appear as separate
-              cards — admin needs to fill / reverse each buy independently. Same
-              minute = one batch (user incremented qty at checkout / single
-              transaction fanned out across N security rows). */
+        /* ── Aggregate holdings per (user, family_member, minute-of-purchase)
+              so each separate buy event surfaces as its own card. Splitting on:
+              - user_id: distinguishes different investors
+              - family_member_id: a parent who bought for two children gets one
+                card per child, plus a separate card for their own holdings
+              - created_at minute bucket: two separate buys of the same strategy
+                by the same account at different times surface separately
+              Holdings inside the same minute (one purchase fanning out across
+              N security rows) stay grouped — that's one event for the user. */
         const minuteBucket = (iso) => String(iso || '').slice(0, 16); // YYYY-MM-DDTHH:mm
         const byBatch = {};
         investRows.forEach(r => {
           const uid = r.user_id;
+          const fmId = r.family_member_id || '';
           const bucket = minuteBucket(r.created_at);
-          const key = `${uid}|${bucket}`;
+          const key = `${uid}|${fmId}|${bucket}`;
           if (!byBatch[key]) {
             byBatch[key] = {
               uid,
+              familyMemberId: fmId || null,
               bucket,
               costBasis: 0,
               currentVal: 0,
@@ -6395,16 +6407,16 @@
 
         /* ── Merge pending buy-side rebalance clients — pending events come
               from one batch and don't carry a created_at on the event, so we
-              key them under a per-user 'pending' bucket (one card per user
-              for whatever's still pending settlement). */
+              key them under a per-(user, family_member) 'pending' bucket. */
         if (pendingRebalance && pendingRebalance.events) {
           pendingRebalance.events
             .filter(ev => ev.trade_side === 'BUY' || ev.closed_reason === 'REBALANCE_EVENT_BUY' || ev.closed_reason === 'REBALANCE_EVENT_BUY_WALLET')
             .forEach(ev => {
               const uid = ev.user_id;
-              const key = `${uid}|pending`;
+              const fmId = ev.family_member_id || '';
+              const key = `${uid}|${fmId}|pending`;
               if (!byBatch[key]) {
-                byBatch[key] = { uid, bucket: 'pending', costBasis: 0, currentVal: 0, inception: new Date().toISOString(), pending: true };
+                byBatch[key] = { uid, familyMemberId: fmId || null, bucket: 'pending', costBasis: 0, currentVal: 0, inception: new Date().toISOString(), pending: true };
               }
               byBatch[key].pending = true;
             });
@@ -6420,7 +6432,22 @@
         const rows = Object.values(byBatch).map((data) => {
           const uid = data.uid;
           const prof = profiles[uid];
-          const name = prof ? ([prof.first_name, prof.last_name].filter(Boolean).join(' ').trim() || prof.email || uid) : uid;
+          const parentName = prof
+            ? ([prof.first_name, prof.last_name].filter(Boolean).join(' ').trim() || prof.email || uid)
+            : uid;
+
+          /* If this batch belongs to a family member, render as "Parent (Child)"
+             — mirrors the convention used on investors.html and the orderbook
+             investors panel so admin can tell parent buys vs child buys apart. */
+          let name = parentName;
+          if (data.familyMemberId) {
+            const fm = familyMembers[data.familyMemberId];
+            const childName = fm
+              ? ([fm.first_name, fm.last_name].filter(Boolean).join(' ').trim() || String(data.familyMemberId).slice(0, 8))
+              : String(data.familyMemberId).slice(0, 8);
+            name = `${parentName} (${childName})`;
+          }
+
           const inceptionDate = data.inception ? data.inception.split('T')[0] : (txnInceptionMap[uid] || null);
           const days = inceptionDate ? Math.floor((Date.now() - new Date(inceptionDate)) / 86400000) : 0;
 
@@ -6435,7 +6462,7 @@
             ? data.bucket.replace('T', ' ')
             : null;
 
-          return { uid, bucket: data.bucket, name, invested: data.costBasis, currentVal, pnl, returnPct, days, inceptionDate, pending, buyTime };
+          return { uid, familyMemberId: data.familyMemberId, bucket: data.bucket, name, invested: data.costBasis, currentVal, pnl, returnPct, days, inceptionDate, pending, buyTime };
         }).sort((a, b) => b.currentVal - a.currentVal);
 
         if (badge) badge.textContent = rows.length;
