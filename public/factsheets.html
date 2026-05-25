@@ -748,10 +748,27 @@
     let _sparkMap = {};
     let _investorCounts = {};
     let _logoMap = {};
+    let _priceMap = {}; /* symbol → price in Rand (for min investment calculation) */
     let _filter = 'all';
     let _query = '';
 
     const escHtml = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    /* Min investment: sum(shares × last_price) — mirrors dashboard's calculateMinInvestmentFromHoldings */
+    function calcMinInv(holdings) {
+      if (!holdings || !holdings.length) return null;
+      let total = 0, matched = 0;
+      for (const h of holdings) {
+        const sym = (h.ticker || h.symbol || '').toString();
+        const price = _priceMap[sym] ?? _priceMap[sym.replace('.JO','')] ?? null;
+        if (price != null && price > 0) {
+          const shares = Number(h.shares || h.quantity || 1);
+          total += shares * price;
+          matched++;
+        }
+      }
+      return matched > 0 ? total : null;
+    }
 
     /* ── Overview band ── */
     function renderOverview() {
@@ -855,6 +872,12 @@
       const ytdClass = ytdRaw == null ? 'na' : (isUp ? 'pos' : 'neg');
       const ytdStr = ytdRaw == null ? '—' : `${ytdRaw > 0 ? '+' : ''}${ytdRaw.toFixed(2)}%`;
 
+      /* Min investment */
+      const minInv = calcMinInv(holdings);
+      const minInvStr = minInv != null
+        ? 'R ' + minInv.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+        : '—';
+
       /* Stats row */
       const statParts = [`<span>${holdings.length} holding${holdings.length!==1?'s':''}</span>`];
       if (inv > 0) statParts.push(`<span class="sdot">·</span><span class="sinv">${inv} investor${inv!==1?'s':''}</span>`);
@@ -878,6 +901,10 @@
             ${logosHtml}
             <div class="spark-wrap">${sparkHtml}</div>
             <div class="s-ytd-chip">
+              <span class="ytd-lbl">MIN. INVESTMENT</span>
+              <span class="ytd-val" style="font-size:13px;color:${minInv != null ? '#334155' : '#94a3b8'};">${minInvStr}</span>
+            </div>
+            <div class="s-ytd-chip" style="margin-top:4px;">
               <span class="ytd-lbl">YTD RETURN</span>
               <span class="ytd-val ${ytdClass}">${ytdStr}</span>
             </div>
@@ -1338,8 +1365,33 @@
         )];
         if (allTickers.length > 0) {
           const { data: logSecs } = await supabaseClient
-            .from('securities_c').select('symbol,logo_url').in('symbol', allTickers);
-          if (logSecs) logSecs.forEach(s => { if (s.logo_url) _logoMap[s.symbol] = s.logo_url; });
+            .from('securities_c').select('id,symbol,logo_url').in('symbol', allTickers);
+          if (logSecs) {
+            logSecs.forEach(s => { if (s.logo_url) _logoMap[s.symbol] = s.logo_url; });
+            /* Also fetch latest prices for min investment — latest date first to avoid row-limit truncation */
+            const secIds = logSecs.map(s => s.id).filter(Boolean);
+            if (secIds.length > 0) {
+              const { data: pd } = await supabaseClient
+                .from('stock_returns_c').select('as_of_date')
+                .order('as_of_date',{ascending:false}).limit(1).maybeSingle();
+              if (pd?.as_of_date) {
+                const { data: pr } = await supabaseClient
+                  .from('stock_returns_c').select('security_id,current_price')
+                  .in('security_id', secIds).eq('as_of_date', pd.as_of_date);
+                const idToSym = {};
+                logSecs.forEach(s => { idToSym[s.id] = s.symbol; });
+                (pr || []).forEach(r => {
+                  const sym = idToSym[r.security_id];
+                  if (sym && r.current_price != null) {
+                    const priceRand = Number(r.current_price) / 100;
+                    _priceMap[sym] = priceRand;
+                    const bare = sym.replace('.JO','');
+                    if (bare !== sym) _priceMap[bare] = priceRand;
+                  }
+                });
+              }
+            }
+          }
         }
       } catch(_){}
 
