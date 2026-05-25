@@ -5739,14 +5739,11 @@
               .eq('direction', 'debit')
               .eq('status', 'posted')
               .gte('amount', 10000),
-            sids.length
-              ? supabaseClient.from('stock_returns_c').select('security_id, current_price, ytd_pct, 1y_pct, as_of_date').in('security_id', sids).order('as_of_date', { ascending: false })
-              : Promise.resolve({ data: [] }),
             fmIds.length
               ? supabaseClient.from('family_members').select('id, first_name, last_name, relationship').in('id', fmIds)
               : Promise.resolve({ data: [] }),
           ];
-          const [{ data: profs }, { data: txnRows }, { data: secRows }, { data: fmRows }] = await Promise.all(fetches);
+          const [{ data: profs }, { data: txnRows }, { data: fmRows }] = await Promise.all(fetches);
           if (profs) profs.forEach(p => { profiles[p.id] = p; });
           (fmRows || []).forEach((fm) => { familyMembers[fm.id] = fm; });
           (txnRows || []).forEach(t => {
@@ -5754,15 +5751,15 @@
             if (d && (!txnInceptionMap[t.user_id] || d < txnInceptionMap[t.user_id]))
               txnInceptionMap[t.user_id] = d;
           });
-          /* current_price from stock_returns_c is already in cents — store directly */
-          const _seenSec = new Set();
-          (secRows || []).forEach(s => {
-            if (_seenSec.has(s.security_id)) return;
-            _seenSec.add(s.security_id);
-            secPriceMap[s.security_id] = s.current_price != null ? Number(s.current_price) / 100 : 0;
-            if (s.ytd_pct != null) secYtdMap[s.security_id] = Number(s.ytd_pct);
-            if (s['1y_pct'] != null) sec1yMap[s.security_id] = Number(s['1y_pct']);
-          });
+          /* Use fetchStockReturnsBySec (date-filtered, avoids 1000-row limit) for investor security data */
+          if (sids.length) {
+            const _secRet = await fetchStockReturnsBySec(sids);
+            Object.entries(_secRet).forEach(([sid, s]) => {
+              secPriceMap[sid] = s.current_price != null ? Number(s.current_price) / 100 : 0;
+              if (s['ytd_pct'] != null) secYtdMap[sid] = Number(s['ytd_pct']);
+              if (s['1y_pct']  != null) sec1yMap[sid]  = Number(s['1y_pct']);
+            });
+          }
         }
 
         /* Compute AUM from live prices (qty × last_price) or fall back to cost basis */
