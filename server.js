@@ -1948,6 +1948,15 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Studio config — non-secret URLs the Client View Studio needs in the browser
+  if (req.url.startsWith('/api/studio-config')) {
+    sendJson(res, 200, {
+      mintAppUrlDev:  (process.env.MINT_APP_URL_DEV  || '').trim().replace(/\/+$/, ''),
+      mintAppUrlLive: (process.env.MINT_APP_URL_LIVE || '').trim().replace(/\/+$/, '')
+    });
+    return;
+  }
+
   // Team management routes
   if (req.url.startsWith('/api/team')) {
     (async () => {

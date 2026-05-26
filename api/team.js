@@ -475,6 +475,65 @@ module.exports = async (req, res) => {
       return sendJson(res, 200, { ok: true });
     }
 
+    // IMPERSONATE — admin only. Generates a magic link for the target client user
+    // so the admin can preview the live Mint client app signed in as them.
+    if (action === 'impersonate') {
+      if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+      const result = await requireAdmin(req, res);
+      if (!result) return;
+      const userId = (req.body?.user_id || '').trim();
+      const target = (req.body?.target || 'dev').toLowerCase() === 'live' ? 'live' : 'dev';
+      if (!userId) return sendJson(res, 400, { error: 'user_id is required' });
+
+      const mintBase = target === 'live'
+        ? (process.env.MINT_APP_URL_LIVE || '').trim().replace(/\/+$/, '')
+        : (process.env.MINT_APP_URL_DEV  || '').trim().replace(/\/+$/, '');
+      if (!mintBase) {
+        return sendJson(res, 500, { error: `Mint app URL not configured (${target === 'live' ? 'MINT_APP_URL_LIVE' : 'MINT_APP_URL_DEV'} env var is missing)` });
+      }
+
+      const profileRows = await supabaseRequest(
+        `/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=id,email,first_name,last_name&limit=1`
+      );
+      const profile = profileRows && profileRows[0];
+      if (!profile || !profile.email) {
+        return sendJson(res, 404, { error: 'Client profile not found or has no email' });
+      }
+
+      const redirectTo = `${mintBase}/?admin_view=1`;
+      let actionLink = null;
+      try {
+        actionLink = await generateAuthLink('magiclink', profile.email, redirectTo);
+      } catch (err) {
+        return sendJson(res, 500, { error: `Could not generate sign-in link: ${err.message}` });
+      }
+      if (!actionLink) {
+        return sendJson(res, 500, { error: 'Supabase did not return an action link' });
+      }
+
+      await writeAudit({
+        action: 'impersonate',
+        target_email: profile.email,
+        target_member_id: null,
+        actor_email: result.user.email,
+        actor_user_id: result.user.id,
+        details: {
+          target_user_id: profile.id,
+          target_name: [profile.first_name, profile.last_name].filter(Boolean).join(' ') || null,
+          mint_environment: target,
+          mint_base: mintBase
+        }
+      });
+
+      return sendJson(res, 200, {
+        ok: true,
+        actionLink,
+        mintBase,
+        target,
+        targetEmail: profile.email
+      });
+    }
+
     // AUDIT-LIST — admin only
     if (action === 'audit-list') {
       if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });

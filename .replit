@@ -12,6 +12,8 @@ channel = "stable-25_05"
 [userenv.shared]
 PORT = "5000"
 SUPABASE_URL = "https://mfxnghmuccevsxwcetej.supabase.co"
+MINT_APP_URL_DEV = "https://mint-development.vercel.app/"
+MINT_APP_URL_LIVE = "https://app.mymint.co.za/"
 
 [workflows]
 runButton = "Project"

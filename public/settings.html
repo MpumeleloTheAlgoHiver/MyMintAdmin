@@ -116,6 +116,19 @@
       .cp-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
       .cp-pnl-pos{color:#34c759;} .cp-pnl-neg{color:#ff3b30;} .cp-muted{color:#8e8e93;}
       .cp-pending{font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border-radius:5px;padding:2px 6px;text-transform:uppercase;}
+      /* ── Impersonation iframe ── */
+      .impersonation-panel{display:flex;flex-direction:column;height:100%;background:#000;}
+      .impersonation-frame{flex:1;width:100%;border:none;background:#f8f6fa;}
+      .impersonation-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#f8f6fa;color:#3c3c43;font-size:13px;font-weight:600;padding:24px;text-align:center;}
+      .impersonation-loading .spinner{width:30px;height:30px;border:3px solid #e5e5ea;border-top-color:#7c3aed;border-radius:50%;animation:spin .9s linear infinite;}
+      .impersonation-error{padding:18px;color:#ff3b30;font-size:12px;font-weight:600;line-height:1.4;}
+      @keyframes spin{to{transform:rotate(360deg);}}
+      .env-toggle{display:inline-flex;border:1px solid #e5e5ea;border-radius:8px;overflow:hidden;background:#fff;}
+      .env-toggle button{border:none;background:none;padding:6px 12px;font-size:12px;font-weight:600;color:#3c3c43;cursor:pointer;}
+      .env-toggle button.active{background:#7c3aed;color:#fff;}
+      .env-toggle button:disabled{opacity:.4;cursor:not-allowed;}
+      .exit-btn{display:inline-flex;align-items:center;gap:6px;border:none;background:#fff1f0;color:#ff3b30;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}
+      .exit-btn:hover{background:#ffe1de;}
       /* ── Inspector ── */
       .inspector{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:18px;padding:18px;position:sticky;top:76px;}
       .inspector-title{font-size:15px;font-weight:700;color:#1c1c1e;margin-bottom:4px;}
@@ -269,6 +282,14 @@
               Settings
             </button>
             <div class="toolbar-title">Client View Studio</div>
+            <div class="env-toggle" id="envToggle" title="Pick which Mint deployment to load">
+              <button type="button" data-env="dev" class="active">Dev</button>
+              <button type="button" data-env="live">Live</button>
+            </div>
+            <button type="button" class="exit-btn" id="exitImpersonationBtn" style="display:none;">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+              Exit client view
+            </button>
             <label class="toggle-wrap">
               <input id="frameToggle" type="checkbox" checked>
               Phone frame
@@ -295,38 +316,20 @@
                           </div>
                         </div>
                       </div>
-                      <!-- Profile panel -->
-                      <div class="phone-panel">
-                        <div class="client-profile-view">
-                          <div class="cp-header">
-                            <div class="cp-top">
-                              <button id="profileBackBtn" class="cp-back">‹</button>
-                              <div class="cp-title">Client Preview</div>
-                              <div style="width:28px;"></div>
-                            </div>
-                            <div id="cpAvatar" class="cp-avatar">—</div>
-                            <div id="cpName" class="cp-name">—</div>
-                            <div id="cpEmail" class="cp-email">—</div>
-                            <div class="cp-balance">
-                              <div class="label">Portfolio Value</div>
-                              <div id="cpBalance" class="val">R0.00</div>
-                              <div id="cpChange" class="delta"></div>
-                            </div>
-                          </div>
-                          <div class="cp-body">
-                            <div class="cp-section">
-                              <div class="cp-section-head"><h4>Holdings</h4><span id="cpHoldingsCount"></span></div>
-                              <div id="cpHoldingsList"></div>
-                            </div>
-                            <div class="cp-section">
-                              <div class="cp-section-head"><h4>Strategies</h4><span id="cpStrategiesCount"></span></div>
-                              <div id="cpStrategiesList"></div>
-                            </div>
-                            <div class="cp-section">
-                              <div class="cp-section-head"><h4>Recent Activity</h4></div>
-                              <div id="cpTransactionsList"></div>
-                            </div>
-                          </div>
+                      <!-- Impersonation panel — live Mint app, signed in as the client -->
+                      <div class="phone-panel" style="position:relative;">
+                        <div class="impersonation-panel">
+                          <iframe id="impersonationFrame"
+                                  class="impersonation-frame"
+                                  title="Mint client view"
+                                  allow="clipboard-read; clipboard-write"
+                                  referrerpolicy="no-referrer"
+                                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-storage-access-by-user-activation"></iframe>
+                        </div>
+                        <div id="impersonationStatus" class="impersonation-loading" style="display:none;">
+                          <div class="spinner" id="impersonationSpinner"></div>
+                          <div id="impersonationStatusText">Signing in as client…</div>
+                          <div id="impersonationErrorText" class="impersonation-error" style="display:none;"></div>
                         </div>
                       </div>
                     </div>
@@ -366,6 +369,10 @@
       const previewStage    = document.getElementById('previewStage');
       const phonePanels     = document.getElementById('phonePanels');
       let allClients = [];
+      let currentClient = null;
+      let impersonationLoadingTimer = null;
+      let impersonationRequestId = 0;
+      let inspectorRequestId = 0;
 
       (async () => {
         const { data: { session } } = await supabaseClient.auth.getSession();
@@ -410,7 +417,40 @@
         previewStage.classList.toggle('frame-off', !e.target.checked);
       });
 
-      document.getElementById('profileBackBtn').addEventListener('click', () => showPhonePanel('list'));
+      // Dev/Live environment toggle for the Mint app
+      let currentMintEnv = 'dev';
+      document.getElementById('envToggle').addEventListener('click', e => {
+        const btn = e.target.closest('button[data-env]'); if (!btn) return;
+        currentMintEnv = btn.dataset.env;
+        document.querySelectorAll('#envToggle button').forEach(b => b.classList.toggle('active', b === btn));
+        // If we're currently impersonating someone, reload them in the newly selected env
+        if (currentClient) loadClientImpersonation(currentClient);
+      });
+
+      // Exit client view — tear down iframe and return to list
+      document.getElementById('exitImpersonationBtn').addEventListener('click', exitImpersonation);
+
+      function exitImpersonation() {
+        impersonationRequestId++;
+        inspectorRequestId++;
+        if (impersonationLoadingTimer) { clearTimeout(impersonationLoadingTimer); impersonationLoadingTimer = null; }
+        const frame = document.getElementById('impersonationFrame');
+        try { frame.contentWindow?.postMessage({ type: 'mint:admin_signout' }, '*'); } catch {}
+        frame.onload = null;
+        frame.src = 'about:blank';
+        hideImpersonationStatus();
+        document.getElementById('exitImpersonationBtn').style.display = 'none';
+        currentClient = null;
+        showPhonePanel('list');
+        document.getElementById('inspectorHint').textContent = 'Select a client to load their full profile and data breakdown.';
+        document.getElementById('mClient').textContent = '—';
+        document.getElementById('mPortfolio').textContent = '—';
+        document.getElementById('mPnl').textContent = '—';
+        document.getElementById('mPnl').style.color = '';
+        document.getElementById('mStrategies').textContent = '—';
+        document.getElementById('inspectorHoldings').innerHTML = '<div class="placeholder">No client selected</div>';
+        document.getElementById('inspectorTransactions').innerHTML = '<div class="placeholder">No client selected</div>';
+      }
 
       async function loadClientsInStrategies() {
         const loading    = document.getElementById('clientListLoading');
@@ -469,60 +509,126 @@
 
       document.getElementById('clientScrollArea').addEventListener('click',e=>{
         const card=e.target.closest('.client-card'); if(!card) return;
-        const client=allClients.find(c=>c.id===card.dataset.clientId); if(client) loadClientProfile(client);
+        const client=allClients.find(c=>c.id===card.dataset.clientId); if(client) loadClientImpersonation(client);
       });
 
-      async function loadClientProfile(client) {
-        showPhonePanel('profile');
-        document.getElementById('cpAvatar').textContent=client.initials;
-        document.getElementById('cpName').textContent=client.name;
-        document.getElementById('cpEmail').textContent=client.email;
-        document.getElementById('cpBalance').textContent='Loading…';
-        document.getElementById('cpChange').textContent='';
-        document.getElementById('cpHoldingsList').innerHTML='<div class="client-loading">Loading…</div>';
-        document.getElementById('cpStrategiesList').innerHTML='<div class="client-loading">Loading…</div>';
-        document.getElementById('cpTransactionsList').innerHTML='<div class="client-loading">Loading…</div>';
+      async function getAdminBearer() {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session?.access_token) throw new Error('Not signed in — please reload.');
+        return session.access_token;
+      }
+
+      function showImpersonationStatus(text) {
+        const statusEl = document.getElementById('impersonationStatus');
+        const textEl   = document.getElementById('impersonationStatusText');
+        const errEl    = document.getElementById('impersonationErrorText');
+        const spinner  = document.getElementById('impersonationSpinner');
+        if (spinner) spinner.style.display = '';
+        if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+        if (textEl) { textEl.style.display = ''; textEl.textContent = text || 'Signing in as client…'; }
+        statusEl.style.display = 'flex';
+      }
+      function showImpersonationError(message) {
+        const statusEl = document.getElementById('impersonationStatus');
+        const textEl   = document.getElementById('impersonationStatusText');
+        const errEl    = document.getElementById('impersonationErrorText');
+        const spinner  = document.getElementById('impersonationSpinner');
+        if (spinner) spinner.style.display = 'none';
+        if (textEl) textEl.style.display = 'none';
+        if (errEl) { errEl.textContent = `Could not open client view: ${message || 'Unknown error'}`; errEl.style.display = ''; }
+        statusEl.style.display = 'flex';
+      }
+      function hideImpersonationStatus() {
+        document.getElementById('impersonationStatus').style.display = 'none';
+      }
+
+      async function loadClientImpersonation(client) {
+        const reqId = ++impersonationRequestId;
+        const inspReqId = ++inspectorRequestId;
+        currentClient = client;
+        const envAtStart = currentMintEnv;
+        showPhonePanel('profile'); // re-uses the slide-to-second-panel animation
+        document.getElementById('exitImpersonationBtn').style.display = 'inline-flex';
+        const frame = document.getElementById('impersonationFrame');
+        frame.onload = null;
+        frame.src = 'about:blank';
+        if (impersonationLoadingTimer) { clearTimeout(impersonationLoadingTimer); impersonationLoadingTimer = null; }
+        showImpersonationStatus(`Signing in as ${client.name} (${envAtStart})…`);
+
+        // Reset inspector and start loading its data in parallel
+        document.getElementById('inspectorHint').textContent = 'Loading data for ' + client.name + '…';
+        document.getElementById('mClient').textContent = client.name;
+        document.getElementById('mPortfolio').textContent = '…';
+        document.getElementById('mPnl').textContent = '…';
+        document.getElementById('mPnl').style.color = '';
+        document.getElementById('mStrategies').textContent = '…';
+        document.getElementById('inspectorHoldings').innerHTML = '<div class="placeholder">Loading…</div>';
+        document.getElementById('inspectorTransactions').innerHTML = '<div class="placeholder">Loading…</div>';
+
+        const inspectorPromise = loadClientInspectorData(client, inspReqId).catch(err => {
+          if (inspReqId !== inspectorRequestId) return;
+          console.error('[Studio] inspector load failed:', err);
+          document.getElementById('inspectorHint').textContent = 'Could not load data: ' + (err?.message || 'Unknown');
+        });
+
         try {
-          const [hr, tr] = await Promise.all([
-            supabaseClient.from('stock_holdings_c').select('id,security_id,quantity,avg_fill,strategy_id,Status,trade_side,is_active').eq('user_id',client.id).eq('Status','active').eq('is_active',true).eq('trade_side','BUY'),
-            supabaseClient.from('transactions').select('id,name,description,amount,direction,status,transaction_date,created_at').eq('user_id',client.id).order('created_at',{ascending:false}).limit(6),
-          ]);
-          const holdings=hr.data||[], transactions=tr.data||[];
-          const secIds=[...new Set(holdings.map(h=>h.security_id).filter(Boolean))];
-          const strIds=[...new Set(holdings.map(h=>h.strategy_id).filter(Boolean))];
-          const secMap={}, strMap={};
-          if(secIds.length){ const {data:s}=await supabaseClient.from('securities_c').select('id,symbol,name,last_price,logo_url').in('id',secIds); (s||[]).forEach(x=>secMap[x.id]=x); }
-          if(strIds.length){ const {data:s}=await supabaseClient.from('strategies_c').select('id,name,short_name,risk_level').in('id',strIds); (s||[]).forEach(x=>strMap[x.id]=x); }
-          let tv=0,tc=0;
-          const fh=holdings.filter(h=>secMap[h.security_id]).map(h=>{
-            const sec=secMap[h.security_id],qty=Number(h.quantity||0),af=Number(h.avg_fill||0),ip=!af;
-            const lp=Number(sec.last_price||af),mv=(lp*qty),cb=(af*qty),pr=mv-cb,pp=cb>0?(pr/cb)*100:0;
-            if(!ip){tv+=mv;tc+=cb;}
-            return {symbol:sec.symbol,name:sec.name,logo:sec.logo_url||'',value:mv,pnlRands:pr,pnlPct:pp,isPending:ip,strategyId:h.strategy_id};
-          }).sort((a,b)=>b.value-a.value);
-          const sa={};
-          fh.forEach(h=>{ if(!h.strategyId) return; if(!sa[h.strategyId]) sa[h.strategyId]={value:0,count:0}; if(!h.isPending) sa[h.strategyId].value+=h.value; sa[h.strategyId].count+=1; });
-          const se=Object.entries(sa).map(([id,v])=>({id,strategy:strMap[id],value:v.value,count:v.count})).filter(s=>s.strategy).sort((a,b)=>b.value-a.value);
-          const tp=tv-tc,tpp=tc>0?(tp/tc)*100:0;
-          document.getElementById('cpBalance').textContent=`R${fmt(tv)}`;
-          document.getElementById('cpChange').textContent=tc>0?`${tp>=0?'+':''}R${fmt(Math.abs(tp))} (${tp>=0?'+':''}${tpp.toFixed(2)}%)`:'';
-          document.getElementById('cpHoldingsCount').textContent=fh.length;
-          document.getElementById('cpStrategiesCount').textContent=se.length;
-          document.getElementById('cpHoldingsList').innerHTML=fh.length?fh.map(h=>{
-            const cls=h.pnlRands>=0?'cp-pnl-pos':'cp-pnl-neg';
-            const logoHtml=h.logo?`<img src="${escapeHtml(h.logo)}" style="width:28px;height:28px;border-radius:8px;object-fit:cover;flex-shrink:0;border:1px solid #f2f2f7;" onerror="this.style.display='none'">`:`<div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#a855f7);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;">${escapeHtml((h.symbol||'?')[0])}</div>`;
-            return `<div class="cp-card"><div class="cp-row" style="align-items:center;">${logoHtml}<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">${escapeHtml(h.symbol)}${h.isPending?' <span class="cp-pending">Pending</span>':''}</div><div class="cp-muted" style="font-size:11px;">${escapeHtml(h.name)}</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:700;">R${fmt(h.value)}</div>${h.isPending?'<div class="cp-muted" style="font-size:11px;">Awaiting fill</div>':`<div class="${cls}" style="font-size:11px;font-weight:600;">${h.pnlRands>=0?'+':'-'}R${fmt(Math.abs(h.pnlRands))}</div>`}</div></div></div>`;
-          }).join(''):'<div class="client-empty">No active holdings</div>';
-          document.getElementById('cpStrategiesList').innerHTML=se.length?se.map(s=>`<div class="cp-card"><div style="font-size:13px;font-weight:700;">${escapeHtml(s.strategy.name||s.strategy.short_name)}</div><div class="cp-row" style="margin-top:4px;"><span class="cp-muted" style="font-size:11px;">${escapeHtml(s.strategy.risk_level||'Balanced')} · ${s.count} holding${s.count===1?'':'s'}</span><span style="font-size:12px;font-weight:700;">R${fmt(s.value)}</span></div></div>`).join(''):'<div class="client-empty">No strategies</div>';
-          document.getElementById('cpTransactionsList').innerHTML=transactions.length?transactions.map(t=>{
-            const a=Math.abs(Number(t.amount||0)/100),cr=t.direction==='credit';
-            return `<div class="cp-card"><div class="cp-row"><div><div style="font-size:12px;font-weight:700;">${escapeHtml(t.name||t.description||'Transaction')}</div><div class="cp-muted" style="font-size:10px;">${escapeHtml(fmtDate(t.transaction_date||t.created_at))}</div></div><div style="font-size:12px;font-weight:700;color:${cr?'#34c759':'#1c1c1e'};">${cr?'+':''}R${fmt(a)}</div></div></div>`;
-          }).join(''):'<div class="client-empty">No recent activity</div>';
-          renderInspector({client,totalValue:tv,totalPnl:tp,totalPnlPct:tpp,strategyCount:se.length,holdings:fh.slice(0,8),transactions});
-        } catch(err) {
-          document.getElementById('cpBalance').textContent='Error';
-          document.getElementById('cpHoldingsList').innerHTML=`<div class="client-empty">${escapeHtml(err.message||'Failed')}</div>`;
+          const token = await getAdminBearer();
+          if (reqId !== impersonationRequestId) return;
+          const res = await fetch('/api/team?action=impersonate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ user_id: client.id, target: envAtStart })
+          });
+          if (reqId !== impersonationRequestId) return; // stale — newer click already started
+          const data = await res.json().catch(() => ({}));
+          if (reqId !== impersonationRequestId) return;
+          if (!res.ok || !data.actionLink) {
+            showImpersonationError(data.error || `Sign-in failed (${res.status})`);
+            return;
+          }
+          frame.onload = () => {
+            if (reqId !== impersonationRequestId) return;
+            if (impersonationLoadingTimer) { clearTimeout(impersonationLoadingTimer); impersonationLoadingTimer = null; }
+            hideImpersonationStatus();
+          };
+          frame.src = data.actionLink;
+          impersonationLoadingTimer = setTimeout(() => {
+            if (reqId !== impersonationRequestId) return;
+            showImpersonationStatus(`Still waiting for ${data.mintBase || 'the Mint app'}… If this hangs, the Mint app may be blocking iframe embedding (X-Frame-Options / CSP frame-ancestors). See docs/MINT_IMPERSONATION_SETUP.md.`);
+          }, 10000);
+        } catch (err) {
+          if (reqId !== impersonationRequestId) return;
+          console.error('[Studio] impersonation failed:', err);
+          showImpersonationError(err?.message || 'Unknown error');
         }
+        await inspectorPromise;
+      }
+
+      async function loadClientInspectorData(client, reqId) {
+        const [hr, tr] = await Promise.all([
+          supabaseClient.from('stock_holdings_c').select('id,security_id,quantity,avg_fill,strategy_id,Status,trade_side,is_active').eq('user_id',client.id).eq('Status','active').eq('is_active',true).eq('trade_side','BUY'),
+          supabaseClient.from('transactions').select('id,name,description,amount,direction,status,transaction_date,created_at').eq('user_id',client.id).order('created_at',{ascending:false}).limit(6),
+        ]);
+        if (reqId !== inspectorRequestId) return;
+        const holdings = hr.data || [], transactions = tr.data || [];
+        const secIds = [...new Set(holdings.map(h=>h.security_id).filter(Boolean))];
+        const strIds = [...new Set(holdings.map(h=>h.strategy_id).filter(Boolean))];
+        const secMap = {}, strMap = {};
+        if (secIds.length) { const {data:s} = await supabaseClient.from('securities_c').select('id,symbol,name,last_price,logo_url').in('id',secIds); (s||[]).forEach(x=>secMap[x.id]=x); }
+        if (strIds.length) { const {data:s} = await supabaseClient.from('strategies_c').select('id,name,short_name,risk_level').in('id',strIds); (s||[]).forEach(x=>strMap[x.id]=x); }
+        if (reqId !== inspectorRequestId) return;
+        let tv = 0, tc = 0;
+        const fh = holdings.filter(h=>secMap[h.security_id]).map(h => {
+          const sec = secMap[h.security_id], qty = Number(h.quantity||0), af = Number(h.avg_fill||0), ip = !af;
+          const lp = Number(sec.last_price||af), mv = (lp*qty), cb = (af*qty), pr = mv - cb;
+          if (!ip) { tv += mv; tc += cb; }
+          return { symbol: sec.symbol, name: sec.name, value: mv, pnlRands: pr, isPending: ip, strategyId: h.strategy_id };
+        }).sort((a,b)=>b.value-a.value);
+        const sa = {};
+        fh.forEach(h => { if (!h.strategyId) return; if (!sa[h.strategyId]) sa[h.strategyId]={value:0,count:0}; if (!h.isPending) sa[h.strategyId].value += h.value; sa[h.strategyId].count += 1; });
+        const se = Object.entries(sa).map(([id,v])=>({id,strategy:strMap[id],value:v.value,count:v.count})).filter(s=>s.strategy);
+        const tp = tv - tc, tpp = tc > 0 ? (tp/tc)*100 : 0;
+        renderInspector({ client, totalValue: tv, totalPnl: tp, totalPnlPct: tpp, strategyCount: se.length, holdings: fh.slice(0,8), transactions });
       }
 
       function renderInspector(s) {
