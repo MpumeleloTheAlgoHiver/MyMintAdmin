@@ -3985,8 +3985,42 @@
     };
 
     const getRowFillStatus = (row) => {
+      /* Strategy rows: each strategyHolding carries its own fillDate set by
+         the reconcile function. If ALL holdings have fillDate, the row is
+         fully filled — we don't need a live DB lookup for those. */
+      if (row?.isStrategy && Array.isArray(row.strategyHoldings) && row.strategyHoldings.length) {
+        let allHoldingsFilled = true;
+        let latestFillDate = null;
+        row.strategyHoldings.forEach((h) => {
+          if (!h.fillDate) {
+            allHoldingsFilled = false;
+            return;
+          }
+          const ts = new Date(h.fillDate).getTime();
+          if (Number.isFinite(ts) && (!latestFillDate || ts > new Date(latestFillDate).getTime())) {
+            latestFillDate = h.fillDate;
+          }
+        });
+        if (allHoldingsFilled) {
+          return {
+            filled: true,
+            text: latestFillDate ? `Filled (${new Date(latestFillDate).toLocaleDateString()})` : 'Filled',
+            latestFillDate
+          };
+        }
+        /* Fall through to live lookup if any holding is missing fillDate. */
+      }
+
       const ids = getRowHoldingIds(row);
       if (!ids.length) {
+        /* Non-strategy row with a stored fillDate is already confirmed filled. */
+        if (row?.fillDate) {
+          return {
+            filled: true,
+            text: `Filled (${new Date(row.fillDate).toLocaleDateString()})`,
+            latestFillDate: row.fillDate
+          };
+        }
         return { filled: false, text: 'Not filled', latestFillDate: null };
       }
 
@@ -4004,6 +4038,16 @@
           latestFillDate = fd;
         }
       });
+
+      /* Any ID missing from the live map? Check if the row itself has a
+         stored fillDate from a previous reconcile — if so, trust that. */
+      if (!allFilled && row?.fillDate) {
+        return {
+          filled: true,
+          text: `Filled (${new Date(row.fillDate).toLocaleDateString()})`,
+          latestFillDate: row.fillDate
+        };
+      }
 
       if (!allFilled) {
         return { filled: false, text: 'Not filled', latestFillDate };
