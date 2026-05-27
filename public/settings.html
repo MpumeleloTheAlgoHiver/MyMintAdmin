@@ -655,7 +655,7 @@
 
       async function loadClientInspectorData(client, reqId) {
         const [hr, tr] = await Promise.all([
-          supabaseClient.from('stock_holdings_c').select('id,security_id,quantity,avg_fill,strategy_id,Status,trade_side,is_active').eq('user_id',client.id).eq('Status','active').eq('is_active',true).eq('trade_side','BUY'),
+          supabaseClient.from('stock_holdings_c').select('id,security_id,quantity,avg_fill,Expected_fill,strategy_id,Status,trade_side,is_active').eq('user_id',client.id).eq('Status','active').eq('is_active',true).eq('trade_side','BUY'),
           supabaseClient.from('transactions').select('id,name,description,amount,direction,status,transaction_date,created_at').eq('user_id',client.id).order('created_at',{ascending:false}).limit(6),
         ]);
         if (reqId !== inspectorRequestId) return;
@@ -666,8 +666,8 @@
         if (secIds.length) {
           const {data:s} = await supabaseClient.from('securities_c').select('id,symbol,name,last_price,logo_url').in('id',secIds);
           (s||[]).forEach(x=>secMap[x.id]=x);
-          /* Match the orderbook: prefer the live intraday price (cents → rands)
-             over securities_c.last_price so PnL reflects today's market. */
+          /* Live price source: stock_intraday_c.current_price (cents → rands).
+             Fall back to securities_c.last_price (already rands, EOD-stale). */
           const {data:iq} = await supabaseClient.from('stock_intraday_c').select('security_id,current_price,timestamp').in('security_id',secIds).order('timestamp',{ascending:false});
           const seen = new Set();
           (iq||[]).forEach(row => {
@@ -679,30 +679,54 @@
         }
         if (strIds.length) { const {data:s} = await supabaseClient.from('strategies_c').select('id,name,short_name,risk_level').in('id',strIds); (s||[]).forEach(x=>strMap[x.id]=x); }
         if (reqId !== inspectorRequestId) return;
-        let tv = 0, tc = 0;
+
+        /* Cost basis per share (Expected_fill is rands set at click time; avg_fill
+           is cents). Guard against legacy rows that stored Expected_fill in cents
+           by accident — if Expected_fill is >5× the avg_fill-in-rands, treat it
+           as cents and divide. */
+        const costBasisPerShare = (h) => {
+          const expRaw = Number(h.Expected_fill);
+          const avgRandsFromFill = Number(h.avg_fill || 0) / 100;
+          if (Number.isFinite(expRaw) && expRaw > 0) {
+            if (avgRandsFromFill > 0 && expRaw > (avgRandsFromFill * 5)) {
+              return expRaw / 100; // legacy cents row
+            }
+            return expRaw;
+          }
+          return avgRandsFromFill;
+        };
+
+        let portfolioValue = 0, totalCost = 0, totalPnL = 0;
         const fh = holdings.filter(h=>secMap[h.security_id]).map(h => {
           const sec = secMap[h.security_id];
-          const qty = Number(h.quantity||0);
-          /* avg_fill is stored in CENTS in stock_holdings_c, convert to rands. */
-          const afRaw = Number(h.avg_fill||0);
-          const af = afRaw / 100;
-          const ip = !afRaw;
-          /* Prefer intraday live price; fall back to securities_c.last_price (rands);
-             fall back to avg_fill if no market price is available. */
+          const qty = Number(h.quantity || 0);
+          const cost = costBasisPerShare(h);
           const intraLp = intradayMap[h.security_id];
           const lastLp = Number(sec.last_price);
-          const lp = (intraLp != null && Number.isFinite(intraLp)) ? intraLp
-                   : (Number.isFinite(lastLp) && lastLp > 0) ? lastLp
-                   : af;
-          const mv = (lp*qty), cb = (af*qty), pr = mv - cb;
-          if (!ip) { tv += mv; tc += cb; }
-          return { symbol: sec.symbol, name: sec.name, value: mv, pnlRands: pr, isPending: ip, strategyId: h.strategy_id };
+          const livePrice = Number.isFinite(intraLp) ? intraLp
+                          : (Number.isFinite(lastLp) && lastLp > 0) ? lastLp
+                          : cost;
+          const marketValue = livePrice * qty;
+          const costTotal   = cost * qty;
+          const pnlRands    = marketValue - costTotal;
+          const pnlPct      = costTotal > 0 ? (pnlRands / costTotal) * 100 : 0;
+          const isPending   = !cost;
+
+          portfolioValue += marketValue;
+          totalCost      += costTotal;
+          totalPnL       += pnlRands;
+
+          return {
+            symbol: sec.symbol, name: sec.name,
+            value: marketValue, pnlRands, pnlPct,
+            isPending, strategyId: h.strategy_id
+          };
         }).sort((a,b)=>b.value-a.value);
         const sa = {};
         fh.forEach(h => { if (!h.strategyId) return; if (!sa[h.strategyId]) sa[h.strategyId]={value:0,count:0}; if (!h.isPending) sa[h.strategyId].value += h.value; sa[h.strategyId].count += 1; });
         const se = Object.entries(sa).map(([id,v])=>({id,strategy:strMap[id],value:v.value,count:v.count})).filter(s=>s.strategy);
-        const tp = tv - tc, tpp = tc > 0 ? (tp/tc)*100 : 0;
-        renderInspector({ client, totalValue: tv, totalPnl: tp, totalPnlPct: tpp, strategyCount: se.length, holdings: fh.slice(0,8), transactions });
+        const totalPnLPct = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
+        renderInspector({ client, totalValue: portfolioValue, totalPnl: totalPnL, totalPnlPct: totalPnLPct, strategyCount: se.length, holdings: fh.slice(0,8), transactions });
       }
 
       function renderInspector(s) {
