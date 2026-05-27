@@ -662,14 +662,35 @@
         const holdings = hr.data || [], transactions = tr.data || [];
         const secIds = [...new Set(holdings.map(h=>h.security_id).filter(Boolean))];
         const strIds = [...new Set(holdings.map(h=>h.strategy_id).filter(Boolean))];
-        const secMap = {}, strMap = {};
-        if (secIds.length) { const {data:s} = await supabaseClient.from('securities_c').select('id,symbol,name,last_price,logo_url').in('id',secIds); (s||[]).forEach(x=>secMap[x.id]=x); }
+        const secMap = {}, strMap = {}, intradayMap = {};
+        if (secIds.length) {
+          const {data:s} = await supabaseClient.from('securities_c').select('id,symbol,name,last_price,logo_url').in('id',secIds);
+          (s||[]).forEach(x=>secMap[x.id]=x);
+          /* Match the orderbook: prefer the live intraday price (cents → rands)
+             over securities_c.last_price so PnL reflects today's market. */
+          const {data:iq} = await supabaseClient.from('stock_intraday_c').select('security_id,current_price,timestamp').in('security_id',secIds).order('timestamp',{ascending:false});
+          const seen = new Set();
+          (iq||[]).forEach(row => {
+            if (row.security_id && !seen.has(row.security_id) && row.current_price != null) {
+              seen.add(row.security_id);
+              intradayMap[row.security_id] = Number(row.current_price) / 100;
+            }
+          });
+        }
         if (strIds.length) { const {data:s} = await supabaseClient.from('strategies_c').select('id,name,short_name,risk_level').in('id',strIds); (s||[]).forEach(x=>strMap[x.id]=x); }
         if (reqId !== inspectorRequestId) return;
         let tv = 0, tc = 0;
         const fh = holdings.filter(h=>secMap[h.security_id]).map(h => {
-          const sec = secMap[h.security_id], qty = Number(h.quantity||0), af = Number(h.avg_fill||0), ip = !af;
-          const lp = Number(sec.last_price||af), mv = (lp*qty), cb = (af*qty), pr = mv - cb;
+          const sec = secMap[h.security_id];
+          const qty = Number(h.quantity||0);
+          /* avg_fill is stored in CENTS in stock_holdings_c, convert to rands. */
+          const afRaw = Number(h.avg_fill||0);
+          const af = afRaw / 100;
+          const ip = !afRaw;
+          /* Prefer intraday live price; fall back to securities_c.last_price (rands);
+             fall back to avg_fill if no market price is available. */
+          const lp = intradayMap[h.security_id] ?? Number(sec.last_price) || af;
+          const mv = (lp*qty), cb = (af*qty), pr = mv - cb;
           if (!ip) { tv += mv; tc += cb; }
           return { symbol: sec.symbol, name: sec.name, value: mv, pnlRands: pr, isPending: ip, strategyId: h.strategy_id };
         }).sort((a,b)=>b.value-a.value);
