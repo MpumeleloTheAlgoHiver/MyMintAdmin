@@ -2189,18 +2189,18 @@
           return t > l ? t : l;
         }, 0);
 
-        // Key by (user_id|family_member_id|created_at minute bucket) so a
-        // single investor's separate buys of the same strategy at different
-        // times stay as separate investor rows — they're independent events
-        // and should each be reversible on their own. Holdings inserted within
-        // the same minute are treated as one buy (the strategy purchase fans
-        // out across N stock_holdings_c rows but they share a minute).
+        // Key by transaction_id first — that's the authoritative purchase
+        // batch id. If a single investor buys the same strategy twice, each
+        // buy gets its own transaction_id and shows as a separate investor
+        // row. Fall back to (user_id|family_member|minute bucket) for legacy
+        // rows without transaction_id.
         const minuteBucket = (iso) => String(iso || '').slice(0, 16); // YYYY-MM-DDTHH:mm
         const userMap = new Map();
         (rawRows || []).filter((r) => r.strategyId === strategyId).forEach((r) => {
           if (!r.userId) return;
           const bucket = minuteBucket(r.createdAt);
-          const key = `${r.userId}|${r.familyMemberId || ''}|${bucket}`;
+          const txnPart = r.transactionId ? `t:${r.transactionId}` : `m:${bucket}`;
+          const key = `${r.userId}|${r.familyMemberId || ''}|${txnPart}`;
           if (!userMap.has(key)) {
             userMap.set(key, {
               userId: r.userId,
@@ -2210,6 +2210,7 @@
               clientAccountId: r.clientAccountId, clientIdRegNo: r.clientIdRegNo,
               totalMarketValue: 0, holdingsCount: 0,
               sourceIds: [], securityIds: [],
+              transactionId: r.transactionId || null,
               createdAtBucket: bucket,
               createdAtFrom: r.createdAt,
               createdAtTo: r.createdAt,
@@ -2416,7 +2417,7 @@
        belonging to the selected user|fmId|created_at-bucket. Returns synthetic
        holding objects that carry the user's specific sourceId, avg_fill, qty,
        PnL so renderEditableAvgFill edits only that user's stock_holdings_c rows. */
-    const buildHoldingsForSelectedInvestor = (strategyId, userId, familyMemberId, createdAtFrom, createdAtTo) => {
+    const buildHoldingsForSelectedInvestor = (strategyId, userId, familyMemberId, createdAtFrom, createdAtTo, transactionId) => {
       if (!strategyId || !userId) return [];
       const targetFm = familyMemberId || '';
       const fromMs = createdAtFrom ? new Date(createdAtFrom).getTime() - 5000 : null;
@@ -2425,6 +2426,12 @@
         if (String(r.strategyId || '') !== String(strategyId)) return false;
         if (String(r.userId || '') !== String(userId)) return false;
         if (String(r.familyMemberId || '') !== String(targetFm)) return false;
+        /* transaction_id is the authoritative purchase-batch separator; when
+           present, use it exclusively and skip the time-window check. */
+        if (transactionId) {
+          if (String(r.transactionId || '') !== String(transactionId)) return false;
+          return true;
+        }
         if (fromMs != null && r.createdAt) {
           const ts = new Date(r.createdAt).getTime();
           if (Number.isFinite(ts) && ts < fromMs) return false;
@@ -2458,14 +2465,15 @@
         titleSuffix = options.overrideTitleSuffix || '';
       } else if (selectedInvestorKey) {
         const users = row.strategyUsers || [];
-        const sel = users.find((u) => `${u.userId || ''}|${u.familyMemberId || ''}|${u.createdAtBucket || ''}` === selectedInvestorKey);
+        const sel = users.find((u) => buildInvestorKey(u) === selectedInvestorKey);
         if (sel) {
           const userHoldings = buildHoldingsForSelectedInvestor(
             row.strategyId,
             sel.userId,
             sel.familyMemberId,
             sel.createdAtFrom,
-            sel.createdAtTo
+            sel.createdAtTo,
+            sel.transactionId
           );
           if (userHoldings.length) {
             holdings = userHoldings;
@@ -2555,7 +2563,7 @@
                 </button>
               </td>`
             : '';
-          const investorKey = `${u.userId || ''}|${u.familyMemberId || ''}|${u.createdAtBucket || ''}`;
+          const investorKey = buildInvestorKey(u);
           const isSelected = selectedInvestorKey === investorKey;
           // Show purchase time so two buys of the same strategy by the same
           // user are visually distinguishable.
@@ -2563,7 +2571,7 @@
             ? `<span class="orderbook-cell-muted" style="font-size:10.5px;display:block;">${escapeHtml(u.createdAtBucket.replace('T', ' '))}</span>`
             : '';
           return `
-          <tr class="investor-row ${isSelected ? 'selected' : ''}" data-investor-row data-investor-key="${escapeHtml(investorKey)}" data-user-id="${escapeHtml(String(u.userId || ''))}" data-family-member-id="${escapeHtml(String(u.familyMemberId || ''))}" data-strategy-id="${escapeHtml(String(row.strategyId || ''))}" data-created-at-from="${escapeHtml(String(u.createdAtFrom || ''))}" data-created-at-to="${escapeHtml(String(u.createdAtTo || ''))}"${archiveAttrs}>
+          <tr class="investor-row ${isSelected ? 'selected' : ''}" data-investor-row data-investor-key="${escapeHtml(investorKey)}" data-user-id="${escapeHtml(String(u.userId || ''))}" data-family-member-id="${escapeHtml(String(u.familyMemberId || ''))}" data-strategy-id="${escapeHtml(String(row.strategyId || ''))}" data-transaction-id="${escapeHtml(String(u.transactionId || ''))}" data-created-at-from="${escapeHtml(String(u.createdAtFrom || ''))}" data-created-at-to="${escapeHtml(String(u.createdAtTo || ''))}"${archiveAttrs}>
             <td>${escapeHtml(String(i + 1))}</td>
             <td>${escapeHtml(u.clientName || '-')}${buyTime}</td>
             <td>${escapeHtml(u.clientAccountId || '-')}</td>
@@ -3984,6 +3992,15 @@
       return Array.from(fallbackIds);
     };
 
+    /* The investor selection key must uniquely identify one purchase batch.
+       transaction_id is the authoritative separator (set per purchase event).
+       Falls back to createdAtBucket for legacy snapshots without transactionId. */
+    const buildInvestorKey = (u) => {
+      if (!u) return '';
+      const txnPart = u.transactionId ? `t:${u.transactionId}` : `m:${u.createdAtBucket || ''}`;
+      return `${u.userId || ''}|${u.familyMemberId || ''}|${txnPart}`;
+    };
+
     const getRowFillStatus = (row) => {
       /* Strategy rows: each strategyHolding carries its own fillDate set by
          the reconcile function. If ALL holdings have fillDate, the row is
@@ -5080,7 +5097,7 @@
       const [holdingsResult, rebEventsResult, rebBatchesResult] = await Promise.all([
         supabaseClient
           .from('stock_holdings_c')
-          .select('id, user_id, family_member_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, as_of_date, created_at, updated_at, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", avg_exit, strategy_id, trade_side, is_active, closed_reason, closed_at, rebalance_batch_id, strategy_name_snapshot')
+          .select('id, user_id, family_member_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, as_of_date, created_at, updated_at, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", avg_exit, strategy_id, trade_side, is_active, closed_reason, closed_at, rebalance_batch_id, strategy_name_snapshot, transaction_id')
           .order('updated_at', { ascending: false }),
         supabaseClient
           .from('rebalance_event')
@@ -5367,6 +5384,7 @@
           closedReason: String(row.closed_reason || ''),
           closedAt: row.closed_at || null,
           rebalanceBatchId: row.rebalance_batch_id || null,
+          transactionId: row.transaction_id || null,
           isPendingRebalance: false,
           rebalanceBatchStatus: null,
           notificationStatus: orderEmailsMap[row.rebalance_batch_id] || orderEmailsMap[row.id] || 'pending',
@@ -6963,14 +6981,12 @@
          and re-render the Holdings panel with them. Two buys of the same
          strategy at different times then show their own real fill state. */
       if (selectedInvestorKey && bookId != null && holdingsPanel) {
-        const sel = (stratRow.strategyUsers || []).find((u) =>
-          `${u.userId || ''}|${u.familyMemberId || ''}|${u.createdAtBucket || ''}` === selectedInvestorKey
-        );
+        const sel = (stratRow.strategyUsers || []).find((u) => buildInvestorKey(u) === selectedInvestorKey);
         if (!sel?.sourceIds?.length) return;
         try {
           const realHoldings = await loadArchivedInvestorHoldings(sel.sourceIds, stratRow.strategyHoldings);
           if (!realHoldings.length) return;
-          const stillSelected = selectedInvestorKey === `${sel.userId || ''}|${sel.familyMemberId || ''}|${sel.createdAtBucket || ''}`;
+          const stillSelected = selectedInvestorKey === buildInvestorKey(sel);
           if (!stillSelected) return;
           const overrideTitleSuffix = ` <span style="font-size:11px;font-weight:400;color:#7c3aed;margin-left:8px;">· filtered to ${escapeHtml(sel.clientName || '')}${sel.createdAtBucket ? ' @ ' + escapeHtml(sel.createdAtBucket.replace('T', ' ')) : ''}</span>`;
           holdingsPanel.innerHTML = renderStrategyHoldingsHtml(stratRow, {
