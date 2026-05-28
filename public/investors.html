@@ -416,17 +416,10 @@
         } else if (fill * qty > 10 * mv && mv > 0) {
           fill /= 100;
         }
-        /* Investor PnL: cost basis = higher of avg_fill (now in cents) and
-           Expected_fill (rands set at click time). Guard against legacy
-           Expected_fill rows stored in cents (>5x avg_fill-in-rands → /100). */
+        /* Match the orderbook's Client PnL: cost basis = avg_fill / 100 only
+           (no higher-of with Expected_fill), so PnL = qty × (live − avg_fill). */
         const avgFillR = fill / 100;
-        let expFillR = Number(row.Expected_fill);
-        if (!Number.isFinite(expFillR) || expFillR <= 0) expFillR = 0;
-        if (expFillR > 0 && avgFillR > 0 && expFillR > avgFillR * 5) {
-          expFillR = expFillR / 100;
-        }
-        const costPerShareR = Math.max(avgFillR, expFillR);
-        const investedR = costPerShareR * qty;
+        const investedR = avgFillR * qty;
         const currentR  = live ? live.priceR * qty : (mv / 100);
         byUser[key].holdings.push({
           securityId: row.security_id,
@@ -434,7 +427,7 @@
           name:   meta.name   || meta.symbol || '—',
           sector: meta.sector || 'Other',
           logo:   meta.logo_url,
-          qty, avgFillR: costPerShareR, priceR: live ? live.priceR : (mv/qty/100 || 0),
+          qty, avgFillR, priceR: live ? live.priceR : (mv/qty/100 || 0),
           investedR, currentR,
           pnlR: currentR - investedR,
           retPct: investedR > 0 ? ((currentR - investedR) / investedR) * 100 : 0,
