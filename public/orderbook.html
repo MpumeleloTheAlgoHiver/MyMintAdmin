@@ -2185,12 +2185,19 @@
           return s + (h.actualFillNumber * Math.abs(h.quantityValue || 0));
         }, 0);
         const hasActualFillTotal = totalActualFill > 0;
+        /* Strategy-level Avg Fill = Σ(avg_fill × qty) across all underlying
+           securities, in rands. Per-share weighted avg across mixed-price
+           securities is meaningless at the strategy level. */
+        let totalAvgFill = 0;
+        let hasAvgFillSum = false;
         let wSum = 0, wTot = 0;
         holdings.forEach((h) => {
           if (h.avgFillNumber != null && Number.isFinite(h.avgFillNumber)) {
             const w = Math.abs(h.quantityValue) || 1;
             wSum += h.avgFillNumber * w;
             wTot += w;
+            totalAvgFill += h.avgFillNumber * Math.abs(h.quantityValue || 0);
+            hasAvgFillSum = true;
           }
         });
         const latestTs = holdings.reduce((l, h) => {
@@ -2261,9 +2268,12 @@
           rebalanceBatchStatus: hasPendingRebalance ? 'PENDING' : null,
           quantityValue: totalQty,
           totalQuantity: totalQty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 }),
+          /* avgFillNumber stays as weighted-avg-per-share so any consumer
+             that needs a price still gets one; avgFill (display) is the SUM
+             in rands so the strategy row reads as a total alongside Actual Fill. */
           avgFillNumber: wTot > 0 ? (wSum / wTot) : null,
-          avgFill: wTot > 0
-            ? `R ${(wSum / wTot).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          avgFill: hasAvgFillSum
+            ? `R ${totalAvgFill.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
             : '-',
           actualFillNumber: hasActualFillTotal ? totalActualFill : null,
           actualFill: hasActualFillTotal
@@ -4255,9 +4265,11 @@
       let pnlTotal = 0;
       let avgWeighted = 0;
       let avgWeight = 0;
-      /* Strategy-level Actual Fill is a SUM (Σ Expected_fill × qty), not a
-         weighted avg — a per-share price makes no sense when each holding is
-         a different security. */
+      /* Strategy-level Avg Fill and Actual Fill are SUMS in rands, not
+         per-share weighted averages — different securities at different
+         price levels make a per-share blend meaningless. */
+      let avgFillSum = 0;
+      let hasAvgFillSum = false;
       let actualFillSum = 0;
       let hasActualFillSum = false;
       let latestTimestamp = null;
@@ -4281,6 +4293,8 @@
           const w = Math.abs(q) || 1;
           avgWeighted += (avg * w);
           avgWeight += w;
+          avgFillSum += avg * Math.abs(q || 0);
+          hasAvgFillSum = true;
         }
 
         if (Number.isFinite(act) && act > 0) {
@@ -4334,10 +4348,14 @@
         notificationStatus: hasSent ? 'sent' : (hasFailed ? 'failed' : (row.notificationStatus || 'pending'))
       };
 
+      /* Keep avgFillNumber as the per-share weighted avg for any downstream
+         consumer; the display string shows the SUM so the strategy row reads
+         as a total alongside Actual Fill. */
       if (avgWeight > 0) {
-        const avgFillNumber = avgWeighted / avgWeight;
-        next.avgFillNumber = avgFillNumber;
-        next.avgFill = formatMoneyText(avgFillNumber);
+        next.avgFillNumber = avgWeighted / avgWeight;
+      }
+      if (hasAvgFillSum) {
+        next.avgFill = formatMoneyText(avgFillSum);
       }
 
       if (hasActualFillSum) {
