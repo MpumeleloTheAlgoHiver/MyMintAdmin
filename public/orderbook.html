@@ -2177,6 +2177,14 @@
         const totalMV = holdings.reduce((s, h) => s + (h.marketValueNumber || 0), 0);
         const totalQty = holdings.reduce((s, h) => s + (h.quantityValue || 0), 0);
         const totalPnl = holdings.reduce((s, h) => s + (h.unrealizedPnlNumber || 0), 0);
+        /* Strategy-level Actual Fill = Σ(Expected_fill × qty) across all
+           underlying securities, in rands. Skips holdings without an
+           Expected_fill so a single missing row doesn't zero the total. */
+        const totalActualFill = holdings.reduce((s, h) => {
+          if (h.actualFillNumber == null || !Number.isFinite(h.actualFillNumber)) return s;
+          return s + (h.actualFillNumber * Math.abs(h.quantityValue || 0));
+        }, 0);
+        const hasActualFillTotal = totalActualFill > 0;
         let wSum = 0, wTot = 0;
         holdings.forEach((h) => {
           if (h.avgFillNumber != null && Number.isFinite(h.avgFillNumber)) {
@@ -2256,6 +2264,10 @@
           avgFillNumber: wTot > 0 ? (wSum / wTot) : null,
           avgFill: wTot > 0
             ? `R ${(wSum / wTot).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : '-',
+          actualFillNumber: hasActualFillTotal ? totalActualFill : null,
+          actualFill: hasActualFillTotal
+            ? `R ${totalActualFill.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
             : '-',
           marketValueNumber: totalMV,
           marketValue: `R ${totalMV.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -2493,6 +2505,7 @@
           <td>${escapeHtml(h.side || '-')}</td>
           <td>${escapeHtml(String(h.totalQuantity ?? '-'))}</td>
           <td>${editable ? renderEditableAvgFill(h) : escapeHtml(asRandValue(h.avgFill))}</td>
+          <td>${escapeHtml(asRandValue(h.actualFill))}</td>
           <td>${escapeHtml(asRandValue(h.marketValue))}</td>
           ${renderInitialPnlCell(h.unrealizedPnlNumber, h.unrealizedPnl)}
         </tr>
@@ -2510,6 +2523,7 @@
                 <th>Side</th>
                 <th>Total QYT</th>
                 <th>Avg Fill</th>
+                <th>Actual Fill</th>
                 <th>Expected Fill</th>
                 <th>Initial PnL</th>
               </tr>
@@ -4112,6 +4126,8 @@
       let pnlTotal = 0;
       let avgWeighted = 0;
       let avgWeight = 0;
+      let actualWeighted = 0;
+      let actualWeight = 0;
       let latestTimestamp = null;
       let latestFillDate = null;
       let hasSent = false;
@@ -4122,6 +4138,7 @@
         const mv = Number(live.marketValueNumber || 0);
         const pnl = Number(live.unrealizedPnlNumber || 0);
         const avg = Number(live.avgFillNumber);
+        const act = Number(live.actualFillNumber);
 
         if (Number.isFinite(q)) qtyTotal += q;
         if (Number.isFinite(mv)) mvTotal += mv;
@@ -4130,6 +4147,11 @@
           const w = Math.abs(q) || 1;
           avgWeighted += (avg * w);
           avgWeight += w;
+        }
+        if (Number.isFinite(act) && act > 0) {
+          const w = Math.abs(q) || 1;
+          actualWeighted += (act * w);
+          actualWeight += w;
         }
 
         if (live.notificationStatus === 'sent') hasSent = true;
@@ -4174,6 +4196,12 @@
         next.avgFill = formatMoneyText(avgFillNumber);
       }
 
+      if (actualWeight > 0) {
+        const actualFillNumber = actualWeighted / actualWeight;
+        next.actualFillNumber = actualFillNumber;
+        next.actualFill = formatMoneyText(actualFillNumber);
+      }
+
       const changed = JSON.stringify({
         sourceIds: row.sourceIds || [],
         sourceId: row.sourceId || '',
@@ -4185,6 +4213,8 @@
         unrealizedPnl: row.unrealizedPnl,
         avgFillNumber: row.avgFillNumber,
         avgFill: row.avgFill,
+        actualFillNumber: row.actualFillNumber,
+        actualFill: row.actualFill,
         timestamp: row.timestamp,
         fillDate: row.fillDate
       }) !== JSON.stringify({
@@ -4198,6 +4228,8 @@
         unrealizedPnl: next.unrealizedPnl,
         avgFillNumber: next.avgFillNumber,
         avgFill: next.avgFill,
+        actualFillNumber: next.actualFillNumber,
+        actualFill: next.actualFill,
         timestamp: next.timestamp,
         fillDate: next.fillDate
       });
@@ -4223,6 +4255,11 @@
       let pnlTotal = 0;
       let avgWeighted = 0;
       let avgWeight = 0;
+      /* Strategy-level Actual Fill is a SUM (Σ Expected_fill × qty), not a
+         weighted avg — a per-share price makes no sense when each holding is
+         a different security. */
+      let actualFillSum = 0;
+      let hasActualFillSum = false;
       let latestTimestamp = null;
       let latestFillDate = null;
       let hasSent = false;
@@ -4234,6 +4271,7 @@
         const mv = Number(holding.marketValueNumber || 0);
         const pnl = Number(holding.unrealizedPnlNumber || 0);
         const avg = Number(holding.avgFillNumber);
+        const act = Number(holding.actualFillNumber);
 
         if (Number.isFinite(q)) qtyTotal += q;
         if (Number.isFinite(mv)) mvTotal += mv;
@@ -4243,6 +4281,11 @@
           const w = Math.abs(q) || 1;
           avgWeighted += (avg * w);
           avgWeight += w;
+        }
+
+        if (Number.isFinite(act) && act > 0) {
+          actualFillSum += act * Math.abs(q || 0);
+          hasActualFillSum = true;
         }
 
         if (holding.timestamp) {
@@ -4297,6 +4340,11 @@
         next.avgFill = formatMoneyText(avgFillNumber);
       }
 
+      if (hasActualFillSum) {
+        next.actualFillNumber = actualFillSum;
+        next.actualFill = formatMoneyText(actualFillSum);
+      }
+
       const parentChanged = JSON.stringify({
         sourceIds: row.sourceIds || [],
         sourceId: row.sourceId || '',
@@ -4308,6 +4356,8 @@
         unrealizedPnl: row.unrealizedPnl,
         avgFillNumber: row.avgFillNumber,
         avgFill: row.avgFill,
+        actualFillNumber: row.actualFillNumber,
+        actualFill: row.actualFill,
         timestamp: row.timestamp,
         fillDate: row.fillDate
       }) !== JSON.stringify({
@@ -4321,6 +4371,8 @@
         unrealizedPnl: next.unrealizedPnl,
         avgFillNumber: next.avgFillNumber,
         avgFill: next.avgFill,
+        actualFillNumber: next.actualFillNumber,
+        actualFill: next.actualFill,
         timestamp: next.timestamp,
         fillDate: next.fillDate
       });
@@ -4478,6 +4530,7 @@
                 <td>${escapeHtml(row.side || '-')}</td>
                 <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
                 <td>${escapeHtml(asRandValue(row.avgFill))}</td>
+                <td>${escapeHtml(asRandValue(row.actualFill))}</td>
                 <td>${escapeHtml(asRandValue(row.marketValue))}</td>
                 <td>${escapeHtml(row.orderType || '-')}</td>
                 <td>${escapeHtml(row.settlementAccount || '')}</td>
@@ -4486,7 +4539,7 @@
                 ${showActiveBooksFilledColumn ? `<td><span class="filled-status-pill ${rowFillStatus.filled ? 'is-filled' : 'is-open'}">${escapeHtml(rowFillStatus.text)}</span></td>` : ''}
               </tr>
               <tr class="orderbook-detail-row is-hidden" data-archive-detail-row data-archive-line-key="${escapeHtml(rowKey)}">
-                <td colspan="${showActiveBooksFilledColumn ? '13' : '12'}">
+                <td colspan="${showActiveBooksFilledColumn ? '14' : '13'}">
                   <div class="orderbook-detail-wrap">
                     ${row.isStrategy ? renderStrategyDetailsTable(row, { cleanup: cleanupMode, bookId: book.id, rowIndex, allowReverse: true }) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderSnapshotBndDetailsTable(rows, row, book.sequence, { allowReverse: true, cleanup: cleanupMode, bookId: book.id, rowIndex })}`}
                   </div>
@@ -4494,7 +4547,7 @@
               </tr>
             `;
             }).join('')
-            : '<tr><td class="orderbook-empty-row" colspan="12">No rows captured.</td></tr>';
+            : '<tr><td class="orderbook-empty-row" colspan="13">No rows captured.</td></tr>';
 
           const moveToClosedBtn = book.readyToClose
             ? `<button type="button" class="orderbook-export-btn" data-move-to-closed data-book-id="${escapeHtml(String(book.id || ''))}" style="padding:4px 10px;height:26px;font-size:11px;background:#16a34a;color:#fff;border-color:#16a34a;" title="All rows are filled — move this book to Closed Books">Move to Closed Book</button>`
@@ -4523,6 +4576,7 @@
                         <th>Side</th>
                         <th>Total QYT</th>
                         <th>Avg Fill</th>
+                        <th>Actual Fill</th>
                         <th>Expected Fill</th>
                         <th>Order Type</th>
                         <th>Settlement Account</th>
@@ -4686,6 +4740,7 @@
               <td>${escapeHtml(row.side || '-')}</td>
               <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
               <td>${escapeHtml(asRandValue(row.avgFill))}</td>
+              <td>${escapeHtml(asRandValue(row.actualFill))}</td>
               <td>${escapeHtml(asRandValue(row.marketValue))}</td>
               <td>${escapeHtml(row.orderType || '-')}</td>
               <td>${escapeHtml(row.settlementAccount || '')}</td>
@@ -4693,7 +4748,7 @@
               ${renderInitialPnlCell(row.unrealizedPnlNumber, row.unrealizedPnl)}
             </tr>
             <tr class="orderbook-detail-row is-hidden" data-closed-detail-row data-closed-line-key="${escapeHtml(rowKey)}">
-              <td colspan="12">
+              <td colspan="13">
                 <div class="orderbook-detail-wrap">
                   ${row.isStrategy ? renderStrategyDetailsTable(row, { editable: false, cleanup: cleanupMode, bookId: book.id, rowIndex }) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderSnapshotBndDetailsTable(rows, row, book.sequence, { cleanup: cleanupMode, bookId: book.id, rowIndex })}`}
                 </div>
@@ -4701,7 +4756,7 @@
             </tr>
           `;
           }).join('')
-          : '<tr><td class="orderbook-empty-row" colspan="12">No rows captured.</td></tr>';
+          : '<tr><td class="orderbook-empty-row" colspan="13">No rows captured.</td></tr>';
 
         return `
           <details class="filled-orderbook-item">
@@ -4725,6 +4780,7 @@
                       <th>Side</th>
                       <th>Total QYT</th>
                       <th>Avg Fill</th>
+                      <th>Actual Fill</th>
                       <th>Expected Fill</th>
                       <th>Order Type</th>
                       <th>Settlement Account</th>
@@ -5307,31 +5363,27 @@
         const hasAvgFill = Number.isFinite(avgFillValue);
         /* Expected_fill is the per-share price recorded at click time (rands).
            Guard against legacy rows that stored it in cents — if >5× the
-           avg_fill-in-rands, treat as cents and divide. */
+           avg_fill-in-rands, treat as cents and divide. Used for the Actual
+           Fill column only; PnL math stays on avg_fill. */
         let actualFillValue = Number(row.expected_fill);
         if (!Number.isFinite(actualFillValue) || actualFillValue <= 0) actualFillValue = NaN;
         if (Number.isFinite(actualFillValue) && hasAvgFill && avgFillValue > 0 && actualFillValue > avgFillValue * 5) {
           actualFillValue = actualFillValue / 100;
         }
         const hasActualFill = Number.isFinite(actualFillValue) && actualFillValue > 0;
-        /* Cost basis = higher of avg_fill and Expected_fill (both in rands). */
-        const costBasisValue = (hasAvgFill || hasActualFill)
-          ? Math.max(hasAvgFill ? avgFillValue : 0, hasActualFill ? actualFillValue : 0)
-          : NaN;
-        const hasCostBasis = Number.isFinite(costBasisValue) && costBasisValue > 0;
         // Prefer live intraday price; fall back to securities_c.last_price.
         const rawLastPrice = intradayPriceMap[row.security_id] ?? Number(security.last_price);
         const lastPrice = Number(rawLastPrice);
         const hasLastPrice = Number.isFinite(lastPrice) && lastPrice > 0;
-        // Expected Fill column uses current market price; falls back to cost basis.
-        const expectedFillPrice = hasLastPrice ? lastPrice : (hasCostBasis ? costBasisValue : NaN);
+        // Expected Fill uses current market price primarily, falls back to avg fill.
+        const expectedFillPrice = hasLastPrice ? lastPrice : (hasAvgFill ? avgFillValue : NaN);
         const hasExpectedFillPrice = Number.isFinite(expectedFillPrice);
         const computedMarketValueNumber = (isQuantityNumeric && hasExpectedFillPrice)
           ? (Math.abs(quantityValue) * expectedFillPrice)
           : 0;
-        /* PnL = qty × (livePrice − higherOfCostBasis). */
-        const computedInitialPnlNumber = (isQuantityNumeric && hasCostBasis && hasLastPrice)
-          ? (Math.abs(quantityValue) * (lastPrice - costBasisValue))
+        // Initial PnL = qty × (lastPrice − avgFill). Only meaningful when both prices are known.
+        const computedInitialPnlNumber = (isQuantityNumeric && hasAvgFill && hasLastPrice)
+          ? (Math.abs(quantityValue) * (lastPrice - avgFillValue))
           : 0;
         const normalizedUnrealizedPnlNumber = computedInitialPnlNumber;
         const explicitSide = String(row.trade_side || '').trim().toUpperCase();
@@ -5353,7 +5405,7 @@
         const marketValue = (isQuantityNumeric && hasExpectedFillPrice)
           ? `R ${computedMarketValueNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : '-';
-        const unrealizedPnl = (isQuantityNumeric && hasCostBasis && hasLastPrice)
+        const unrealizedPnl = (isQuantityNumeric && hasAvgFill && hasLastPrice)
           ? computedInitialPnlNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
           : '-';
 

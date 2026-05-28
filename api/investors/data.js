@@ -30,7 +30,7 @@ module.exports = async (req, res) => {
       fetch(`${supabaseUrl}/rest/v1/${path}`, { headers: sbH }).then((r) => r.json());
 
     const [holdings, strategies] = await Promise.all([
-      sbGet('stock_holdings_c?select=user_id,family_member_id,security_id,strategy_id,quantity,avg_fill,market_value,created_at&is_active=eq.true&trade_side=eq.BUY'),
+      sbGet('stock_holdings_c?select=user_id,family_member_id,security_id,strategy_id,quantity,avg_fill,Expected_fill,market_value,created_at&is_active=eq.true&trade_side=eq.BUY'),
       sbGet('strategies_c?select=id,name,short_name,description,risk_level,sector'),
     ]);
 
@@ -50,13 +50,25 @@ module.exports = async (req, res) => {
       : [];
     const stratHist = stratHistArrays.flat();
 
-    /* Recalculate inception_pnl and inception_pct on the LATEST row per user only
-       (fixes avg_fill unit mismatches for the investor card without distorting chart history) */
+    /* Recalculate inception_pnl and inception_pct on the LATEST row per user.
+       Cost basis per share = higher of (avg_fill / 100) and Expected_fill,
+       both in rands. Guard against legacy rows that stored Expected_fill in
+       cents (>5x avg_fill-in-rands → /100). Then × 100 to keep investedByUser
+       in cents because client_strategy_returns_c.basket_value is in cents. */
+    const costBasisRandsPerShare = (h) => {
+      const avgRands = (Number(h.avg_fill) || 0) / 100;
+      let expRands = Number(h.Expected_fill);
+      if (!Number.isFinite(expRands) || expRands <= 0) expRands = 0;
+      if (expRands > 0 && avgRands > 0 && expRands > avgRands * 5) {
+        expRands = expRands / 100;
+      }
+      return Math.max(avgRands, expRands);
+    };
     const investedByUser = {};
     (holdings || []).forEach(h => {
       const uid = h.user_id;
-      const cost = Number(h.avg_fill) * Number(h.quantity);
-      if (uid && cost > 0) investedByUser[uid] = (investedByUser[uid] || 0) + cost;
+      const costCents = costBasisRandsPerShare(h) * Number(h.quantity) * 100;
+      if (uid && costCents > 0) investedByUser[uid] = (investedByUser[uid] || 0) + costCents;
     });
     const latestRowByUser = {};
     stratHist.forEach(r => { latestRowByUser[r.user_id] = r; });
