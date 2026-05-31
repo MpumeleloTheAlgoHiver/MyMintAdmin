@@ -177,17 +177,20 @@ This pairs naturally with per-strategy residual: the gain made on Strategy A's r
 
 ## Parent + child holding the same strategy
 
-Today's rebalance UI groups all holdings under a single `user_id` regardless of whether they belong to the parent or a child of that parent. Until the admin UI is extended to pick a specific child to rebalance, **`rebalance_event.family_member_id` defaults to `NULL` (parent-scoped)** and:
+The CRM rebalance UI now has an **"Owner scope"** dropdown next to the strategy selector. It defaults to **"Parent only"** (legacy behavior, family_member_id IS NULL) and is auto-populated with each family member who holds the strategy. Switching the dropdown reloads `rebRawHoldings` filtered to that owner so the admin can see and rebalance just one child's positions at a time.
 
-- `executeFillAndSettle` strictly scopes the SELL lookup by `family_member_id IS NULL` when the event has no family_member_id, so a child's positions of the same security in the same strategy are **left alone** — they are no longer at risk of being silently closed.
-- New BUY rows are inserted with `family_member_id = NULL` (parent-only) for the same reason.
-- The R0 history transaction is written per `(user_id, family_member_id)` pair, so once per-child rebalance lands, each owner gets their own entry.
+What happens under the hood for the chosen scope:
 
-When you later want to actually rebalance a child's positions, `rebExecute` needs the UI affordance to select the family member, and then write the events with `family_member_id` set. Everything downstream (fill & settle, residual upsert, history transaction) already reads from `evt.family_member_id` and routes correctly.
+- `rebalance_event.family_member_id` is set on every event row.
+- `executeFillAndSettle` SELL lookup, materialise-remainder insert, SELL-audit insert, BUY insert, and residual upsert all scope by that family_member_id.
+- The R0 history transaction is written per `(user_id, family_member_id)` pair, so each owner sees their own entry in MINT's activity feed.
+- `MINT/src/lib/useUserStrategies.js` and `MINT/src/components/SwipeableBalanceCard.jsx` both fetch residual scoped by the active view's `family_member_id`, so the right cash bucket flows into each strategy card and into the headline portfolio total on each dashboard.
+
+Children's positions cannot accidentally be touched by a parent-scoped rebalance any more — the SELL lookup explicitly filters by `family_member_id IS NULL` when the event has none.
 
 ## What's NOT in this flow (gaps and future work)
 
-- **Per-child rebalance execution UI.** Schema + execution path are ready; the UI in `rebExecute` still groups all holdings by `user_id`. When you want to rebalance just a child's positions, that's the remaining piece.
+- **Cross-owner combined rebalance.** Today you pick one owner at a time. If you want to rebalance "everyone in the strategy at once" (parent + all children in a single batch), the UI needs a different mode that emits N event rows per security (one per owner). Doable but defer.
 - **Migration of legacy `wallets.rebalance_residual`.** Untouched. Any residual that already existed in that per-user pool stays there as unallocated cash. If you want to retroactively attribute old residuals to specific strategies you'd write a one-off SQL with manual rules.
 
 ---

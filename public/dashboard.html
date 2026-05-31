@@ -1292,6 +1292,13 @@
                   <option value="">Select a strategy…</option>
                 </select>
               </div>
+              <!-- Family member scope: pick a specific child (or all combined) to rebalance only that owner's holdings. Defaults to parent-only. -->
+              <div class="flex-1 min-w-[200px]">
+                <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Owner scope</label>
+                <select id="rebFamilyScopeSelect" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white" title="Restrict the rebalance to a single owner — parent's own holdings, a specific child's holdings, or every owner combined.">
+                  <option value="">Parent only (family_member_id IS NULL)</option>
+                </select>
+              </div>
               <div id="rebNegativeBadge" class="hidden items-center gap-1.5 text-red-600 text-xs font-semibold">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>
                 Negative holdings detected
@@ -8590,15 +8597,20 @@
         if (!ids.length || !strategyId) return {};
 
         try {
-          /* Parent-scoped read (family_member_id IS NULL). When admin needs
-             per-child views, this query will need a familyMemberId arg. */
-          const { data, error } = await supabaseClient
+          /* Scope by the active owner. rebSelectedFamilyMemberId is set by
+             the family-scope dropdown in the rebalance UI; null = parent's
+             own residuals. The same scope drives event inserts so residual
+             reads and writes stay in lockstep. */
+          let query = supabaseClient
             .from("strategy_rebalance_residuals")
             .select("user_id, balance_cents")
             .eq("strategy_id", strategyId)
-            .is("family_member_id", null)
             .in("user_id", ids);
+          query = rebSelectedFamilyMemberId
+            ? query.eq("family_member_id", rebSelectedFamilyMemberId)
+            : query.is("family_member_id", null);
 
+          const { data, error } = await query;
           if (error) throw error;
           return (data || []).reduce((acc, row) => {
             const userId = String(row.user_id || "");
@@ -8665,6 +8677,13 @@
       let rebWalletByClient = {};   // userId -> stored credits balance
       let rebImpactChangeView = false;
       let rebPendingRebalance = null; // {batchId, sellCode, buyCode, extraBuyCode, events[]}
+      /* Family-member scope for rebalance: NULL = parent only (default,
+         legacy behavior), a uuid = restrict to that child's holdings.
+         Filtering happens in rebRawHoldings and the value flows into every
+         rebalance_event insert as family_member_id so fill & settle hits
+         the right rows. */
+      let rebSelectedFamilyMemberId = null;
+      let rebFamilyMembersForStrategy = []; // [{id, label}] populated per strategy
 
       /* ── Helpers ── */
       const rebFmtZAR = n => `R\u00A0${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -8800,6 +8819,22 @@
         });
         if (currentVal) sel.value = currentVal;
       }
+
+      /* Owner-scope dropdown change handler: switch which family member's
+         holdings the rebalance UI is restricted to, then reload the strategy
+         so rebRawHoldings is rebuilt with the new filter. */
+      (function bindFamilyScopeHandler() {
+        const fmSel = document.getElementById("rebFamilyScopeSelect");
+        if (!fmSel || fmSel._bound) return;
+        fmSel._bound = true;
+        fmSel.addEventListener("change", () => {
+          rebSelectedFamilyMemberId = fmSel.value || null;
+          if (rebSelectedStrategyId) {
+            rebLoadStrategy(rebSelectedStrategyId).catch(err =>
+              console.warn("Owner-scope reload failed:", err?.message || err));
+          }
+        });
+      })();
 
       /* ── Load strategy holdings into ISINs (+ fetch live client holdings) ── */
       async function rebLoadStrategy(strategyId) {
@@ -8937,19 +8972,43 @@
                   });
                 }
               }
+              /* First pass: collect distinct family_member_ids present in
+                 this strategy so we can offer them as a scope choice. */
+              const fmIdsInStrategy = new Set();
+              (holdRows || []).forEach(r => {
+                if (r.family_member_id) fmIdsInStrategy.add(String(r.family_member_id));
+              });
+              /* Look up names for any family members found. */
+              const fmLabelsById = {};
+              if (fmIdsInStrategy.size) {
+                const { data: fmRows } = await supabaseClient
+                  .from("family_members")
+                  .select("id, first_name, last_name")
+                  .in("id", [...fmIdsInStrategy]);
+                (fmRows || []).forEach((row) => {
+                  const nm = [row.first_name, row.last_name].filter(Boolean).join(" ").trim() || String(row.id).slice(0, 8);
+                  fmLabelsById[row.id] = nm;
+                });
+              }
+              rebFamilyMembersForStrategy = [...fmIdsInStrategy].map((id) => ({
+                id,
+                label: fmLabelsById[id] || `Child ${id.slice(0, 8)}`,
+              }));
+
               (holdRows || []).forEach(r => {
                 if (!r.user_id || !r.security_id) return;
                 if (strategy?.id && String(r.strategy_id) !== String(strategy.id)) return;
                 const code = codeBySecId[r.security_id];
                 if (!code) return;
+                const fmId = r.family_member_id ? String(r.family_member_id) : null;
+                /* Apply the active scope filter — only include rows that
+                   match rebSelectedFamilyMemberId (NULL = parent's own rows). */
+                if ((rebSelectedFamilyMemberId || null) !== fmId) return;
                 if (!rebRawHoldings[code]) rebRawHoldings[code] = [];
                 const uid = String(r.user_id);
-                const fmId = r.family_member_id ? String(r.family_member_id) : null;
                 const qty = Number(r.quantity) || 0;
                 /* avg_fill stored in cents (consistent with orderbook PnL convention) */
                 const fillCents = Number(r.avg_fill) || 0;
-                /* Key by (user, family_member) so parent + child holdings of
-                   the same security in the same strategy stay distinct. */
                 const existing = rebRawHoldings[code].find(x => x.userId === uid && (x.familyMemberId || null) === fmId);
                 if (existing) {
                   const totalQty = existing.quantity + qty;
@@ -8970,6 +9029,23 @@
             }
         } catch (e) { console.warn("rebLoadStrategy: holdings fetch failed", e); }
           }
+
+        /* ── Repopulate the owner-scope dropdown with this strategy's
+           distinct family members. Preserves the current selection if
+           still applicable. ── */
+        try {
+          const fmSel = document.getElementById("rebFamilyScopeSelect");
+          if (fmSel) {
+            const prev = rebSelectedFamilyMemberId || "";
+            fmSel.innerHTML = '<option value="">Parent only</option>'
+              + rebFamilyMembersForStrategy.map(fm =>
+                  `<option value="${fm.id}">${fm.label}</option>`
+                ).join("");
+            const stillValid = !prev || rebFamilyMembersForStrategy.some(fm => fm.id === prev);
+            fmSel.value = stillValid ? prev : "";
+            if (!stillValid) rebSelectedFamilyMemberId = null;
+          }
+        } catch (e) { /* harmless */ }
 
         /* ── Fetch pending rebalance batch for this strategy ── */
         try {
@@ -10119,12 +10195,18 @@
           return { holdingId: row.id, userId: row.user_id, soldQty, remaining: totalQty - soldQty };
         });
 
+        /* The active owner scope is captured once here. Every event row
+           inserted by this rebalance carries the same family_member_id, so
+           fill & settle only touches the correct (user, family_member) rows. */
+        const familyMemberIdForEvents = rebSelectedFamilyMemberId || null;
+
         /* ── Build SELL events → rebalance_event ── */
         const sellEventRows = _sellRowMeta
           .filter((m) => m.soldQty > 0)
           .map((m) => ({
             batch_id: rebalanceBatchId,
             user_id: m.userId,
+            family_member_id: familyMemberIdForEvents,
             security_id: sellSecurityId,
             trade_side: "SELL",
             quantity: m.soldQty,
@@ -10142,6 +10224,7 @@
           .map((alloc) => ({
             batch_id: rebalanceBatchId,
             user_id: String(alloc.clientId),
+            family_member_id: familyMemberIdForEvents,
             security_id: buySecurityId,
             trade_side: "BUY",
             quantity: Number(alloc.shares || 0),
@@ -10162,6 +10245,7 @@
             .map((alloc) => ({
               batch_id: rebalanceBatchId,
               user_id: String(alloc.clientId),
+              family_member_id: familyMemberIdForEvents,
               security_id: extraBuySecurityId,
               trade_side: "BUY",
               quantity: Number(alloc.shares || 0),
@@ -10254,7 +10338,7 @@
             );
           }
         });
-        await rebUpsertWalletBalances(strategyId, finalWalletByClient);
+        await rebUpsertWalletBalances(strategyId, finalWalletByClient, rebSelectedFamilyMemberId || null);
         rebWalletByClient = { ...rebWalletByClient, ...finalWalletByClient };
 
         rebSelectedStrategyId = String(strategyId);
@@ -10415,11 +10499,13 @@
           return { holdingId: row.id, userId: row.user_id, soldQty };
         });
 
+        const familyMemberIdForLiquidateEvents = rebSelectedFamilyMemberId || null;
         const sellEventRows = _sellRowMeta
           .filter((m) => m.soldQty > 0)
           .map((m) => ({
             batch_id: rebalanceBatchId,
             user_id: m.userId,
+            family_member_id: familyMemberIdForLiquidateEvents,
             security_id: sellSecurityId,
             trade_side: "SELL",
             quantity: m.soldQty,
@@ -10476,7 +10562,7 @@
           finalWalletByClient[userId] = rebRoundMoney(currentBalance + Number(addAmount || 0));
         });
         if (Object.keys(finalWalletByClient).length) {
-          await rebUpsertWalletBalances(strategyId, finalWalletByClient);
+          await rebUpsertWalletBalances(strategyId, finalWalletByClient, rebSelectedFamilyMemberId || null);
           rebWalletByClient = { ...rebWalletByClient, ...finalWalletByClient };
         }
 
@@ -10784,7 +10870,7 @@
           finalWalletByClient[String(p.client.id)] = rebRoundMoney(Math.max(0, p.remaining));
         });
         if (Object.keys(finalWalletByClient).length) {
-          await rebUpsertWalletBalances(strategyId, finalWalletByClient);
+          await rebUpsertWalletBalances(strategyId, finalWalletByClient, rebSelectedFamilyMemberId || null);
           rebWalletByClient = { ...rebWalletByClient, ...finalWalletByClient };
         }
 
