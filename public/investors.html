@@ -923,7 +923,10 @@
       const dir = String(t.direction || '').toLowerCase();
       // direction=debit = money INTO MINT (deposits, investments, fees charged)
       // direction=credit = money OUT of MINT (withdrawals, refunds, residual credits)
-      if (/strategy investment|invest/i.test(name)) {
+      /* "Strategy Investment: X" for baskets, "Purchased X" for single stocks.
+         Also catch any row that has fee breakdown columns populated (base_amount_cents > 0)
+         so future transaction name changes don't break the classification. */
+      if (/strategy investment|invest|purchased/i.test(name) || Number(t.base_amount_cents) > 0) {
         return { label: 'INVESTMENT', color: '#7c3aed', bg: '#ede9fe', sign: '-', isOutflow: true };
       }
       if (/withdraw/i.test(name)) {
