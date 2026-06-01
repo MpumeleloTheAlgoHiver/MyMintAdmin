@@ -1822,28 +1822,6 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        const attachments = [];
-        try {
-          const bannerPath = path.join(publicDir, 'images', 'Mailer Funds put.avif');
-          if (fs.existsSync(bannerPath)) {
-            attachments.push({
-              filename: 'banner.avif',
-              content: fs.readFileSync(bannerPath).toString('base64'),
-              cid: 'banner'
-            });
-          }
-          const logoPath = path.join(publicDir, 'icon.png');
-          if (fs.existsSync(logoPath)) {
-            attachments.push({
-              filename: 'logo.png',
-              content: fs.readFileSync(logoPath).toString('base64'),
-              cid: 'logo'
-            });
-          }
-        } catch (e) {
-          console.error('[EFT Email] Error reading attachments:', e);
-        }
-
         const response = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
@@ -1854,8 +1832,7 @@ const server = http.createServer((req, res) => {
             from: orderbookEmailFrom,
             to: [to],
             subject: subject || 'Funds Allocated - Mint',
-            html: html,
-            attachments: attachments
+            html: html
           })
         });
 
