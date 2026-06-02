@@ -2189,13 +2189,22 @@
 
       const strategyParentRows = Array.from(strategyBuckets.entries()).map(([strategyId, holdings]) => {
         const first = holdings[0];
-        const totalMV = holdings.reduce((s, h) => s + (h.marketValueNumber || 0), 0);
-        const totalQty = holdings.reduce((s, h) => s + (h.quantityValue || 0), 0);
-        const totalPnl = holdings.reduce((s, h) => s + (h.unrealizedPnlNumber || 0), 0);
+        /* Totals count only LIVE positions: active rows that aren't the SELL audit
+           row. A rebalance SELL records shares that LEFT the portfolio, so it must
+           not inflate the strategy's value or quantity. It still stays in `holdings`
+           (strategyHoldings) so it shows in the detail table as a red sale record. */
+        const isLive = (h) => {
+          const sd = String(h.tradeSide || h.side || '').toUpperCase();
+          return h.isActive !== false && sd !== 'SELL';
+        };
+        const liveHoldings = holdings.filter(isLive);
+        const totalMV = liveHoldings.reduce((s, h) => s + (h.marketValueNumber || 0), 0);
+        const totalQty = liveHoldings.reduce((s, h) => s + (h.quantityValue || 0), 0);
+        const totalPnl = liveHoldings.reduce((s, h) => s + (h.unrealizedPnlNumber || 0), 0);
         /* Strategy-level Actual Fill = ÃÂ£(Expected_fill &times; qty) across all
            underlying securities, in rands. Skips holdings without an
            Expected_fill so a single missing row doesn't zero the total. */
-        const totalActualFill = holdings.reduce((s, h) => {
+        const totalActualFill = liveHoldings.reduce((s, h) => {
           if (h.actualFillNumber == null || !Number.isFinite(h.actualFillNumber)) return s;
           return s + (h.actualFillNumber * Math.abs(h.quantityValue || 0));
         }, 0);
@@ -2206,7 +2215,7 @@
         let totalAvgFill = 0;
         let hasAvgFillSum = false;
         let wSum = 0, wTot = 0;
-        holdings.forEach((h) => {
+        liveHoldings.forEach((h) => {
           if (h.avgFillNumber != null && Number.isFinite(h.avgFillNumber)) {
             const w = Math.abs(h.quantityValue) || 1;
             wSum += h.avgFillNumber * w;
@@ -2275,8 +2284,15 @@
             });
           }
           const u = userMap.get(key);
-          u.totalMarketValue += r.marketValueNumber || 0;
-          u.holdingsCount += 1;
+          /* Only LIVE positions count toward the investor's value + holdings count.
+             The SELL audit row (inactive, side SELL) records shares that left the
+             portfolio — counting it would inflate Live Price and Holdings. */
+          const rSide = String(r.tradeSide || r.side || '').toUpperCase();
+          const rLive = r.isActive !== false && rSide !== 'SELL';
+          if (rLive) {
+            u.totalMarketValue += r.marketValueNumber || 0;
+            u.holdingsCount += 1;
+          }
           if (r.sourceId) u.sourceIds.push(String(r.sourceId));
           if (r.securityId) u.securityIds.push(String(r.securityId));
           // Widen the timestamp window so range filters catch every holding
@@ -2553,12 +2569,17 @@
         const hRebBadge = h.rebalanceBatchId
           ? ' <span style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;margin-left:3px;letter-spacing:.03em;">REB</span>'
           : '';
+        const hSide = String(h.side || '-').toUpperCase();
+        const hSideClass = hSide === 'BUY' ? 'side-badge-buy' : hSide === 'SELL' ? 'side-badge-sell' : 'side-badge-neutral';
+        /* Sold (inactive SELL) rows are dimmed so they read as historical, not
+           a current holding. */
+        const hRowStyle = (h.isActive === false || hSide === 'SELL') ? ' style="opacity:.6;"' : '';
         return `
-        <tr>
+        <tr${hRowStyle}>
           <td>${escapeHtml(String(h.line))}</td>
           <td>${escapeHtml(h.instrumentName || '-')}${hRebBadge}</td>
           <td class="orderbook-cell-muted">${escapeHtml(h.ticker || '-')}</td>
-          <td>${escapeHtml(h.side || '-')}</td>
+          <td><span class="side-badge ${hSideClass}">${escapeHtml(hSide)}</span></td>
           <td>${escapeHtml(String(h.totalQuantity ?? '-'))}</td>
           <td>${editable ? renderEditableAvgFill(h) : escapeHtml(asRandValue(h.avgFill))}</td>
           <td>${escapeHtml(asRandValue(h.actualFill))}</td>
