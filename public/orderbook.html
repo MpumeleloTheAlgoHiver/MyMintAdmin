@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+ï»¿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -1256,7 +1256,7 @@
           <img src="/icon.png" style="width:26px;height:26px;border-radius:7px;flex-shrink:0;" />
           <div style="flex:1;min-width:0;">
             <div style="font-size:12px;font-weight:700;color:#0f172a;line-height:1.3;">Mint Hub</div>
-            <div style="font-size:10px;color:#7c3aed;font-weight:500;">Admin Portal Â· Active</div>
+            <div style="font-size:10px;color:#7c3aed;font-weight:500;">Admin Portal &middot; Active</div>
           </div>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
@@ -1440,9 +1440,9 @@
         <button class="orderbook-tab-btn" id="strateBirTab" type="button" role="tab" aria-selected="false" aria-controls="strateBirPanel">Strate BIR</button>
         <div class="orderbook-tab-search">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13 11a5 5 0 10-1.41 1.41l3.54 3.55 1.41-1.42L13 11zm-5 1a4 4 0 110-8 4 4 0 010 8z"/></svg>
-          <input id="orderbookSearch" type="search" placeholder="Search instrument, ticker, sideâ€¦" aria-label="Search orderbook">
+          <input id="orderbookSearch" type="search" placeholder="Search instrument, ticker, sideÃ¢â¬Â¦" aria-label="Search orderbook">
         </div>
-        <button id="cleanupModeBtn" class="orderbook-cleanup-btn" type="button" title="Cleanup mode â€” remove investors from snapshot JSON" aria-pressed="false" aria-label="Cleanup mode toggle"></button>
+        <button id="cleanupModeBtn" class="orderbook-cleanup-btn" type="button" title="Cleanup mode &mdash; remove investors from snapshot JSON" aria-pressed="false" aria-label="Cleanup mode toggle"></button>
       </div>
 
       <div class="orderbook-tab-panel active" id="activeBooksPanel" role="tabpanel" aria-labelledby="activeBooksTab">
@@ -1611,12 +1611,12 @@
        + the reconciled buffer ledger so every render path (main rows, strategy
        parents, per-investor detail) sums the SAME cent-accurate figures and
        never re-parses formatted strings (which broke under comma-decimal locales).
-         â€¢ mintGainByHolding     = profit from filling BELOW the client's quote:
-                                    max(0, Expected_fill âˆ’ avg_fill) Ã— qty (cents).
+         &bull; mintGainByHolding     = profit from filling BELOW the client's quote:
+                                    max(0, Expected_fill &minus; avg_fill) &times; qty (cents).
                                     Present for every FILLED holding (even when 0).
-         â€¢ mintBufferUsedByHolding = slippage the 8% reserve absorbed (cents) â€” MINT net 0.
-         â€¢ mintShortfallByHolding  = slippage BEYOND the reserve (cents) â€” MINT real loss.
-       MINT PnL (row) = (Î£ gain âˆ’ Î£ shortfall) / 100. */
+         &bull; mintBufferUsedByHolding = slippage the 8% reserve absorbed (cents) &mdash; MINT net 0.
+         &bull; mintShortfallByHolding  = slippage BEYOND the reserve (cents) &mdash; MINT real loss.
+       MINT PnL (row) = (ÃÂ£ gain &minus; ÃÂ£ shortfall) / 100. */
     let mintGainByHolding = new Map();
     let mintBufferUsedByHolding = new Map();
     let mintShortfallByHolding = new Map();
@@ -2192,7 +2192,7 @@
         const totalMV = holdings.reduce((s, h) => s + (h.marketValueNumber || 0), 0);
         const totalQty = holdings.reduce((s, h) => s + (h.quantityValue || 0), 0);
         const totalPnl = holdings.reduce((s, h) => s + (h.unrealizedPnlNumber || 0), 0);
-        /* Strategy-level Actual Fill = Î£(Expected_fill Ã— qty) across all
+        /* Strategy-level Actual Fill = ÃÂ£(Expected_fill &times; qty) across all
            underlying securities, in rands. Skips holdings without an
            Expected_fill so a single missing row doesn't zero the total. */
         const totalActualFill = holdings.reduce((s, h) => {
@@ -2200,7 +2200,7 @@
           return s + (h.actualFillNumber * Math.abs(h.quantityValue || 0));
         }, 0);
         const hasActualFillTotal = totalActualFill > 0;
-        /* Strategy-level Avg Fill = Î£(avg_fill Ã— qty) across all underlying
+        /* Strategy-level Avg Fill = ÃÂ£(avg_fill &times; qty) across all underlying
            securities, in rands. Per-share weighted avg across mixed-price
            securities is meaningless at the strategy level. */
         let totalAvgFill = 0;
@@ -2220,7 +2220,7 @@
           return t > l ? t : l;
         }, 0);
 
-        // Key by transaction_id first â€” that's the authoritative purchase
+        // Key by transaction_id first &mdash; that's the authoritative purchase
         // batch id. If a single investor buys the same strategy twice, each
         // buy gets its own transaction_id and shows as a separate investor
         // row. Fall back to (user_id|family_member|minute bucket) for legacy
@@ -2315,7 +2315,7 @@
         .map((row, i) => ({ ...row, line: i + 1 }));
     };
 
-    /* Selected investor in the per-user fill panel â€” keyed by `${userId}|${familyMemberId}` */
+    /* Selected investor in the per-user fill panel &mdash; keyed by `${userId}|${familyMemberId}` */
     let selectedInvestorKey = null;
 
     /* Walk allOrderbookRawRows to find the selected investor's individual
@@ -2344,8 +2344,8 @@
       const totalCurrent  = holdings.reduce((s, h) => s + (Number(h.marketValueNumber || 0)), 0);
       const totalPnl = holdings.reduce((s, h) => s + (Number(h.unrealizedPnlNumber || 0)), 0);
       const subtitle = selected.familyMemberRelationship
-        ? `${selected.clientName} (family member: ${selected.familyMemberRelationship}) Â· ${holdings.length} position${holdings.length !== 1 ? 's' : ''}`
-        : `${selected.clientName} Â· ${holdings.length} position${holdings.length !== 1 ? 's' : ''}`;
+        ? `${selected.clientName} (family member: ${selected.familyMemberRelationship}) &middot; ${holdings.length} position${holdings.length !== 1 ? 's' : ''}`
+        : `${selected.clientName} &middot; ${holdings.length} position${holdings.length !== 1 ? 's' : ''}`;
 
       const pnlClass = totalPnl > 0 ? 'investor-detail-pnl-pos' : totalPnl < 0 ? 'investor-detail-pnl-neg' : '';
       const summaryHtml = `
@@ -2399,7 +2399,7 @@
               <div class="investor-detail-panel-title">Individual fills & PnL</div>
               <div class="investor-detail-panel-sub">${escapeHtml(subtitle)}</div>
             </div>
-            <button type="button" class="investor-detail-panel-close" data-investor-detail-close>âœ• Close</button>
+            <button type="button" class="investor-detail-panel-close" data-investor-detail-close>Ã¢Å&bull; Close</button>
           </div>
           ${summaryHtml}
           ${tableHtml}
@@ -2408,7 +2408,7 @@
 
     /* Snapshot strategyHoldings are aggregated per-security across every
        investor and every purchase, so the avg_fill on them is a quantity-
-       weighted blend â€” which means clicking line 1 (filled) vs line 2 (not
+       weighted blend &mdash; which means clicking line 1 (filled) vs line 2 (not
        filled) of the same user's separate buys would show identical numbers.
        For archived books we fetch the actual current avg_fill per source-id
        directly from stock_holdings_c using the user's purchase-bucket
@@ -2515,9 +2515,9 @@
           );
           if (userHoldings.length) {
             holdings = userHoldings;
-            titleSuffix = ` <span style="font-size:11px;font-weight:400;color:#7c3aed;margin-left:8px;">Â· filtered to ${escapeHtml(sel.clientName || '')}${sel.createdAtBucket ? ' @ ' + escapeHtml(sel.createdAtBucket.replace('T', ' ')) : ''}</span>`;
+            titleSuffix = ` <span style="font-size:11px;font-weight:400;color:#7c3aed;margin-left:8px;">&middot; filtered to ${escapeHtml(sel.clientName || '')}${sel.createdAtBucket ? ' @ ' + escapeHtml(sel.createdAtBucket.replace('T', ' ')) : ''}</span>`;
           } else {
-            titleSuffix = ` <span style="font-size:11px;font-weight:400;color:#94a3b8;margin-left:8px;">Â· no holdings found for selected investor</span>`;
+            titleSuffix = ` <span style="font-size:11px;font-weight:400;color:#94a3b8;margin-left:8px;">&middot; no holdings found for selected investor</span>`;
           }
         }
       }
@@ -3274,7 +3274,7 @@
           <tr class="strate-bir-group-row" data-strate-group-toggle data-record-type="${escapeHtml(recordType)}">
             <td colspan="${headers.length}">
               <span class="strate-bir-group-toggle">
-                <span class="strate-bir-group-caret">${isCollapsed ? 'â–¸' : 'â–¾'}</span>
+                <span class="strate-bir-group-caret">${isCollapsed ? 'Ã¢&ndash;Â¸' : 'Ã¢&ndash;Â¾'}</span>
                 <span>${escapeHtml(recordType)} - ${escapeHtml(recordTypeLabels[recordType] || 'Records')}</span>
                 <span class="strate-bir-group-count">(${escapeHtml(String(typeRows.length))} entries)</span>
               </span>
@@ -3341,7 +3341,7 @@
       return `<td style="color:${color};font-weight:600;">${escapeHtml(display)}</td>`;
     };
 
-    /* Collect every stock_holdings_c id a row represents â€” single security,
+    /* Collect every stock_holdings_c id a row represents &mdash; single security,
        multi-user aggregated security, or strategy parent (sum of its holdings). */
     const collectHoldingIds = (row) => {
       const out = [];
@@ -4101,7 +4101,7 @@
     const getRowFillStatus = (row) => {
       /* Strategy rows: each strategyHolding carries its own fillDate set by
          the reconcile function. If ALL holdings have fillDate, the row is
-         fully filled â€” we don't need a live DB lookup for those. */
+         fully filled &mdash; we don't need a live DB lookup for those. */
       if (row?.isStrategy && Array.isArray(row.strategyHoldings) && row.strategyHoldings.length) {
         let allHoldingsFilled = true;
         let latestFillDate = null;
@@ -4154,7 +4154,7 @@
       });
 
       /* Any ID missing from the live map? Check if the row itself has a
-         stored fillDate from a previous reconcile â€” if so, trust that. */
+         stored fillDate from a previous reconcile &mdash; if so, trust that. */
       if (!allFilled && row?.fillDate) {
         return {
           filled: true,
@@ -4338,7 +4338,7 @@
       let avgWeighted = 0;
       let avgWeight = 0;
       /* Strategy-level Avg Fill and Actual Fill are SUMS in rands, not
-         per-share weighted averages â€” different securities at different
+         per-share weighted averages &mdash; different securities at different
          price levels make a per-share blend meaningless. */
       let avgFillSum = 0;
       let hasAvgFillSum = false;
@@ -4569,7 +4569,7 @@
         } else if (activeBooksSortOrder === 'as-is') {
           sorted = activeBooks.slice();
         } else {
-          // 'newest' â€” biggest sequence first
+          // 'newest' &mdash; biggest sequence first
           sorted = activeBooks.slice().sort((a, b) => (b.sequence || 0) - (a.sequence || 0));
         }
 
@@ -4640,7 +4640,7 @@
             : '<tr><td class="orderbook-empty-row" colspan="14">No rows captured.</td></tr>';
 
           const moveToClosedBtn = book.readyToClose
-            ? `<button type="button" class="orderbook-export-btn" data-move-to-closed data-book-id="${escapeHtml(String(book.id || ''))}" style="padding:4px 10px;height:26px;font-size:11px;background:#16a34a;color:#fff;border-color:#16a34a;" title="All rows are filled â€” move this book to Closed Books">Move to Closed Book</button>`
+            ? `<button type="button" class="orderbook-export-btn" data-move-to-closed data-book-id="${escapeHtml(String(book.id || ''))}" style="padding:4px 10px;height:26px;font-size:11px;background:#16a34a;color:#fff;border-color:#16a34a;" title="All rows are filled &mdash; move this book to Closed Books">Move to Closed Book</button>`
             : '';
 
           return `
@@ -4929,7 +4929,7 @@
     const captureFilledOrderbook = async () => {
       if (!allOrderbookRows.length) return;
 
-      // Separate pending rebalance rows â€“ they must NOT be archived
+      // Separate pending rebalance rows &mdash; they must NOT be archived
       const settledRows = allOrderbookRows.filter(r => !r.isPendingRebalance);
       const pendingRows = allOrderbookRows.filter(r => r.isPendingRebalance);
       if (!settledRows.length) return;
@@ -5030,7 +5030,7 @@
     };
 
     window.sendTradeConfirmation = async (evt, holdingId, bndReference, emailStatus) => {
-      // Grab button reference and update UI BEFORE any await â€” prevents evt.currentTarget becoming null
+      // Grab button reference and update UI BEFORE any await &mdash; prevents evt.currentTarget becoming null
       const btn = evt.currentTarget || evt.target.closest('button');
       const originalText = btn.textContent;
 
@@ -5047,7 +5047,7 @@
           return alert('No session token');
         }
 
-        // Use the emailStatus passed from the rendered row â€” more reliable than button text
+        // Use the emailStatus passed from the rendered row &mdash; more reliable than button text
         const isResend = emailStatus === 'sent';
 
         const res = await fetch('/api/orderbook/send-csv?action=trade-confirmation', {
@@ -5146,10 +5146,10 @@
                 style="background:#dc2626;color:white;border-radius:8px;padding:5px 14px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;letter-spacing:.02em;box-shadow:0 1px 3px rgba(220,38,38,.25);transition:background .15s;"
                 onmouseover="this.style.background='#b91c1c'" onmouseout="this.style.background='#dc2626'">Reverse</button>
             </div>`;
-        // â”€â”€ Client Email column â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Client Email column Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬
         // investor_trade_confirmations is the sole source of truth.
         // Show pill + button for any row that has a fill price set.
-        // No dependency on fillDate â€” that was causing 8/9 rows to show AWAITING FILL.
+        // No dependency on fillDate &mdash; that was causing 8/9 rows to show AWAITING FILL.
         } else {
           const hasFillPrice = row.avgFillNumber != null && row.avgFillNumber > 0;
           // notificationStatus is populated from investor_trade_confirmations via orderEmailsMap
@@ -5162,7 +5162,7 @@
           } else if (emailStatus === 'failed') {
             pillClass = 'filled-status-pill';
             pillLabel = 'FAILED';
-            // inline style for red â€” reuses existing side-badge-sell colors
+            // inline style for red &mdash; reuses existing side-badge-sell colors
           } else {
             pillClass = 'filled-status-pill is-open';
             pillLabel = 'PENDING';
@@ -5179,7 +5179,7 @@
                 </button>
               </div>`;
           } else {
-            // No fill price set yet â€” can't send a confirmation
+            // No fill price set yet &mdash; can't send a confirmation
             actionsHtml = `<span class="filled-status-pill is-open" style="background:#f3f4f6;color:#6b7280;border-color:#d1d5db;font-size:0.7rem;">No price set</span>`;
           }
         }
@@ -5242,7 +5242,7 @@
     };
 
     const loadOrderbookClientSideFallback = async () => {
-      /* â”€â”€ Load stock_holdings_c + pending rebalance events in parallel â”€â”€ */
+      /* Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Load stock_holdings_c + pending rebalance events in parallel Ã¢&rdquo;â¬Ã¢&rdquo;â¬ */
       const [holdingsResult, rebEventsResult, rebBatchesResult] = await Promise.all([
         supabaseClient
           .from('stock_holdings_c')
@@ -5278,7 +5278,7 @@
            cents, Expected_fill is rands (guard the legacy rows that stored it in
            cents). Only filled holdings (avg_fill > 0) get an entry, which also
            marks the holding as "filled" for the render. Slippage (avg above the
-           quote) yields 0 here â€” that loss is the buffer ledger's job, not a gain. */
+           quote) yields 0 here &mdash; that loss is the buffer ledger's job, not a gain. */
         const hid = h.id ? String(h.id) : '';
         if (!hid) return;
         const avgCents = Number(h.avg_fill);
@@ -5286,7 +5286,7 @@
         const avgRands = avgCents / 100;
         let expectedRands = Number(h.expected_fill);
         if (!Number.isFinite(expectedRands) || expectedRands <= 0) {
-          expectedRands = avgRands; // legacy: no quote recorded â†’ no spread
+          expectedRands = avgRands; // legacy: no quote recorded &rarr; no spread
         } else if (expectedRands > avgRands * 5) {
           expectedRands = expectedRands / 100; // legacy Expected_fill stored in cents
         }
@@ -5304,7 +5304,7 @@
       ])];
 
       const securitiesMap = {};
-      const intradayPriceMap = {};   // security_id â†’ latest current_price (Rands)
+      const intradayPriceMap = {};   // security_id &rarr; latest current_price (Rands)
       const profilesMap = {};
       const onboardingPackDetailsMap = {};
       const strategiesMap = {};
@@ -5431,7 +5431,7 @@
         }
       }
 
-      /* Execution-reserve (8% buffer) ledger â€” per-holding slippage the reserve
+      /* Execution-reserve (8% buffer) ledger &mdash; per-holding slippage the reserve
          absorbed (slippage_drawdown) vs. what spilled past it (shortfall = MINT's
          out-of-pocket loss). Folded into the MINT PnL column so admins see true
          execution economics without an extra column. Read through the API's
@@ -5508,7 +5508,7 @@
         const avgFillValue = Number.isFinite(avgFillRaw) ? (avgFillRaw / 100) : NaN;
         const hasAvgFill = Number.isFinite(avgFillValue);
         /* Expected_fill is the per-share price recorded at click time (rands).
-           Guard against legacy rows that stored it in cents â€” if >5Ã— the
+           Guard against legacy rows that stored it in cents &mdash; if >5&times; the
            avg_fill-in-rands, treat as cents and divide. Used for the Actual
            Fill column only; PnL math stays on avg_fill. */
         let actualFillValue = Number(row.expected_fill);
@@ -5527,9 +5527,9 @@
         const computedMarketValueNumber = (isQuantityNumeric && hasExpectedFillPrice)
           ? (Math.abs(quantityValue) * expectedFillPrice)
           : 0;
-        /* Client PnL = qty Ã— (lastPrice âˆ’ Expected_fill). Expected_fill (actualFillValue,
+        /* Client PnL = qty &times; (lastPrice &minus; Expected_fill). Expected_fill (actualFillValue,
            already in rands with the legacy-cents guard above) is the price the client SAW
-           when they tapped Buy â€” their true cost basis. avg_fill carries MINT's execution
+           when they tapped Buy &mdash; their true cost basis. avg_fill carries MINT's execution
            spread and must NOT be used here (matches the MINT client app + the buffer ledger).
            Falls back to avg_fill only for legacy rows with no Expected_fill. */
         const clientCostBasis = hasActualFill ? actualFillValue : (hasAvgFill ? avgFillValue : NaN);
@@ -5628,7 +5628,7 @@
         // Always show pending rebalance events
         if (row.isPendingRebalance) return true;
 
-        // Hide SETTLED rebalance_event rows â€” stock_holdings_c audit rows cover them
+        // Hide SETTLED rebalance_event rows &mdash; stock_holdings_c audit rows cover them
         if (row.rebalanceEventId && row.rebalanceBatchStatus === 'SETTLED') return false;
 
         // Hide REVERSED rebalance events (they are no longer actionable).
@@ -5643,7 +5643,7 @@
         const reason = String(row.closedReason || '').toUpperCase();
 
         // Rows linked to a rebalance batch should NOT appear in the regular
-        // orderbook â€” they are already represented by the "Rebalance â€”" entry
+        // orderbook &mdash; they are already represented by the "Rebalance &mdash;" entry
         // in Closed Books.  Only PENDING rebalance rows (handled above) belong
         // in the live view.
         if (row.rebalanceBatchId) return false;
@@ -5653,7 +5653,7 @@
         return false;
       });
 
-      /* â”€â”€ Map rebalance_event rows into orderbook-compatible format â”€â”€ */
+      /* Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Map rebalance_event rows into orderbook-compatible format Ã¢&rdquo;â¬Ã¢&rdquo;â¬ */
       const rebEventRows = rebEvents.map((evt, idx) => {
         const batch = batchById[evt.batch_id] || {};
         const batchStatus = batch.status || '';
@@ -5720,7 +5720,7 @@
           rebalanceBatchStatus: batchStatus,
         };
       }).filter((row) => {
-        // Show only PENDING rebalance events â€” SETTLED ones are covered by stock_holdings_c audit rows, REVERSED are no longer actionable
+        // Show only PENDING rebalance events &mdash; SETTLED ones are covered by stock_holdings_c audit rows, REVERSED are no longer actionable
         return row.rebalanceBatchStatus === 'PENDING';
       });
 
@@ -5735,7 +5735,7 @@
       allBirSourceRows = rawRows;
       allOrderbookRawRows = settledRows;
 
-      // â”€â”€ Build standalone rebalance batches â”€â”€
+      // Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Build standalone rebalance batches Ã¢&rdquo;â¬Ã¢&rdquo;â¬
       rebalanceBatchesForStandaloneList = rebBatches
         .filter((b) => ['PENDING', 'SETTLED', 'REVERSED'].includes(String(b.status || '').toUpperCase()))
         .map((b) => {
@@ -5814,7 +5814,7 @@
       orderbookSearch.addEventListener('input', applySearchFilter);
     }
 
-    /* â”€â”€ Sort toggle for Active Order Books â”€â”€ */
+    /* Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Sort toggle for Active Order Books Ã¢&rdquo;â¬Ã¢&rdquo;â¬ */
     const obSortBtn = document.getElementById('obSortBtn');
     const obSortLabel = document.getElementById('obSortLabel');
     const sortCycle = ['newest', 'oldest', 'as-is'];
@@ -5869,16 +5869,16 @@
     }
 
     const fmtRand = (cents) => {
-      if (!cents && cents !== 0) return 'â€”';
+      if (!cents && cents !== 0) return '&mdash;';
       return 'R ' + (Number(cents) / 100).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
     const fmtDate = (iso) => {
-      if (!iso) return 'â€”';
+      if (!iso) return '&mdash;';
       try { return new Date(iso).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return iso; }
     };
 
 
-      /* â”€â”€ Fill & Settle Modal (inline, dynamic) â”€â”€ */
+      /* Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Fill & Settle Modal (inline, dynamic) Ã¢&rdquo;â¬Ã¢&rdquo;â¬ */
       const openFillSettleModal = async (batchId) => {
         try {
           const [batchResult, eventsResult] = await Promise.all([
@@ -5913,23 +5913,23 @@
           fillModal.innerHTML = `
             <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:28px 32px;max-width:540px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
               <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;color:#f1f5f9;">Fill &amp; Settle Rebalance</h3>
-              <p style="margin:0 0 20px;font-size:13px;color:#94a3b8;">${batch.strategy_name_snapshot || batch.strategy_id} â€” ${events.length} events for ${[...new Set(events.map((e)=>e.user_id))].length} clients</p>
+              <p style="margin:0 0 20px;font-size:13px;color:#94a3b8;">${batch.strategy_name_snapshot || batch.strategy_id} &mdash; ${events.length} events for ${[...new Set(events.map((e)=>e.user_id))].length} clients</p>
               <div style="display:grid;gap:14px;">
                 ${sellEvts.length ? `
                 <div>
-                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">SELL Fill Price (R) â€” ${totalSellQty} units Â· committed ${fmtRand(sellEvts[0]?.price_at_commit)}</label>
+                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">SELL Fill Price (R) &mdash; ${totalSellQty} units &middot; committed ${fmtRand(sellEvts[0]?.price_at_commit)}</label>
                   <input id="fillSellPrice" type="number" step="0.01" min="0" value="${sellCommitR}" placeholder="e.g. 142.50"
                     style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
                 </div>` : ''}
                 ${buyEvts.length ? `
                 <div>
-                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">BUY Fill Price (R) â€” ${totalBuyQty} units Â· committed ${fmtRand(buyEvts[0]?.price_at_commit)}</label>
+                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">BUY Fill Price (R) &mdash; ${totalBuyQty} units &middot; committed ${fmtRand(buyEvts[0]?.price_at_commit)}</label>
                   <input id="fillBuyPrice" type="number" step="0.01" min="0" value="${buyCommitR}" placeholder="e.g. 98.20"
                     style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
                 </div>` : ''}
                 ${walletBuyEvts.length ? `
                 <div>
-                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">Extra BUY Fill Price (R) â€” ${totalExtraQty} units Â· committed ${fmtRand(walletBuyEvts[0]?.price_at_commit)}</label>
+                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">Extra BUY Fill Price (R) &mdash; ${totalExtraQty} units &middot; committed ${fmtRand(walletBuyEvts[0]?.price_at_commit)}</label>
                   <input id="fillExtraBuyPrice" type="number" step="0.01" min="0" value="${extraCommitR}" placeholder="e.g. 98.20"
                     style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
                 </div>` : ''}
@@ -5959,7 +5959,7 @@
             if (buyEvts.length && (!buyR || buyR <= 0)) { alert('Enter a valid BUY fill price.'); return; }
             if (walletBuyEvts.length && (!extraBuyR || extraBuyR <= 0)) { alert('Enter a valid Extra BUY fill price.'); return; }
             confirmBtn.disabled = true;
-            confirmBtn.textContent = 'Settlingâ€¦';
+            confirmBtn.textContent = 'SettlingÃ¢â¬Â¦';
             try {
               await executeFillAndSettle(batch, events, Math.round(sellR * 100), Math.round(buyR * 100), walletBuyEvts.length ? Math.round(extraBuyR * 100) : 0);
               closeFillModal();
@@ -5992,12 +5992,12 @@
            See docs/rebalance-cost-basis-carryover.md for the rationale and
            how to reinstate carryover if the decision changes. */
 
-        // â”€â”€ 1. Close / reduce existing SELL positions for every user â”€â”€
+        // Ã¢&rdquo;â¬Ã¢&rdquo;â¬ 1. Close / reduce existing SELL positions for every user Ã¢&rdquo;â¬Ã¢&rdquo;â¬
         for (const evt of sellEvts) {
           /* Critical: scope by family_member_id too. Without this, when a
              parent AND their child both hold the same security in the same
              strategy, the lookup returns both rows and .find(...) silently
-             picks one — risking the child's position getting closed when only
+             picks one &mdash; risking the child's position getting closed when only
              the parent's should be. evt.family_member_id is NULL for parent
              events and a uuid for per-child events. */
           let activeQuery = supabaseClient
@@ -6021,7 +6021,7 @@
           if (activePos) {
             const remaining = Math.max(0, Number(activePos.quantity) - soldQty);
             if (remaining <= 0) {
-              // Full close â€” mark position inactive
+              // Full close &mdash; mark position inactive
               const { error: closeErr } = await supabaseClient.from('stock_holdings_c').update({
                 is_active: false,
                 closed_reason: 'REBALANCE_SELL',
@@ -6033,7 +6033,7 @@
               }).eq('id', activePos.id);
               if (closeErr) errors.push(`SELL close ${evt.user_id}: ${closeErr.message}`);
             } else {
-              // Partial reduce â€” keep position active with reduced qty
+              // Partial reduce &mdash; keep position active with reduced qty
               const { error: reduceErr } = await supabaseClient.from('stock_holdings_c').update({
                 quantity: remaining,
                 updated_at: nowIso,
@@ -6059,7 +6059,7 @@
                 });
                 if (match) originalQty = Number(match.quantity) || 0;
               }
-            } catch (_) { /* snapshot parse failed â€“ originalQty stays 0 */ }
+            } catch (_) { /* snapshot parse failed &mdash; originalQty stays 0 */ }
 
             const remaining = originalQty - soldQty;
             if (remaining > 0) {
@@ -6118,7 +6118,7 @@
           if (evtUpErr) errors.push(`SELL event update: ${evtUpErr.message}`);
         }
 
-        // â”€â”€ 2. Create new BUY holdings for every user (primary + wallet) â”€â”€
+        // Ã¢&rdquo;â¬Ã¢&rdquo;â¬ 2. Create new BUY holdings for every user (primary + wallet) Ã¢&rdquo;â¬Ã¢&rdquo;â¬
         // perUserFillCents: optional map of user_id -> avg_fill_cents that
         // overrides defaultFillCents. Used for cost-basis carryover on
         // primary BUYs (the carried-over basis preserves PnL across the swap).
@@ -6183,9 +6183,9 @@
           await applyBuySettlement(walletBuyEvts, extraBuyFillCents || buyFillCents, 'WALLET_BUY', null);
         }
 
-        /* ── 2.5 Write a R0 transactions row per affected (user,family_member)
+        /* ââ 2.5 Write a R0 transactions row per affected (user,family_member)
            so each rebalance shows up in MINT's activity feed for the right
-           owner. Amount = 0 because positions↔positions isn't money in/out;
+           owner. Amount = 0 because positionsâpositions isn't money in/out;
            MINT's list reads name/description for the display label. */
         try {
           const allEvtsForTxn = [...sellEvts, ...buyEvts, ...walletBuyEvts];
@@ -6217,10 +6217,10 @@
             const userSells = sellEvts.filter(own);
             const userBuys = [...buyEvts, ...walletBuyEvts].filter(own);
             const sellSummary = userSells.length
-              ? `sold ${userSells.reduce((s, e) => s + Number(e.quantity || 0), 0)} × ${symbolBySecId[userSells[0].security_id] || '?'}`
+              ? `sold ${userSells.reduce((s, e) => s + Number(e.quantity || 0), 0)} &times; ${symbolBySecId[userSells[0].security_id] || '?'}`
               : '';
             const buySummary = userBuys.length
-              ? `bought ${userBuys.reduce((s, e) => s + Number(e.quantity || 0), 0)} × ${symbolBySecId[userBuys[0].security_id] || '?'}`
+              ? `bought ${userBuys.reduce((s, e) => s + Number(e.quantity || 0), 0)} &times; ${symbolBySecId[userBuys[0].security_id] || '?'}`
               : '';
             const parts = [sellSummary, buySummary].filter(Boolean);
             return {
@@ -6243,7 +6243,7 @@
           errors.push(`Rebalance txn step failed: ${txnCatchErr?.message || txnCatchErr}`);
         }
 
-        // â”€â”€ 3. Mark batch SETTLED â”€â”€
+        // Ã¢&rdquo;â¬Ã¢&rdquo;â¬ 3. Mark batch SETTLED Ã¢&rdquo;â¬Ã¢&rdquo;â¬
         const { error: settleErr } = await supabaseClient.from('rebalance_batch').update({
           status: 'SETTLED', settled_at: nowIso, updated_at: nowIso,
         }).eq('id', batch.id);
@@ -6256,10 +6256,10 @@
         }
       };
 
-      /* â”€â”€ Reverse Rebalance Batch â”€â”€ */
+      /* Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Reverse Rebalance Batch Ã¢&rdquo;â¬Ã¢&rdquo;â¬ */
       const executeReverseRebalanceBatch = async (batchId) => {
         const reason = prompt(
-          'Reverse this pending rebalance batch?\n\nThis will:\nâ€¢ Mark all events as REVERSED\nâ€¢ Restore the strategy composition to its pre-rebalance state\nâ€¢ Restore wallet balances to their pre-rebalance values\n\nEnter a reason (optional):',
+          'Reverse this pending rebalance batch?\n\nThis will:\n&bull; Mark all events as REVERSED\n&bull; Restore the strategy composition to its pre-rebalance state\n&bull; Restore wallet balances to their pre-rebalance values\n\nEnter a reason (optional):',
           ''
         );
         if (reason === null) return;
@@ -6297,7 +6297,7 @@
 
           // 4. Restore rebalance_residual balances from snapshot.
           // Snapshot stores Rand amounts (as seen in-app); the column itself
-          // is stored in cents, so we Ã—100 on write.
+          // is stored in cents, so we &times;100 on write.
           if (batch.wallet_snapshot_before && typeof batch.wallet_snapshot_before === 'object') {
             await Promise.all(Object.entries(batch.wallet_snapshot_before).map(async ([userId, balance]) => {
               if (!userId) return;
@@ -6311,7 +6311,7 @@
           }
 
           // 5. Delete any stock_holdings_c rows that were created by this batch's settlement
-          //    (in case the batch was settled before reversal â€” safety net)
+          //    (in case the batch was settled before reversal &mdash; safety net)
           const { error: holdingsDelErr } = await supabaseClient
             .from('stock_holdings_c')
             .delete()
@@ -6330,7 +6330,7 @@
         }
       };
 
-      /* â”€â”€ Reverse Investor Order (per-user, per-strategy or per-security) â”€â”€ */
+      /* Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Reverse Investor Order (per-user, per-strategy or per-security) Ã¢&rdquo;â¬Ã¢&rdquo;â¬ */
       const _reverseState = { payload: null, holdings: [], txns: [], walletId: null, walletBefore: 0, refund: 0, refundCents: 0, selectedTxnId: null };
 
       const getReverseModalEls = () => ({
@@ -6417,7 +6417,7 @@
             holdingsQuery = holdingsQuery.eq('strategy_id', payload.strategyId);
             // Scope to the exact purchase (created_at minute window) so two
             // separate buys of the same strategy don't get reversed together.
-            // Widen the window by Â±5 seconds to absorb fan-out jitter when a
+            // Widen the window by ÃÂ±5 seconds to absorb fan-out jitter when a
             // single purchase fans out across multiple stock_holdings_c rows.
             if (payload.createdAtFrom) {
               const fromMs = new Date(payload.createdAtFrom).getTime() - 5000;
@@ -6463,7 +6463,7 @@
               .maybeSingle();
             if (fmErr) throw new Error(fmErr.message);
             _reverseState.walletId = fmRow?.id || null;
-            // available_balance is stored in cents â€” convert to Rands for display.
+            // available_balance is stored in cents &mdash; convert to Rands for display.
             _reverseState.walletBefore = Number(fmRow?.available_balance || 0) / 100;
           } else {
             const { data: walletRow, error: wErr } = await supabaseClient
@@ -6480,7 +6480,7 @@
             ? payload.strategyName
             : (payload.instrument || payload.ticker);
 
-          // transactions.user_id is RLS-restricted â€” use the API (service-role key) to read.
+          // transactions.user_id is RLS-restricted &mdash; use the API (service-role key) to read.
           const { data: sessionData } = await supabaseClient.auth.getSession();
           const apiToken = sessionData?.session?.access_token;
           if (!apiToken) throw new Error('Your session has expired. Please sign in again.');
@@ -6506,8 +6506,8 @@
           const allTxns = Array.isArray(txnRespJson.transactions) ? txnRespJson.transactions : [];
 
           // Filter to txns referencing THIS strategy/security.
-          // Strategy: name includes strategy name (e.g. “Strategy Investment: Yield Basket”)
-          // Single security: name is “Purchased {ticker}” — match on ticker OR full
+          // Strategy: name includes strategy name (e.g. &ldquo;Strategy Investment: Yield Basket&rdquo;)
+          // Single security: name is &ldquo;Purchased {ticker}&rdquo; &mdash; match on ticker OR full
           // instrument name OR security_id in description as fallback.
           const lowerTarget = String(targetName || '').toLowerCase().trim();
           const lowerTicker = String(payload.ticker || '').toLowerCase().trim();
@@ -6571,7 +6571,7 @@
             els.confirmBtn.disabled = false;
           } else if (!_reverseState.walletId) {
             els.warning.style.display = 'block';
-            els.warning.textContent = `This investor has no existing wallet â€” a new wallet row will be created with the refund as the balance.`;
+            els.warning.textContent = `This investor has no existing wallet &mdash; a new wallet row will be created with the refund as the balance.`;
           }
 
           els.loading.style.display = 'none';
@@ -6638,7 +6638,7 @@
               selectedTxnId: _reverseState.selectedTxnId || null,
               targetName: targetName || 'Order',
               /* Scope to the specific buy event when present (set by the
-                 investors-panel reverse button). Optional â€” falls back to
+                 investors-panel reverse button). Optional &mdash; falls back to
                  the whole strategy if missing. */
               createdAtFrom: payload.createdAtFrom || null,
               createdAtTo: payload.createdAtTo || null,
@@ -6652,11 +6652,11 @@
           // Accurate summary built from server's actual counts/balances.
           const lines = [
             `Reversal for ${payload.userName || 'investor'}:`,
-            `â€¢ Holdings deleted: ${result.deletedCount} of ${(result.requestedHoldingIds || []).length}`,
-            `â€¢ Refund: ${formatRand(result.refund || 0)}`,
-            `â€¢ Wallet: ${formatRand(result.balanceBefore || 0)} â†’ ${formatRand(result.balanceAfter || 0)}${result.walletUpdated ? '' : ' (no wallet change)'}`,
+            `&bull; Holdings deleted: ${result.deletedCount} of ${(result.requestedHoldingIds || []).length}`,
+            `&bull; Refund: ${formatRand(result.refund || 0)}`,
+            `&bull; Wallet: ${formatRand(result.balanceBefore || 0)} &rarr; ${formatRand(result.balanceAfter || 0)}${result.walletUpdated ? '' : ' (no wallet change)'}`,
           ];
-          if (result.auditTxnId) lines.push(`â€¢ Audit txn: ${result.auditTxnId}`);
+          if (result.auditTxnId) lines.push(`&bull; Audit txn: ${result.auditTxnId}`);
 
           closeReverseModal();
           alert(lines.join('\n'));
@@ -6676,8 +6676,8 @@
       cleanupModeBtn.classList.toggle('is-active', !!cleanupMode);
       cleanupModeBtn.setAttribute('aria-pressed', cleanupMode ? 'true' : 'false');
       cleanupModeBtn.title = cleanupMode
-        ? 'Cleanup mode ON â€” click X next to investors to remove them. Click here to exit.'
-        : 'Cleanup mode â€” remove investors from snapshot JSON';
+        ? 'Cleanup mode ON &mdash; click X next to investors to remove them. Click here to exit.'
+        : 'Cleanup mode &mdash; remove investors from snapshot JSON';
     };
 
     const promptForCleanupPassword = async () => {
@@ -6738,9 +6738,9 @@
       if (!row) return;
 
       /* Two cleanup flavours share this handler:
-         - Strategy rows: data-user-id only â€” remove a user from strategyUsers
+         - Strategy rows: data-user-id only &mdash; remove a user from strategyUsers
            (which also strips them out of bndRows).
-         - Single-security rows: data-bnd-row-index present â€” remove just that
+         - Single-security rows: data-bnd-row-index present &mdash; remove just that
            one BND allocation (one investor's slice of the security order). We
            identify the target by array index first because some legacy
            bndRows have empty sourceId (a backfill stripped it), which used
@@ -7084,7 +7084,7 @@
     }
 
 
-    /* â”€â”€ Price Update Logic â”€â”€ */
+    /* Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Price Update Logic Ã¢&rdquo;â¬Ã¢&rdquo;â¬ */
     let currentEditRow = null;
 
     const getPriceModalEls = () => ({
@@ -7142,7 +7142,7 @@
       const side = String(row.tradeSide || row.side || '').toUpperCase();
       const isBuy = side === 'BUY';
       
-      priceModalInstrument.textContent = `${row.ticker || ''} Â· ${row.instrumentName || ''}`;
+      priceModalInstrument.textContent = `${row.ticker || ''} &middot; ${row.instrumentName || ''}`;
       
       // Show side with badge style
       const sideEl = document.getElementById('priceModalSide');
@@ -7237,7 +7237,7 @@
         instrument: d.instrument || '',
         ticker: d.ticker || '',
         /* Scope reversal to the specific purchase (created_at minute bucket)
-           when present â€” otherwise it falls back to the whole strategy. */
+           when present &mdash; otherwise it falls back to the whole strategy. */
         createdAtFrom: d.createdAtFrom || null,
         createdAtTo: d.createdAtTo || null,
       };
@@ -7247,12 +7247,12 @@
       openReverseInvestorModal(payload).catch((err) => alert('Reverse modal error: ' + (err?.message || err)));
     });
 
-    /* Investor row click â†’ select, highlight purple, render detail panel,
+    /* Investor row click &rarr; select, highlight purple, render detail panel,
        AND re-render the Holdings table above to show only that investor's
        holdings (with their own avg_fill that can be edited independently).
        Detail panel close button clears the selection.
 
-       bookId/rowIndex are passed for Active / Closed Books snapshots â€” they
+       bookId/rowIndex are passed for Active / Closed Books snapshots &mdash; they
        point back to filledOrderbooksArchive[book].rows[rowIndex] (the source
        row that lives on the snapshot, not in the live orderbook) and scope
        the panel queries to the right instance when the same strategy appears
@@ -7289,7 +7289,7 @@
           if (!realHoldings.length) return;
           const stillSelected = selectedInvestorKey === buildInvestorKey(sel);
           if (!stillSelected) return;
-          const overrideTitleSuffix = ` <span style="font-size:11px;font-weight:400;color:#7c3aed;margin-left:8px;">Â· filtered to ${escapeHtml(sel.clientName || '')}${sel.createdAtBucket ? ' @ ' + escapeHtml(sel.createdAtBucket.replace('T', ' ')) : ''}</span>`;
+          const overrideTitleSuffix = ` <span style="font-size:11px;font-weight:400;color:#7c3aed;margin-left:8px;">&middot; filtered to ${escapeHtml(sel.clientName || '')}${sel.createdAtBucket ? ' @ ' + escapeHtml(sel.createdAtBucket.replace('T', ' ')) : ''}</span>`;
           holdingsPanel.innerHTML = renderStrategyHoldingsHtml(stratRow, {
             editable: false,
             overrideHoldings: realHoldings,
@@ -7503,10 +7503,10 @@
     requireSession().then(async (ok) => {
       if (!ok) return;
 
-      // â”€â”€ Load DB archive FIRST, then load the live orderbook â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Load DB archive FIRST, then load the live orderbook Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬
       // Running these in parallel caused a race condition: the live rows
       // rendered before the archive was known, briefly showing archived rows
-      // as "live", then removing them once the archive resolved â€” causing a flash.
+      // as "live", then removing them once the archive resolved &mdash; causing a flash.
       try {
         const dbArchive = await loadFilledArchiveFromDb();
         if (Array.isArray(dbArchive)) {
@@ -7521,12 +7521,12 @@
 
       await loadOrderbook();
 
-      /* ── Realtime live-price refresh ────────────────────────────────────────
+      /* ââ Realtime live-price refresh ââââââââââââââââââââââââââââââââââââââââ
          Subscribe to intraday price ticks (and holding changes from fills) so
          Live Price / Client PnL / MINT PnL update on their own. Guards:
-           • debounced (2s) + in-flight guarded  → no request storms
-           • skipped while an input is focused    → never wipes a value mid-edit
-           • skipped unless the admin has been idle ~12s → never collapses an
+           &bull; debounced (2s) + in-flight guarded  &rarr; no request storms
+           &bull; skipped while an input is focused    &rarr; never wipes a value mid-edit
+           &bull; skipped unless the admin has been idle ~12s &rarr; never collapses an
              expanded panel or interrupts active work; prices catch up once they
              pause. A 60s poll is the fallback if realtime isn't enabled on the
              table (see docs/enable-realtime-prices.sql). */

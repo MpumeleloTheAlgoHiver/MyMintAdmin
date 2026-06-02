@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mint — Investors</title>
+  <title>Mint &mdash; Investors</title>
   <style>html{opacity:0}</style>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -66,7 +66,7 @@
           <img src="/icon.png" style="width:26px;height:26px;border-radius:7px;flex-shrink:0;" />
           <div style="flex:1;min-width:0;">
             <div style="font-size:12px;font-weight:700;color:#0f172a;line-height:1.3;">Mint Hub</div>
-            <div style="font-size:10px;color:#7c3aed;font-weight:500;">Admin Portal · Active</div>
+            <div style="font-size:10px;color:#7c3aed;font-weight:500;">Admin Portal &middot; Active</div>
           </div>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
@@ -258,7 +258,7 @@
             </div>
             <input id="investorSearch" placeholder="Search investors..." style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:12px;color:#0f172a;outline:none;box-sizing:border-box;" />
             <select id="strategyFilter" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:12px;color:#64748b;background:#fff;outline:none;box-sizing:border-box;"><option value="">All Strategies</option></select>
-            <div style="display:flex;justify-content:space-between;padding:4px 10px;font-size:11px;font-weight:500;color:#94a3b8;border-bottom:1px solid #f1f5f9;margin-bottom:4px;"><span>Name ↕</span><div style="display:flex;gap:24px;"><span>Value ↕</span><span>Ret %</span></div></div>
+            <div style="display:flex;justify-content:space-between;padding:4px 10px;font-size:11px;font-weight:500;color:#94a3b8;border-bottom:1px solid #f1f5f9;margin-bottom:4px;"><span>Name â</span><div style="display:flex;gap:24px;"><span>Value â</span><span>Ret %</span></div></div>
             <div id="investorList" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:2px;"></div>
           </div>
           <div id="detailPanel" style="background:white;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,0.05),0 1px 4px rgba(0,0,0,0.06);overflow:hidden;display:flex;flex-direction:column;"></div>
@@ -277,7 +277,7 @@
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg";
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    /* ─── State ─── */
+    /* âââ State âââ */
     let allInvestors = [], allStrategies = [], stratNavMap = {}, stratMetricsMap = {}, txnNameById = {};
     let activeView = 'strategy'; // 'strategy' | 'security'
     let currentInvestor = null, currentTab = 'performance';
@@ -289,16 +289,16 @@
       else if (window.echarts) { try { const inst = echarts.getInstanceByDom(el); if (inst) inst.dispose(); } catch(e) {} }
     }
 
-    /* ─── Formatters ─── */
+    /* âââ Formatters âââ */
     const fmtR    = n => 'R' + (Number(n) || 0).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     const fmtR2   = n => 'R' + (Number(n) || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const fmtPct  = n => (n == null || isNaN(n)) ? '—' : ((n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%');
-    const fmtPctNoSign = n => (n == null || isNaN(n)) ? '—' : Number(n).toFixed(2) + '%';
+    const fmtPct  = n => (n == null || isNaN(n)) ? '&mdash;' : ((n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%');
+    const fmtPctNoSign = n => (n == null || isNaN(n)) ? '&mdash;' : Number(n).toFixed(2) + '%';
     const pctClr  = n => (n == null || isNaN(n)) ? '#64748b' : (n >= 0 ? '#059669' : '#dc2626');
-    const fmtDate = s => s ? new Date(s).toLocaleDateString('en-ZA', { day:'2-digit', month:'short', year:'numeric' }) : '—';
-    const fmtDateShort = s => s ? new Date(s).toLocaleDateString('en-ZA', { day:'2-digit', month:'short' }) : '—';
+    const fmtDate = s => s ? new Date(s).toLocaleDateString('en-ZA', { day:'2-digit', month:'short', year:'numeric' }) : '&mdash;';
+    const fmtDateShort = s => s ? new Date(s).toLocaleDateString('en-ZA', { day:'2-digit', month:'short' }) : '&mdash;';
 
-    /* ─── Risk math (from daily NAV series) ─── */
+    /* âââ Risk math (from daily NAV series) âââ */
     function computeMetrics(navSeries) {
       if (!navSeries || navSeries.length < 2) return { sharpe:null, vol:null, maxDD:null, sortino:null };
       const rets = [];
@@ -339,7 +339,7 @@
       };
     }
 
-    /* Build calendar-returns table from daily NAV: monthKey → % return for that month */
+    /* Build calendar-returns table from daily NAV: monthKey &rarr; % return for that month */
     /* inceptionDate (optional YYYY-MM-DD): when provided, series is trimmed to that date
        so the first partial month uses the investor's entry NAV, not the prior month-end. */
     function computeCalendar(navSeries, inceptionDate) {
@@ -365,7 +365,7 @@
       return out;
     }
 
-    /* ─── Data Load ─── */
+    /* âââ Data Load âââ */
     async function loadAll() {
       /* Fetch via server-side endpoint which uses the service role key,
          bypassing Supabase RLS so ALL investors are always visible to admins. */
@@ -377,14 +377,14 @@
       const famMap     = Object.fromEntries((familyMembers||[]).map(fm => [fm.id, fm]));
       const stratMap   = Object.fromEntries((strategies||[]).map(s => [s.id, s]));
       const secMetaMap = Object.fromEntries((secMeta||[]).map(s => [s.id, s]));
-      /* First-write-wins (rows are sorted DESC by as_of_date → first row is latest per security) */
+      /* First-write-wins (rows are sorted DESC by as_of_date &rarr; first row is latest per security) */
       const secLiveMap = {};
       (secLive||[]).forEach(s => {
         if (secLiveMap[s.security_id]) return;
         secLiveMap[s.security_id] = { priceR: (Number(s.current_price)||0)/100, dayPct: Number(s['1d_pct'])||0, ytd: Number(s.ytd_pct)||0, y1: Number(s['1y_pct'])||0, asOf: s.as_of_date };
       });
 
-      /* Per-investor NAV history & metrics — keyed by user_id */
+      /* Per-investor NAV history & metrics &mdash; keyed by user_id */
       stratNavMap = {}; stratMetricsMap = {};
       const stratLatest = {};
       (stratHist||[]).forEach(r => {
@@ -392,7 +392,7 @@
         if (!stratNavMap[uid]) stratNavMap[uid] = [];
         const nav = Number(r.basket_value);
         if (nav > 0) stratNavMap[uid].push({ date: r.as_of_date, nav, incPct: r.inception_pct != null ? Number(r.inception_pct) : null });
-        stratLatest[uid] = r;  /* last one wins → most recent (asc order) */
+        stratLatest[uid] = r;  /* last one wins &rarr; most recent (asc order) */
       });
       Object.entries(stratNavMap).forEach(([uid, series]) => {
         stratMetricsMap[uid] = {
@@ -424,21 +424,21 @@
         const mv    = Number(row.market_value) || 0;
         const live  = secLiveMap[row.security_id];
         const meta  = secMetaMap[row.security_id] || {};
-        /* Unit detection: avg_fill is stored inconsistently — sometimes cents, sometimes rands.
+        /* Unit detection: avg_fill is stored inconsistently &mdash; sometimes cents, sometimes rands.
            Compare fill to the live price (always cents). Whichever interpretation is closer
            to the current market price determines the unit. */
         if (live && live.priceR > 0 && fill > 0) {
           const diffAsRands = Math.abs(fill - live.priceR);
           const diffAsCents = Math.abs(fill / 100 - live.priceR);
-          if (diffAsRands < diffAsCents) fill *= 100;  /* fill was in rands → convert to cents */
+          if (diffAsRands < diffAsCents) fill *= 100;  /* fill was in rands &rarr; convert to cents */
         } else if (fill * qty > 10 * mv && mv > 0) {
           fill /= 100;
         }
-        /* Broker fill in rands — shown in the Avg Fill display column only. */
+        /* Broker fill in rands &mdash; shown in the Avg Fill display column only. */
         const avgFillR = fill / 100;
         /* Client cost basis = Expected_fill (the price the client saw at buy time,
-           in rands), NOT avg_fill — avg_fill carries MINT's execution spread.
-           Guards legacy Expected_fill rows stored in cents (>5× avgFillR); falls
+           in rands), NOT avg_fill &mdash; avg_fill carries MINT's execution spread.
+           Guards legacy Expected_fill rows stored in cents (>5&times; avgFillR); falls
            back to avg_fill when no quote was recorded. Mirrors the MINT client app,
            api/investors/data.js and the orderbook so every surface agrees. */
         let costBasisR = avgFillR;
@@ -450,8 +450,8 @@
         const currentR  = live ? live.priceR * qty : (mv / 100);
         byUser[key].holdings.push({
           securityId: row.security_id,
-          symbol: meta.symbol || '—',
-          name:   meta.name   || meta.symbol || '—',
+          symbol: meta.symbol || '&mdash;',
+          name:   meta.name   || meta.symbol || '&mdash;',
           sector: meta.sector || 'Other',
           logo:   meta.logo_url,
           qty, avgFillR, priceR: live ? live.priceR : (mv/qty/100 || 0),
@@ -489,7 +489,7 @@
         const earliestDep = deposits.length ? deposits[deposits.length-1].transaction_date : null;
         const inception = earliestDep || u.inception;
         const days = inception ? Math.floor((Date.now() - new Date(inception)) / 86400000) : 0;
-        /* Annualise; clamp to -100% to avoid NaN/complex roots when retPct ≤ -100% */
+        /* Annualise; clamp to -100% to avoid NaN/complex roots when retPct â¤ -100% */
         let annualised = retPct;
         if (days > 30) {
           const safe = Math.max(1 + retPct/100, 0.0001);
@@ -509,7 +509,7 @@
         return {
           type: isStrategy ? 'strategy' : 'security',
           userId: u.userId, investorKey, familyMemberId: u.familyMemberId, isMinor: !!u.familyMemberId, name, email: prof.email, mintNo: prof.mint_number,
-          strategy: strat.short_name || strat.name || (isStrategy ? '—' : 'Direct securities'), strategyId: u.strategyId,
+          strategy: strat.short_name || strat.name || (isStrategy ? '&mdash;' : 'Direct securities'), strategyId: u.strategyId,
           strategyDesc: strat.description, riskLevel: strat.risk_level,
           invested, current, pnl, retPct: +retPct.toFixed(2),
           csrAum, csrInvested, csrPnl, csrRetPct, csrYtdPct,
@@ -524,13 +524,13 @@
       return investors;
     }
 
-    /* ─── KPI Bar ─── */
+    /* âââ KPI Bar âââ */
     function renderKpiBar(investors) {
       const visible = investors.filter(i => i.type === activeView);
       const aum  = visible.reduce((s,i)=>s+i.csrAum,0);
       const inv  = visible.reduce((s,i)=>s+i.csrInvested,0);
       const pnl  = visible.reduce((s,i)=>s+i.csrPnl,0);
-      /* Weighted average return — weight by each investor's AUM so small accounts don't distort the figure */
+      /* Weighted average return &mdash; weight by each investor's AUM so small accounts don't distort the figure */
       const avg = aum > 0 ? visible.reduce((s,i)=>s+(i.csrRetPct * i.csrAum), 0) / aum : 0;
       const sorted = [...visible].sort((a,b) => b.csrRetPct - a.csrRetPct);
       const best  = sorted[0];
@@ -540,8 +540,8 @@
         { l:'TOTAL INVESTED',  v: fmtR(inv), c:'#64748b' },
         { l:'TOTAL P&L',       v: (pnl>=0?'+':'')+fmtR2(pnl), c: pctClr(pnl) },
         { l:'AVG RETURN',      v: fmtPct(avg), c: pctClr(avg) },
-        { l:'BEST PERFORMER',  v: best  ? `${best.name.split(' ')[0]} ${fmtPct(best.csrRetPct)}`   : '—', c:'#059669' },
-        { l:'WORST PERFORMER', v: worst ? `${worst.name.split(' ')[0]} ${fmtPct(worst.csrRetPct)}` : '—', c:'#dc2626' },
+        { l:'BEST PERFORMER',  v: best  ? `${best.name.split(' ')[0]} ${fmtPct(best.csrRetPct)}`   : '&mdash;', c:'#059669' },
+        { l:'WORST PERFORMER', v: worst ? `${worst.name.split(' ')[0]} ${fmtPct(worst.csrRetPct)}` : '&mdash;', c:'#dc2626' },
       ];
       document.getElementById('kpiBar').innerHTML = kpis.map(k =>
         `<div class="ov-kpi-card">
@@ -551,7 +551,7 @@
       ).join('');
     }
 
-    /* ─── View toggle ─── */
+    /* âââ View toggle âââ */
     function switchView(view) {
       activeView = view;
       const stBtn = document.getElementById('tabStrategy');
@@ -570,7 +570,7 @@
       renderDetail();
     }
 
-    /* ─── Investor list ─── */
+    /* âââ Investor list âââ */
     function renderList(investors) {
       const q = document.getElementById('investorSearch').value.toLowerCase();
       const f = document.getElementById('strategyFilter').value;
@@ -597,7 +597,7 @@
       `).join('') || `<div style="padding:20px;text-align:center;color:#94a3b8;font-size:12px;">No investors found</div>`;
     }
 
-    /* ─── Detail panel ─── */
+    /* âââ Detail panel âââ */
     function selectInvestor(investorKey) {
       const inv = allInvestors.find(i => i.investorKey === investorKey);
       if (!inv) return;
@@ -628,7 +628,7 @@
                 <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">${(i.name[0]||'?').toUpperCase()}</div>
                 <div style="min-width:0;">
                   <div style="font-size:16px;font-weight:700;color:#0f172a;">${i.name}</div>
-                  <div style="font-size:11px;color:#64748b;margin-top:1px;">${i.strategy}${i.email?' · '+i.email:''}</div>
+                  <div style="font-size:11px;color:#64748b;margin-top:1px;">${i.strategy}${i.email?' &middot; '+i.email:''}</div>
                 </div>
               </div>
             </div>
@@ -641,8 +641,8 @@
             ${[
               ['Invested', fmtR(i.invested), '#64748b'],
               ['P&L',      (i.pnl>=0?'+':'')+fmtR2(i.pnl), pctClr(i.pnl)],
-              ['YTD', i.csrYtdPct != null ? fmtPct(i.csrYtdPct) : '—', pctClr(i.csrYtdPct || 0)],
-              ['Inception', fmtDate(i.inception)+' · '+i.days+'d', '#0f172a'],
+              ['YTD', i.csrYtdPct != null ? fmtPct(i.csrYtdPct) : '&mdash;', pctClr(i.csrYtdPct || 0)],
+              ['Inception', fmtDate(i.inception)+' &middot; '+i.days+'d', '#0f172a'],
             ].map(([l,v,c]) => `
               <div style="background:rgba(255,255,255,0.7);border-radius:8px;padding:8px 10px;">
                 <div style="font-size:10px;color:#94a3b8;font-weight:500;letter-spacing:0.04em;">${l.toUpperCase()}</div>
@@ -675,7 +675,7 @@
       else if (currentTab === 'transactions') el.innerHTML = renderTxnsTab(i);
     }
 
-    /* ─── Tab: Performance (merged: user P&L chart + calendar + strategy stats + holdings) ─── */
+    /* âââ Tab: Performance (merged: user P&L chart + calendar + strategy stats + holdings) âââ */
     function renderPerformanceTab(i) {
       const m = stratMetricsMap[i.userId] || {};
       const latest = m.latest || {};
@@ -685,7 +685,7 @@
       ];
       const topHoldings = i.holdings.slice(0, 5);
 
-      /* Calendar — computed per-investor from their inception date so the first
+      /* Calendar &mdash; computed per-investor from their inception date so the first
          partial month uses their entry NAV, not the prior month-end */
       const incDate = i.inception ? i.inception.slice(0, 10) : null;
       const cal = computeCalendar(stratNavMap[i.userId] || [], incDate);
@@ -720,10 +720,10 @@
                     const monthNum = idx + 1;
                     /* Hide cells before investor inception */
                     if (incYear && (+y < incYear || (+y === incYear && monthNum < incMonth))) {
-                      return `<td class="r ov-mono" style="background:#f8fafc;color:#e2e8f0;font-size:10.5px;">·</td>`;
+                      return `<td class="r ov-mono" style="background:#f8fafc;color:#e2e8f0;font-size:10.5px;">&middot;</td>`;
                     }
                     const v = byYear[y][monthNum];
-                    return `<td class="r ov-mono" style="background:${cellColor(v)};color:${v==null?'#cbd5e1':'#0f172a'};font-weight:${v==null?'400':'600'};font-size:10.5px;">${v==null?'—':v.toFixed(1)}</td>`;
+                    return `<td class="r ov-mono" style="background:${cellColor(v)};color:${v==null?'#cbd5e1':'#0f172a'};font-weight:${v==null?'400':'600'};font-size:10.5px;">${v==null?'&mdash;':v.toFixed(1)}</td>`;
                   }).join('')}
                   <td class="r ov-mono" style="font-weight:700;color:${pctClr(ytd)};">${fmtPctNoSign(ytd)}</td>
                 </tr>`;
@@ -737,7 +737,7 @@
         <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);margin-bottom:14px;">
           <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
             <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">SINCE INCEPTION RETURN (%)</div>
-            <div style="font-size:11px;color:${pctClr(i.csrRetPct)};font-weight:700;font-family:ui-monospace,monospace;">${i.csrRetPct != null ? (i.csrRetPct >= 0 ? '+' : '') + Number(i.csrRetPct).toFixed(2) + '%' : '—'}</div>
+            <div style="font-size:11px;color:${pctClr(i.csrRetPct)};font-weight:700;font-family:ui-monospace,monospace;">${i.csrRetPct != null ? (i.csrRetPct >= 0 ? '+' : '') + Number(i.csrRetPct).toFixed(2) + '%' : '&mdash;'}</div>
           </div>
           <div id="userPnlChart" style="width:100%;height:320px;"></div>
         </div>
@@ -764,7 +764,7 @@
               ${[['Sharpe', m.sharpe], ['Sortino', m.sortino], ['Vol %', m.vol], ['Max DD %', m.maxDD]].map(([l,v]) => `
                 <div style="text-align:center;padding:8px 4px;background:#f8fafc;border-radius:6px;">
                   <div style="font-size:9px;color:#94a3b8;font-weight:600;">${l}</div>
-                  <div style="font-size:11px;font-weight:700;color:#0f172a;margin-top:2px;font-family:ui-monospace,monospace;">${v == null ? '—' : v}</div>
+                  <div style="font-size:11px;font-weight:700;color:#0f172a;margin-top:2px;font-family:ui-monospace,monospace;">${v == null ? '&mdash;' : v}</div>
                 </div>`).join('')}
             </div>
           </div>
@@ -790,7 +790,7 @@
       `;
     }
 
-    /* Build user P&L series: starts at (inception, 0), then strategy NAV ratio × invested */
+    /* Build user P&L series: starts at (inception, 0), then strategy NAV ratio &times; invested */
     function renderUserPnlChart(i) {
       const el = document.getElementById('userPnlChart'); if (!el) return;
       const navs = stratNavMap[i.userId] || [];
@@ -822,7 +822,7 @@
       });
     }
 
-    /* ─── Tab: Risk ─── */
+    /* âââ Tab: Risk âââ */
     function renderRiskTab(i) {
       const m = stratMetricsMap[i.userId] || {};
       const cards = [
@@ -838,7 +838,7 @@
           ${cards.map(([l, v, hint, suffix]) => `
             <div style="background:#fff;border-radius:10px;padding:16px 18px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);">
               <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">${l.toUpperCase()}</div>
-              <div style="font-size:24px;font-weight:700;color:${l==='Max Drawdown'?'#dc2626':(l==='Annualised Return'?pctClr(v):'#0f172a')};margin-top:4px;font-family:ui-monospace,monospace;">${v == null ? '—' : v + (suffix||'')}</div>
+              <div style="font-size:24px;font-weight:700;color:${l==='Max Drawdown'?'#dc2626':(l==='Annualised Return'?pctClr(v):'#0f172a')};margin-top:4px;font-family:ui-monospace,monospace;">${v == null ? '&mdash;' : v + (suffix||'')}</div>
               <div style="font-size:11px;color:#64748b;margin-top:6px;line-height:1.4;">${hint}</div>
             </div>`).join('')}
         </div>
@@ -870,7 +870,7 @@
       _charts.set(el, chart);
     }
 
-    /* ─── Tab: Allocations ─── */
+    /* âââ Tab: Allocations âââ */
     function renderAllocationsTab(i) {
       return `
         <div style="display:grid;grid-template-columns:1fr 360px;gap:14px;">
@@ -923,7 +923,7 @@
       });
     }
 
-    /* ─── Tab: Transactions ─── */
+    /* âââ Tab: Transactions âââ */
 
     /* Classify a transactions row by name + direction. Returns:
        { label, color, bg, sign } so the UI styles consistently. */
@@ -945,7 +945,7 @@
         return { label: 'FEE', color: '#b45309', bg: '#fef3c7', sign: '-', isOutflow: true };
       }
       if (/rebalance/i.test(name)) {
-        return { label: 'REBALANCE', color: '#0284c7', bg: '#e0f2fe', sign: '·', isOutflow: false };
+        return { label: 'REBALANCE', color: '#0284c7', bg: '#e0f2fe', sign: '&middot;', isOutflow: false };
       }
       if (/reversal|refund/i.test(name)) {
         return { label: 'REFUND', color: '#059669', bg: '#dcfce7', sign: '+', isOutflow: false };
@@ -963,7 +963,7 @@
       /* KPI summary across all this user's transactions. Fees are split by
          where the money actually goes: broker (EasyEquities), custodian (ISIN),
          and MINT's own revenue (the 3.8% txn fee). The 8% execution reserve is
-         tracked separately — it's the user's money, not a fee. */
+         tracked separately &mdash; it's the user's money, not a fee. */
       let totalDeposits = 0, totalWithdrawals = 0, totalInvested = 0;
       let feeBroker = 0, feeCustody = 0, feeMint = 0, bufferHeld = 0;
       for (const t of txns) {
@@ -1008,16 +1008,16 @@
           sale_refund:         { t: 'Sale refund', c: '#059669', bg: '#dcfce7' },
           partial_sale_refund: { t: 'Partial refund', c: '#059669', bg: '#dcfce7' },
         };
-        const m = map[type] || { t: type || '—', c: '#64748b', bg: '#f1f5f9' };
+        const m = map[type] || { t: type || '&mdash;', c: '#64748b', bg: '#f1f5f9' };
         return `<span style="font-size:10px;color:${m.c};background:${m.bg};padding:2px 7px;border-radius:10px;font-weight:600;">${m.t}</span>`;
       };
 
-      /* Buffer-events ledger section — admin-only; never shown to the user. */
+      /* Buffer-events ledger section &mdash; admin-only; never shown to the user. */
       const bufferEventsHtml = dds.length ? `
         <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);margin-bottom:14px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">EXECUTION RESERVE — BUFFER EVENTS (${dds.length})</div>
-            <div style="font-size:10px;color:#94a3b8;">Admin only · not shown to client</div>
+            <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">EXECUTION RESERVE &mdash; BUFFER EVENTS (${dds.length})</div>
+            <div style="font-size:10px;color:#94a3b8;">Admin only &middot; not shown to client</div>
           </div>
           <table class="ov-table">
             <thead><tr><th>Date</th><th>Transaction</th><th>Event</th><th class="r">Quoted</th><th class="r">Filled</th><th class="r">Qty</th><th class="r">Amount</th></tr></thead>
@@ -1028,14 +1028,14 @@
                 const delta = Number(d.delta_cents || 0) / 100;
                 const isRefund = /refund/.test(d.event_type || '');
                 const amtColor = d.event_type === 'shortfall' ? '#dc2626' : (isRefund ? '#059669' : '#0284c7');
-                const amtSign = isRefund ? '+' : '−';
+                const amtSign = isRefund ? '+' : '&minus;';
                 return `<tr>
                   <td>${fmtDate(d.created_at)}</td>
-                  <td style="color:#64748b;">${txnNameById[d.transaction_id] || (d.transaction_id ? d.transaction_id.slice(0,8) : '—')}</td>
+                  <td style="color:#64748b;">${txnNameById[d.transaction_id] || (d.transaction_id ? d.transaction_id.slice(0,8) : '&mdash;')}</td>
                   <td>${ddTypeChip(d.event_type)}</td>
-                  <td class="r ov-mono">${expR != null ? fmtR2(expR) : '—'}</td>
-                  <td class="r ov-mono">${actR != null ? fmtR2(actR) : '—'}</td>
-                  <td class="r ov-mono">${d.quantity != null ? d.quantity : '—'}</td>
+                  <td class="r ov-mono">${expR != null ? fmtR2(expR) : '&mdash;'}</td>
+                  <td class="r ov-mono">${actR != null ? fmtR2(actR) : '&mdash;'}</td>
+                  <td class="r ov-mono">${d.quantity != null ? d.quantity : '&mdash;'}</td>
                   <td class="r ov-mono" style="color:${amtColor};font-weight:600;">${amtSign}${fmtR2(delta)}</td>
                 </tr>`;
               }).join('')}
@@ -1058,8 +1058,8 @@
         <div style="background:#fff;border-radius:10px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);margin-bottom:14px;overflow:hidden;">
           <button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.chev').style.transform=this.nextElementSibling.style.display==='none'?'rotate(0deg)':'rotate(180deg)';"
             style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:14px;background:none;border:none;cursor:pointer;font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">
-            FEES — WHERE THE MONEY GOES
-            <span class="chev" style="transition:transform 0.2s;display:inline-block;">▾</span>
+            FEES &mdash; WHERE THE MONEY GOES
+            <span class="chev" style="transition:transform 0.2s;display:inline-block;">â¾</span>
           </button>
           <div style="display:none;padding:0 14px 14px;">
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
@@ -1073,7 +1073,7 @@
           <button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.chev').style.transform=this.nextElementSibling.style.display==='none'?'rotate(0deg)':'rotate(180deg)';"
             style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:14px;background:none;border:none;cursor:pointer;font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">
             EXECUTION RESERVE (8% BUFFER)
-            <span class="chev" style="transition:transform 0.2s;display:inline-block;">▾</span>
+            <span class="chev" style="transition:transform 0.2s;display:inline-block;">â¾</span>
           </button>
           <div style="display:none;padding:0 14px 14px;">
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
@@ -1082,7 +1082,7 @@
               ${kpi('Refunded', ddRefunded, '#059669')}
               ${kpi('Still locked', bufferRemaining, '#64748b')}
             </div>
-            ${ddShortfall > 0 ? `<div style="margin-top:10px;font-size:11px;color:#dc2626;font-weight:600;">⚠ Shortfall (slippage beyond buffer, absorbed by MINT): ${fmtR2(ddShortfall)}</div>` : ''}
+            ${ddShortfall > 0 ? `<div style="margin-top:10px;font-size:11px;color:#dc2626;font-weight:600;">â  Shortfall (slippage beyond buffer, absorbed by MINT): ${fmtR2(ddShortfall)}</div>` : ''}
           </div>
         </div>
         ${bufferEventsHtml}
@@ -1097,7 +1097,7 @@
                 /* For investment rows, render the fee breakdown inline so the
                    reviewer can see what went into the gross amount without
                    leaving the page. */
-                let breakdownHtml = '—';
+                let breakdownHtml = '&mdash;';
                 if (cls.label === 'INVESTMENT') {
                   const base = Number(t.base_amount_cents || 0) / 100;
                   const buffer = Number(t.buffer_cents || 0) / 100;
@@ -1117,9 +1117,9 @@
                 }
                 return `<tr>
                   <td>${fmtDate(t.transaction_date)}</td>
-                  <td style="color:#64748b;">${t.name || t.description || '—'}</td>
+                  <td style="color:#64748b;">${t.name || t.description || '&mdash;'}</td>
                   <td><span style="font-size:10px;color:${cls.color};background:${cls.bg};padding:2px 7px;border-radius:10px;font-weight:600;">${cls.label}</span></td>
-                  <td><span style="font-size:10px;color:#64748b;background:#f1f5f9;padding:2px 7px;border-radius:10px;">${t.status||'—'}</span></td>
+                  <td><span style="font-size:10px;color:#64748b;background:#f1f5f9;padding:2px 7px;border-radius:10px;">${t.status||'&mdash;'}</span></td>
                   <td class="r ov-mono" style="color:${cls.color};font-weight:600;">${cls.sign}${fmtR2(amt)}</td>
                   <td class="r">${breakdownHtml}</td>
                 </tr>`;
@@ -1130,7 +1130,7 @@
       `;
     }
 
-    /* ─── Init ─── */
+    /* âââ Init âââ */
     document.addEventListener('DOMContentLoaded', async () => {
       try {
         const { data: { session } } = await sb.auth.getSession();
@@ -1153,7 +1153,7 @@
         document.getElementById('investorSearch').oninput = () => renderList(allInvestors);
         sf.onchange = () => renderList(allInvestors);
 
-        /* Realtime + interval refresh — debounced + in-flight guarded to avoid request storms */
+        /* Realtime + interval refresh &mdash; debounced + in-flight guarded to avoid request storms */
         let _refreshTimer = null, _refreshInFlight = false, _refreshQueued = false;
         const doRefresh = async () => {
           if (_refreshInFlight) { _refreshQueued = true; return; }
