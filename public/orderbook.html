@@ -2522,10 +2522,14 @@
         }
       }
 
-      const hBody = holdings.map((h) => `
+      const hBody = holdings.map((h) => {
+        const hRebBadge = h.rebalanceBatchId
+          ? ' <span style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;margin-left:3px;letter-spacing:.03em;">REB</span>'
+          : '';
+        return `
         <tr>
           <td>${escapeHtml(String(h.line))}</td>
-          <td>${escapeHtml(h.instrumentName || '-')}</td>
+          <td>${escapeHtml(h.instrumentName || '-')}${hRebBadge}</td>
           <td class="orderbook-cell-muted">${escapeHtml(h.ticker || '-')}</td>
           <td>${escapeHtml(h.side || '-')}</td>
           <td>${escapeHtml(String(h.totalQuantity ?? '-'))}</td>
@@ -2534,7 +2538,7 @@
           <td>${escapeHtml(asRandValue(h.marketValue))}</td>
           ${renderInitialPnlCell(h.unrealizedPnlNumber, h.unrealizedPnl)}${renderMintPnlCell(h)}
         </tr>
-      `).join('');
+      `; }).join('');
 
       return `
         <div class="orderbook-detail-title">Holdings under ${escapeHtml(row.strategyName || 'Strategy')}${titleSuffix}</div>
@@ -5116,6 +5120,11 @@
         const pendingBadge = isPending
           ? ' <span class="side-badge" style="background:#fef3c7;color:#92400e;font-size:9px;padding:1px 6px;border-radius:6px;margin-left:4px;">PENDING</span>'
           : '';
+        /* Rebalance-created settled holdings: show a teal badge so admins can
+           see at a glance which positions came from a rebalance vs an original buy. */
+        const rebalancedBadge = (!isPending && row.rebalanceBatchId && !row.isStrategy)
+          ? ' <span style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc;font-size:9px;font-weight:700;padding:1px 6px;border-radius:6px;margin-left:4px;letter-spacing:.03em;">REBALANCED</span>'
+          : '';
         const settlementOptions = (row.settlementAccountOptions || []).map((option) => {
           const isSelected = option === row.settlementAccount ? ' selected' : '';
           return `<option value="${escapeHtml(option)}"${isSelected}>${escapeHtml(option)}</option>`;
@@ -5188,7 +5197,7 @@
           <tr class="orderbook-main-row${isPending ? ' orderbook-pending-row' : ''}" data-orderbook-main-row data-line-key="${lineKey}">
             <td style="white-space:nowrap;">${actionsHtml}</td>
             <td>${escapeHtml(String(row.line ?? '-'))}</td>
-            <td>${escapeHtml(row.instrumentName || '-')}${strategyTag}${pendingBadge}</td>
+            <td>${escapeHtml(row.instrumentName || '-')}${strategyTag}${pendingBadge}${rebalancedBadge}</td>
             <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
             <td><span class="side-badge ${sideClass}">${escapeHtml(sideValue || '-')}</span></td>
             <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
@@ -5642,11 +5651,11 @@
         const side = String(row.tradeSide || row.side || '').toUpperCase();
         const reason = String(row.closedReason || '').toUpperCase();
 
-        // Rows linked to a rebalance batch should NOT appear in the regular
-        // orderbook &mdash; they are already represented by the "Rebalance &mdash;" entry
-        // in Closed Books.  Only PENDING rebalance rows (handled above) belong
-        // in the live view.
-        if (row.rebalanceBatchId) return false;
+        // Settled rebalance holdings (active BUY rows with rebalance_batch_id)
+        // DO belong in the live orderbook — they are real current positions.
+        // They get a "Rebalanced" badge in the render so they're visually distinct
+        // from original purchases. Only hide the inactive side (the sold shares
+        // are already captured by the SELL audit row and the Rebalances tab).
 
         if (isActive) return true;
         if (side === 'SELL') return true;
@@ -6132,6 +6141,11 @@
               ? perUserFillCents[uid]
               : defaultFillCents;
 
+            /* Expected_fill = committed price in rands (price_at_commit is cents).
+               This is the price the admin locked in at execution time — the best
+               proxy for "what price was shown" on a rebalance buy, so PnL cost
+               basis works correctly just like a regular purchase. */
+            const expectedFillRands = evt.price_at_commit ? Number(evt.price_at_commit) / 100 : null;
             const { data: insertedBuy, error: buyInsertErr } = await supabaseClient
               .from('stock_holdings_c')
               .insert({
@@ -6143,6 +6157,7 @@
                 trade_side: 'BUY',
                 is_active: true,
                 avg_fill: fillCentsForUser,
+                "Expected_fill": expectedFillRands,
                 "Fill_date": fillDateStr,
                 rebalance_batch_id: batch.id,
                 strategy_name_snapshot: batch.strategy_name_snapshot,
