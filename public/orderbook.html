@@ -2225,14 +2225,41 @@
         // buy gets its own transaction_id and shows as a separate investor
         // row. Fall back to (user_id|family_member|minute bucket) for legacy
         // rows without transaction_id.
+        // Rebalance-created holdings (rebalanceBatchId set) are position swaps,
+        // not new investments. Merge them into the existing entry for that owner
+        // rather than creating a second row at the rebalance timestamp.
         const minuteBucket = (iso) => String(iso || '').slice(0, 16); // YYYY-MM-DDTHH:mm
         const userMap = new Map();
-        (rawRows || []).filter((r) => r.strategyId === strategyId).forEach((r) => {
-          if (!r.userId) return;
+        // ownerKey -> first non-rebalance map key seen for that owner
+        const ownerFirstKey = new Map();
+
+        const stratRows = (rawRows || []).filter((r) => r.strategyId === strategyId);
+        // First pass: index non-rebalance rows so their key is known before
+        // rebalance rows try to look it up.
+        stratRows.forEach((r) => {
+          if (!r.userId || r.rebalanceBatchId) return;
           const bucket = minuteBucket(r.createdAt);
           const txnPart = r.transactionId ? `t:${r.transactionId}` : `m:${bucket}`;
           const key = `${r.userId}|${r.familyMemberId || ''}|${txnPart}`;
+          const ownerKey = `${r.userId}|${r.familyMemberId || ''}`;
+          if (!ownerFirstKey.has(ownerKey)) ownerFirstKey.set(ownerKey, key);
+        });
+
+        stratRows.forEach((r) => {
+          if (!r.userId) return;
+          const ownerKey = `${r.userId}|${r.familyMemberId || ''}`;
+          let key;
+          if (r.rebalanceBatchId && ownerFirstKey.has(ownerKey)) {
+            // Merge into the owner's original purchase row, not a new bucket.
+            key = ownerFirstKey.get(ownerKey);
+          } else {
+            const bucket = minuteBucket(r.createdAt);
+            const txnPart = r.transactionId ? `t:${r.transactionId}` : `m:${bucket}`;
+            key = `${r.userId}|${r.familyMemberId || ''}|${txnPart}`;
+            if (!ownerFirstKey.has(ownerKey)) ownerFirstKey.set(ownerKey, key);
+          }
           if (!userMap.has(key)) {
+            const bucket = minuteBucket(r.createdAt);
             userMap.set(key, {
               userId: r.userId,
               familyMemberId: r.familyMemberId || null,
@@ -2252,8 +2279,8 @@
           u.holdingsCount += 1;
           if (r.sourceId) u.sourceIds.push(String(r.sourceId));
           if (r.securityId) u.securityIds.push(String(r.securityId));
-          // Widen the timestamp window slightly so range filters still catch
-          // every holding row from this buy event (clock skew, fan-out delay).
+          // Widen the timestamp window so range filters catch every holding
+          // row from this buy event (clock skew, fan-out delay, rebalance rows).
           if (r.createdAt) {
             if (!u.createdAtFrom || r.createdAt < u.createdAtFrom) u.createdAtFrom = r.createdAt;
             if (!u.createdAtTo   || r.createdAt > u.createdAtTo)   u.createdAtTo   = r.createdAt;
