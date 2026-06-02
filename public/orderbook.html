@@ -5250,7 +5250,7 @@
           .order('updated_at', { ascending: false }),
         supabaseClient
           .from('rebalance_event')
-          .select('id, batch_id, user_id, security_id, trade_side, quantity, price_at_commit, avg_fill, fill_date, closed_reason, strategy_name_snapshot, settled_holding_id, created_at, updated_at')
+          .select('id, batch_id, user_id, family_member_id, security_id, trade_side, quantity, price_at_commit, avg_fill, fill_date, closed_reason, strategy_name_snapshot, settled_holding_id, created_at, updated_at')
           .order('created_at', { ascending: false }),
         supabaseClient
           .from('rebalance_batch')
@@ -5884,7 +5884,7 @@
           const [batchResult, eventsResult] = await Promise.all([
             supabaseClient.from('rebalance_batch').select('*').eq('id', batchId).single(),
             supabaseClient.from('rebalance_event')
-              .select('id, batch_id, user_id, security_id, trade_side, quantity, price_at_commit, avg_fill, fill_date, closed_reason, strategy_name_snapshot, settled_holding_id')
+              .select('id, batch_id, user_id, family_member_id, security_id, trade_side, quantity, price_at_commit, avg_fill, fill_date, closed_reason, strategy_name_snapshot, settled_holding_id')
               .eq('batch_id', batchId),
           ]);
           if (batchResult.error) throw new Error(batchResult.error.message);
