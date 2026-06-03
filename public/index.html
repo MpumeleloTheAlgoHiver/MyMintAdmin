@@ -9734,6 +9734,9 @@
           fullName
         ]),
         accountType: valueFrom([
+          parsedSumsubRaw?.bank_details?.bank_account_type,
+          parsedSumsubRaw?.bank_details?.account_type,
+          parsedSumsubRaw?.bank_details?.type,
           onboardingRow?.bank_account_type,
           profile?.bank_account_type,
           onboardingRow?.account_type,
