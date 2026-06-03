@@ -422,7 +422,7 @@ module.exports = async (req, res) => {
       const beforeRows = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}&limit=1`);
       const before = beforeRows && beforeRows[0];
 
-      const safeRole = role === 'superadmin' ? 'superadmin' : role === 'admin' ? 'admin' : 'staff';
+      const safeRole = role === 'admin' ? 'admin' : 'staff';
       const safePages = safeRole === 'admin' ? [] : (Array.isArray(page_access) ? page_access : []);
       const [updated] = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}`, {
         method: 'PATCH',
