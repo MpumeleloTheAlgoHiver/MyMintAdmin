@@ -9724,8 +9724,24 @@
         bankAccountNumber: valueFrom([onboardingRow?.bank_account_number, profile?.bank_account_number, profile?.bank_account]),
         branchNumber: valueFrom([onboardingRow?.bank_branch_code, onboardingRow?.branch_code, profile?.branch_number]),
         bankName: valueFrom([onboardingRow?.bank_name, profile?.bank_name]),
-        bankAccountName: valueFrom([onboardingRow?.bank_account_name, profile?.bank_account_name, onboardingRow?.bank_account_type, profile?.bank_account_type]),
-        accountType: valueFrom([onboardingRow?.bank_account_type, profile?.bank_account_type]),
+        bankAccountName: valueFrom([
+          onboardingRow?.bank_account_name,
+          profile?.bank_account_name,
+          parsedSumsubRaw?.mandate_data?.bank_account_name,
+          parsedSumsubRaw?.mandate_data?.account_name,
+          parsedSumsubRaw?.mandate_data?.account_holder_name,
+          pickPackValue(parsedPack, ['bankAccountName', 'bank_account_name', 'accountName', 'account_name', 'info.bankAccountName', 'info.accountName']),
+          fullName
+        ]),
+        accountType: valueFrom([
+          onboardingRow?.bank_account_type,
+          profile?.bank_account_type,
+          onboardingRow?.account_type,
+          profile?.account_type,
+          parsedSumsubRaw?.mandate_data?.bank_account_type,
+          parsedSumsubRaw?.mandate_data?.account_type,
+          pickPackValue(parsedPack, ['bankAccountType', 'bank_account_type', 'accountType', 'account_type', 'info.bankAccountType', 'info.accountType'])
+        ]),
         safeBase: sanitizeFilename([firstName, lastName].filter(Boolean).join('_') || profile?.id || 'client') || 'client'
       };
     };
