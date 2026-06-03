@@ -21,11 +21,11 @@
       .sidebar-brand-sub{font-size:10px;color:#8e8e93;font-weight:500;letter-spacing:.04em;text-transform:uppercase;}
       .sidebar-nav{flex:1;display:flex;flex-direction:column;gap:2px;padding:14px 12px;overflow-y:auto;}
       .sidebar-section-label{font-size:10px;font-weight:600;color:#8e8e93;letter-spacing:.07em;text-transform:uppercase;padding:8px 8px 4px;margin-top:6px;}
-      .nav-icon{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;text-decoration:none;color:#3c3c43;font-size:13px;font-weight:500;}
-      .nav-icon svg{width:18px;height:18px;fill:#8e8e93;}
-      .nav-icon:hover{background:#f2f2f7;color:#1c1c1e;}
-      .nav-icon:hover svg{fill:#3c3c43;}
-      .nav-icon.active{background:#e8e0fd;color:#5e35b1;}
+      .nav-icon{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;text-decoration:none;color:#64748b;font-size:13px;font-weight:500;transition:all 0.15s ease;white-space:nowrap;}
+      .nav-icon svg{width:18px;height:18px;fill:#94a3b8;transition:fill 0.15s ease;flex-shrink:0;}
+      .nav-icon:hover{background:#f5f3ff;color:#5b21b6;}
+      .nav-icon:hover svg{fill:#7c3aed;}
+      .nav-icon.active{background:#ede9fe;color:#5b21b6;font-weight:600;}
       .nav-icon.active svg{fill:#7c3aed;}
       .sidebar-footer{border-top:1px solid #f2f2f7;padding:12px;}
       .sidebar-user{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;margin-bottom:4px;}
@@ -94,6 +94,9 @@
       .client-name{font-size:13px;font-weight:600;color:#1c1c1e;}
       .client-strategy{font-size:11px;color:#8e8e93;}
       .client-empty,.client-loading{text-align:center;font-size:12px;color:#8e8e93;padding:28px 12px;}
+      .client-tabs{display:flex;gap:4px;padding:0 12px 8px;flex-shrink:0;}
+      .client-tab{flex:1;padding:7px 0;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;background:#f2f2f7;color:#8e8e93;transition:all .15s;}
+      .client-tab.active{background:#ede9fe;color:#7c3aed;}
       /* ── Profile ── */
       .client-profile-view{display:flex;flex-direction:column;height:100%;overflow:hidden;}
       .cp-header{flex-shrink:0;min-height:188px;background:linear-gradient(180deg,#0d0b1a 0%,#2c1a57 18%,#6b3ea6 36%,#c088e0 52%,#e8c9f0 64%,#f6eefa 74%,#f8f6fa 100%);padding:10px 14px 16px;}
@@ -116,6 +119,34 @@
       .cp-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
       .cp-pnl-pos{color:#34c759;} .cp-pnl-neg{color:#ff3b30;} .cp-muted{color:#8e8e93;}
       .cp-pending{font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border-radius:5px;padding:2px 6px;text-transform:uppercase;}
+      /* ── Client launch card (replaces iframe) ── */
+      .impersonation-panel{display:flex;flex-direction:column;height:100%;background:#f8f6fa;align-items:center;justify-content:center;padding:20px;}
+      .client-launch-card{width:100%;background:#fff;border-radius:18px;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden;display:flex;flex-direction:column;align-items:center;padding:24px 20px 20px;}
+      .clc-avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;margin-bottom:12px;}
+      .clc-name{font-size:15px;font-weight:700;color:#1c1c1e;text-align:center;margin-bottom:2px;}
+      .clc-email{font-size:11px;color:#8e8e93;text-align:center;margin-bottom:16px;word-break:break-all;}
+      .clc-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;margin-bottom:18px;}
+      .clc-stat{background:#f8f6fa;border-radius:10px;padding:9px 12px;}
+      .clc-stat .k{font-size:9px;color:#8e8e93;font-weight:700;text-transform:uppercase;letter-spacing:.06em;}
+      .clc-stat .v{font-size:13px;font-weight:700;color:#1c1c1e;margin-top:2px;}
+      .clc-open-btn{width:100%;border:none;border-radius:12px;background:#7c3aed;color:#fff;font-size:13px;font-weight:700;padding:13px 16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .15s;}
+      .clc-open-btn:hover{background:#6d28d9;}
+      .clc-open-btn:disabled{background:#c4b5fd;cursor:not-allowed;}
+      .clc-open-btn svg{flex-shrink:0;}
+      .clc-env-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:4px 9px;border-radius:20px;margin-bottom:14px;}
+      .clc-env-badge.dev{background:#ede9fe;color:#6d28d9;}
+      .clc-env-badge.live{background:#dcfce7;color:#15803d;}
+      .clc-loading{display:flex;flex-direction:column;align-items:center;gap:12px;color:#3c3c43;font-size:13px;font-weight:600;}
+      .clc-loading .spinner{width:30px;height:30px;border:3px solid #e5e5ea;border-top-color:#7c3aed;border-radius:50%;animation:spin .9s linear infinite;}
+      .clc-error{color:#ff3b30;font-size:12px;font-weight:600;text-align:center;line-height:1.4;padding:4px 0;}
+      .impersonation-loading{display:none;}
+      @keyframes spin{to{transform:rotate(360deg);}}
+      .env-toggle{display:inline-flex;border:1px solid #e5e5ea;border-radius:8px;overflow:hidden;background:#fff;}
+      .env-toggle button{border:none;background:none;padding:6px 12px;font-size:12px;font-weight:600;color:#3c3c43;cursor:pointer;}
+      .env-toggle button.active{background:#7c3aed;color:#fff;}
+      .env-toggle button:disabled{opacity:.4;cursor:not-allowed;}
+      .exit-btn{display:inline-flex;align-items:center;gap:6px;border:none;background:#fff1f0;color:#ff3b30;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}
+      .exit-btn:hover{background:#ffe1de;}
       /* ── Inspector ── */
       .inspector{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:18px;padding:18px;position:sticky;top:76px;}
       .inspector-title{font-size:15px;font-weight:700;color:#1c1c1e;margin-bottom:4px;}
@@ -140,6 +171,7 @@
       <nav class="sidebar-nav">
         <span class="sidebar-section-label">Main</span>
         <a class="nav-icon" href="/index.html"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>Clients</a>
+                <a class="nav-icon" href="/studio.html"><svg viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>Client View Studio</a>
         <span class="sidebar-section-label">Investments</span>
         <a class="nav-icon" href="/dashboard.html"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>Dashboard</a>
         <a class="nav-icon" href="/strategies.html"><svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zm0 11h7v7H3zm11-11h7v7h-7zm0 11h7v7h-7z"/></svg>Strategies</a>
@@ -181,9 +213,9 @@
         <!-- ─── Landing: iOS grouped settings ─── -->
         <div id="settingsLanding" class="view visible">
 
-          <div class="settings-section-label">Studio</div>
-          <div class="settings-group">
-            <div class="settings-row" id="openClientStudioBtn">
+          <div class="settings-section-label" id="studioSectionLabel" style="display:none;">Studio</div>
+          <div class="settings-group" id="studioSectionGroup" style="display:none;">
+            <a class="settings-row" href="/studio.html" style="text-decoration:none;color:inherit;" id="openClientStudioBtn">
               <div class="row-icon" style="background:#e8e0fd;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01"/></svg>
               </div>
@@ -192,7 +224,7 @@
                 <div class="row-sub">Preview the app as any client</div>
               </div>
               <span class="row-chevron">›</span>
-            </div>
+            </a>
           </div>
 
           <div class="settings-section-label">Appearance</div>
@@ -267,97 +299,6 @@
           <div style="height:40px;"></div>
         </div>
 
-        <!-- ─── Client View Studio ─── -->
-        <div id="clientStudio" class="view hidden" style="max-width:1100px;">
-          <div class="studio-toolbar">
-            <button class="back-btn" id="backToSettingsBtn">
-              <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
-              Settings
-            </button>
-            <div class="toolbar-title">Client View Studio</div>
-            <label class="toggle-wrap">
-              <input id="frameToggle" type="checkbox" checked>
-              Phone frame
-            </label>
-          </div>
-
-          <div class="studio-grid">
-            <div class="preview-stage" id="previewStage">
-              <div class="phone-shell">
-                <div class="phone-screen">
-                  <div class="phone-notch"></div>
-                  <div class="phone-screens-wrap">
-                    <div class="phone-panels" id="phonePanels">
-                      <!-- List panel -->
-                      <div class="phone-panel">
-                        <div class="client-list-view">
-                          <div class="client-list-head">
-                            <h3>Clients</h3>
-                            <span id="clientCountBadge" class="client-count">…</span>
-                          </div>
-                          <input id="clientSearch" class="client-search" type="text" placeholder="Search…" />
-                          <div id="clientScrollArea" class="client-scroll">
-                            <div id="clientListLoading" class="client-loading">Loading clients…</div>
-                          </div>
-                        </div>
-                      </div>
-                      <!-- Profile panel -->
-                      <div class="phone-panel">
-                        <div class="client-profile-view">
-                          <div class="cp-header">
-                            <div class="cp-top">
-                              <button id="profileBackBtn" class="cp-back">‹</button>
-                              <div class="cp-title">Client Preview</div>
-                              <div style="width:28px;"></div>
-                            </div>
-                            <div id="cpAvatar" class="cp-avatar">—</div>
-                            <div id="cpName" class="cp-name">—</div>
-                            <div id="cpEmail" class="cp-email">—</div>
-                            <div class="cp-balance">
-                              <div class="label">Portfolio Value</div>
-                              <div id="cpBalance" class="val">R0.00</div>
-                              <div id="cpChange" class="delta"></div>
-                            </div>
-                          </div>
-                          <div class="cp-body">
-                            <div class="cp-section">
-                              <div class="cp-section-head"><h4>Holdings</h4><span id="cpHoldingsCount"></span></div>
-                              <div id="cpHoldingsList"></div>
-                            </div>
-                            <div class="cp-section">
-                              <div class="cp-section-head"><h4>Strategies</h4><span id="cpStrategiesCount"></span></div>
-                              <div id="cpStrategiesList"></div>
-                            </div>
-                            <div class="cp-section">
-                              <div class="cp-section-head"><h4>Recent Activity</h4></div>
-                              <div id="cpTransactionsList"></div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <aside class="inspector">
-              <div class="inspector-title">Client Breakdown</div>
-              <p class="inspector-note" id="inspectorHint">Select a client to load their full profile and data breakdown.</p>
-              <div class="inspector-grid">
-                <div class="metric"><div class="k">Client</div><div class="v" id="mClient">—</div></div>
-                <div class="metric"><div class="k">Portfolio</div><div class="v" id="mPortfolio">—</div></div>
-                <div class="metric"><div class="k">P&amp;L</div><div class="v" id="mPnl">—</div></div>
-                <div class="metric"><div class="k">Strategies</div><div class="v" id="mStrategies">—</div></div>
-              </div>
-              <div class="inspector-section-label">Top Holdings</div>
-              <div id="inspectorHoldings" class="inspector-list"><div class="placeholder">No client selected</div></div>
-              <div class="inspector-section-label">Recent Transactions</div>
-              <div id="inspectorTransactions" class="inspector-list"><div class="placeholder">No client selected</div></div>
-            </aside>
-          </div>
-        </div>
-
       </div>
     </main>
 
@@ -366,12 +307,6 @@
       const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
       const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-      const settingsLanding = document.getElementById('settingsLanding');
-      const clientStudio    = document.getElementById('clientStudio');
-      const previewStage    = document.getElementById('previewStage');
-      const phonePanels     = document.getElementById('phonePanels');
-      let allClients = [];
 
       (async () => {
         const { data: { session } } = await supabaseClient.auth.getSession();
@@ -383,15 +318,6 @@
         document.querySelector('html').style.opacity = '1';
       })();
 
-      function showView(show, hide) {
-        hide.classList.remove('visible'); hide.classList.add('hidden');
-        show.classList.remove('hidden'); show.classList.add('visible');
-      }
-
-      function showPhonePanel(panel) {
-        phonePanels.classList.toggle('show-profile', panel === 'profile');
-      }
-
       async function signOut() {
         await supabaseClient.auth.signOut();
         window.location.href = '/signin.html';
@@ -399,165 +325,19 @@
 
       document.getElementById('signOutBtn').addEventListener('click', signOut);
       document.getElementById('logoutRow').addEventListener('click', signOut);
-
-      document.getElementById('openClientStudioBtn').addEventListener('click', async () => {
-        showView(clientStudio, settingsLanding);
-        document.getElementById('topBarTitle').textContent = 'Client View Studio';
-        showPhonePanel('list');
-        await loadClientsInStrategies();
-      });
-
-      document.getElementById('backToSettingsBtn').addEventListener('click', () => {
-        showView(settingsLanding, clientStudio);
-        document.getElementById('topBarTitle').textContent = 'Settings';
-      });
-
-      document.getElementById('frameToggle').addEventListener('change', e => {
-        previewStage.classList.toggle('frame-off', !e.target.checked);
-      });
-
-      document.getElementById('profileBackBtn').addEventListener('click', () => showPhonePanel('list'));
-
-      async function loadClientsInStrategies() {
-        const loading    = document.getElementById('clientListLoading');
-        const countBadge = document.getElementById('clientCountBadge');
-        const scrollArea = document.getElementById('clientScrollArea');
-        loading.style.display = 'block';
-        countBadge.textContent = '…';
-        try {
-          const { data: holdings, error: holdingsErr } = await supabaseClient
-            .from('stock_holdings_c').select('user_id,strategy_id').eq('is_active',true).eq('trade_side','BUY');
-          if (holdingsErr) throw holdingsErr;
-          const userIds     = [...new Set((holdings||[]).map(h=>h.user_id).filter(Boolean))];
-          const strategyIds = [...new Set((holdings||[]).map(h=>h.strategy_id).filter(Boolean))];
-          if (!userIds.length) { loading.style.display='none'; countBadge.textContent='0'; scrollArea.innerHTML='<div class="client-empty">No clients found.</div>'; return; }
-          const { data: strategies } = await supabaseClient.from('strategies_c').select('id,name,short_name').in('id',strategyIds);
-          const stratMap = {};
-          (strategies||[]).forEach(s=>{ stratMap[s.id]=s.name||s.short_name||'Strategy'; });
-          const userStrategies = {};
-          (holdings||[]).forEach(h=>{ if(!userStrategies[h.user_id]) userStrategies[h.user_id]=new Set(); userStrategies[h.user_id].add(stratMap[h.strategy_id]||'Strategy'); });
-          const profileResults=[];
-          for(let i=0;i<userIds.length;i+=50){
-            const {data:p}=await supabaseClient.from('profiles').select('id,first_name,last_name,email').in('id',userIds.slice(i,i+50));
-            if(p) profileResults.push(...p);
-          }
-          allClients = profileResults.map(p=>{
-            const strats=[...(userStrategies[p.id]||new Set())];
-            const name=[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email||'Unknown';
-            const initials=name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
-            return {id:p.id,name,initials,email:p.email||'',strategyLabel:strats.join(', ')};
-          }).sort((a,b)=>a.name.localeCompare(b.name));
-          countBadge.textContent = allClients.length;
-          loading.style.display='none';
-          renderClientList(allClients);
-        } catch(err) {
-          loading.style.display='none'; countBadge.textContent='Err';
-          scrollArea.innerHTML=`<div class="client-empty">Error: ${escapeHtml(err.message||'Unknown')}</div>`;
-        }
-      }
-
-      function renderClientList(clients) {
-        const scrollArea = document.getElementById('clientScrollArea');
-        if(!clients.length){ scrollArea.innerHTML='<div class="client-empty">No clients match.</div>'; return; }
-        scrollArea.innerHTML = clients.map(c=>`
-          <div class="client-card" data-client-id="${c.id}">
-            <div class="client-avatar">${escapeHtml(c.initials)}</div>
-            <div style="flex:1;min-width:0;"><div class="client-name">${escapeHtml(c.name)}</div><div class="client-strategy">${escapeHtml(c.strategyLabel)}</div></div>
-            <span style="color:#c7c7cc;font-size:15px;">›</span>
-          </div>`).join('');
-      }
-
-      document.getElementById('clientSearch').addEventListener('input',e=>{
-        const q=(e.target.value||'').toLowerCase().trim();
-        if(!q){renderClientList(allClients);return;}
-        renderClientList(allClients.filter(c=>c.name.toLowerCase().includes(q)||c.email.toLowerCase().includes(q)||c.strategyLabel.toLowerCase().includes(q)));
-      });
-
-      document.getElementById('clientScrollArea').addEventListener('click',e=>{
-        const card=e.target.closest('.client-card'); if(!card) return;
-        const client=allClients.find(c=>c.id===card.dataset.clientId); if(client) loadClientProfile(client);
-      });
-
-      async function loadClientProfile(client) {
-        showPhonePanel('profile');
-        document.getElementById('cpAvatar').textContent=client.initials;
-        document.getElementById('cpName').textContent=client.name;
-        document.getElementById('cpEmail').textContent=client.email;
-        document.getElementById('cpBalance').textContent='Loading…';
-        document.getElementById('cpChange').textContent='';
-        document.getElementById('cpHoldingsList').innerHTML='<div class="client-loading">Loading…</div>';
-        document.getElementById('cpStrategiesList').innerHTML='<div class="client-loading">Loading…</div>';
-        document.getElementById('cpTransactionsList').innerHTML='<div class="client-loading">Loading…</div>';
-        try {
-          const [hr, tr] = await Promise.all([
-            supabaseClient.from('stock_holdings_c').select('id,security_id,quantity,avg_fill,strategy_id,Status,trade_side,is_active').eq('user_id',client.id).eq('Status','active').eq('is_active',true).eq('trade_side','BUY'),
-            supabaseClient.from('transactions').select('id,name,description,amount,direction,status,transaction_date,created_at').eq('user_id',client.id).order('created_at',{ascending:false}).limit(6),
-          ]);
-          const holdings=hr.data||[], transactions=tr.data||[];
-          const secIds=[...new Set(holdings.map(h=>h.security_id).filter(Boolean))];
-          const strIds=[...new Set(holdings.map(h=>h.strategy_id).filter(Boolean))];
-          const secMap={}, strMap={};
-          if(secIds.length){ const {data:s}=await supabaseClient.from('securities_c').select('id,symbol,name,last_price,logo_url').in('id',secIds); (s||[]).forEach(x=>secMap[x.id]=x); }
-          if(strIds.length){ const {data:s}=await supabaseClient.from('strategies_c').select('id,name,short_name,risk_level').in('id',strIds); (s||[]).forEach(x=>strMap[x.id]=x); }
-          let tv=0,tc=0;
-          const fh=holdings.filter(h=>secMap[h.security_id]).map(h=>{
-            const sec=secMap[h.security_id],qty=Number(h.quantity||0),af=Number(h.avg_fill||0),ip=!af;
-            const lp=Number(sec.last_price||af),mv=(lp*qty),cb=(af*qty),pr=mv-cb,pp=cb>0?(pr/cb)*100:0;
-            if(!ip){tv+=mv;tc+=cb;}
-            return {symbol:sec.symbol,name:sec.name,logo:sec.logo_url||'',value:mv,pnlRands:pr,pnlPct:pp,isPending:ip,strategyId:h.strategy_id};
-          }).sort((a,b)=>b.value-a.value);
-          const sa={};
-          fh.forEach(h=>{ if(!h.strategyId) return; if(!sa[h.strategyId]) sa[h.strategyId]={value:0,count:0}; if(!h.isPending) sa[h.strategyId].value+=h.value; sa[h.strategyId].count+=1; });
-          const se=Object.entries(sa).map(([id,v])=>({id,strategy:strMap[id],value:v.value,count:v.count})).filter(s=>s.strategy).sort((a,b)=>b.value-a.value);
-          const tp=tv-tc,tpp=tc>0?(tp/tc)*100:0;
-          document.getElementById('cpBalance').textContent=`R${fmt(tv)}`;
-          document.getElementById('cpChange').textContent=tc>0?`${tp>=0?'+':''}R${fmt(Math.abs(tp))} (${tp>=0?'+':''}${tpp.toFixed(2)}%)`:'';
-          document.getElementById('cpHoldingsCount').textContent=fh.length;
-          document.getElementById('cpStrategiesCount').textContent=se.length;
-          document.getElementById('cpHoldingsList').innerHTML=fh.length?fh.map(h=>{
-            const cls=h.pnlRands>=0?'cp-pnl-pos':'cp-pnl-neg';
-            const logoHtml=h.logo?`<img src="${escapeHtml(h.logo)}" style="width:28px;height:28px;border-radius:8px;object-fit:cover;flex-shrink:0;border:1px solid #f2f2f7;" onerror="this.style.display='none'">`:`<div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#a855f7);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;">${escapeHtml((h.symbol||'?')[0])}</div>`;
-            return `<div class="cp-card"><div class="cp-row" style="align-items:center;">${logoHtml}<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">${escapeHtml(h.symbol)}${h.isPending?' <span class="cp-pending">Pending</span>':''}</div><div class="cp-muted" style="font-size:11px;">${escapeHtml(h.name)}</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:700;">R${fmt(h.value)}</div>${h.isPending?'<div class="cp-muted" style="font-size:11px;">Awaiting fill</div>':`<div class="${cls}" style="font-size:11px;font-weight:600;">${h.pnlRands>=0?'+':'-'}R${fmt(Math.abs(h.pnlRands))}</div>`}</div></div></div>`;
-          }).join(''):'<div class="client-empty">No active holdings</div>';
-          document.getElementById('cpStrategiesList').innerHTML=se.length?se.map(s=>`<div class="cp-card"><div style="font-size:13px;font-weight:700;">${escapeHtml(s.strategy.name||s.strategy.short_name)}</div><div class="cp-row" style="margin-top:4px;"><span class="cp-muted" style="font-size:11px;">${escapeHtml(s.strategy.risk_level||'Balanced')} · ${s.count} holding${s.count===1?'':'s'}</span><span style="font-size:12px;font-weight:700;">R${fmt(s.value)}</span></div></div>`).join(''):'<div class="client-empty">No strategies</div>';
-          document.getElementById('cpTransactionsList').innerHTML=transactions.length?transactions.map(t=>{
-            const a=Math.abs(Number(t.amount||0)/100),cr=t.direction==='credit';
-            return `<div class="cp-card"><div class="cp-row"><div><div style="font-size:12px;font-weight:700;">${escapeHtml(t.name||t.description||'Transaction')}</div><div class="cp-muted" style="font-size:10px;">${escapeHtml(fmtDate(t.transaction_date||t.created_at))}</div></div><div style="font-size:12px;font-weight:700;color:${cr?'#34c759':'#1c1c1e'};">${cr?'+':''}R${fmt(a)}</div></div></div>`;
-          }).join(''):'<div class="client-empty">No recent activity</div>';
-          renderInspector({client,totalValue:tv,totalPnl:tp,totalPnlPct:tpp,strategyCount:se.length,holdings:fh.slice(0,8),transactions});
-        } catch(err) {
-          document.getElementById('cpBalance').textContent='Error';
-          document.getElementById('cpHoldingsList').innerHTML=`<div class="client-empty">${escapeHtml(err.message||'Failed')}</div>`;
-        }
-      }
-
-      function renderInspector(s) {
-        document.getElementById('inspectorHint').textContent='Live data for '+s.client.name;
-        document.getElementById('mClient').textContent=s.client.name;
-        document.getElementById('mPortfolio').textContent=`R${fmt(s.totalValue)}`;
-        const pe=document.getElementById('mPnl');
-        pe.textContent=`${s.totalPnl>=0?'+':''}R${fmt(Math.abs(s.totalPnl))}`;
-        pe.style.color=s.totalPnl>=0?'#34c759':'#ff3b30';
-        document.getElementById('mStrategies').textContent=String(s.strategyCount);
-        document.getElementById('inspectorHoldings').innerHTML=s.holdings.length?s.holdings.map(h=>`<div class="inspector-item"><span>${escapeHtml(h.symbol)}${h.isPending?' · Pending':''}</span><span style="font-weight:700;">R${fmt(h.value)}</span></div>`).join(''):'<div class="placeholder">No holdings</div>';
-        document.getElementById('inspectorTransactions').innerHTML=(s.transactions||[]).length?s.transactions.map(t=>{
-          const a=Math.abs(Number(t.amount||0)/100),cr=t.direction==='credit';
-          return `<div class="inspector-item"><span>${escapeHtml(t.name||t.description||'Transaction')}</span><span style="font-weight:700;color:${cr?'#34c759':'#1c1c1e'};">${cr?'+':''}R${fmt(a)}</span></div>`;
-        }).join(''):'<div class="placeholder">No transactions</div>';
-      }
-
-      function escapeHtml(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-      function fmt(n){return Number(n||0).toLocaleString('en-ZA',{minimumFractionDigits:2,maximumFractionDigits:2});}
-      function fmtDate(d){if(!d)return'';const dt=new Date(d);if(isNaN(dt))return'';const diff=Math.floor((Date.now()-dt)/86400000);if(diff===0)return'Today';if(diff===1)return'Yesterday';if(diff<7)return`${diff}d ago`;return dt.toLocaleDateString('en-ZA',{day:'numeric',month:'short'});}
     </script>
   <script>
-    // Reveal Team links (sidebar + settings row) only for admins.
     window.addEventListener('access-guard:ready', function (e) {
-      if (e.detail && e.detail.role === 'admin') {
+      var isAdmin = !!(e.detail && e.detail.role === 'admin');
+      if (isAdmin) {
         var nav = document.getElementById('teamNavLink');
         if (nav) nav.style.display = '';
         var row = document.getElementById('settingsTeamRow');
         if (row) row.style.display = '';
+        var label = document.getElementById('studioSectionLabel');
+        if (label) label.style.display = '';
+        var group = document.getElementById('studioSectionGroup');
+        if (group) group.style.display = '';
       }
     });
   </script>

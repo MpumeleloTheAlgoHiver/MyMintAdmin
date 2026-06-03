@@ -13,6 +13,9 @@ channel = "stable-25_05"
 PORT = "5000"
 SUPABASE_URL = "https://mfxnghmuccevsxwcetej.supabase.co"
 ORDERBOOK_EMAIL_FROM = "noreply@mymint.co.za"
+MINT_APP_URL_DEV = "https://mint-development.vercel.app/"
+MINT_APP_URL_LIVE = "https://app.mymint.co.za/"
+
 
 [workflows]
 runButton = "Project"

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ï»¿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -1158,6 +1158,26 @@
       cursor: not-allowed;
     }
     .reverse-investor-btn svg { width: 14px; height: 14px; }
+    .investor-row { cursor: pointer; transition: background 0.12s ease; }
+    .investor-row:hover { background: #f5f3ff; }
+    .investor-row.selected { background: #ede9fe; box-shadow: inset 4px 0 0 #7c3aed; }
+    .investor-row.selected td { color: #5b21b6; font-weight: 600; }
+    .investor-detail-panel { background: linear-gradient(180deg,#faf5ff,#fff); border: 1px solid #ddd6fe; border-radius: 12px; padding: 14px 16px; margin-top: 12px; }
+    .investor-detail-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e9d5ff; }
+    .investor-detail-panel-title { font-size: 13px; font-weight: 700; color: #5b21b6; }
+    .investor-detail-panel-sub { font-size: 11px; color: #7c3aed; font-weight: 500; margin-top: 2px; }
+    .investor-detail-panel-close { background: none; border: none; color: #7c3aed; cursor: pointer; font-size: 12px; padding: 4px 8px; border-radius: 6px; }
+    .investor-detail-panel-close:hover { background: #ede9fe; }
+    .investor-detail-panel table { width: 100%; font-size: 11px; border-collapse: collapse; }
+    .investor-detail-panel th { text-align: left; padding: 6px 8px; font-weight: 500; color: #94a3b8; border-bottom: 1px solid #e9d5ff; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .investor-detail-panel td { padding: 6px 8px; color: #1e293b; border-bottom: 1px solid #f1f5f9; }
+    .investor-detail-panel td.r { text-align: right; font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+    .investor-detail-pnl-pos { color: #059669; font-weight: 600; }
+    .investor-detail-pnl-neg { color: #dc2626; font-weight: 600; }
+    .investor-detail-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+    .investor-detail-summary-card { background: rgba(255,255,255,0.7); border-radius: 8px; padding: 8px 10px; }
+    .investor-detail-summary-label { font-size: 9px; color: #94a3b8; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+    .investor-detail-summary-value { font-size: 13px; font-weight: 700; color: #0f172a; font-family: ui-monospace, monospace; margin-top: 2px; }
     .reverse-summary-block {
       background: #f8fafc;
       border: 1px solid #e2e8f0;
@@ -1236,7 +1256,7 @@
           <img src="/icon.png" style="width:26px;height:26px;border-radius:7px;flex-shrink:0;" />
           <div style="flex:1;min-width:0;">
             <div style="font-size:12px;font-weight:700;color:#0f172a;line-height:1.3;">Mint Hub</div>
-            <div style="font-size:10px;color:#7c3aed;font-weight:500;">Admin Portal · Active</div>
+            <div style="font-size:10px;color:#7c3aed;font-weight:500;">Admin Portal &middot; Active</div>
           </div>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
@@ -1346,7 +1366,8 @@
         Clients
       </a>
 
-      <span class="sidebar-section-label">Investments</span>
+              <a class="nav-icon" href="/studio.html"><svg viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>Client View Studio</a>
+        <span class="sidebar-section-label">Investments</span>
 
       <a class="nav-icon" href="/dashboard.html" aria-label="Dashboard">
         <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
@@ -1425,9 +1446,9 @@
         <button class="orderbook-tab-btn" id="strateBirTab" type="button" role="tab" aria-selected="false" aria-controls="strateBirPanel">Strate BIR</button>
         <div class="orderbook-tab-search">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13 11a5 5 0 10-1.41 1.41l3.54 3.55 1.41-1.42L13 11zm-5 1a4 4 0 110-8 4 4 0 010 8z"/></svg>
-          <input id="orderbookSearch" type="search" placeholder="Search instrument, ticker, side…" aria-label="Search orderbook">
+          <input id="orderbookSearch" type="search" placeholder="Search instrument, ticker, side&hellip;" aria-label="Search orderbook">
         </div>
-        <button id="cleanupModeBtn" class="orderbook-cleanup-btn" type="button" title="Cleanup mode — remove investors from snapshot JSON" aria-pressed="false" aria-label="Cleanup mode toggle"></button>
+        <button id="cleanupModeBtn" class="orderbook-cleanup-btn" type="button" title="Cleanup mode &mdash; remove investors from snapshot JSON" aria-pressed="false" aria-label="Cleanup mode toggle"></button>
       </div>
 
       <div class="orderbook-tab-panel active" id="activeBooksPanel" role="tabpanel" aria-labelledby="activeBooksTab">
@@ -1452,16 +1473,17 @@
                   <th>Side</th>
                   <th>Total QYT</th>
                   <th>Avg Fill</th>
-                  <th>Expected Fill</th>
+                  <th>Actual Fill</th>
+                  <th>Live Price</th>
                   <th>Order Type</th>
                   <th>Settlement Account</th>
                   <th>Broker Ref</th>
-                  <th>Initial PnL</th>
+                  <th>Client PnL</th><th>MINT PnL</th>
                 </tr>
               </thead>
               <tbody id="orderbookTableBody">
                 <tr>
-                  <td class="orderbook-empty-row" colspan="12">Loading orderbook...</td>
+                  <td class="orderbook-empty-row" colspan="14">Loading orderbook...</td>
                 </tr>
               </tbody>
             </table>
@@ -1587,8 +1609,23 @@
     let isCapturingFilledOrderbook = false;
     const FILLED_ARCHIVE_KEY = 'filled-orderbooks-archive-v1';
     const ARCHIVE_BACKFILL_KEY = 'orderbook-archive-backfill-v2';
+    const MANUALLY_CLOSED_BOOKS_KEY = 'orderbook-manually-closed-v1';
     let filledOrderbooksArchive = [];
     let holdingFillDateById = new Map();
+    /* Per-holding execution economics for the MINT PnL column, keyed by
+       stock_holdings_c id. Built once per load from the authoritative holdings
+       + the reconciled buffer ledger so every render path (main rows, strategy
+       parents, per-investor detail) sums the SAME cent-accurate figures and
+       never re-parses formatted strings (which broke under comma-decimal locales).
+         &bull; mintGainByHolding     = profit from filling BELOW the client's quote:
+                                    max(0, Expected_fill &minus; avg_fill) &times; qty (cents).
+                                    Present for every FILLED holding (even when 0).
+         &bull; mintBufferUsedByHolding = slippage the 8% reserve absorbed (cents) &mdash; MINT net 0.
+         &bull; mintShortfallByHolding  = slippage BEYOND the reserve (cents) &mdash; MINT real loss.
+       MINT PnL (row) = (ÃÂ£ gain &minus; ÃÂ£ shortfall) / 100. */
+    let mintGainByHolding = new Map();
+    let mintBufferUsedByHolding = new Map();
+    let mintShortfallByHolding = new Map();
     let strategyFillStateById = new Map();
     let showActiveBooksFilledColumn = false;
     let isArchiveBooksLoading = true;
@@ -1976,7 +2013,7 @@
                 <th>Client Name</th>
                 <th>ID / Reg No</th>
                 <th>Quantity</th>
-                <th>Expected Fill</th>
+                <th>Live Price</th>
                 <th>Order Timestamp</th>
                 <th>Instruction Type</th>
                 <th>Settlement Ref</th>
@@ -2013,9 +2050,16 @@
 
     const renderSnapshotBndDetailsTable = (snapshotRows, targetRow, parentSequence = null, options = {}) => {
       const allowReverse = options.allowReverse === true;
+      const cleanup = options.cleanup === true && options.bookId != null && options.rowIndex != null;
+      const cleanupBookId = options.bookId != null ? String(options.bookId) : '';
+      const cleanupRowIndex = options.rowIndex != null ? String(options.rowIndex) : '';
       const reverseHeader = allowReverse ? '<th class="reverse-investor-col" aria-label="Reverse"></th>' : '';
+      const deleteHeader = cleanup ? '<th class="cleanup-delete-col" aria-label="Remove"></th>' : '';
+      const buildDeleteCell = (row, idx) => cleanup
+        ? `<td class="cleanup-delete-col"><button type="button" class="cleanup-delete-btn" data-cleanup-delete data-book-id="${escapeHtml(cleanupBookId)}" data-row-index="${escapeHtml(cleanupRowIndex)}" data-bnd-row-index="${escapeHtml(String(idx))}" data-bnd-source-id="${escapeHtml(String(row.sourceId || ''))}" data-user-id="${escapeHtml(String(row.userId || ''))}" title="Remove this investor from this orderbook snapshot">&times;</button></td>`
+        : '';
       if (Array.isArray(targetRow?.bndRows) && targetRow.bndRows.length) {
-        const body = targetRow.bndRows.map((row) => `
+        const body = targetRow.bndRows.map((row, idx) => `
           <tr>
             <td>${escapeHtml(String(row.line ?? '-'))}</td>
             <td>${escapeHtml(row.clientAccountId || '-')}</td>
@@ -2028,6 +2072,7 @@
             <td>${escapeHtml(row.instructionType || 'Market')}</td>
             <td>${escapeHtml(row.settlementRef || '')}</td>
             ${allowReverse ? buildSnapshotReverseCell(row, allowReverse) : ''}
+            ${buildDeleteCell(row, idx)}
           </tr>
         `).join('');
 
@@ -2042,11 +2087,12 @@
                   <th>Client Name</th>
                   <th>ID / Reg No</th>
                   <th>Quantity</th>
-                  <th>Expected Fill</th>
+                  <th>Live Price</th>
                   <th>Order Timestamp</th>
                   <th>Instruction Type</th>
                   <th>Settlement Ref</th>
                   ${reverseHeader}
+                  ${deleteHeader}
                 </tr>
               </thead>
               <tbody>
@@ -2118,7 +2164,7 @@
                 <th>Client Name</th>
                 <th>ID / Reg No</th>
                 <th>Quantity</th>
-                <th>Expected Fill</th>
+                <th>Live Price</th>
                 <th>Order Timestamp</th>
                 <th>Instruction Type</th>
                 <th>Settlement Ref</th>
@@ -2149,15 +2195,39 @@
 
       const strategyParentRows = Array.from(strategyBuckets.entries()).map(([strategyId, holdings]) => {
         const first = holdings[0];
-        const totalMV = holdings.reduce((s, h) => s + (h.marketValueNumber || 0), 0);
-        const totalQty = holdings.reduce((s, h) => s + (h.quantityValue || 0), 0);
-        const totalPnl = holdings.reduce((s, h) => s + (h.unrealizedPnlNumber || 0), 0);
+        /* Totals count only LIVE positions: active rows that aren't the SELL audit
+           row. A rebalance SELL records shares that LEFT the portfolio, so it must
+           not inflate the strategy's value or quantity. It still stays in `holdings`
+           (strategyHoldings) so it shows in the detail table as a red sale record. */
+        const isLive = (h) => {
+          const sd = String(h.tradeSide || h.side || '').toUpperCase();
+          return h.isActive !== false && sd !== 'SELL';
+        };
+        const liveHoldings = holdings.filter(isLive);
+        const totalMV = liveHoldings.reduce((s, h) => s + (h.marketValueNumber || 0), 0);
+        const totalQty = liveHoldings.reduce((s, h) => s + (h.quantityValue || 0), 0);
+        const totalPnl = liveHoldings.reduce((s, h) => s + (h.unrealizedPnlNumber || 0), 0);
+        /* Strategy-level Actual Fill = ÃÂ£(Expected_fill &times; qty) across all
+           underlying securities, in rands. Skips holdings without an
+           Expected_fill so a single missing row doesn't zero the total. */
+        const totalActualFill = liveHoldings.reduce((s, h) => {
+          if (h.actualFillNumber == null || !Number.isFinite(h.actualFillNumber)) return s;
+          return s + (h.actualFillNumber * Math.abs(h.quantityValue || 0));
+        }, 0);
+        const hasActualFillTotal = totalActualFill > 0;
+        /* Strategy-level Avg Fill = ÃÂ£(avg_fill &times; qty) across all underlying
+           securities, in rands. Per-share weighted avg across mixed-price
+           securities is meaningless at the strategy level. */
+        let totalAvgFill = 0;
+        let hasAvgFillSum = false;
         let wSum = 0, wTot = 0;
-        holdings.forEach((h) => {
+        liveHoldings.forEach((h) => {
           if (h.avgFillNumber != null && Number.isFinite(h.avgFillNumber)) {
             const w = Math.abs(h.quantityValue) || 1;
             wSum += h.avgFillNumber * w;
             wTot += w;
+            totalAvgFill += h.avgFillNumber * Math.abs(h.quantityValue || 0);
+            hasAvgFillSum = true;
           }
         });
         const latestTs = holdings.reduce((l, h) => {
@@ -2165,13 +2235,46 @@
           return t > l ? t : l;
         }, 0);
 
-        // Key by (user_id|family_member_id) so a parent's own holdings and the
-        // holdings they bought for each child appear as separate investor rows.
+        // Key by transaction_id first &mdash; that's the authoritative purchase
+        // batch id. If a single investor buys the same strategy twice, each
+        // buy gets its own transaction_id and shows as a separate investor
+        // row. Fall back to (user_id|family_member|minute bucket) for legacy
+        // rows without transaction_id.
+        // Rebalance-created holdings (rebalanceBatchId set) are position swaps,
+        // not new investments. Merge them into the existing entry for that owner
+        // rather than creating a second row at the rebalance timestamp.
+        const minuteBucket = (iso) => String(iso || '').slice(0, 16); // YYYY-MM-DDTHH:mm
         const userMap = new Map();
-        (rawRows || []).filter((r) => r.strategyId === strategyId).forEach((r) => {
+        // ownerKey -> first non-rebalance map key seen for that owner
+        const ownerFirstKey = new Map();
+
+        const stratRows = (rawRows || []).filter((r) => r.strategyId === strategyId);
+        // First pass: index non-rebalance rows so their key is known before
+        // rebalance rows try to look it up.
+        stratRows.forEach((r) => {
+          if (!r.userId || r.rebalanceBatchId) return;
+          const bucket = minuteBucket(r.createdAt);
+          const txnPart = r.transactionId ? `t:${r.transactionId}` : `m:${bucket}`;
+          const key = `${r.userId}|${r.familyMemberId || ''}|${txnPart}`;
+          const ownerKey = `${r.userId}|${r.familyMemberId || ''}`;
+          if (!ownerFirstKey.has(ownerKey)) ownerFirstKey.set(ownerKey, key);
+        });
+
+        stratRows.forEach((r) => {
           if (!r.userId) return;
-          const key = `${r.userId}|${r.familyMemberId || ''}`;
+          const ownerKey = `${r.userId}|${r.familyMemberId || ''}`;
+          let key;
+          if (r.rebalanceBatchId && ownerFirstKey.has(ownerKey)) {
+            // Merge into the owner's original purchase row, not a new bucket.
+            key = ownerFirstKey.get(ownerKey);
+          } else {
+            const bucket = minuteBucket(r.createdAt);
+            const txnPart = r.transactionId ? `t:${r.transactionId}` : `m:${bucket}`;
+            key = `${r.userId}|${r.familyMemberId || ''}|${txnPart}`;
+            if (!ownerFirstKey.has(ownerKey)) ownerFirstKey.set(ownerKey, key);
+          }
           if (!userMap.has(key)) {
+            const bucket = minuteBucket(r.createdAt);
             userMap.set(key, {
               userId: r.userId,
               familyMemberId: r.familyMemberId || null,
@@ -2179,14 +2282,31 @@
               clientName: r.clientName,
               clientAccountId: r.clientAccountId, clientIdRegNo: r.clientIdRegNo,
               totalMarketValue: 0, holdingsCount: 0,
-              sourceIds: [], securityIds: []
+              sourceIds: [], securityIds: [],
+              transactionId: r.transactionId || null,
+              createdAtBucket: bucket,
+              createdAtFrom: r.createdAt,
+              createdAtTo: r.createdAt,
             });
           }
           const u = userMap.get(key);
-          u.totalMarketValue += r.marketValueNumber || 0;
-          u.holdingsCount += 1;
+          /* Only LIVE positions count toward the investor's value + holdings count.
+             The SELL audit row (inactive, side SELL) records shares that left the
+             portfolio — counting it would inflate Live Price and Holdings. */
+          const rSide = String(r.tradeSide || r.side || '').toUpperCase();
+          const rLive = r.isActive !== false && rSide !== 'SELL';
+          if (rLive) {
+            u.totalMarketValue += r.marketValueNumber || 0;
+            u.holdingsCount += 1;
+          }
           if (r.sourceId) u.sourceIds.push(String(r.sourceId));
           if (r.securityId) u.securityIds.push(String(r.securityId));
+          // Widen the timestamp window so range filters catch every holding
+          // row from this buy event (clock skew, fan-out delay, rebalance rows).
+          if (r.createdAt) {
+            if (!u.createdAtFrom || r.createdAt < u.createdAtFrom) u.createdAtFrom = r.createdAt;
+            if (!u.createdAtTo   || r.createdAt > u.createdAtTo)   u.createdAtTo   = r.createdAt;
+          }
         });
 
         const hasPendingRebalance = holdings.some((h) => !!h.isPendingRebalance);
@@ -2212,9 +2332,16 @@
           rebalanceBatchStatus: hasPendingRebalance ? 'PENDING' : null,
           quantityValue: totalQty,
           totalQuantity: totalQty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 }),
+          /* avgFillNumber stays as weighted-avg-per-share so any consumer
+             that needs a price still gets one; avgFill (display) is the SUM
+             in rands so the strategy row reads as a total alongside Actual Fill. */
           avgFillNumber: wTot > 0 ? (wSum / wTot) : null,
-          avgFill: wTot > 0
-            ? `R ${(wSum / wTot).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          avgFill: hasAvgFillSum
+            ? `R ${totalAvgFill.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : '-',
+          actualFillNumber: hasActualFillTotal ? totalActualFill : null,
+          actualFill: hasActualFillTotal
+            ? `R ${totalActualFill.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
             : '-',
           marketValueNumber: totalMV,
           marketValue: `R ${totalMV.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -2237,6 +2364,259 @@
         .map((row, i) => ({ ...row, line: i + 1 }));
     };
 
+    /* Selected investor in the per-user fill panel &mdash; keyed by `${userId}|${familyMemberId}` */
+    let selectedInvestorKey = null;
+
+    /* Walk allOrderbookRawRows to find the selected investor's individual
+       holdings under the strategy. Each user's avg_fill and PnL is preserved
+       per stock_holdings_c row in the raw rows. */
+    const collectInvestorHoldings = (strategyId, userId, familyMemberId) => {
+      if (!strategyId || !userId) return [];
+      const targetFm = familyMemberId || '';
+      return (allOrderbookRawRows || [])
+        .filter((r) => {
+          if (String(r.strategyId || '') !== String(strategyId)) return;
+          if (String(r.userId || '') !== String(userId)) return;
+          return String(r.familyMemberId || '') === String(targetFm);
+        })
+        .sort((a, b) => String(a.instrumentName || '').localeCompare(String(b.instrumentName || '')));
+    };
+
+    const renderInvestorDetailPanel = (strategyRow) => {
+      if (!selectedInvestorKey) return '';
+      const users = strategyRow?.strategyUsers || [];
+      const selected = users.find((u) => `${u.userId || ''}|${u.familyMemberId || ''}` === selectedInvestorKey);
+      if (!selected) return '';
+
+      const holdings = collectInvestorHoldings(strategyRow.strategyId, selected.userId, selected.familyMemberId);
+      const totalInvested = holdings.reduce((s, h) => s + ((Number(h.avgFillNumber || 0) * Math.abs(Number(h.quantityValue || 0))) || 0), 0);
+      const totalCurrent  = holdings.reduce((s, h) => s + (Number(h.marketValueNumber || 0)), 0);
+      const totalPnl = holdings.reduce((s, h) => s + (Number(h.unrealizedPnlNumber || 0)), 0);
+      const subtitle = selected.familyMemberRelationship
+        ? `${selected.clientName} (family member: ${selected.familyMemberRelationship}) &middot; ${holdings.length} position${holdings.length !== 1 ? 's' : ''}`
+        : `${selected.clientName} &middot; ${holdings.length} position${holdings.length !== 1 ? 's' : ''}`;
+
+      const pnlClass = totalPnl > 0 ? 'investor-detail-pnl-pos' : totalPnl < 0 ? 'investor-detail-pnl-neg' : '';
+      const summaryHtml = `
+        <div class="investor-detail-summary">
+          <div class="investor-detail-summary-card">
+            <div class="investor-detail-summary-label">Account</div>
+            <div class="investor-detail-summary-value" style="font-size:11px;">${escapeHtml(selected.clientAccountId || '-')}</div>
+          </div>
+          <div class="investor-detail-summary-card">
+            <div class="investor-detail-summary-label">Invested</div>
+            <div class="investor-detail-summary-value">${escapeHtml(formatMoney(totalInvested))}</div>
+          </div>
+          <div class="investor-detail-summary-card">
+            <div class="investor-detail-summary-label">Current Value</div>
+            <div class="investor-detail-summary-value">${escapeHtml(formatMoney(totalCurrent))}</div>
+          </div>
+          <div class="investor-detail-summary-card">
+            <div class="investor-detail-summary-label">Unrealized PnL</div>
+            <div class="investor-detail-summary-value ${pnlClass}">${totalPnl >= 0 ? '+' : ''}${escapeHtml(formatMoney(totalPnl))}</div>
+          </div>
+        </div>`;
+
+      const tableBody = holdings.map((h) => {
+        const pnl = Number(h.unrealizedPnlNumber || 0);
+        const pnlCls = pnl > 0 ? 'investor-detail-pnl-pos' : pnl < 0 ? 'investor-detail-pnl-neg' : '';
+        return `
+          <tr>
+            <td>${escapeHtml(h.instrumentName || '-')}</td>
+            <td class="orderbook-cell-muted">${escapeHtml(h.ticker || '-')}</td>
+            <td>${escapeHtml(h.side || '-')}</td>
+            <td class="r">${escapeHtml(String(h.totalQuantity ?? '-'))}</td>
+            <td class="r">${escapeHtml(asRandValue(h.avgFill))}</td>
+            <td class="r">${escapeHtml(asRandValue(h.marketValue))}</td>
+            <td class="r ${pnlCls}">${pnl >= 0 ? '+' : ''}${escapeHtml(formatMoney(pnl))}</td>
+          </tr>`;
+      }).join('');
+
+      const tableHtml = holdings.length
+        ? `<table>
+            <thead>
+              <tr><th>Instrument</th><th>Ticker</th><th>Side</th><th class="r">Qty</th><th class="r">Avg Fill</th><th class="r">Market Value</th><th class="r">PnL</th></tr>
+            </thead>
+            <tbody>${tableBody}</tbody>
+          </table>`
+        : '<p style="color:#94a3b8;font-size:11px;text-align:center;padding:12px 0;">No individual holdings found for this investor in raw orderbook data.</p>';
+
+      return `
+        <div class="investor-detail-panel">
+          <div class="investor-detail-panel-header">
+            <div>
+              <div class="investor-detail-panel-title">Individual fills & PnL</div>
+              <div class="investor-detail-panel-sub">${escapeHtml(subtitle)}</div>
+            </div>
+            <button type="button" class="investor-detail-panel-close" data-investor-detail-close>Ã¢Å&bull; Close</button>
+          </div>
+          ${summaryHtml}
+          ${tableHtml}
+        </div>`;
+    };
+
+    /* Snapshot strategyHoldings are aggregated per-security across every
+       investor and every purchase, so the avg_fill on them is a quantity-
+       weighted blend &mdash; which means clicking line 1 (filled) vs line 2 (not
+       filled) of the same user's separate buys would show identical numbers.
+       For archived books we fetch the actual current avg_fill per source-id
+       directly from stock_holdings_c using the user's purchase-bucket
+       sourceIds, then merge instrument metadata from the snapshot. */
+    const loadArchivedInvestorHoldings = async (sourceIds, snapshotHoldings) => {
+      if (!Array.isArray(sourceIds) || !sourceIds.length) return [];
+      const ids = sourceIds.map(String).filter(Boolean);
+      if (!ids.length) return [];
+
+      const { data, error } = await supabaseClient
+        .from('stock_holdings_c')
+        .select('id, quantity, avg_fill, security_id, side')
+        .in('id', ids);
+      if (error) throw new Error(error.message || 'Failed to load investor holdings');
+
+      const meta = {};
+      (snapshotHoldings || []).forEach((h) => {
+        (h.sourceIds || []).forEach((id) => { meta[String(id)] = h; });
+      });
+
+      return (data || []).map((db, i) => {
+        const m = meta[String(db.id)] || {};
+        const avgFillCents = Number(db.avg_fill || 0);
+        const avgFillRand = avgFillCents > 0 ? avgFillCents / 100 : null;
+        const qty = Number(db.quantity || 0);
+        return {
+          ...m,
+          line: i + 1,
+          totalQuantity: qty,
+          quantityValue: qty,
+          avgFillNumber: avgFillRand,
+          avgFill: avgFillRand != null
+            ? `R ${avgFillRand.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : '-',
+          side: db.side || m.side || '-',
+          sourceIds: [String(db.id)],
+          sourceId: String(db.id),
+        };
+      }).sort((a, b) => String(a.instrumentName || '').localeCompare(String(b.instrumentName || '')))
+        .map((r, i) => ({ ...r, line: i + 1 }));
+    };
+
+    /* Build the per-investor view of the strategy's holdings: only the rows
+       belonging to the selected user|fmId|created_at-bucket. Returns synthetic
+       holding objects that carry the user's specific sourceId, avg_fill, qty,
+       PnL so renderEditableAvgFill edits only that user's stock_holdings_c rows. */
+    const buildHoldingsForSelectedInvestor = (strategyId, userId, familyMemberId, createdAtFrom, createdAtTo, transactionId) => {
+      if (!strategyId || !userId) return [];
+      const targetFm = familyMemberId || '';
+      const fromMs = createdAtFrom ? new Date(createdAtFrom).getTime() - 5000 : null;
+      const toMs   = createdAtTo   ? new Date(createdAtTo).getTime() + 5000   : null;
+      const rows = (allOrderbookRawRows || []).filter((r) => {
+        if (String(r.strategyId || '') !== String(strategyId)) return false;
+        if (String(r.userId || '') !== String(userId)) return false;
+        if (String(r.familyMemberId || '') !== String(targetFm)) return false;
+        /* transaction_id is the authoritative purchase-batch separator; when
+           present, use it exclusively and skip the time-window check. */
+        if (transactionId) {
+          if (String(r.transactionId || '') !== String(transactionId)) return false;
+          return true;
+        }
+        if (fromMs != null && r.createdAt) {
+          const ts = new Date(r.createdAt).getTime();
+          if (Number.isFinite(ts) && ts < fromMs) return false;
+        }
+        if (toMs != null && r.createdAt) {
+          const ts = new Date(r.createdAt).getTime();
+          if (Number.isFinite(ts) && ts > toMs) return false;
+        }
+        return true;
+      });
+      return rows
+        .sort((a, b) => String(a.instrumentName || '').localeCompare(String(b.instrumentName || '')))
+        .map((r, i) => ({ ...r, line: i + 1 }));
+    };
+
+    /* Render the Holdings panel (top of the strategy detail). When an investor
+       is selected, switches to per-user view; otherwise shows the aggregated view. */
+    const renderStrategyHoldingsHtml = (row, options = {}) => {
+      const editable = options.editable !== false;
+      const aggregateHoldings = row.strategyHoldings || [];
+      if (!aggregateHoldings.length) {
+        return '<div class="filled-orderbook-empty">No holdings found for this strategy.</div>';
+      }
+
+      let titleSuffix = '';
+      let holdings = aggregateHoldings;
+      /* Caller-supplied override (used for archived snapshots where per-source-id
+         data has to come from the DB rather than the aggregated snapshot). */
+      if (options.overrideHoldings) {
+        holdings = options.overrideHoldings;
+        titleSuffix = options.overrideTitleSuffix || '';
+      } else if (selectedInvestorKey) {
+        const users = row.strategyUsers || [];
+        const sel = users.find((u) => buildInvestorKey(u) === selectedInvestorKey);
+        if (sel) {
+          const userHoldings = buildHoldingsForSelectedInvestor(
+            row.strategyId,
+            sel.userId,
+            sel.familyMemberId,
+            sel.createdAtFrom,
+            sel.createdAtTo,
+            sel.transactionId
+          );
+          if (userHoldings.length) {
+            holdings = userHoldings;
+            titleSuffix = ` <span style="font-size:11px;font-weight:400;color:#7c3aed;margin-left:8px;">&middot; filtered to ${escapeHtml(sel.clientName || '')}${sel.createdAtBucket ? ' @ ' + escapeHtml(sel.createdAtBucket.replace('T', ' ')) : ''}</span>`;
+          } else {
+            titleSuffix = ` <span style="font-size:11px;font-weight:400;color:#94a3b8;margin-left:8px;">&middot; no holdings found for selected investor</span>`;
+          }
+        }
+      }
+
+      const hBody = holdings.map((h) => {
+        const hRebBadge = h.rebalanceBatchId
+          ? ' <span style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;margin-left:3px;letter-spacing:.03em;">REB</span>'
+          : '';
+        const hSide = String(h.side || '-').toUpperCase();
+        const hSideClass = hSide === 'BUY' ? 'side-badge-buy' : hSide === 'SELL' ? 'side-badge-sell' : 'side-badge-neutral';
+        /* Sold (inactive SELL) rows are dimmed so they read as historical, not
+           a current holding. */
+        const hRowStyle = (h.isActive === false || hSide === 'SELL') ? ' style="opacity:.6;"' : '';
+        return `
+        <tr${hRowStyle}>
+          <td>${escapeHtml(String(h.line))}</td>
+          <td>${escapeHtml(h.instrumentName || '-')}${hRebBadge}</td>
+          <td class="orderbook-cell-muted">${escapeHtml(h.ticker || '-')}</td>
+          <td><span class="side-badge ${hSideClass}">${escapeHtml(hSide)}</span></td>
+          <td>${escapeHtml(String(h.totalQuantity ?? '-'))}</td>
+          <td>${editable ? renderEditableAvgFill(h) : escapeHtml(asRandValue(h.avgFill))}</td>
+          <td>${escapeHtml(asRandValue(h.actualFill))}</td>
+          <td>${escapeHtml(asRandValue(h.marketValue))}</td>
+          ${renderInitialPnlCell(h.unrealizedPnlNumber, h.unrealizedPnl)}${renderMintPnlCell(h)}
+        </tr>
+      `; }).join('');
+
+      return `
+        <div class="orderbook-detail-title">Holdings under ${escapeHtml(row.strategyName || 'Strategy')}${titleSuffix}</div>
+        <div class="orderbook-detail-table-wrap">
+          <table class="orderbook-detail-table">
+            <thead>
+              <tr>
+                <th>Line</th>
+                <th>Instrument Name</th>
+                <th>Ticker</th>
+                <th>Side</th>
+                <th>Total QYT</th>
+                <th>Avg Fill</th>
+                <th>Actual Fill</th>
+                <th>Live Price</th>
+                <th>Client PnL</th><th>MINT PnL</th>
+              </tr>
+            </thead>
+            <tbody>${hBody}</tbody>
+          </table>
+        </div>
+      `;
+    };
+
     const renderStrategyDetailsTable = (row, options = {}) => {
       const editable = options.editable !== false;
       const cleanup = options.cleanup === true && options.bookId != null && options.rowIndex != null;
@@ -2245,45 +2625,18 @@
       const cleanupRowIndex = options.rowIndex != null ? String(options.rowIndex) : '';
       const holdings = row.strategyHoldings || [];
       const users = row.strategyUsers || [];
+      /* In archive views, bookId+rowIndex point back to the snapshot row in
+         filledOrderbooksArchive. We thread them through to the investor row
+         and the holdings/detail panels so the click handler can find the
+         right source row (not the live orderbook) and re-render the right
+         panel instance (when the same strategy appears in multiple books). */
+      const archiveAttrs = options.bookId != null && options.rowIndex != null
+        ? ` data-book-id="${escapeHtml(String(options.bookId))}" data-row-index="${escapeHtml(String(options.rowIndex))}"`
+        : '';
 
-      let holdingsHtml;
-      if (holdings.length) {
-        const hBody = holdings.map((h) => `
-          <tr>
-            <td>${escapeHtml(String(h.line))}</td>
-            <td>${escapeHtml(h.instrumentName || '-')}</td>
-            <td class="orderbook-cell-muted">${escapeHtml(h.ticker || '-')}</td>
-            <td>${escapeHtml(h.side || '-')}</td>
-            <td>${escapeHtml(String(h.totalQuantity ?? '-'))}</td>
-            <td>${editable ? renderEditableAvgFill(h) : escapeHtml(asRandValue(h.avgFill))}</td>
-            <td>${escapeHtml(asRandValue(h.marketValue))}</td>
-            ${renderInitialPnlCell(h.unrealizedPnlNumber, h.unrealizedPnl)}
-          </tr>
-        `).join('');
-
-        holdingsHtml = `
-          <div class="orderbook-detail-title">Holdings under ${escapeHtml(row.strategyName || 'Strategy')}</div>
-          <div class="orderbook-detail-table-wrap">
-            <table class="orderbook-detail-table">
-              <thead>
-                <tr>
-                  <th>Line</th>
-                  <th>Instrument Name</th>
-                  <th>Ticker</th>
-                  <th>Side</th>
-                  <th>Total QYT</th>
-                  <th>Avg Fill</th>
-                  <th>Expected Fill</th>
-                  <th>Initial PnL</th>
-                </tr>
-              </thead>
-              <tbody>${hBody}</tbody>
-            </table>
-          </div>
-        `;
-      } else {
-        holdingsHtml = '<div class="filled-orderbook-empty">No holdings found for this strategy.</div>';
-      }
+      const holdingsHtml = holdings.length
+        ? `<div data-strategy-holdings-panel data-strategy-id="${escapeHtml(String(row.strategyId || ''))}"${archiveAttrs}>${renderStrategyHoldingsHtml(row, options)}</div>`
+        : '<div class="filled-orderbook-empty">No holdings found for this strategy.</div>';
 
       let usersHtml = '';
       if (users.length) {
@@ -2301,15 +2654,24 @@
                   data-family-member-id="${escapeHtml(String(u.familyMemberId || ''))}"
                   data-strategy-id="${escapeHtml(String(row.strategyId || ''))}"
                   data-strategy-name="${escapeHtml(row.strategyName || '')}"
-                  title="Reverse this investor's order and refund their wallet">
+                  data-created-at-from="${escapeHtml(String(u.createdAtFrom || ''))}"
+                  data-created-at-to="${escapeHtml(String(u.createdAtTo || ''))}"
+                  title="Reverse only this specific purchase (${escapeHtml(u.createdAtBucket || 'unknown time')}) and refund their wallet">
                   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
                 </button>
               </td>`
             : '';
+          const investorKey = buildInvestorKey(u);
+          const isSelected = selectedInvestorKey === investorKey;
+          // Show purchase time so two buys of the same strategy by the same
+          // user are visually distinguishable.
+          const buyTime = u.createdAtBucket
+            ? `<span class="orderbook-cell-muted" style="font-size:10.5px;display:block;">${escapeHtml(u.createdAtBucket.replace('T', ' '))}</span>`
+            : '';
           return `
-          <tr>
+          <tr class="investor-row ${isSelected ? 'selected' : ''}" data-investor-row data-investor-key="${escapeHtml(investorKey)}" data-user-id="${escapeHtml(String(u.userId || ''))}" data-family-member-id="${escapeHtml(String(u.familyMemberId || ''))}" data-strategy-id="${escapeHtml(String(row.strategyId || ''))}" data-transaction-id="${escapeHtml(String(u.transactionId || ''))}" data-created-at-from="${escapeHtml(String(u.createdAtFrom || ''))}" data-created-at-to="${escapeHtml(String(u.createdAtTo || ''))}"${archiveAttrs}>
             <td>${escapeHtml(String(i + 1))}</td>
-            <td>${escapeHtml(u.clientName || '-')}</td>
+            <td>${escapeHtml(u.clientName || '-')}${buyTime}</td>
             <td>${escapeHtml(u.clientAccountId || '-')}</td>
             <td>${escapeHtml(maskIdentifier(u.clientIdRegNo || '-'))}</td>
             <td>${escapeHtml(formatMoney(u.totalMarketValue))}</td>
@@ -2324,8 +2686,8 @@
         const reverseHeader = allowReverse ? '<th class="reverse-investor-col" aria-label="Reverse"></th>' : '';
 
         usersHtml = `
-          <div class="orderbook-detail-title" style="margin-top: 16px;">Investors in ${escapeHtml(row.strategyName || 'Strategy')}</div>
-          <div class="orderbook-detail-table-wrap">
+          <div class="orderbook-detail-title" style="margin-top: 16px;">Investors in ${escapeHtml(row.strategyName || 'Strategy')} <span style="font-size:11px;font-weight:400;color:#94a3b8;margin-left:8px;">(click a row to see this client's individual fills)</span></div>
+          <div class="orderbook-detail-table-wrap" data-investors-table data-strategy-id="${escapeHtml(String(row.strategyId || ''))}"${archiveAttrs}>
             <table class="orderbook-detail-table">
               <thead>
                 <tr>
@@ -2333,7 +2695,7 @@
                   <th>Client Name</th>
                   <th>Account ID</th>
                   <th>ID / Reg No</th>
-                  <th>Expected Fill</th>
+                  <th>Live Price</th>
                   <th>Holdings</th>
                   ${deleteHeader}
                   ${reverseHeader}
@@ -2342,6 +2704,7 @@
               <tbody>${uBody}</tbody>
             </table>
           </div>
+          <div data-investor-detail-panel data-strategy-id="${escapeHtml(String(row.strategyId || ''))}"${archiveAttrs}>${renderInvestorDetailPanel(row)}</div>
         `;
       }
 
@@ -2969,7 +3332,7 @@
           <tr class="strate-bir-group-row" data-strate-group-toggle data-record-type="${escapeHtml(recordType)}">
             <td colspan="${headers.length}">
               <span class="strate-bir-group-toggle">
-                <span class="strate-bir-group-caret">${isCollapsed ? '▸' : '▾'}</span>
+                <span class="strate-bir-group-caret">${isCollapsed ? '&#9658;' : '&#9660;'}</span>
                 <span>${escapeHtml(recordType)} - ${escapeHtml(recordTypeLabels[recordType] || 'Records')}</span>
                 <span class="strate-bir-group-count">(${escapeHtml(String(typeRows.length))} entries)</span>
               </span>
@@ -3034,6 +3397,63 @@
       const color = Number.isFinite(n) && n > 0 ? '#059669' : (Number.isFinite(n) && n < 0 ? '#dc2626' : '#64748b');
       const display = pnlText !== undefined && pnlText !== null ? String(pnlText) : '-';
       return `<td style="color:${color};font-weight:600;">${escapeHtml(display)}</td>`;
+    };
+
+    /* Collect every stock_holdings_c id a row represents &mdash; single security,
+       multi-user aggregated security, or strategy parent (sum of its holdings). */
+    const collectHoldingIds = (row) => {
+      const out = [];
+      const push = (v) => { if (v) out.push(String(v)); };
+      if (row?.isStrategy && Array.isArray(row.strategyHoldings)) {
+        row.strategyHoldings.forEach((h) => {
+          if (Array.isArray(h.sourceIds) && h.sourceIds.length) h.sourceIds.forEach(push);
+          else push(h.sourceId);
+        });
+      } else if (Array.isArray(row?.sourceIds) && row.sourceIds.length) {
+        row.sourceIds.forEach(push);
+      } else if (row?.sourceId) {
+        push(row.sourceId);
+      }
+      return [...new Set(out)];
+    };
+
+    /* MINT PnL = the TRUE execution result, summed per holding from the buffer
+       ledger + fill prices (never from formatted strings, so no locale comma bug):
+         - gain  = filled BELOW the client's quote: max(0, Expected - avg) x qty
+         - loss  = slippage BEYOND the 8% reserve: -shortfall (0 if reserve absorbed it)
+       So a cheaper fill reads as profit; slippage inside the cushion reads 0; only
+       slippage that exhausts the reserve shows a real (red) loss. Unfilled -> "-". */
+    const renderMintPnlCell = (row) => {
+      const ids = collectHoldingIds(row);
+      let filled = false;
+      let gainCents = 0;
+      let shortfallCents = 0;
+      let bufferUsedCents = 0;
+      ids.forEach((id) => {
+        if (mintGainByHolding.has(id)) { filled = true; gainCents += mintGainByHolding.get(id) || 0; }
+        shortfallCents += mintShortfallByHolding.get(id) || 0;
+        bufferUsedCents += mintBufferUsedByHolding.get(id) || 0;
+      });
+      if (!filled) {
+        return '<td style="color:#64748b;font-weight:600;">-</td>';
+      }
+      const netCents = gainCents - shortfallCents;
+      const display = (netCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const color = netCents > 0 ? '#059669' : (netCents < 0 ? '#dc2626' : '#64748b');
+      const fmt = (c) => (c / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      let title;
+      if (shortfallCents > 0) {
+        title = `Slippage beat the 8% execution reserve - MINT covered R ${fmt(shortfallCents)} out of pocket`
+          + (gainCents > 0 ? `, offset by R ${fmt(gainCents)} gained on cheaper fills.` : '.');
+      } else if (gainCents > 0) {
+        title = `Filled R ${fmt(gainCents)} below the client's quoted price - MINT spread profit`
+          + (bufferUsedCents > 0 ? `; R ${fmt(bufferUsedCents)} of slippage elsewhere was absorbed by the client's reserve (MINT net 0 on that).` : '.');
+      } else if (bufferUsedCents > 0) {
+        title = `Slippage of R ${fmt(bufferUsedCents)} fully absorbed by the client's execution reserve - MINT net 0.`;
+      } else {
+        title = "Filled at the client's quoted price - MINT net 0 on execution.";
+      }
+      return `<td style="color:${color};font-weight:600;" title="${escapeHtml(title)}">${escapeHtml(display)}</td>`;
     };
 
     const buildStrateBirIndividuals = (lines) => {
@@ -3114,7 +3534,7 @@
           <th>Account</th>
           <th>Owner Type</th>
           <th>Holdings</th>
-          <th>Expected Fill</th>
+          <th>Live Price</th>
           <th>Country</th>
         </tr>
       `;
@@ -3183,7 +3603,7 @@
                         <th>Security</th>
                         <th>Quantity</th>
                         <th>Balance Type</th>
-                        <th>Expected Fill</th>
+                        <th>Live Price</th>
                         <th>Record Date</th>
                         <th>Settlement Ref</th>
                       </tr>
@@ -3362,6 +3782,39 @@
       }
     };
 
+    /* Books are only marked "closed" when the user explicitly clicks "Move to
+       Closed Book" on a fully-filled book. We track that locally rather than
+       persisting to the DB so this works without a schema migration. */
+    const readManuallyClosedMap = () => {
+      try {
+        const raw = localStorage.getItem(MANUALLY_CLOSED_BOOKS_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        return (parsed && typeof parsed === 'object') ? parsed : {};
+      } catch {
+        return {};
+      }
+    };
+
+    const writeManuallyClosedMap = (map) => {
+      try {
+        localStorage.setItem(MANUALLY_CLOSED_BOOKS_KEY, JSON.stringify(map || {}));
+      } catch {
+      }
+    };
+
+    const markBookManuallyClosed = (bookId, closedAtIso) => {
+      if (!bookId) return;
+      const map = readManuallyClosedMap();
+      map[String(bookId)] = closedAtIso || new Date().toISOString();
+      writeManuallyClosedMap(map);
+    };
+
+    const getManualCloseDate = (bookId) => {
+      if (!bookId) return null;
+      const map = readManuallyClosedMap();
+      return map[String(bookId)] || null;
+    };
+
     const hasCompletedArchiveBackfill = () => {
       try {
         return localStorage.getItem(ARCHIVE_BACKFILL_KEY) === 'done';
@@ -3384,6 +3837,16 @@
         const seed = deterministicNumberFromText(item.userId || item.sourceId || item.clientName || `${index + 1}`);
         return {
           line: index + 1,
+          sourceId: item.sourceId || '',
+          sourceIds: item.sourceId ? [String(item.sourceId)] : [],
+          userId: item.userId || '',
+          familyMemberId: item.familyMemberId || null,
+          securityId: item.securityId || '',
+          strategyId: item.strategyId || null,
+          strategyName: item.strategyName || null,
+          instrumentName: item.instrumentName || '',
+          ticker: item.ticker || '',
+          side: item.side || '',
           clientAccountId: item.clientAccountId || `MINT-${String(seed % 1000000).padStart(6, '0')}`,
           bndReference: item.bndReference || buildBndReference({
             timestamp: item.timestamp,
@@ -3391,8 +3854,12 @@
             lineNumber: index + 1
           }),
           clientName: shortClientName(item.clientName),
+          clientNameFull: item.clientName || '',
           idRegNoFull: String(item.clientIdRegNo || '-'),
+          quantityValue: item.quantityValue,
           quantity: item.totalQuantity || '-',
+          avgFillNumber: item.avgFillNumber,
+          avgFill: item.avgFill,
           marketValue: asRandValue(item.marketValue || '-'),
           orderTimestamp: formatTimeOnly(item.timestamp),
           instructionType: item.orderType || 'Market',
@@ -3680,9 +4147,52 @@
       return Array.from(fallbackIds);
     };
 
+    /* The investor selection key must uniquely identify one purchase batch.
+       transaction_id is the authoritative separator (set per purchase event).
+       Falls back to createdAtBucket for legacy snapshots without transactionId. */
+    const buildInvestorKey = (u) => {
+      if (!u) return '';
+      const txnPart = u.transactionId ? `t:${u.transactionId}` : `m:${u.createdAtBucket || ''}`;
+      return `${u.userId || ''}|${u.familyMemberId || ''}|${txnPart}`;
+    };
+
     const getRowFillStatus = (row) => {
+      /* Strategy rows: each strategyHolding carries its own fillDate set by
+         the reconcile function. If ALL holdings have fillDate, the row is
+         fully filled &mdash; we don't need a live DB lookup for those. */
+      if (row?.isStrategy && Array.isArray(row.strategyHoldings) && row.strategyHoldings.length) {
+        let allHoldingsFilled = true;
+        let latestFillDate = null;
+        row.strategyHoldings.forEach((h) => {
+          if (!h.fillDate) {
+            allHoldingsFilled = false;
+            return;
+          }
+          const ts = new Date(h.fillDate).getTime();
+          if (Number.isFinite(ts) && (!latestFillDate || ts > new Date(latestFillDate).getTime())) {
+            latestFillDate = h.fillDate;
+          }
+        });
+        if (allHoldingsFilled) {
+          return {
+            filled: true,
+            text: latestFillDate ? `Filled (${new Date(latestFillDate).toLocaleDateString()})` : 'Filled',
+            latestFillDate
+          };
+        }
+        /* Fall through to live lookup if any holding is missing fillDate. */
+      }
+
       const ids = getRowHoldingIds(row);
       if (!ids.length) {
+        /* Non-strategy row with a stored fillDate is already confirmed filled. */
+        if (row?.fillDate) {
+          return {
+            filled: true,
+            text: `Filled (${new Date(row.fillDate).toLocaleDateString()})`,
+            latestFillDate: row.fillDate
+          };
+        }
         return { filled: false, text: 'Not filled', latestFillDate: null };
       }
 
@@ -3700,6 +4210,16 @@
           latestFillDate = fd;
         }
       });
+
+      /* Any ID missing from the live map? Check if the row itself has a
+         stored fillDate from a previous reconcile &mdash; if so, trust that. */
+      if (!allFilled && row?.fillDate) {
+        return {
+          filled: true,
+          text: `Filled (${new Date(row.fillDate).toLocaleDateString()})`,
+          latestFillDate: row.fillDate
+        };
+      }
 
       if (!allFilled) {
         return { filled: false, text: 'Not filled', latestFillDate };
@@ -3746,6 +4266,8 @@
       let pnlTotal = 0;
       let avgWeighted = 0;
       let avgWeight = 0;
+      let actualWeighted = 0;
+      let actualWeight = 0;
       let latestTimestamp = null;
       let latestFillDate = null;
       let hasSent = false;
@@ -3756,6 +4278,7 @@
         const mv = Number(live.marketValueNumber || 0);
         const pnl = Number(live.unrealizedPnlNumber || 0);
         const avg = Number(live.avgFillNumber);
+        const act = Number(live.actualFillNumber);
 
         if (Number.isFinite(q)) qtyTotal += q;
         if (Number.isFinite(mv)) mvTotal += mv;
@@ -3764,6 +4287,11 @@
           const w = Math.abs(q) || 1;
           avgWeighted += (avg * w);
           avgWeight += w;
+        }
+        if (Number.isFinite(act) && act > 0) {
+          const w = Math.abs(q) || 1;
+          actualWeighted += (act * w);
+          actualWeight += w;
         }
 
         if (live.notificationStatus === 'sent') hasSent = true;
@@ -3808,6 +4336,12 @@
         next.avgFill = formatMoneyText(avgFillNumber);
       }
 
+      if (actualWeight > 0) {
+        const actualFillNumber = actualWeighted / actualWeight;
+        next.actualFillNumber = actualFillNumber;
+        next.actualFill = formatMoneyText(actualFillNumber);
+      }
+
       const changed = JSON.stringify({
         sourceIds: row.sourceIds || [],
         sourceId: row.sourceId || '',
@@ -3819,6 +4353,8 @@
         unrealizedPnl: row.unrealizedPnl,
         avgFillNumber: row.avgFillNumber,
         avgFill: row.avgFill,
+        actualFillNumber: row.actualFillNumber,
+        actualFill: row.actualFill,
         timestamp: row.timestamp,
         fillDate: row.fillDate
       }) !== JSON.stringify({
@@ -3832,6 +4368,8 @@
         unrealizedPnl: next.unrealizedPnl,
         avgFillNumber: next.avgFillNumber,
         avgFill: next.avgFill,
+        actualFillNumber: next.actualFillNumber,
+        actualFill: next.actualFill,
         timestamp: next.timestamp,
         fillDate: next.fillDate
       });
@@ -3857,6 +4395,13 @@
       let pnlTotal = 0;
       let avgWeighted = 0;
       let avgWeight = 0;
+      /* Strategy-level Avg Fill and Actual Fill are SUMS in rands, not
+         per-share weighted averages &mdash; different securities at different
+         price levels make a per-share blend meaningless. */
+      let avgFillSum = 0;
+      let hasAvgFillSum = false;
+      let actualFillSum = 0;
+      let hasActualFillSum = false;
       let latestTimestamp = null;
       let latestFillDate = null;
       let hasSent = false;
@@ -3868,6 +4413,7 @@
         const mv = Number(holding.marketValueNumber || 0);
         const pnl = Number(holding.unrealizedPnlNumber || 0);
         const avg = Number(holding.avgFillNumber);
+        const act = Number(holding.actualFillNumber);
 
         if (Number.isFinite(q)) qtyTotal += q;
         if (Number.isFinite(mv)) mvTotal += mv;
@@ -3877,6 +4423,13 @@
           const w = Math.abs(q) || 1;
           avgWeighted += (avg * w);
           avgWeight += w;
+          avgFillSum += avg * Math.abs(q || 0);
+          hasAvgFillSum = true;
+        }
+
+        if (Number.isFinite(act) && act > 0) {
+          actualFillSum += act * Math.abs(q || 0);
+          hasActualFillSum = true;
         }
 
         if (holding.timestamp) {
@@ -3925,10 +4478,19 @@
         notificationStatus: hasSent ? 'sent' : (hasFailed ? 'failed' : (row.notificationStatus || 'pending'))
       };
 
+      /* Keep avgFillNumber as the per-share weighted avg for any downstream
+         consumer; the display string shows the SUM so the strategy row reads
+         as a total alongside Actual Fill. */
       if (avgWeight > 0) {
-        const avgFillNumber = avgWeighted / avgWeight;
-        next.avgFillNumber = avgFillNumber;
-        next.avgFill = formatMoneyText(avgFillNumber);
+        next.avgFillNumber = avgWeighted / avgWeight;
+      }
+      if (hasAvgFillSum) {
+        next.avgFill = formatMoneyText(avgFillSum);
+      }
+
+      if (hasActualFillSum) {
+        next.actualFillNumber = actualFillSum;
+        next.actualFill = formatMoneyText(actualFillSum);
       }
 
       const parentChanged = JSON.stringify({
@@ -3942,6 +4504,8 @@
         unrealizedPnl: row.unrealizedPnl,
         avgFillNumber: row.avgFillNumber,
         avgFill: row.avgFill,
+        actualFillNumber: row.actualFillNumber,
+        actualFill: row.actualFill,
         timestamp: row.timestamp,
         fillDate: row.fillDate
       }) !== JSON.stringify({
@@ -3955,6 +4519,8 @@
         unrealizedPnl: next.unrealizedPnl,
         avgFillNumber: next.avgFillNumber,
         avgFill: next.avgFill,
+        actualFillNumber: next.actualFillNumber,
+        actualFill: next.actualFill,
         timestamp: next.timestamp,
         fillDate: next.fillDate
       });
@@ -4044,10 +4610,11 @@
 
       filledOrderbooksArchive.forEach((book) => {
         const result = isBookFullyClosed(book);
-        if (result.closed) {
-          closedBooks.push({ ...book, latestFillDate: result.latestFillDate });
+        const manualClosedAt = getManualCloseDate(book.id);
+        if (manualClosedAt) {
+          closedBooks.push({ ...book, latestFillDate: result.latestFillDate, closedAt: manualClosedAt });
         } else {
-          activeBooks.push(book);
+          activeBooks.push({ ...book, readyToClose: result.closed, latestFillDate: result.latestFillDate });
         }
       });
 
@@ -4060,7 +4627,7 @@
         } else if (activeBooksSortOrder === 'as-is') {
           sorted = activeBooks.slice();
         } else {
-          // 'newest' — biggest sequence first
+          // 'newest' &mdash; biggest sequence first
           sorted = activeBooks.slice().sort((a, b) => (b.sequence || 0) - (a.sequence || 0));
         }
 
@@ -4111,23 +4678,28 @@
                 <td>${escapeHtml(row.side || '-')}</td>
                 <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
                 <td>${escapeHtml(asRandValue(row.avgFill))}</td>
+                <td>${escapeHtml(asRandValue(row.actualFill))}</td>
                 <td>${escapeHtml(asRandValue(row.marketValue))}</td>
                 <td>${escapeHtml(row.orderType || '-')}</td>
                 <td>${escapeHtml(row.settlementAccount || '')}</td>
                 <td>${escapeHtml(row.brokerRef || '')}</td>
-                ${renderInitialPnlCell(row.unrealizedPnlNumber, row.unrealizedPnl)}
+                ${renderInitialPnlCell(row.unrealizedPnlNumber, row.unrealizedPnl)}${renderMintPnlCell(row)}
                 ${showActiveBooksFilledColumn ? `<td><span class="filled-status-pill ${rowFillStatus.filled ? 'is-filled' : 'is-open'}">${escapeHtml(rowFillStatus.text)}</span></td>` : ''}
               </tr>
               <tr class="orderbook-detail-row is-hidden" data-archive-detail-row data-archive-line-key="${escapeHtml(rowKey)}">
-                <td colspan="${showActiveBooksFilledColumn ? '13' : '12'}">
+                <td colspan="${showActiveBooksFilledColumn ? '15' : '14'}">
                   <div class="orderbook-detail-wrap">
-                    ${row.isStrategy ? renderStrategyDetailsTable(row, { cleanup: cleanupMode, bookId: book.id, rowIndex, allowReverse: true }) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderSnapshotBndDetailsTable(rows, row, book.sequence, { allowReverse: true })}`}
+                    ${row.isStrategy ? renderStrategyDetailsTable(row, { cleanup: cleanupMode, bookId: book.id, rowIndex, allowReverse: true }) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderSnapshotBndDetailsTable(rows, row, book.sequence, { allowReverse: true, cleanup: cleanupMode, bookId: book.id, rowIndex })}`}
                   </div>
                 </td>
               </tr>
             `;
             }).join('')
-            : '<tr><td class="orderbook-empty-row" colspan="12">No rows captured.</td></tr>';
+            : '<tr><td class="orderbook-empty-row" colspan="14">No rows captured.</td></tr>';
+
+          const moveToClosedBtn = book.readyToClose
+            ? `<button type="button" class="orderbook-export-btn" data-move-to-closed data-book-id="${escapeHtml(String(book.id || ''))}" style="padding:4px 10px;height:26px;font-size:11px;background:#16a34a;color:#fff;border-color:#16a34a;" title="All rows are filled &mdash; move this book to Closed Books">Move to Closed Book</button>`
+            : '';
 
           return `
             <details class="filled-orderbook-item">
@@ -4137,6 +4709,7 @@
                   <span>${escapeHtml(book.dateLabel || '-')}</span>
                   ${book.sentAt ? `<span>Sent: ${escapeHtml(new Date(book.sentAt).toLocaleString())}</span>` : ''}
                   <span data-book-id="${escapeHtml(String(book.id || ''))}">${emailStatusChip(book.emailStatus)}</span>
+                  ${moveToClosedBtn}
                 </span>
               </summary>
               <div class="filled-orderbook-details">
@@ -4151,11 +4724,13 @@
                         <th>Side</th>
                         <th>Total QYT</th>
                         <th>Avg Fill</th>
-                        <th>Expected Fill</th>
+                        <th>Actual Fill</th>
+                        <th>Live Price</th>
                         <th>Order Type</th>
                         <th>Settlement Account</th>
                         <th>Broker Ref</th>
-                        <th>Initial PnL <span class="orderbook-plus-toggle" data-toggle-filled-col title="Toggle filled status">+</span></th>
+                        <th>Client PnL <span class="orderbook-plus-toggle" data-toggle-filled-col title="Toggle filled status">+</span></th>
+                        <th>MINT PnL</th>
                         ${showActiveBooksFilledColumn ? '<th>Filled</th>' : ''}
                       </tr>
                     </thead>
@@ -4230,7 +4805,7 @@
         return `
           <details class="filled-orderbook-item">
             <summary class="filled-orderbook-summary">
-              <span>Rebalance — ${escapeHtml(sb.strategyName)} (${escapeHtml(sb.sellIsin)} → ${escapeHtml(sb.buyIsin)}${sb.extraBuyIsin ? ' + ' + escapeHtml(sb.extraBuyIsin) : ''})</span>
+              <span>Rebalance &mdash; ${escapeHtml(sb.strategyName)} (${escapeHtml(sb.sellIsin)} &rarr; ${escapeHtml(sb.buyIsin)}${sb.extraBuyIsin ? ' + ' + escapeHtml(sb.extraBuyIsin) : ''})</span>
               <span class="filled-orderbook-meta">
                 ${rebalanceStatusPill(sb.batchStatus)}
                 <span>${sb.clientCount} client${sb.clientCount !== 1 ? 's' : ''}</span>
@@ -4314,22 +4889,23 @@
               <td>${escapeHtml(row.side || '-')}</td>
               <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
               <td>${escapeHtml(asRandValue(row.avgFill))}</td>
+              <td>${escapeHtml(asRandValue(row.actualFill))}</td>
               <td>${escapeHtml(asRandValue(row.marketValue))}</td>
               <td>${escapeHtml(row.orderType || '-')}</td>
               <td>${escapeHtml(row.settlementAccount || '')}</td>
               <td>${escapeHtml(row.brokerRef || '')}</td>
-              ${renderInitialPnlCell(row.unrealizedPnlNumber, row.unrealizedPnl)}
+              ${renderInitialPnlCell(row.unrealizedPnlNumber, row.unrealizedPnl)}${renderMintPnlCell(row)}
             </tr>
             <tr class="orderbook-detail-row is-hidden" data-closed-detail-row data-closed-line-key="${escapeHtml(rowKey)}">
-              <td colspan="12">
+              <td colspan="14">
                 <div class="orderbook-detail-wrap">
-                  ${row.isStrategy ? renderStrategyDetailsTable(row, { editable: false, cleanup: cleanupMode, bookId: book.id, rowIndex }) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderSnapshotBndDetailsTable(rows, row, book.sequence)}`}
+                  ${row.isStrategy ? renderStrategyDetailsTable(row, { editable: false, cleanup: cleanupMode, bookId: book.id, rowIndex }) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderSnapshotBndDetailsTable(rows, row, book.sequence, { cleanup: cleanupMode, bookId: book.id, rowIndex })}`}
                 </div>
               </td>
             </tr>
           `;
           }).join('')
-          : '<tr><td class="orderbook-empty-row" colspan="12">No rows captured.</td></tr>';
+          : '<tr><td class="orderbook-empty-row" colspan="14">No rows captured.</td></tr>';
 
         return `
           <details class="filled-orderbook-item">
@@ -4353,11 +4929,12 @@
                       <th>Side</th>
                       <th>Total QYT</th>
                       <th>Avg Fill</th>
-                      <th>Expected Fill</th>
+                      <th>Actual Fill</th>
+                      <th>Live Price</th>
                       <th>Order Type</th>
                       <th>Settlement Account</th>
                       <th>Broker Ref</th>
-                      <th>Initial PnL</th>
+                      <th>Client PnL</th><th>MINT PnL</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -4410,7 +4987,7 @@
     const captureFilledOrderbook = async () => {
       if (!allOrderbookRows.length) return;
 
-      // Separate pending rebalance rows – they must NOT be archived
+      // Separate pending rebalance rows &mdash; they must NOT be archived
       const settledRows = allOrderbookRows.filter(r => !r.isPendingRebalance);
       const pendingRows = allOrderbookRows.filter(r => r.isPendingRebalance);
       if (!settledRows.length) return;
@@ -4511,7 +5088,7 @@
     };
 
     window.sendTradeConfirmation = async (evt, holdingId, bndReference, emailStatus) => {
-      // Grab button reference and update UI BEFORE any await — prevents evt.currentTarget becoming null
+      // Grab button reference and update UI BEFORE any await &mdash; prevents evt.currentTarget becoming null
       const btn = evt.currentTarget || evt.target.closest('button');
       const originalText = btn.textContent;
 
@@ -4528,7 +5105,7 @@
           return alert('No session token');
         }
 
-        // Use the emailStatus passed from the rendered row — more reliable than button text
+        // Use the emailStatus passed from the rendered row &mdash; more reliable than button text
         const isResend = emailStatus === 'sent';
 
         const res = await fetch('/api/orderbook/send-csv?action=trade-confirmation', {
@@ -4577,7 +5154,7 @@
       exportOrderbookBtn.disabled = rows.length === 0;
 
       if (!rows.length) {
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="12">No orderbook records found.</td></tr>';
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="14">No orderbook records found.</td></tr>';
         return;
       }
 
@@ -4596,6 +5173,11 @@
             : '';
         const pendingBadge = isPending
           ? ' <span class="side-badge" style="background:#fef3c7;color:#92400e;font-size:9px;padding:1px 6px;border-radius:6px;margin-left:4px;">PENDING</span>'
+          : '';
+        /* Rebalance-created settled holdings: show a teal badge so admins can
+           see at a glance which positions came from a rebalance vs an original buy. */
+        const rebalancedBadge = (!isPending && row.rebalanceBatchId && !row.isStrategy)
+          ? ' <span style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc;font-size:9px;font-weight:700;padding:1px 6px;border-radius:6px;margin-left:4px;letter-spacing:.03em;">REBALANCED</span>'
           : '';
         const settlementOptions = (row.settlementAccountOptions || []).map((option) => {
           const isSelected = option === row.settlementAccount ? ' selected' : '';
@@ -4627,10 +5209,10 @@
                 style="background:#dc2626;color:white;border-radius:8px;padding:5px 14px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;letter-spacing:.02em;box-shadow:0 1px 3px rgba(220,38,38,.25);transition:background .15s;"
                 onmouseover="this.style.background='#b91c1c'" onmouseout="this.style.background='#dc2626'">Reverse</button>
             </div>`;
-        // ── Client Email column ────────────────────────────────────────────────
+        // Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Client Email column Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬
         // investor_trade_confirmations is the sole source of truth.
         // Show pill + button for any row that has a fill price set.
-        // No dependency on fillDate — that was causing 8/9 rows to show AWAITING FILL.
+        // No dependency on fillDate &mdash; that was causing 8/9 rows to show AWAITING FILL.
         } else {
           const hasFillPrice = row.avgFillNumber != null && row.avgFillNumber > 0;
           // notificationStatus is populated from investor_trade_confirmations via orderEmailsMap
@@ -4643,7 +5225,7 @@
           } else if (emailStatus === 'failed') {
             pillClass = 'filled-status-pill';
             pillLabel = 'FAILED';
-            // inline style for red — reuses existing side-badge-sell colors
+            // inline style for red &mdash; reuses existing side-badge-sell colors
           } else {
             pillClass = 'filled-status-pill is-open';
             pillLabel = 'PENDING';
@@ -4660,7 +5242,7 @@
                 </button>
               </div>`;
           } else {
-            // No fill price set yet — can't send a confirmation
+            // No fill price set yet &mdash; can't send a confirmation
             actionsHtml = `<span class="filled-status-pill is-open" style="background:#f3f4f6;color:#6b7280;border-color:#d1d5db;font-size:0.7rem;">No price set</span>`;
           }
         }
@@ -4669,11 +5251,12 @@
           <tr class="orderbook-main-row${isPending ? ' orderbook-pending-row' : ''}" data-orderbook-main-row data-line-key="${lineKey}">
             <td style="white-space:nowrap;">${actionsHtml}</td>
             <td>${escapeHtml(String(row.line ?? '-'))}</td>
-            <td>${escapeHtml(row.instrumentName || '-')}${strategyTag}${pendingBadge}</td>
+            <td>${escapeHtml(row.instrumentName || '-')}${strategyTag}${pendingBadge}${rebalancedBadge}</td>
             <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
             <td><span class="side-badge ${sideClass}">${escapeHtml(sideValue || '-')}</span></td>
             <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
             <td>${priceActionHtml}</td>
+            <td>${escapeHtml(asRandValue(row.actualFill))}</td>
             <td>${escapeHtml(asRandValue(row.marketValue))}</td>
             <td>${escapeHtml(row.orderType || '-')}</td>
             <td>
@@ -4686,10 +5269,10 @@
                 ${brokerRefOptions}
               </select>
             </td>
-            ${renderInitialPnlCell(row.unrealizedPnlNumber, row.unrealizedPnl)}
+            ${renderInitialPnlCell(row.unrealizedPnlNumber, row.unrealizedPnl)}${renderMintPnlCell(row)}
           </tr>
           <tr class="orderbook-detail-row is-hidden" data-orderbook-detail-row data-line-key="${lineKey}">
-            <td colspan="12">
+            <td colspan="14">
               <div class="orderbook-detail-wrap">
                 ${row.isStrategy ? renderStrategyDetailsTable(row, { allowReverse: true }) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderBndDetailsTable(row)}`}
               </div>
@@ -4722,15 +5305,15 @@
     };
 
     const loadOrderbookClientSideFallback = async () => {
-      /* ── Load stock_holdings_c + pending rebalance events in parallel ── */
+      /* Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Load stock_holdings_c + pending rebalance events in parallel Ã¢&rdquo;â¬Ã¢&rdquo;â¬ */
       const [holdingsResult, rebEventsResult, rebBatchesResult] = await Promise.all([
         supabaseClient
           .from('stock_holdings_c')
-          .select('id, user_id, family_member_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, as_of_date, created_at, updated_at, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", avg_exit, strategy_id, trade_side, is_active, closed_reason, closed_at, rebalance_batch_id, strategy_name_snapshot')
+          .select('id, user_id, family_member_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, as_of_date, created_at, updated_at, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", avg_exit, strategy_id, trade_side, is_active, closed_reason, closed_at, rebalance_batch_id, strategy_name_snapshot, transaction_id, expected_fill:"Expected_fill"')
           .order('updated_at', { ascending: false }),
         supabaseClient
           .from('rebalance_event')
-          .select('id, batch_id, user_id, security_id, trade_side, quantity, price_at_commit, avg_fill, fill_date, closed_reason, strategy_name_snapshot, settled_holding_id, created_at, updated_at')
+          .select('id, batch_id, user_id, family_member_id, security_id, trade_side, quantity, price_at_commit, avg_fill, fill_date, closed_reason, strategy_name_snapshot, settled_holding_id, created_at, updated_at')
           .order('created_at', { ascending: false }),
         supabaseClient
           .from('rebalance_batch')
@@ -4747,10 +5330,32 @@
       const rebBatches = rebBatchesResult.data || [];
       const batchById = rebBatches.reduce((acc, b) => { acc[b.id] = b; return acc; }, {});
       holdingFillDateById.clear();
+      mintGainByHolding.clear();
+      mintBufferUsedByHolding.clear();
+      mintShortfallByHolding.clear();
       holdings.forEach((h) => {
         if (h.id && h.fill_date) {
           holdingFillDateById.set(String(h.id), String(h.fill_date));
         }
+        /* MINT gain = how far BELOW the client's quote we filled. avg_fill is
+           cents, Expected_fill is rands (guard the legacy rows that stored it in
+           cents). Only filled holdings (avg_fill > 0) get an entry, which also
+           marks the holding as "filled" for the render. Slippage (avg above the
+           quote) yields 0 here &mdash; that loss is the buffer ledger's job, not a gain. */
+        const hid = h.id ? String(h.id) : '';
+        if (!hid) return;
+        const avgCents = Number(h.avg_fill);
+        if (!Number.isFinite(avgCents) || avgCents <= 0) return; // not yet filled
+        const avgRands = avgCents / 100;
+        let expectedRands = Number(h.expected_fill);
+        if (!Number.isFinite(expectedRands) || expectedRands <= 0) {
+          expectedRands = avgRands; // legacy: no quote recorded &rarr; no spread
+        } else if (expectedRands > avgRands * 5) {
+          expectedRands = expectedRands / 100; // legacy Expected_fill stored in cents
+        }
+        const qtyAbs = Math.abs(Number(h.quantity) || 0);
+        const gainCents = Math.max(0, Math.round((expectedRands - avgRands) * qtyAbs * 100));
+        mintGainByHolding.set(hid, gainCents);
       });
       const securityIds = [...new Set([
         ...holdings.map((row) => row.security_id).filter(Boolean),
@@ -4762,7 +5367,7 @@
       ])];
 
       const securitiesMap = {};
-      const intradayPriceMap = {};   // security_id → latest current_price (Rands)
+      const intradayPriceMap = {};   // security_id &rarr; latest current_price (Rands)
       const profilesMap = {};
       const onboardingPackDetailsMap = {};
       const strategiesMap = {};
@@ -4889,6 +5494,39 @@
         }
       }
 
+      /* Execution-reserve (8% buffer) ledger &mdash; per-holding slippage the reserve
+         absorbed (slippage_drawdown) vs. what spilled past it (shortfall = MINT's
+         out-of-pocket loss). Folded into the MINT PnL column so admins see true
+         execution economics without an extra column. Read through the API's
+         service-role key so it works regardless of RLS on buffer_drawdowns_c. */
+      if (holdingIds.length) {
+        const { data: ddSession } = await supabaseClient.auth.getSession();
+        const ddToken = ddSession?.session?.access_token;
+        if (ddToken) {
+          parallelQueries.push(
+            fetch('/api/orderbook/send-csv?action=get-buffer-drawdowns', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ddToken}` },
+              body: JSON.stringify({ holdingIds })
+            })
+              .then(r => r.ok ? r.json() : { drawdowns: [] })
+              .then(({ drawdowns }) => {
+                (drawdowns || []).forEach((d) => {
+                  if (!d.holding_id) return;
+                  const id = String(d.holding_id);
+                  const cents = Math.max(0, Math.round(Number(d.delta_cents) || 0));
+                  if (d.event_type === 'shortfall') {
+                    mintShortfallByHolding.set(id, (mintShortfallByHolding.get(id) || 0) + cents);
+                  } else {
+                    mintBufferUsedByHolding.set(id, (mintBufferUsedByHolding.get(id) || 0) + cents);
+                  }
+                });
+              })
+              .catch(err => console.error('get-buffer-drawdowns error:', err))
+          );
+        }
+      }
+
       await Promise.all(parallelQueries);
 
       const archivedSourceIds = getArchivedSourceIds();
@@ -4932,6 +5570,16 @@
         const avgFillRaw = (row.avg_fill != null && row.avg_fill !== '') ? Number(row.avg_fill) : NaN;
         const avgFillValue = Number.isFinite(avgFillRaw) ? (avgFillRaw / 100) : NaN;
         const hasAvgFill = Number.isFinite(avgFillValue);
+        /* Expected_fill is the per-share price recorded at click time (rands).
+           Guard against legacy rows that stored it in cents &mdash; if >5&times; the
+           avg_fill-in-rands, treat as cents and divide. Used for the Actual
+           Fill column only; PnL math stays on avg_fill. */
+        let actualFillValue = Number(row.expected_fill);
+        if (!Number.isFinite(actualFillValue) || actualFillValue <= 0) actualFillValue = NaN;
+        if (Number.isFinite(actualFillValue) && hasAvgFill && avgFillValue > 0 && actualFillValue > avgFillValue * 5) {
+          actualFillValue = actualFillValue / 100;
+        }
+        const hasActualFill = Number.isFinite(actualFillValue) && actualFillValue > 0;
         // Prefer live intraday price; fall back to securities_c.last_price.
         const rawLastPrice = intradayPriceMap[row.security_id] ?? Number(security.last_price);
         const lastPrice = Number(rawLastPrice);
@@ -4942,9 +5590,15 @@
         const computedMarketValueNumber = (isQuantityNumeric && hasExpectedFillPrice)
           ? (Math.abs(quantityValue) * expectedFillPrice)
           : 0;
-        // Initial PnL = qty × (lastPrice − avgFill). Only meaningful when both prices are known.
-        const computedInitialPnlNumber = (isQuantityNumeric && hasAvgFill && hasLastPrice)
-          ? (Math.abs(quantityValue) * (lastPrice - avgFillValue))
+        /* Client PnL = qty &times; (lastPrice &minus; Expected_fill). Expected_fill (actualFillValue,
+           already in rands with the legacy-cents guard above) is the price the client SAW
+           when they tapped Buy &mdash; their true cost basis. avg_fill carries MINT's execution
+           spread and must NOT be used here (matches the MINT client app + the buffer ledger).
+           Falls back to avg_fill only for legacy rows with no Expected_fill. */
+        const clientCostBasis = hasActualFill ? actualFillValue : (hasAvgFill ? avgFillValue : NaN);
+        const hasClientCostBasis = Number.isFinite(clientCostBasis);
+        const computedInitialPnlNumber = (isQuantityNumeric && hasClientCostBasis && hasLastPrice)
+          ? (Math.abs(quantityValue) * (lastPrice - clientCostBasis))
           : 0;
         const normalizedUnrealizedPnlNumber = computedInitialPnlNumber;
         const explicitSide = String(row.trade_side || '').trim().toUpperCase();
@@ -4960,10 +5614,13 @@
         const avgFill = hasAvgFill
           ? `R ${avgFillValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : '-';
+        const actualFill = hasActualFill
+          ? `R ${actualFillValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          : '-';
         const marketValue = (isQuantityNumeric && hasExpectedFillPrice)
           ? `R ${computedMarketValueNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : '-';
-        const unrealizedPnl = (isQuantityNumeric && hasAvgFill && hasLastPrice)
+        const unrealizedPnl = (isQuantityNumeric && hasClientCostBasis && hasLastPrice)
           ? computedInitialPnlNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
           : '-';
 
@@ -4992,6 +5649,8 @@
           totalQuantity,
           avgFillNumber: hasAvgFill ? avgFillValue : null,
           avgFill,
+          actualFillNumber: hasActualFill ? actualFillValue : null,
+          actualFill,
           marketValueNumber: computedMarketValueNumber,
           marketValue,
           unrealizedPnlNumber: normalizedUnrealizedPnlNumber,
@@ -5013,9 +5672,11 @@
           closedReason: String(row.closed_reason || ''),
           closedAt: row.closed_at || null,
           rebalanceBatchId: row.rebalance_batch_id || null,
+          transactionId: row.transaction_id || null,
           isPendingRebalance: false,
           rebalanceBatchStatus: null,
-          notificationStatus: orderEmailsMap[row.rebalance_batch_id] || orderEmailsMap[row.id] || 'pending'
+          notificationStatus: orderEmailsMap[row.rebalance_batch_id] || orderEmailsMap[row.id] || 'pending',
+          createdAt: row.created_at || null,
         };
       });
 
@@ -5030,7 +5691,7 @@
         // Always show pending rebalance events
         if (row.isPendingRebalance) return true;
 
-        // Hide SETTLED rebalance_event rows — stock_holdings_c audit rows cover them
+        // Hide SETTLED rebalance_event rows &mdash; stock_holdings_c audit rows cover them
         if (row.rebalanceEventId && row.rebalanceBatchStatus === 'SETTLED') return false;
 
         // Hide REVERSED rebalance events (they are no longer actionable).
@@ -5044,18 +5705,18 @@
         const side = String(row.tradeSide || row.side || '').toUpperCase();
         const reason = String(row.closedReason || '').toUpperCase();
 
-        // Rows linked to a rebalance batch should NOT appear in the regular
-        // orderbook — they are already represented by the "Rebalance —" entry
-        // in Closed Books.  Only PENDING rebalance rows (handled above) belong
-        // in the live view.
-        if (row.rebalanceBatchId) return false;
+        // Settled rebalance holdings (active BUY rows with rebalance_batch_id)
+        // DO belong in the live orderbook — they are real current positions.
+        // They get a "Rebalanced" badge in the render so they're visually distinct
+        // from original purchases. Only hide the inactive side (the sold shares
+        // are already captured by the SELL audit row and the Rebalances tab).
 
         if (isActive) return true;
         if (side === 'SELL') return true;
         return false;
       });
 
-      /* ── Map rebalance_event rows into orderbook-compatible format ── */
+      /* Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Map rebalance_event rows into orderbook-compatible format Ã¢&rdquo;â¬Ã¢&rdquo;â¬ */
       const rebEventRows = rebEvents.map((evt, idx) => {
         const batch = batchById[evt.batch_id] || {};
         const batchStatus = batch.status || '';
@@ -5122,7 +5783,7 @@
           rebalanceBatchStatus: batchStatus,
         };
       }).filter((row) => {
-        // Show only PENDING rebalance events — SETTLED ones are covered by stock_holdings_c audit rows, REVERSED are no longer actionable
+        // Show only PENDING rebalance events &mdash; SETTLED ones are covered by stock_holdings_c audit rows, REVERSED are no longer actionable
         return row.rebalanceBatchStatus === 'PENDING';
       });
 
@@ -5137,7 +5798,7 @@
       allBirSourceRows = rawRows;
       allOrderbookRawRows = settledRows;
 
-      // ── Build standalone rebalance batches ──
+      // Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Build standalone rebalance batches Ã¢&rdquo;â¬Ã¢&rdquo;â¬
       rebalanceBatchesForStandaloneList = rebBatches
         .filter((b) => ['PENDING', 'SETTLED', 'REVERSED'].includes(String(b.status || '').toUpperCase()))
         .map((b) => {
@@ -5216,7 +5877,7 @@
       orderbookSearch.addEventListener('input', applySearchFilter);
     }
 
-    /* ── Sort toggle for Active Order Books ── */
+    /* Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Sort toggle for Active Order Books Ã¢&rdquo;â¬Ã¢&rdquo;â¬ */
     const obSortBtn = document.getElementById('obSortBtn');
     const obSortLabel = document.getElementById('obSortLabel');
     const sortCycle = ['newest', 'oldest', 'as-is'];
@@ -5271,22 +5932,22 @@
     }
 
     const fmtRand = (cents) => {
-      if (!cents && cents !== 0) return '—';
+      if (!cents && cents !== 0) return '&mdash;';
       return 'R ' + (Number(cents) / 100).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
     const fmtDate = (iso) => {
-      if (!iso) return '—';
+      if (!iso) return '&mdash;';
       try { return new Date(iso).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return iso; }
     };
 
 
-      /* ── Fill & Settle Modal (inline, dynamic) ── */
+      /* Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Fill & Settle Modal (inline, dynamic) Ã¢&rdquo;â¬Ã¢&rdquo;â¬ */
       const openFillSettleModal = async (batchId) => {
         try {
           const [batchResult, eventsResult] = await Promise.all([
             supabaseClient.from('rebalance_batch').select('*').eq('id', batchId).single(),
             supabaseClient.from('rebalance_event')
-              .select('id, batch_id, user_id, security_id, trade_side, quantity, price_at_commit, avg_fill, fill_date, closed_reason, strategy_name_snapshot, settled_holding_id')
+              .select('id, batch_id, user_id, family_member_id, security_id, trade_side, quantity, price_at_commit, avg_fill, fill_date, closed_reason, strategy_name_snapshot, settled_holding_id')
               .eq('batch_id', batchId),
           ]);
           if (batchResult.error) throw new Error(batchResult.error.message);
@@ -5315,24 +5976,27 @@
           fillModal.innerHTML = `
             <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:28px 32px;max-width:540px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
               <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;color:#f1f5f9;">Fill &amp; Settle Rebalance</h3>
-              <p style="margin:0 0 20px;font-size:13px;color:#94a3b8;">${batch.strategy_name_snapshot || batch.strategy_id} — ${events.length} events for ${[...new Set(events.map((e)=>e.user_id))].length} clients</p>
+              <p style="margin:0 0 20px;font-size:13px;color:#94a3b8;">${batch.strategy_name_snapshot || batch.strategy_id} &mdash; ${events.length} events for ${[...new Set(events.map((e)=>e.user_id))].length} clients</p>
               <div style="display:grid;gap:14px;">
+                ${sellEvts.length ? `
                 <div>
-                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">SELL Fill Price (R) — ${totalSellQty} units · committed ${fmtRand(sellEvts[0]?.price_at_commit)}</label>
+                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">SELL Fill Price (R) &mdash; ${totalSellQty} units &middot; committed ${fmtRand(sellEvts[0]?.price_at_commit)}</label>
                   <input id="fillSellPrice" type="number" step="0.01" min="0" value="${sellCommitR}" placeholder="e.g. 142.50"
                     style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
-                </div>
+                </div>` : ''}
+                ${buyEvts.length ? `
                 <div>
-                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">BUY Fill Price (R) — ${totalBuyQty} units · committed ${fmtRand(buyEvts[0]?.price_at_commit)}</label>
+                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">BUY Fill Price (R) &mdash; ${totalBuyQty} units &middot; committed ${fmtRand(buyEvts[0]?.price_at_commit)}</label>
                   <input id="fillBuyPrice" type="number" step="0.01" min="0" value="${buyCommitR}" placeholder="e.g. 98.20"
                     style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
-                </div>
+                </div>` : ''}
                 ${walletBuyEvts.length ? `
                 <div>
-                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">Extra BUY Fill Price (R) — ${totalExtraQty} units · committed ${fmtRand(walletBuyEvts[0]?.price_at_commit)}</label>
+                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">Extra BUY Fill Price (R) &mdash; ${totalExtraQty} units &middot; committed ${fmtRand(walletBuyEvts[0]?.price_at_commit)}</label>
                   <input id="fillExtraBuyPrice" type="number" step="0.01" min="0" value="${extraCommitR}" placeholder="e.g. 98.20"
                     style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
                 </div>` : ''}
+                ${!sellEvts.length && !buyEvts.length && !walletBuyEvts.length ? '<p style="color:#fca5a5;font-size:13px;">No events to settle in this batch.</p>' : ''}
               </div>
               <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:24px;">
                 <button id="fillSettleCancelBtn" style="padding:10px 20px;background:transparent;border:1px solid #475569;border-radius:8px;color:#94a3b8;font-size:14px;cursor:pointer;">Cancel</button>
@@ -5348,15 +6012,17 @@
 
           const confirmBtn = document.getElementById('fillSettleConfirmBtn');
           confirmBtn.addEventListener('click', async () => {
-            const sellR = parseFloat(document.getElementById('fillSellPrice')?.value || '0');
-            const buyR = parseFloat(document.getElementById('fillBuyPrice')?.value || '0');
+            const sellInput = document.getElementById('fillSellPrice');
+            const buyInput = document.getElementById('fillBuyPrice');
             const extraBuyInput = document.getElementById('fillExtraBuyPrice');
+            const sellR = sellInput ? parseFloat(sellInput.value || '0') : 0;
+            const buyR = buyInput ? parseFloat(buyInput.value || '0') : 0;
             const extraBuyR = extraBuyInput ? parseFloat(extraBuyInput.value || '0') : 0;
-            if (!sellR || sellR <= 0) { alert('Enter a valid SELL fill price.'); return; }
-            if (!buyR || buyR <= 0) { alert('Enter a valid BUY fill price.'); return; }
+            if (sellEvts.length && (!sellR || sellR <= 0)) { alert('Enter a valid SELL fill price.'); return; }
+            if (buyEvts.length && (!buyR || buyR <= 0)) { alert('Enter a valid BUY fill price.'); return; }
             if (walletBuyEvts.length && (!extraBuyR || extraBuyR <= 0)) { alert('Enter a valid Extra BUY fill price.'); return; }
             confirmBtn.disabled = true;
-            confirmBtn.textContent = 'Settling…';
+            confirmBtn.textContent = 'SettlingÃ¢â¬Â¦';
             try {
               await executeFillAndSettle(batch, events, Math.round(sellR * 100), Math.round(buyR * 100), walletBuyEvts.length ? Math.round(extraBuyR * 100) : 0);
               closeFillModal();
@@ -5383,9 +6049,21 @@
 
         const errors = [];
 
-        // ── 1. Close / reduce existing SELL positions for every user ──
+        /* Cost basis carryover was removed in favour of clean per-trade
+           recording: each new BUY lands at its actual market fill price.
+           Realized gain from the SELL flows into wallets.rebalance_residual.
+           See docs/rebalance-cost-basis-carryover.md for the rationale and
+           how to reinstate carryover if the decision changes. */
+
+        // Ã¢&rdquo;â¬Ã¢&rdquo;â¬ 1. Close / reduce existing SELL positions for every user Ã¢&rdquo;â¬Ã¢&rdquo;â¬
         for (const evt of sellEvts) {
-          const { data: activePositions, error: fetchErr } = await supabaseClient
+          /* Critical: scope by family_member_id too. Without this, when a
+             parent AND their child both hold the same security in the same
+             strategy, the lookup returns both rows and .find(...) silently
+             picks one &mdash; risking the child's position getting closed when only
+             the parent's should be. evt.family_member_id is NULL for parent
+             events and a uuid for per-child events. */
+          let activeQuery = supabaseClient
             .from('stock_holdings_c')
             .select('id, quantity')
             .eq('strategy_id', strategyId)
@@ -5393,6 +6071,10 @@
             .eq('security_id', evt.security_id)
             .eq('is_active', true)
             .eq('trade_side', 'BUY');
+          activeQuery = evt.family_member_id
+            ? activeQuery.eq('family_member_id', evt.family_member_id)
+            : activeQuery.is('family_member_id', null);
+          const { data: activePositions, error: fetchErr } = await activeQuery;
 
           if (fetchErr) { errors.push(`SELL lookup: ${fetchErr.message}`); continue; }
 
@@ -5402,7 +6084,7 @@
           if (activePos) {
             const remaining = Math.max(0, Number(activePos.quantity) - soldQty);
             if (remaining <= 0) {
-              // Full close — mark position inactive
+              // Full close &mdash; mark position inactive
               const { error: closeErr } = await supabaseClient.from('stock_holdings_c').update({
                 is_active: false,
                 closed_reason: 'REBALANCE_SELL',
@@ -5414,7 +6096,7 @@
               }).eq('id', activePos.id);
               if (closeErr) errors.push(`SELL close ${evt.user_id}: ${closeErr.message}`);
             } else {
-              // Partial reduce — keep position active with reduced qty
+              // Partial reduce &mdash; keep position active with reduced qty
               const { error: reduceErr } = await supabaseClient.from('stock_holdings_c').update({
                 quantity: remaining,
                 updated_at: nowIso,
@@ -5440,13 +6122,14 @@
                 });
                 if (match) originalQty = Number(match.quantity) || 0;
               }
-            } catch (_) { /* snapshot parse failed – originalQty stays 0 */ }
+            } catch (_) { /* snapshot parse failed &mdash; originalQty stays 0 */ }
 
             const remaining = originalQty - soldQty;
             if (remaining > 0) {
               // Materialise the leftover shares as an active BUY in stock_holdings_c
               const { error: matErr } = await supabaseClient.from('stock_holdings_c').insert({
                 user_id: evt.user_id,
+                family_member_id: evt.family_member_id || null,
                 security_id: evt.security_id,
                 quantity: remaining,
                 strategy_id: strategyId,
@@ -5469,6 +6152,7 @@
           // Insert SELL audit row into stock_holdings_c
           const { error: sellInsertErr } = await supabaseClient.from('stock_holdings_c').insert({
             user_id: evt.user_id,
+            family_member_id: evt.family_member_id || null,
             security_id: evt.security_id,
             quantity: Number(evt.quantity) || 0,
             strategy_id: strategyId,
@@ -5497,22 +6181,37 @@
           if (evtUpErr) errors.push(`SELL event update: ${evtUpErr.message}`);
         }
 
-        // ── 2. Create new BUY holdings for every user (primary + wallet) ──
-        const applyBuySettlement = async (buyEvtList, fillCents, label) => {
+        // Ã¢&rdquo;â¬Ã¢&rdquo;â¬ 2. Create new BUY holdings for every user (primary + wallet) Ã¢&rdquo;â¬Ã¢&rdquo;â¬
+        // perUserFillCents: optional map of user_id -> avg_fill_cents that
+        // overrides defaultFillCents. Used for cost-basis carryover on
+        // primary BUYs (the carried-over basis preserves PnL across the swap).
+        const applyBuySettlement = async (buyEvtList, defaultFillCents, label, perUserFillCents) => {
           for (const evt of buyEvtList) {
             const qty = Number(evt.quantity) || 0;
             if (qty <= 0) continue;
 
+            const uid = String(evt.user_id || '');
+            const fillCentsForUser = (perUserFillCents && perUserFillCents[uid] != null)
+              ? perUserFillCents[uid]
+              : defaultFillCents;
+
+            /* Expected_fill = committed price in rands (price_at_commit is cents).
+               This is the price the admin locked in at execution time — the best
+               proxy for "what price was shown" on a rebalance buy, so PnL cost
+               basis works correctly just like a regular purchase. */
+            const expectedFillRands = evt.price_at_commit ? Number(evt.price_at_commit) / 100 : null;
             const { data: insertedBuy, error: buyInsertErr } = await supabaseClient
               .from('stock_holdings_c')
               .insert({
                 user_id: evt.user_id,
+                family_member_id: evt.family_member_id || null,
                 security_id: evt.security_id,
                 quantity: qty,
                 strategy_id: strategyId,
                 trade_side: 'BUY',
                 is_active: true,
-                avg_fill: fillCents,
+                avg_fill: fillCentsForUser,
+                "Expected_fill": expectedFillRands,
                 "Fill_date": fillDateStr,
                 rebalance_batch_id: batch.id,
                 strategy_name_snapshot: batch.strategy_name_snapshot,
@@ -5534,7 +6233,7 @@
             const { error: evtUpErr } = await supabaseClient
               .from('rebalance_event')
               .update({
-                avg_fill: fillCents,
+                avg_fill: fillCentsForUser,
                 fill_date: fillDateStr,
                 updated_at: nowIso,
                 settled_holding_id: settledId,
@@ -5544,12 +6243,76 @@
           }
         };
 
-        await applyBuySettlement(buyEvts, buyFillCents, 'BUY');
+        // No cost basis carryover: both primary and wallet-funded buys land
+        // at their actual market fill price (see docs/rebalance-cost-basis-
+        // carryover.md for the rationale). Realized gain from the sell side
+        // flows into wallets.rebalance_residual via the commit handler.
+        await applyBuySettlement(buyEvts, buyFillCents, 'BUY', null);
         if (walletBuyEvts.length) {
-          await applyBuySettlement(walletBuyEvts, extraBuyFillCents || buyFillCents, 'WALLET_BUY');
+          await applyBuySettlement(walletBuyEvts, extraBuyFillCents || buyFillCents, 'WALLET_BUY', null);
         }
 
-        // ── 3. Mark batch SETTLED ──
+        /* ââ 2.5 Write a R0 transactions row per affected (user,family_member)
+           so each rebalance shows up in MINT's activity feed for the right
+           owner. Amount = 0 because positionsâpositions isn't money in/out;
+           MINT's list reads name/description for the display label. */
+        try {
+          const allEvtsForTxn = [...sellEvts, ...buyEvts, ...walletBuyEvts];
+          const securityIds = [...new Set(allEvtsForTxn.map((e) => e.security_id).filter(Boolean))];
+          const symbolBySecId = {};
+          if (securityIds.length) {
+            const { data: secs } = await supabaseClient
+              .from('securities_c')
+              .select('id, symbol')
+              .in('id', securityIds);
+            (secs || []).forEach((s) => { symbolBySecId[s.id] = s.symbol || String(s.id).slice(0, 6); });
+          }
+          const stratName = batch?.strategy_name_snapshot || 'Strategy';
+          /* Group by (user_id, family_member_id) so parent and child each
+             get their own activity entry. The composite key handles NULL
+             via a sentinel string. */
+          const ownerKeys = new Set();
+          allEvtsForTxn.forEach((e) => {
+            const uid = String(e.user_id || '');
+            if (!uid) return;
+            const fm = e.family_member_id ? String(e.family_member_id) : '';
+            ownerKeys.add(`${uid}|${fm}`);
+          });
+          const txnRows = [...ownerKeys].map((key) => {
+            const [uid, fm] = key.split('|');
+            const fmId = fm || null;
+            const own = (e) => String(e.user_id) === uid
+              && (e.family_member_id ? String(e.family_member_id) : '') === (fmId || '');
+            const userSells = sellEvts.filter(own);
+            const userBuys = [...buyEvts, ...walletBuyEvts].filter(own);
+            const sellSummary = userSells.length
+              ? `sold ${userSells.reduce((s, e) => s + Number(e.quantity || 0), 0)} &times; ${symbolBySecId[userSells[0].security_id] || '?'}`
+              : '';
+            const buySummary = userBuys.length
+              ? `bought ${userBuys.reduce((s, e) => s + Number(e.quantity || 0), 0)} &times; ${symbolBySecId[userBuys[0].security_id] || '?'}`
+              : '';
+            const parts = [sellSummary, buySummary].filter(Boolean);
+            return {
+              user_id: uid,
+              family_member_id: fmId,
+              amount: 0,
+              direction: 'credit',
+              status: 'posted',
+              name: `Rebalance: ${stratName}`,
+              description: parts.length ? parts.join(', ') : 'Strategy rebalance',
+              currency: 'ZAR',
+              transaction_date: nowIso,
+            };
+          });
+          if (txnRows.length) {
+            const { error: txnErr } = await supabaseClient.from('transactions').insert(txnRows);
+            if (txnErr) errors.push(`Rebalance txn insert: ${txnErr.message}`);
+          }
+        } catch (txnCatchErr) {
+          errors.push(`Rebalance txn step failed: ${txnCatchErr?.message || txnCatchErr}`);
+        }
+
+        // Ã¢&rdquo;â¬Ã¢&rdquo;â¬ 3. Mark batch SETTLED Ã¢&rdquo;â¬Ã¢&rdquo;â¬
         const { error: settleErr } = await supabaseClient.from('rebalance_batch').update({
           status: 'SETTLED', settled_at: nowIso, updated_at: nowIso,
         }).eq('id', batch.id);
@@ -5562,10 +6325,10 @@
         }
       };
 
-      /* ── Reverse Rebalance Batch ── */
+      /* Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Reverse Rebalance Batch Ã¢&rdquo;â¬Ã¢&rdquo;â¬ */
       const executeReverseRebalanceBatch = async (batchId) => {
         const reason = prompt(
-          'Reverse this pending rebalance batch?\n\nThis will:\n• Mark all events as REVERSED\n• Restore the strategy composition to its pre-rebalance state\n• Restore wallet balances to their pre-rebalance values\n\nEnter a reason (optional):',
+          'Reverse this pending rebalance batch?\n\nThis will:\n&bull; Mark all events as REVERSED\n&bull; Restore the strategy composition to its pre-rebalance state\n&bull; Restore wallet balances to their pre-rebalance values\n\nEnter a reason (optional):',
           ''
         );
         if (reason === null) return;
@@ -5601,26 +6364,23 @@
             if (stratErr) errors.push('Strategy restore: ' + stratErr.message);
           }
 
-          // 4. Restore wallet balances from snapshot
-          if (batch.strategy_id && batch.wallet_snapshot_before && typeof batch.wallet_snapshot_before === 'object') {
-            const walletRows = Object.entries(batch.wallet_snapshot_before)
-              .map(([userId, balance]) => ({
-                strategy_id: batch.strategy_id,
-                user_id: userId,
-                balance: Number(balance) || 0,
-                updated_at: nowIso,
-              }))
-              .filter((r) => r.user_id);
-            if (walletRows.length) {
+          // 4. Restore rebalance_residual balances from snapshot.
+          // Snapshot stores Rand amounts (as seen in-app); the column itself
+          // is stored in cents, so we &times;100 on write.
+          if (batch.wallet_snapshot_before && typeof batch.wallet_snapshot_before === 'object') {
+            await Promise.all(Object.entries(batch.wallet_snapshot_before).map(async ([userId, balance]) => {
+              if (!userId) return;
+              const cents = Math.round((Number(balance) || 0) * 100);
               const { error: walletErr } = await supabaseClient
-                .from('strategy_client_wallet_credits')
-                .upsert(walletRows, { onConflict: 'strategy_id,user_id' });
+                .from('wallets')
+                .update({ rebalance_residual: cents, updated_at: nowIso })
+                .eq('user_id', userId);
               if (walletErr) errors.push('Wallet restore: ' + walletErr.message);
-            }
+            }));
           }
 
           // 5. Delete any stock_holdings_c rows that were created by this batch's settlement
-          //    (in case the batch was settled before reversal — safety net)
+          //    (in case the batch was settled before reversal &mdash; safety net)
           const { error: holdingsDelErr } = await supabaseClient
             .from('stock_holdings_c')
             .delete()
@@ -5639,7 +6399,7 @@
         }
       };
 
-      /* ── Reverse Investor Order (per-user, per-strategy or per-security) ── */
+      /* Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Reverse Investor Order (per-user, per-strategy or per-security) Ã¢&rdquo;â¬Ã¢&rdquo;â¬ */
       const _reverseState = { payload: null, holdings: [], txns: [], walletId: null, walletBefore: 0, refund: 0, refundCents: 0, selectedTxnId: null };
 
       const getReverseModalEls = () => ({
@@ -5724,6 +6484,27 @@
             .eq('user_id', payload.userId);
           if (payload.context === 'strategy') {
             holdingsQuery = holdingsQuery.eq('strategy_id', payload.strategyId);
+            // Scope to the exact purchase (created_at minute window) so two
+            // separate buys of the same strategy don't get reversed together.
+            // Widen the window by ÃÂ±5 seconds to absorb fan-out jitter when a
+            // single purchase fans out across multiple stock_holdings_c rows.
+            if (payload.createdAtFrom) {
+              const fromMs = new Date(payload.createdAtFrom).getTime() - 5000;
+              if (Number.isFinite(fromMs)) {
+                holdingsQuery = holdingsQuery.gte('created_at', new Date(fromMs).toISOString());
+              }
+            }
+            if (payload.createdAtTo) {
+              const toMs = new Date(payload.createdAtTo).getTime() + 5000;
+              if (Number.isFinite(toMs)) {
+                holdingsQuery = holdingsQuery.lte('created_at', new Date(toMs).toISOString());
+              }
+            }
+            if (payload.familyMemberId) {
+              holdingsQuery = holdingsQuery.eq('family_member_id', payload.familyMemberId);
+            } else {
+              holdingsQuery = holdingsQuery.is('family_member_id', null);
+            }
           } else {
             holdingsQuery = holdingsQuery.eq('id', payload.sourceId);
           }
@@ -5751,7 +6532,7 @@
               .maybeSingle();
             if (fmErr) throw new Error(fmErr.message);
             _reverseState.walletId = fmRow?.id || null;
-            // available_balance is stored in cents — convert to Rands for display.
+            // available_balance is stored in cents &mdash; convert to Rands for display.
             _reverseState.walletBefore = Number(fmRow?.available_balance || 0) / 100;
           } else {
             const { data: walletRow, error: wErr } = await supabaseClient
@@ -5768,7 +6549,7 @@
             ? payload.strategyName
             : (payload.instrument || payload.ticker);
 
-          // transactions.user_id is RLS-restricted — use the API (service-role key) to read.
+          // transactions.user_id is RLS-restricted &mdash; use the API (service-role key) to read.
           const { data: sessionData } = await supabaseClient.auth.getSession();
           const apiToken = sessionData?.session?.access_token;
           if (!apiToken) throw new Error('Your session has expired. Please sign in again.');
@@ -5793,10 +6574,12 @@
           if (!txnResp.ok) throw new Error(txnRespJson?.error || 'Failed to load transactions');
           const allTxns = Array.isArray(txnRespJson.transactions) ? txnRespJson.transactions : [];
 
-          // Filter to txns referencing THIS strategy/security only — match by
-          // name substring (e.g. "Strategy Investment: Yield Basket" matches "Yield Basket")
-          // OR by the id appearing in the description JSON.
+          // Filter to txns referencing THIS strategy/security.
+          // Strategy: name includes strategy name (e.g. &ldquo;Strategy Investment: Yield Basket&rdquo;)
+          // Single security: name is &ldquo;Purchased {ticker}&rdquo; &mdash; match on ticker OR full
+          // instrument name OR security_id in description as fallback.
           const lowerTarget = String(targetName || '').toLowerCase().trim();
+          const lowerTicker = String(payload.ticker || '').toLowerCase().trim();
           const matchId = payload.context === 'strategy'
             ? String(payload.strategyId || '')
             : String(payload.securityId || '');
@@ -5804,6 +6587,7 @@
             const tn = String(t.name || '').toLowerCase();
             const desc = String(t.description || '');
             if (lowerTarget && tn.includes(lowerTarget)) return true;
+            if (lowerTicker && tn.includes(lowerTicker)) return true;
             if (matchId && desc.includes(matchId)) return true;
             return false;
           });
@@ -5856,7 +6640,7 @@
             els.confirmBtn.disabled = false;
           } else if (!_reverseState.walletId) {
             els.warning.style.display = 'block';
-            els.warning.textContent = `This investor has no existing wallet — a new wallet row will be created with the refund as the balance.`;
+            els.warning.textContent = `This investor has no existing wallet &mdash; a new wallet row will be created with the refund as the balance.`;
           }
 
           els.loading.style.display = 'none';
@@ -5922,6 +6706,11 @@
               sourceId: payload.sourceId || null,
               selectedTxnId: _reverseState.selectedTxnId || null,
               targetName: targetName || 'Order',
+              /* Scope to the specific buy event when present (set by the
+                 investors-panel reverse button). Optional &mdash; falls back to
+                 the whole strategy if missing. */
+              createdAtFrom: payload.createdAtFrom || null,
+              createdAtTo: payload.createdAtTo || null,
             })
           });
           const result = await resp.json().catch(() => ({}));
@@ -5932,11 +6721,11 @@
           // Accurate summary built from server's actual counts/balances.
           const lines = [
             `Reversal for ${payload.userName || 'investor'}:`,
-            `• Holdings deleted: ${result.deletedCount} of ${(result.requestedHoldingIds || []).length}`,
-            `• Refund: ${formatRand(result.refund || 0)}`,
-            `• Wallet: ${formatRand(result.balanceBefore || 0)} → ${formatRand(result.balanceAfter || 0)}${result.walletUpdated ? '' : ' (no wallet change)'}`,
+            `&bull; Holdings deleted: ${result.deletedCount} of ${(result.requestedHoldingIds || []).length}`,
+            `&bull; Refund: ${formatRand(result.refund || 0)}`,
+            `&bull; Wallet: ${formatRand(result.balanceBefore || 0)} &rarr; ${formatRand(result.balanceAfter || 0)}${result.walletUpdated ? '' : ' (no wallet change)'}`,
           ];
-          if (result.auditTxnId) lines.push(`• Audit txn: ${result.auditTxnId}`);
+          if (result.auditTxnId) lines.push(`&bull; Audit txn: ${result.auditTxnId}`);
 
           closeReverseModal();
           alert(lines.join('\n'));
@@ -5956,8 +6745,8 @@
       cleanupModeBtn.classList.toggle('is-active', !!cleanupMode);
       cleanupModeBtn.setAttribute('aria-pressed', cleanupMode ? 'true' : 'false');
       cleanupModeBtn.title = cleanupMode
-        ? 'Cleanup mode ON — click X next to investors to remove them. Click here to exit.'
-        : 'Cleanup mode — remove investors from snapshot JSON';
+        ? 'Cleanup mode ON &mdash; click X next to investors to remove them. Click here to exit.'
+        : 'Cleanup mode &mdash; remove investors from snapshot JSON';
     };
 
     const promptForCleanupPassword = async () => {
@@ -6007,40 +6796,98 @@
       const bookId = btn.dataset.bookId;
       const rowIndex = Number(btn.dataset.rowIndex);
       const userId = btn.dataset.userId;
-      if (!bookId || !Number.isFinite(rowIndex) || !userId) return;
+      const bndSourceId = btn.dataset.bndSourceId || '';
+      const bndRowIndexRaw = btn.dataset.bndRowIndex;
+      const bndRowIndex = bndRowIndexRaw == null || bndRowIndexRaw === '' ? -1 : Number(bndRowIndexRaw);
+      if (!bookId || !Number.isFinite(rowIndex)) return;
 
       const book = filledOrderbooksArchive.find((b) => String(b.id) === String(bookId));
       if (!book || !Array.isArray(book.rows)) return;
       const row = book.rows[rowIndex];
-      if (!row || !Array.isArray(row.strategyUsers)) return;
+      if (!row) return;
 
-      const target = row.strategyUsers.find((u) => String(u.userId) === String(userId));
-      const userName = target?.clientName || 'this investor';
+      /* Two cleanup flavours share this handler:
+         - Strategy rows: data-user-id only &mdash; remove a user from strategyUsers
+           (which also strips them out of bndRows).
+         - Single-security rows: data-bnd-row-index present &mdash; remove just that
+           one BND allocation (one investor's slice of the security order). We
+           identify the target by array index first because some legacy
+           bndRows have empty sourceId (a backfill stripped it), which used
+           to silently fall through to the strategy path. */
+      const hasBndRows = Array.isArray(row.bndRows) && row.bndRows.length;
+      const isBndDelete = hasBndRows && (Number.isFinite(bndRowIndex) && bndRowIndex >= 0 || !!bndSourceId);
 
-      const isLast = row.strategyUsers.length <= 1;
-      const message = isLast
-        ? `Remove ${userName} from this orderbook?\n\nThis is the last investor in "${row.strategyName || 'Strategy'}", so the whole row will be removed from the snapshot.`
-        : `Remove ${userName} from this orderbook snapshot?`;
-      if (!window.confirm(message)) return;
+      if (isBndDelete) {
+        let targetIndex = -1;
+        if (Number.isFinite(bndRowIndex) && bndRowIndex >= 0 && bndRowIndex < row.bndRows.length) {
+          targetIndex = bndRowIndex;
+        } else if (bndSourceId) {
+          targetIndex = row.bndRows.findIndex((b) => String(b.sourceId || '') === String(bndSourceId));
+        }
+        if (targetIndex < 0) return;
+        const target = row.bndRows[targetIndex];
+        const userName = target.clientNameFull || target.clientName || 'this investor';
+        const isLast = row.bndRows.length <= 1;
+        const securityLabel = row.instrumentName || row.ticker || 'Security';
+        const message = isLast
+          ? `Remove ${userName} from this orderbook?\n\nThis is the last investor in "${securityLabel}", so the whole row will be removed from the snapshot.`
+          : `Remove ${userName} from this orderbook snapshot?`;
+        if (!window.confirm(message)) return;
 
-      btn.disabled = true;
+        btn.disabled = true;
 
-      const removedMv = Number(target?.totalMarketValue || 0);
-      row.strategyUsers = row.strategyUsers.filter((u) => String(u.userId) !== String(userId));
+        const removedMv = Number(String(target.marketValue || '').replace(/[^\d.\-]/g, '')) || 0;
+        const removedQty = Number(target.quantityValue || 0);
+        const removedSourceId = String(target.sourceId || '');
+        row.bndRows = row.bndRows.filter((_, idx) => idx !== targetIndex);
+        if (Array.isArray(row.sourceIds) && removedSourceId) {
+          row.sourceIds = row.sourceIds.filter((id) => String(id) !== removedSourceId);
+        }
+        if (Number.isFinite(removedMv) && removedMv) {
+          const currentMv = Number(row.marketValueNumber || 0);
+          const nextMv = currentMv - removedMv;
+          row.marketValueNumber = nextMv;
+          row.marketValue = `R ${nextMv.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+        if (Number.isFinite(removedQty) && removedQty) {
+          const currentQty = Number(row.quantityValue || 0);
+          const nextQty = currentQty - removedQty;
+          row.quantityValue = nextQty;
+          row.totalQuantity = nextQty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 });
+        }
+        if (row.bndRows.length === 0) {
+          book.rows = book.rows.filter((_, idx) => idx !== rowIndex);
+        }
+      } else {
+        if (!userId || !Array.isArray(row.strategyUsers)) return;
+        const target = row.strategyUsers.find((u) => String(u.userId) === String(userId));
+        const userName = target?.clientName || 'this investor';
 
-      if (Array.isArray(row.bndRows) && row.bndRows.length) {
-        row.bndRows = row.bndRows.filter((b) => String(b.userId || '') !== String(userId));
-      }
+        const isLast = row.strategyUsers.length <= 1;
+        const message = isLast
+          ? `Remove ${userName} from this orderbook?\n\nThis is the last investor in "${row.strategyName || 'Strategy'}", so the whole row will be removed from the snapshot.`
+          : `Remove ${userName} from this orderbook snapshot?`;
+        if (!window.confirm(message)) return;
 
-      if (Number.isFinite(removedMv) && removedMv) {
-        const currentMv = Number(row.marketValueNumber || 0);
-        const nextMv = currentMv - removedMv;
-        row.marketValueNumber = nextMv;
-        row.marketValue = `R ${nextMv.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      }
+        btn.disabled = true;
 
-      if (row.strategyUsers.length === 0) {
-        book.rows = book.rows.filter((_, idx) => idx !== rowIndex);
+        const removedMv = Number(target?.totalMarketValue || 0);
+        row.strategyUsers = row.strategyUsers.filter((u) => String(u.userId) !== String(userId));
+
+        if (Array.isArray(row.bndRows) && row.bndRows.length) {
+          row.bndRows = row.bndRows.filter((b) => String(b.userId || '') !== String(userId));
+        }
+
+        if (Number.isFinite(removedMv) && removedMv) {
+          const currentMv = Number(row.marketValueNumber || 0);
+          const nextMv = currentMv - removedMv;
+          row.marketValueNumber = nextMv;
+          row.marketValue = `R ${nextMv.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+
+        if (row.strategyUsers.length === 0) {
+          book.rows = book.rows.filter((_, idx) => idx !== rowIndex);
+        }
       }
 
       try {
@@ -6059,10 +6906,26 @@
       renderFilledOrderbooks();
     };
 
+    const handleMoveToClosedClick = (event) => {
+      const btn = event.target.closest('[data-move-to-closed]');
+      if (!btn) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const bookId = btn.dataset.bookId;
+      if (!bookId) return;
+      if (!window.confirm('Move this book to Closed Books?')) return;
+
+      markBookManuallyClosed(bookId);
+      renderFilledOrderbooks();
+    };
+
     if (filledOrderbooksList) {
       filledOrderbooksList.addEventListener('click', handleCleanupDeleteClick);
+      filledOrderbooksList.addEventListener('click', handleMoveToClosedClick);
       filledOrderbooksList.addEventListener('click', async (event) => {
         if (event.target.closest('[data-cleanup-delete]')) return;
+        if (event.target.closest('[data-move-to-closed]')) return;
 
         const toggleFilledColumn = event.target.closest('[data-toggle-filled-col]');
         if (toggleFilledColumn) {
@@ -6290,7 +7153,7 @@
     }
 
 
-    /* ── Price Update Logic ── */
+    /* Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Price Update Logic Ã¢&rdquo;â¬Ã¢&rdquo;â¬ */
     let currentEditRow = null;
 
     const getPriceModalEls = () => ({
@@ -6348,7 +7211,7 @@
       const side = String(row.tradeSide || row.side || '').toUpperCase();
       const isBuy = side === 'BUY';
       
-      priceModalInstrument.textContent = `${row.ticker || ''} · ${row.instrumentName || ''}`;
+      priceModalInstrument.textContent = `${row.ticker || ''} &middot; ${row.instrumentName || ''}`;
       
       // Show side with badge style
       const sideEl = document.getElementById('priceModalSide');
@@ -6442,11 +7305,117 @@
         securityId: d.securityId || '',
         instrument: d.instrument || '',
         ticker: d.ticker || '',
+        /* Scope reversal to the specific purchase (created_at minute bucket)
+           when present &mdash; otherwise it falls back to the whole strategy. */
+        createdAtFrom: d.createdAtFrom || null,
+        createdAtTo: d.createdAtTo || null,
       };
       if (!payload.userId) { alert('Missing user id on this row.'); return; }
       if (payload.context === 'strategy' && !payload.strategyId) { alert('Missing strategy id on this row.'); return; }
       if (payload.context === 'security' && !payload.sourceId) { alert('Missing source id on this row.'); return; }
       openReverseInvestorModal(payload).catch((err) => alert('Reverse modal error: ' + (err?.message || err)));
+    });
+
+    /* Investor row click &rarr; select, highlight purple, render detail panel,
+       AND re-render the Holdings table above to show only that investor's
+       holdings (with their own avg_fill that can be edited independently).
+       Detail panel close button clears the selection.
+
+       bookId/rowIndex are passed for Active / Closed Books snapshots &mdash; they
+       point back to filledOrderbooksArchive[book].rows[rowIndex] (the source
+       row that lives on the snapshot, not in the live orderbook) and scope
+       the panel queries to the right instance when the same strategy appears
+       in multiple books on the page. */
+    const refreshStrategyDetailViews = async (strategyId, bookId = null, rowIndex = null) => {
+      if (!strategyId) return;
+      let stratRow = null;
+      if (bookId != null && rowIndex != null) {
+        const book = filledOrderbooksArchive.find((b) => String(b.id) === String(bookId));
+        stratRow = book?.rows?.[Number(rowIndex)] || null;
+      }
+      if (!stratRow) {
+        stratRow = (allOrderbookRows || []).find((r) => r.isStrategy && String(r.strategyId || '') === String(strategyId));
+      }
+      if (!stratRow) return;
+      const archiveScope = bookId != null && rowIndex != null
+        ? `[data-book-id="${CSS.escape(String(bookId))}"][data-row-index="${CSS.escape(String(rowIndex))}"]`
+        : ':not([data-book-id])';
+      const holdingsPanel = document.querySelector(`[data-strategy-holdings-panel][data-strategy-id="${CSS.escape(strategyId)}"]${archiveScope}`);
+      if (holdingsPanel) holdingsPanel.innerHTML = renderStrategyHoldingsHtml(stratRow);
+      const detailPanel = document.querySelector(`[data-investor-detail-panel][data-strategy-id="${CSS.escape(strategyId)}"]${archiveScope}`);
+      if (detailPanel) detailPanel.innerHTML = renderInvestorDetailPanel(stratRow);
+
+      /* Archive context + an investor selected: the snapshot's aggregated
+         avg_fill collapses every purchase into one number, so we fetch the
+         actual per-source-id fills for this user's specific purchase bucket
+         and re-render the Holdings panel with them. Two buys of the same
+         strategy at different times then show their own real fill state. */
+      if (selectedInvestorKey && bookId != null && holdingsPanel) {
+        const sel = (stratRow.strategyUsers || []).find((u) => buildInvestorKey(u) === selectedInvestorKey);
+        if (!sel?.sourceIds?.length) return;
+        try {
+          const realHoldings = await loadArchivedInvestorHoldings(sel.sourceIds, stratRow.strategyHoldings);
+          if (!realHoldings.length) return;
+          const stillSelected = selectedInvestorKey === buildInvestorKey(sel);
+          if (!stillSelected) return;
+          const overrideTitleSuffix = ` <span style="font-size:11px;font-weight:400;color:#7c3aed;margin-left:8px;">&middot; filtered to ${escapeHtml(sel.clientName || '')}${sel.createdAtBucket ? ' @ ' + escapeHtml(sel.createdAtBucket.replace('T', ' ')) : ''}</span>`;
+          holdingsPanel.innerHTML = renderStrategyHoldingsHtml(stratRow, {
+            editable: false,
+            overrideHoldings: realHoldings,
+            overrideTitleSuffix,
+          });
+        } catch (err) {
+          console.error('Archived investor fills fetch failed:', err);
+        }
+      }
+    };
+
+    document.addEventListener('click', (event) => {
+      const closeBtn = event.target.closest('[data-investor-detail-close]');
+      if (closeBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        const prevPanel = closeBtn.closest('[data-investor-detail-panel]');
+        const prevStrategyId = prevPanel?.dataset?.strategyId || '';
+        const prevBookId = prevPanel?.dataset?.bookId || null;
+        const prevRowIndex = prevPanel?.dataset?.rowIndex || null;
+        selectedInvestorKey = null;
+        document.querySelectorAll('.investor-row.selected').forEach((r) => r.classList.remove('selected'));
+        if (prevStrategyId) refreshStrategyDetailViews(prevStrategyId, prevBookId, prevRowIndex);
+        else document.querySelectorAll('[data-investor-detail-panel]').forEach((p) => { p.innerHTML = ''; });
+        return;
+      }
+
+      const investorRow = event.target.closest('[data-investor-row]');
+      if (!investorRow) return;
+      /* Ignore clicks on action buttons inside the row */
+      if (event.target.closest('.reverse-investor-btn, .cleanup-delete-btn')) return;
+      event.stopPropagation();
+
+      const key = investorRow.dataset.investorKey || '';
+      const strategyId = investorRow.dataset.strategyId || '';
+      const bookId = investorRow.dataset.bookId || null;
+      const rowIndex = investorRow.dataset.rowIndex || null;
+      if (!key) return;
+
+      /* Toggle off if clicking same row */
+      if (selectedInvestorKey === key) {
+        selectedInvestorKey = null;
+      } else {
+        selectedInvestorKey = key;
+      }
+
+      /* Update highlight on all rows in this strategy's investors table */
+      const tableWrap = investorRow.closest('[data-investors-table]');
+      if (tableWrap) {
+        tableWrap.querySelectorAll('.investor-row').forEach((r) => {
+          if (r.dataset.investorKey === selectedInvestorKey) r.classList.add('selected');
+          else r.classList.remove('selected');
+        });
+      }
+
+      /* Re-render the holdings panel (filter to selected user) + detail panel */
+      refreshStrategyDetailViews(strategyId, bookId, rowIndex);
     });
 
     // Reverse modal close / cancel / confirm / select-txn
@@ -6603,10 +7572,10 @@
     requireSession().then(async (ok) => {
       if (!ok) return;
 
-      // ── Load DB archive FIRST, then load the live orderbook ──────────────
+      // Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Load DB archive FIRST, then load the live orderbook Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬Ã¢&rdquo;â¬
       // Running these in parallel caused a race condition: the live rows
       // rendered before the archive was known, briefly showing archived rows
-      // as "live", then removing them once the archive resolved — causing a flash.
+      // as "live", then removing them once the archive resolved &mdash; causing a flash.
       try {
         const dbArchive = await loadFilledArchiveFromDb();
         if (Array.isArray(dbArchive)) {
@@ -6620,6 +7589,46 @@
       }
 
       await loadOrderbook();
+
+      /* ââ Realtime live-price refresh ââââââââââââââââââââââââââââââââââââââââ
+         Subscribe to intraday price ticks (and holding changes from fills) so
+         Live Price / Client PnL / MINT PnL update on their own. Guards:
+           &bull; debounced (2s) + in-flight guarded  &rarr; no request storms
+           &bull; skipped while an input is focused    &rarr; never wipes a value mid-edit
+           &bull; skipped unless the admin has been idle ~12s &rarr; never collapses an
+             expanded panel or interrupts active work; prices catch up once they
+             pause. A 60s poll is the fallback if realtime isn't enabled on the
+             table (see docs/enable-realtime-prices.sql). */
+      (() => {
+        let rtTimer = null, rtInFlight = false, rtQueued = false, lastInteraction = 0;
+        const IDLE_MS = 12000;
+        ['mousedown', 'keydown', 'input', 'focusin', 'touchstart'].forEach((ev) =>
+          document.addEventListener(ev, () => { lastInteraction = Date.now(); }, true));
+        const isEditing = () => {
+          const el = document.activeElement;
+          return !!(el && (el.matches?.('input, textarea, select') || el.isContentEditable));
+        };
+        const doRtRefresh = async () => {
+          if (isEditing() || (Date.now() - lastInteraction) < IDLE_MS) { scheduleRt(); return; }
+          if (rtInFlight) { rtQueued = true; return; }
+          rtInFlight = true;
+          try { await loadOrderbook(); }
+          catch (e) { console.error('[orderbook] realtime refresh failed:', e?.message || e); }
+          finally { rtInFlight = false; if (rtQueued) { rtQueued = false; scheduleRt(); } }
+        };
+        const scheduleRt = () => {
+          if (rtTimer) clearTimeout(rtTimer);
+          rtTimer = setTimeout(doRtRefresh, 2000);
+        };
+        try {
+          ['stock_intraday_c', 'stock_holdings_c'].forEach((t) => {
+            supabaseClient.channel('ob-rt:' + t)
+              .on('postgres_changes', { event: '*', schema: 'public', table: t }, scheduleRt)
+              .subscribe();
+          });
+        } catch (e) { console.warn('[orderbook] realtime subscribe failed:', e?.message || e); }
+        setInterval(scheduleRt, 60000);
+      })();
     });
 
     startOrderbookTimer();

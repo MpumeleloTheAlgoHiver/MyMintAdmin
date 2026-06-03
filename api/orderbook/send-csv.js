@@ -29,7 +29,11 @@ module.exports = async (req, res) => {
       if (!userId) return sendJson(res, 400, { error: 'userId required' });
 
       const baseQs = () => {
-        let qs = `user_id=eq.${encodeURIComponent(userId)}&name=ilike.${encodeURIComponent('%Strategy Investment%')}&select=id,amount,name,description,direction,status,transaction_date,created_at,family_member_id&order=transaction_date.desc&limit=200`;
+        // Fetch both strategy ("Strategy Investment: X") and single-security
+        // ("Purchased X") transactions — the name filter was Strategy Investment
+        // only, which silently dropped direct stock buys. Client-side narrows
+        // to the specific security/strategy after fetch.
+        let qs = `user_id=eq.${encodeURIComponent(userId)}&select=id,amount,name,description,direction,status,transaction_date,created_at,family_member_id&order=transaction_date.desc&limit=400`;
         // Scope to the right account: family member's txns vs parent's own.
         if (familyMemberId) qs += `&family_member_id=eq.${encodeURIComponent(familyMemberId)}`;
         else qs += `&family_member_id=is.null`;
@@ -58,15 +62,39 @@ module.exports = async (req, res) => {
       const sourceId = String(body.sourceId || '').trim();
       const selectedTxnId = String(body.selectedTxnId || '').trim();
       const targetName = String(body.targetName || 'Order');
+      // Scope to a specific buy event by created_at window (the investors
+      // panel passes the minute bucket ±5s of the original purchase).
+      // Optional — falls back to whole-strategy when missing.
+      const createdAtFrom = String(body.createdAtFrom || '').trim();
+      const createdAtTo = String(body.createdAtTo || '').trim();
 
       if (!userId) return sendJson(res, 400, { error: 'userId required' });
       if (context === 'strategy' && !strategyId) return sendJson(res, 400, { error: 'strategyId required for strategy context' });
       if (context === 'security' && !sourceId) return sendJson(res, 400, { error: 'sourceId required for security context' });
 
-      // 1. Holdings to delete — all holdings for this user under the strategy.
-      const holdingsPath = context === 'strategy'
-        ? `/rest/v1/stock_holdings_c?user_id=eq.${encodeURIComponent(userId)}&strategy_id=eq.${encodeURIComponent(strategyId)}&select=id`
-        : `/rest/v1/stock_holdings_c?id=eq.${encodeURIComponent(sourceId)}&select=id`;
+      // 1. Holdings to delete — for strategy context, scope by user + strategy
+      //    and optionally by created_at window so two separate buys of the
+      //    same strategy by the same user don't get reversed together.
+      let holdingsPath;
+      if (context === 'strategy') {
+        let qs = `user_id=eq.${encodeURIComponent(userId)}&strategy_id=eq.${encodeURIComponent(strategyId)}`;
+        if (familyMemberId) {
+          qs += `&family_member_id=eq.${encodeURIComponent(familyMemberId)}`;
+        } else {
+          qs += `&family_member_id=is.null`;
+        }
+        if (createdAtFrom) {
+          const fromMs = new Date(createdAtFrom).getTime() - 5000;
+          if (Number.isFinite(fromMs)) qs += `&created_at=gte.${encodeURIComponent(new Date(fromMs).toISOString())}`;
+        }
+        if (createdAtTo) {
+          const toMs = new Date(createdAtTo).getTime() + 5000;
+          if (Number.isFinite(toMs)) qs += `&created_at=lte.${encodeURIComponent(new Date(toMs).toISOString())}`;
+        }
+        holdingsPath = `/rest/v1/stock_holdings_c?${qs}&select=id`;
+      } else {
+        holdingsPath = `/rest/v1/stock_holdings_c?id=eq.${encodeURIComponent(sourceId)}&select=id`;
+      }
       const holdingsRows = await fetchSupabaseJson(holdingsPath);
       const holdingIds = Array.isArray(holdingsRows) ? holdingsRows.map((r) => r.id).filter(Boolean) : [];
 
@@ -203,6 +231,94 @@ module.exports = async (req, res) => {
         selectedTxnId: selectedTxn?.id || null,
         sourceTxnReversed,
       });
+    }
+
+    // Fetch execution-reserve (8% buffer) ledger rows via service-role key
+    // (bypasses RLS) so the orderbook's MINT PnL column can reliably show the
+    // shortfall (slippage beyond the reserve) regardless of RLS on the table.
+    if (action === 'get-buffer-drawdowns') {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const holdingIds = Array.isArray(body.holdingIds)
+        ? body.holdingIds.map((v) => String(v || '').trim()).filter(Boolean)
+        : [];
+      if (!holdingIds.length) return sendJson(res, 200, { drawdowns: [] });
+
+      const chunkSize = 150;
+      const all = [];
+      for (let i = 0; i < holdingIds.length; i += chunkSize) {
+        const chunk = holdingIds.slice(i, i + chunkSize);
+        const rows = await fetchSupabaseJson(
+          `/rest/v1/buffer_drawdowns_c?holding_id=in.(${buildInFilter(chunk)})&event_type=in.(slippage_drawdown,shortfall)&select=holding_id,event_type,delta_cents`
+        );
+        if (Array.isArray(rows)) all.push(...rows);
+      }
+      return sendJson(res, 200, { drawdowns: all });
+    }
+
+    // Read strategy_rebalance_residuals with the service-role key. The table's
+    // RLS only grants SELECT to the owning user, so a browser read returns {} for
+    // every other client — this lets the admin see every holder's residual.
+    if (action === 'rebalance-load-residuals') {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const strategyId = String(body.strategyId || '').trim();
+      if (!strategyId) return sendJson(res, 400, { error: 'strategyId required' });
+      const userIds = Array.isArray(body.userIds)
+        ? [...new Set(body.userIds.map((v) => String(v || '').trim()).filter(Boolean))]
+        : [];
+      if (!userIds.length) return sendJson(res, 200, { balances: {} });
+      const familyMemberId = body.familyMemberId ? String(body.familyMemberId).trim() : null;
+      const fmFilter = familyMemberId
+        ? `&family_member_id=eq.${encodeURIComponent(familyMemberId)}`
+        : `&family_member_id=is.null`;
+
+      const rows = await fetchSupabaseJson(
+        `/rest/v1/strategy_rebalance_residuals?select=user_id,balance_cents&strategy_id=eq.${encodeURIComponent(strategyId)}&user_id=in.(${buildInFilter(userIds)})${fmFilter}`
+      );
+      const balances = {};
+      (rows || []).forEach((r) => {
+        const uid = String(r.user_id || '');
+        if (uid) balances[uid] = (Number(r.balance_cents) || 0) / 100;
+      });
+      return sendJson(res, 200, { balances });
+    }
+
+    // Upsert strategy_rebalance_residuals with the service-role key. The table has
+    // no write RLS policy (writes are service-role only by design), so a browser
+    // upsert fails with "new row violates row-level security policy".
+    if (action === 'rebalance-upsert-residuals') {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const strategyId = String(body.strategyId || '').trim();
+      if (!strategyId) return sendJson(res, 400, { error: 'strategyId required' });
+      const familyMemberId = body.familyMemberId ? String(body.familyMemberId).trim() : null;
+      const fmFilter = familyMemberId
+        ? `&family_member_id=eq.${encodeURIComponent(familyMemberId)}`
+        : `&family_member_id=is.null`;
+      const balancesByUser = body.balancesByUser && typeof body.balancesByUser === 'object'
+        ? body.balancesByUser
+        : {};
+      const entries = Object.entries(balancesByUser).filter(([uid]) => uid);
+      if (!entries.length) return sendJson(res, 200, { ok: true, upserted: 0 });
+
+      const nowIso = new Date().toISOString();
+      let upserted = 0;
+      // Manual read-then-update-or-insert per user — PostgREST on_conflict can't
+      // target the COALESCE(family_member_id, sentinel) unique index.
+      for (const [userId, balance] of entries) {
+        const balanceCents = Math.round((Number(balance) || 0) * 100);
+        const scope = `user_id=eq.${encodeURIComponent(userId)}&strategy_id=eq.${encodeURIComponent(strategyId)}${fmFilter}`;
+        const updated = await requestSupabaseJson(
+          `/rest/v1/strategy_rebalance_residuals?${scope}&select=user_id`,
+          { method: 'PATCH', body: { balance_cents: balanceCents, updated_at: nowIso }, extraHeaders: { Prefer: 'return=representation' } }
+        );
+        if (!Array.isArray(updated) || !updated.length) {
+          await requestSupabaseJson('/rest/v1/strategy_rebalance_residuals', {
+            method: 'POST',
+            body: { user_id: userId, strategy_id: strategyId, family_member_id: familyMemberId || null, balance_cents: balanceCents, updated_at: nowIso },
+          });
+        }
+        upserted += 1;
+      }
+      return sendJson(res, 200, { ok: true, upserted });
     }
 
     // Fetch confirmation statuses using service-role key (bypasses RLS)

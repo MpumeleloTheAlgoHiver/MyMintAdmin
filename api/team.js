@@ -475,16 +475,116 @@ module.exports = async (req, res) => {
       return sendJson(res, 200, { ok: true });
     }
 
+    // IMPERSONATE — admin only. Generates a magic link for the target client user
+    // so the admin can preview the live Mint client app signed in as them.
+    if (action === 'impersonate') {
+      if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+      const result = await requireAdmin(req, res);
+      if (!result) return;
+      const userId = (req.body?.user_id || '').trim();
+      const target = (req.body?.target || 'dev').toLowerCase() === 'live' ? 'live' : 'dev';
+      if (!userId) return sendJson(res, 400, { error: 'user_id is required' });
+
+      const mintBase = target === 'live'
+        ? (process.env.MINT_APP_URL_LIVE || '').trim().replace(/\/+$/, '')
+        : (process.env.MINT_APP_URL_DEV  || '').trim().replace(/\/+$/, '');
+      if (!mintBase) {
+        return sendJson(res, 500, { error: `Mint app URL not configured (${target === 'live' ? 'MINT_APP_URL_LIVE' : 'MINT_APP_URL_DEV'} env var is missing)` });
+      }
+
+      const profileRows = await supabaseRequest(
+        `/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=id,email,first_name,last_name&limit=1`
+      );
+      const profile = profileRows && profileRows[0];
+      if (!profile || !profile.email) {
+        return sendJson(res, 404, { error: 'Client profile not found or has no email' });
+      }
+
+      const redirectTo = `${mintBase}/`;
+      let actionLink = null;
+      try {
+        actionLink = await generateAuthLink('magiclink', profile.email, redirectTo);
+      } catch (err) {
+        return sendJson(res, 500, { error: `Could not generate sign-in link: ${err.message}` });
+      }
+      if (!actionLink) {
+        return sendJson(res, 500, { error: 'Supabase did not return an action link' });
+      }
+
+      // Resolve the Supabase verify hop server-side.
+      // Supabase's verify endpoint (action_link) 302-redirects to
+      //   <mintBase>/?admin_view=1#access_token=...&refresh_token=...
+      // If we let the iframe follow this redirect itself, Next.js SSR runs
+      // before the browser processes the hash, shows the login screen, and
+      // the user appears to be signed out.
+      // By following the redirect here (redirect:'manual') we extract the
+      // final Location URL — which already contains the tokens in the hash —
+      // and hand it directly to the iframe, bypassing the SSR issue entirely.
+      try {
+        const verifyRes = await fetch(actionLink, { redirect: 'manual' });
+        const location = verifyRes.headers.get('location');
+        if (location && location.includes('access_token')) {
+          console.log('[Impersonate] Resolved verify redirect to final Mint URL');
+          actionLink = location;
+        } else {
+          console.warn('[Impersonate] Verify redirect did not contain tokens; falling back to action_link. Status:', verifyRes.status, 'Location:', location);
+        }
+      } catch (err) {
+        // Non-fatal: fall back to the original action_link
+        console.warn('[Impersonate] Could not follow action_link server-side:', err.message);
+      }
+
+      await writeAudit({
+        action: 'impersonate',
+        target_email: profile.email,
+        target_member_id: null,
+        actor_email: result.user.email,
+        actor_user_id: result.user.id,
+        details: {
+          target_user_id: profile.id,
+          target_name: [profile.first_name, profile.last_name].filter(Boolean).join(' ') || null,
+          mint_environment: target,
+          mint_base: mintBase
+        }
+      });
+
+      return sendJson(res, 200, {
+        ok: true,
+        actionLink,
+        mintBase,
+        target,
+        targetEmail: profile.email
+      });
+    }
+
     // AUDIT-LIST — admin only
     if (action === 'audit-list') {
       if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
       const result = await requireAdmin(req, res);
       if (!result) return;
       const limit = Math.min(parseInt(url.searchParams.get('limit') || '100', 10) || 100, 500);
+
+      const filters = [];
+      const auditAction = (url.searchParams.get('audit_action') || '').trim();
+      if (auditAction) filters.push(`action=eq.${encodeURIComponent(auditAction)}`);
+      const actorEmail = (url.searchParams.get('actor_email') || '').trim();
+      if (actorEmail) filters.push(`actor_email=ilike.${encodeURIComponent('%' + actorEmail + '%')}`);
+      const targetEmail = (url.searchParams.get('target_email') || '').trim();
+      if (targetEmail) filters.push(`target_email=ilike.${encodeURIComponent('%' + targetEmail + '%')}`);
+      const fromDate = (url.searchParams.get('from') || '').trim();
+      if (fromDate) filters.push(`created_at=gte.${encodeURIComponent(fromDate)}`);
+      const toDate = (url.searchParams.get('to') || '').trim();
+      if (toDate) filters.push(`created_at=lte.${encodeURIComponent(toDate)}`);
+
+      const qs = [
+        'select=id,action,target_email,target_member_id,actor_email,actor_user_id,details,created_at',
+        'order=created_at.desc',
+        `limit=${limit}`,
+        ...filters
+      ].join('&');
+
       try {
-        const rows = await supabaseRequest(
-          `/rest/v1/admin_team_audit?select=id,action,target_email,target_member_id,actor_email,actor_user_id,details,created_at&order=created_at.desc&limit=${limit}`
-        );
+        const rows = await supabaseRequest(`/rest/v1/admin_team_audit?${qs}`);
         return sendJson(res, 200, { ok: true, entries: rows });
       } catch (err) {
         // If the table doesn't exist yet, return an actionable hint

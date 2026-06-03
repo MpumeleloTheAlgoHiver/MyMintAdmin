@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mint — Investors</title>
+  <title>Mint &mdash; Investors</title>
   <style>html{opacity:0}</style>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -66,7 +66,7 @@
           <img src="/icon.png" style="width:26px;height:26px;border-radius:7px;flex-shrink:0;" />
           <div style="flex:1;min-width:0;">
             <div style="font-size:12px;font-weight:700;color:#0f172a;line-height:1.3;">Mint Hub</div>
-            <div style="font-size:10px;color:#7c3aed;font-weight:500;">Admin Portal · Active</div>
+            <div style="font-size:10px;color:#7c3aed;font-weight:500;">Admin Portal &middot; Active</div>
           </div>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
@@ -174,7 +174,8 @@
         <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
         Clients
       </a>
-      <span class="sidebar-section-label">Investments</span>
+              <a class="nav-icon" href="/studio.html"><svg viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>Client View Studio</a>
+        <span class="sidebar-section-label">Investments</span>
       <a class="nav-icon" href="/dashboard.html" aria-label="Dashboard">
         <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
         Dashboard
@@ -246,14 +247,24 @@
         <div id="kpiBar" style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:8px;"></div>
         <div style="display:grid;grid-template-columns:300px 1fr;gap:12px;min-height:600px;">
           <div style="background:white;border-radius:12px;padding:16px;box-shadow:0 0 0 1px rgba(0,0,0,0.05),0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;gap:10px;">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               <span style="font-size:13px;font-weight:600;color:#0f172a;">Investors</span>
               <span id="investorCount" style="font-size:10px;color:#94a3b8;background:#f1f5f9;padding:1px 7px;border-radius:20px;">0</span>
             </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;background:#f1f5f9;border-radius:8px;padding:3px;margin-bottom:2px;">
+              <button id="tabStrategy" onclick="switchView('strategy')"
+                style="border:none;border-radius:6px;padding:5px 0;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.15s;background:#7c3aed;color:#fff;">
+                Strategies
+              </button>
+              <button id="tabSecurity" onclick="switchView('security')"
+                style="border:none;border-radius:6px;padding:5px 0;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.15s;background:transparent;color:#64748b;">
+                Single Securities
+              </button>
+            </div>
             <input id="investorSearch" placeholder="Search investors..." style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:12px;color:#0f172a;outline:none;box-sizing:border-box;" />
             <select id="strategyFilter" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:12px;color:#64748b;background:#fff;outline:none;box-sizing:border-box;"><option value="">All Strategies</option></select>
-            <div style="display:flex;justify-content:space-between;padding:4px 10px;font-size:11px;font-weight:500;color:#94a3b8;border-bottom:1px solid #f1f5f9;margin-bottom:4px;"><span>Name ↕</span><div style="display:flex;gap:24px;"><span>Value ↕</span><span>Ret %</span></div></div>
+            <div style="display:flex;justify-content:space-between;padding:4px 10px;font-size:11px;font-weight:500;color:#94a3b8;border-bottom:1px solid #f1f5f9;margin-bottom:4px;"><span>Name &darr;</span><div style="display:flex;gap:24px;"><span>Value &darr;</span><span>Ret %</span></div></div>
             <div id="investorList" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:2px;"></div>
           </div>
           <div id="detailPanel" style="background:white;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,0.05),0 1px 4px rgba(0,0,0,0.06);overflow:hidden;display:flex;flex-direction:column;"></div>
@@ -272,8 +283,9 @@
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg";
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    /* ─── State ─── */
-    let allInvestors = [], allStrategies = [], stratNavMap = {}, stratMetricsMap = {};
+    /* âââ State âââ */
+    let allInvestors = [], allStrategies = [], stratNavMap = {}, stratMetricsMap = {}, txnNameById = {};
+    let activeView = 'strategy'; // 'strategy' | 'security'
     let currentInvestor = null, currentTab = 'performance';
     const _charts = new WeakMap();
     function disposeChart(el) {
@@ -283,16 +295,16 @@
       else if (window.echarts) { try { const inst = echarts.getInstanceByDom(el); if (inst) inst.dispose(); } catch(e) {} }
     }
 
-    /* ─── Formatters ─── */
+    /* âââ Formatters âââ */
     const fmtR    = n => 'R' + (Number(n) || 0).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     const fmtR2   = n => 'R' + (Number(n) || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const fmtPct  = n => (n == null || isNaN(n)) ? '—' : ((n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%');
-    const fmtPctNoSign = n => (n == null || isNaN(n)) ? '—' : Number(n).toFixed(2) + '%';
+    const fmtPct  = n => (n == null || isNaN(n)) ? '&mdash;' : ((n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%');
+    const fmtPctNoSign = n => (n == null || isNaN(n)) ? '&mdash;' : Number(n).toFixed(2) + '%';
     const pctClr  = n => (n == null || isNaN(n)) ? '#64748b' : (n >= 0 ? '#059669' : '#dc2626');
-    const fmtDate = s => s ? new Date(s).toLocaleDateString('en-ZA', { day:'2-digit', month:'short', year:'numeric' }) : '—';
-    const fmtDateShort = s => s ? new Date(s).toLocaleDateString('en-ZA', { day:'2-digit', month:'short' }) : '—';
+    const fmtDate = s => s ? new Date(s).toLocaleDateString('en-ZA', { day:'2-digit', month:'short', year:'numeric' }) : '&mdash;';
+    const fmtDateShort = s => s ? new Date(s).toLocaleDateString('en-ZA', { day:'2-digit', month:'short' }) : '&mdash;';
 
-    /* ─── Risk math (from daily NAV series) ─── */
+    /* âââ Risk math (from daily NAV series) âââ */
     function computeMetrics(navSeries) {
       if (!navSeries || navSeries.length < 2) return { sharpe:null, vol:null, maxDD:null, sortino:null };
       const rets = [];
@@ -333,7 +345,7 @@
       };
     }
 
-    /* Build calendar-returns table from daily NAV: monthKey → % return for that month */
+    /* Build calendar-returns table from daily NAV: monthKey &rarr; % return for that month */
     /* inceptionDate (optional YYYY-MM-DD): when provided, series is trimmed to that date
        so the first partial month uses the investor's entry NAV, not the prior month-end. */
     function computeCalendar(navSeries, inceptionDate) {
@@ -359,26 +371,59 @@
       return out;
     }
 
-    /* ─── Data Load ─── */
+    /* âââ Data Load âââ */
     async function loadAll() {
       /* Fetch via server-side endpoint which uses the service role key,
          bypassing Supabase RLS so ALL investors are always visible to admins. */
       const resp = await fetch('/api/investors/data');
       if (!resp.ok) throw new Error(`Investor data fetch failed: ${resp.status}`);
-      const { holdings, strategies, stratHist, profiles, secMeta, secLive, txns, familyMembers } = await resp.json();
+      const { holdings, strategies, stratHist, profiles, secMeta, secLive, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches } = await resp.json();
+
+      /* Per-strategy residual cash (rebalance leftovers), keyed by
+         user|familyMember|strategy so each investor card can add its own cash
+         component to the value and break it out in the detail. */
+      const residualByKey = {};
+      (residuals||[]).forEach(r => {
+        const key = `${r.user_id}:${r.family_member_id || ''}:${r.strategy_id || ''}`;
+        residualByKey[key] = (residualByKey[key] || 0) + (Number(r.balance_cents)||0)/100;
+      });
+
+      /* Rebalance fees per (user|familyMember) — admin reconciliation only.
+         A rebalance posts a R0 audit transaction, so its sell/buy brokerage (0.5%)
+         + custody (R69 per ISIN side) never reach the transactions fee columns.
+         We derive them here from settled, non-reversed rebalance_event rows so the
+         Transactions tab can show "Rebalance fees" and the audit reconciles fully. */
+      const REB_BROKERAGE_RATE = 0.005, REB_CUSTODY_FEE = 69;
+      const settledBatchIds = new Set((rebBatches||[]).filter(b => String(b.status||'').toUpperCase() === 'SETTLED').map(b => b.id));
+      const rebFeeByOwner = {}; // key -> { broker, custody }
+      const custodySeen = {};   // key -> Set of `${batch}:${reasonGroup}`
+      (rebEvents||[]).forEach(e => {
+        if (!settledBatchIds.has(e.batch_id)) return;                 // only settled rebalances charge fees
+        if (String(e.closed_reason||'').toUpperCase() === 'REVERSED') return;
+        const key = `${e.user_id}:${e.family_member_id || ''}`;
+        const fillCents = (e.avg_fill != null && Number(e.avg_fill) > 0) ? Number(e.avg_fill) : Number(e.price_at_commit || 0);
+        const grossR = (Math.abs(Number(e.quantity)||0) * fillCents) / 100;
+        if (!rebFeeByOwner[key]) { rebFeeByOwner[key] = { broker: 0, custody: 0 }; custodySeen[key] = new Set(); }
+        rebFeeByOwner[key].broker += grossR * REB_BROKERAGE_RATE;
+        /* Custody is R69 per ISIN side per batch. closed_reason groups the side:
+           SELL / BUY / BUY_WALLET each get their own R69. */
+        const reasonGroup = String(e.closed_reason || 'REBALANCE_EVENT_BUY').toUpperCase();
+        const ck = `${e.batch_id}:${reasonGroup}`;
+        if (!custodySeen[key].has(ck)) { custodySeen[key].add(ck); rebFeeByOwner[key].custody += REB_CUSTODY_FEE; }
+      });
 
       const profMap    = Object.fromEntries((profiles||[]).map(p => [p.id, p]));
       const famMap     = Object.fromEntries((familyMembers||[]).map(fm => [fm.id, fm]));
       const stratMap   = Object.fromEntries((strategies||[]).map(s => [s.id, s]));
       const secMetaMap = Object.fromEntries((secMeta||[]).map(s => [s.id, s]));
-      /* First-write-wins (rows are sorted DESC by as_of_date → first row is latest per security) */
+      /* First-write-wins (rows are sorted DESC by as_of_date &rarr; first row is latest per security) */
       const secLiveMap = {};
       (secLive||[]).forEach(s => {
         if (secLiveMap[s.security_id]) return;
         secLiveMap[s.security_id] = { priceR: (Number(s.current_price)||0)/100, dayPct: Number(s['1d_pct'])||0, ytd: Number(s.ytd_pct)||0, y1: Number(s['1y_pct'])||0, asOf: s.as_of_date };
       });
 
-      /* Per-investor NAV history & metrics — keyed by user_id */
+      /* Per-investor NAV history & metrics &mdash; keyed by user_id */
       stratNavMap = {}; stratMetricsMap = {};
       const stratLatest = {};
       (stratHist||[]).forEach(r => {
@@ -386,7 +431,7 @@
         if (!stratNavMap[uid]) stratNavMap[uid] = [];
         const nav = Number(r.basket_value);
         if (nav > 0) stratNavMap[uid].push({ date: r.as_of_date, nav, incPct: r.inception_pct != null ? Number(r.inception_pct) : null });
-        stratLatest[uid] = r;  /* last one wins → most recent (asc order) */
+        stratLatest[uid] = r;  /* last one wins &rarr; most recent (asc order) */
       });
       Object.entries(stratNavMap).forEach(([uid, series]) => {
         stratMetricsMap[uid] = {
@@ -400,6 +445,12 @@
       const txnByUser = {};
       (txns||[]).forEach(t => { (txnByUser[t.user_id] = txnByUser[t.user_id] || []).push(t); });
 
+      /* Group buffer drawdowns by user + a txn lookup so the buffer-events view
+         can label each ledger row with its source transaction. */
+      const ddByUser = {};
+      (drawdowns||[]).forEach(d => { (ddByUser[d.user_id] = ddByUser[d.user_id] || []).push(d); });
+      txnNameById = Object.fromEntries((txns||[]).map(t => [t.id, t.name || t.description || '']));
+
       /* Build investor objects */
       const byUser = {};
       (holdings||[]).forEach(row => {
@@ -412,25 +463,37 @@
         const mv    = Number(row.market_value) || 0;
         const live  = secLiveMap[row.security_id];
         const meta  = secMetaMap[row.security_id] || {};
-        /* Unit detection: avg_fill is stored inconsistently — sometimes cents, sometimes rands.
+        /* Unit detection: avg_fill is stored inconsistently &mdash; sometimes cents, sometimes rands.
            Compare fill to the live price (always cents). Whichever interpretation is closer
            to the current market price determines the unit. */
         if (live && live.priceR > 0 && fill > 0) {
           const diffAsRands = Math.abs(fill - live.priceR);
           const diffAsCents = Math.abs(fill / 100 - live.priceR);
-          if (diffAsRands < diffAsCents) fill *= 100;  /* fill was in rands → convert to cents */
+          if (diffAsRands < diffAsCents) fill *= 100;  /* fill was in rands &rarr; convert to cents */
         } else if (fill * qty > 10 * mv && mv > 0) {
           fill /= 100;
         }
-        const investedR = (fill * qty) / 100;
+        /* Broker fill in rands &mdash; shown in the Avg Fill display column only. */
+        const avgFillR = fill / 100;
+        /* Client cost basis = Expected_fill (the price the client saw at buy time,
+           in rands), NOT avg_fill &mdash; avg_fill carries MINT's execution spread.
+           Guards legacy Expected_fill rows stored in cents (>5&times; avgFillR); falls
+           back to avg_fill when no quote was recorded. Mirrors the MINT client app,
+           api/investors/data.js and the orderbook so every surface agrees. */
+        let costBasisR = avgFillR;
+        const expectedRaw = Number(row.expected_fill) || 0;
+        if (expectedRaw > 0) {
+          costBasisR = (avgFillR > 0 && expectedRaw > avgFillR * 5) ? expectedRaw / 100 : expectedRaw;
+        }
+        const investedR = costBasisR * qty;
         const currentR  = live ? live.priceR * qty : (mv / 100);
         byUser[key].holdings.push({
           securityId: row.security_id,
-          symbol: meta.symbol || '—',
-          name:   meta.name   || meta.symbol || '—',
+          symbol: meta.symbol || '&mdash;',
+          name:   meta.name   || meta.symbol || '&mdash;',
           sector: meta.sector || 'Other',
           logo:   meta.logo_url,
-          qty, avgFillR: fill/100, priceR: live ? live.priceR : (mv/qty/100 || 0),
+          qty, avgFillR, priceR: live ? live.priceR : (mv/qty/100 || 0),
           investedR, currentR,
           pnlR: currentR - investedR,
           retPct: investedR > 0 ? ((currentR - investedR) / investedR) * 100 : 0,
@@ -442,7 +505,7 @@
       });
 
       const investors = Object.values(byUser).map(u => {
-        if (!u.strategyId) return null;
+        const isStrategy = !!u.strategyId;
         const prof = profMap[u.userId] || {};
         const strat = stratMap[u.strategyId] || {};
         const parentName = [prof.first_name, prof.last_name].filter(Boolean).join(' ') || prof.email || u.userId.slice(0, 8);
@@ -450,7 +513,7 @@
         if (u.familyMemberId) {
           const fm = famMap[u.familyMemberId] || {};
           const childName = [fm.first_name, fm.last_name].filter(Boolean).join(' ') || u.familyMemberId.slice(0, 8);
-          name = `${parentName} (${childName})`;
+          name = `${childName} (${parentName})`;
         } else {
           name = parentName;
         }
@@ -465,7 +528,7 @@
         const earliestDep = deposits.length ? deposits[deposits.length-1].transaction_date : null;
         const inception = earliestDep || u.inception;
         const days = inception ? Math.floor((Date.now() - new Date(inception)) / 86400000) : 0;
-        /* Annualise; clamp to -100% to avoid NaN/complex roots when retPct ≤ -100% */
+        /* Annualise; clamp to -100% to avoid NaN/complex roots when retPct â¤ -100% */
         let annualised = retPct;
         if (days > 30) {
           const safe = Math.max(1 + retPct/100, 0.0001);
@@ -474,46 +537,64 @@
         /* Add weights to holdings */
         u.holdings.forEach(h => { h.weight = current > 0 ? (h.currentR / current) * 100 : 0; });
         u.holdings.sort((a,b) => b.currentR - a.currentR);
-        /* Pull latest per-investor figures from client_strategy_returns_c */
-        const csrLatest = (stratMetricsMap[u.userId] || {}).latest || null;
+        /* Pull latest per-investor figures from client_strategy_returns_c
+           (only meaningful for strategy investors). */
+        const csrLatest = isStrategy ? ((stratMetricsMap[u.userId] || {}).latest || null) : null;
         const csrAum      = csrLatest ? csrLatest.basket_value / 100 : current;
         const csrPnl      = csrLatest ? csrLatest.inception_pnl / 100 : pnl;
         const csrInvested = csrLatest ? (csrLatest.basket_value - csrLatest.inception_pnl) / 100 : invested;
         const csrRetPct   = csrLatest ? csrLatest.inception_pct : retPct;
         const csrYtdPct   = csrLatest != null ? (csrLatest['ytd_pct'] ?? null) : null;
+        /* Residual cash left in this strategy from rebalances. Held in
+           strategy_rebalance_residuals; it's the client's money but sits as cash,
+           not positions. Broken out from holdings value in the detail view. */
+        const residualCash = residualByKey[`${u.userId}:${u.familyMemberId || ''}:${u.strategyId || ''}`] || 0;
+        /* holdingsValue = LIVE positions value (current = Σ live price × qty),
+           which matches the orderbook. csrAum (basket_value snapshot) can be stale
+           after a rebalance, so we use current here. value = positions + cash. */
+        const holdingsValue = current;
+        const value = holdingsValue + residualCash;
         return {
-          userId: u.userId, investorKey, familyMemberId: u.familyMemberId, name, email: prof.email, mintNo: prof.mint_number,
-          strategy: strat.short_name || strat.name || '—', strategyId: u.strategyId,
+          type: isStrategy ? 'strategy' : 'security',
+          userId: u.userId, investorKey, familyMemberId: u.familyMemberId, isMinor: !!u.familyMemberId, name, email: prof.email, mintNo: prof.mint_number,
+          strategy: strat.short_name || strat.name || (isStrategy ? '&mdash;' : 'Direct securities'), strategyId: u.strategyId,
           strategyDesc: strat.description, riskLevel: strat.risk_level,
           invested, current, pnl, retPct: +retPct.toFixed(2),
           csrAum, csrInvested, csrPnl, csrRetPct, csrYtdPct,
+          residualCash, holdingsValue, value,
+          rebFeeBroker: (rebFeeByOwner[investorKey] || {}).broker || 0,
+          rebFeeCustody: (rebFeeByOwner[investorKey] || {}).custody || 0,
           days, annualised, inception,
           holdings: u.holdings,
           txns: userTxns,
+          drawdowns: ddByUser[u.userId] || [],
         };
-      }).filter(Boolean).sort((a,b) => b.current - a.current);
+      }).sort((a,b) => (b.value ?? b.current) - (a.value ?? a.current));
 
       allStrategies = strategies || [];
       return investors;
     }
 
-    /* ─── KPI Bar ─── */
+    /* âââ KPI Bar âââ */
     function renderKpiBar(investors) {
-      const aum = investors.reduce((s,i)=>s+i.csrAum,0);
-      const inv = investors.reduce((s,i)=>s+i.csrInvested,0);
-      const pnl = investors.reduce((s,i)=>s+i.csrPnl,0);
-      /* Weighted average return — weight by each investor's AUM so small accounts don't distort the figure */
-      const avg = aum > 0 ? investors.reduce((s,i)=>s+(i.csrRetPct * i.csrAum), 0) / aum : 0;
-      const sorted = [...investors].sort((a,b) => b.csrRetPct - a.csrRetPct);
+      const visible = investors.filter(i => i.type === activeView);
+      /* TOTAL AUM includes residual cash (i.value = holdings + residual) so the
+         headline portfolio matches what clients actually hold after rebalances. */
+      const aum  = visible.reduce((s,i)=>s+(i.value ?? i.csrAum),0);
+      const inv  = visible.reduce((s,i)=>s+i.csrInvested,0);
+      const pnl  = visible.reduce((s,i)=>s+i.csrPnl,0);
+      /* Weighted average return &mdash; weight by each investor's AUM so small accounts don't distort the figure */
+      const avg = aum > 0 ? visible.reduce((s,i)=>s+(i.csrRetPct * i.csrAum), 0) / aum : 0;
+      const sorted = [...visible].sort((a,b) => b.csrRetPct - a.csrRetPct);
       const best  = sorted[0];
       const worst = sorted[sorted.length-1];
       const kpis = [
         { l:'TOTAL AUM',       v: fmtR(aum), c:'#0f172a' },
         { l:'TOTAL INVESTED',  v: fmtR(inv), c:'#64748b' },
-        { l:'TOTAL P&L',       v: (pnl>=0?'+':'')+fmtR(pnl), c: pctClr(pnl) },
+        { l:'TOTAL P&L',       v: (pnl>=0?'+':'')+fmtR2(pnl), c: pctClr(pnl) },
         { l:'AVG RETURN',      v: fmtPct(avg), c: pctClr(avg) },
-        { l:'BEST PERFORMER',  v: best  ? `${best.name.split(' ')[0]} ${fmtPct(best.csrRetPct)}`   : '—', c:'#059669' },
-        { l:'WORST PERFORMER', v: worst ? `${worst.name.split(' ')[0]} ${fmtPct(worst.csrRetPct)}` : '—', c:'#dc2626' },
+        { l:'BEST PERFORMER',  v: best  ? `${best.name.split(' ')[0]} ${fmtPct(best.csrRetPct)}`   : '&mdash;', c:'#059669' },
+        { l:'WORST PERFORMER', v: worst ? `${worst.name.split(' ')[0]} ${fmtPct(worst.csrRetPct)}` : '&mdash;', c:'#dc2626' },
       ];
       document.getElementById('kpiBar').innerHTML = kpis.map(k =>
         `<div class="ov-kpi-card">
@@ -523,12 +604,33 @@
       ).join('');
     }
 
-    /* ─── Investor list ─── */
+    /* âââ View toggle âââ */
+    function switchView(view) {
+      activeView = view;
+      const stBtn = document.getElementById('tabStrategy');
+      const scBtn = document.getElementById('tabSecurity');
+      const sfEl  = document.getElementById('strategyFilter');
+      if (stBtn && scBtn) {
+        stBtn.style.background = view === 'strategy' ? '#7c3aed' : 'transparent';
+        stBtn.style.color      = view === 'strategy' ? '#fff'    : '#64748b';
+        scBtn.style.background = view === 'security' ? '#7c3aed' : 'transparent';
+        scBtn.style.color      = view === 'security' ? '#fff'    : '#64748b';
+      }
+      if (sfEl) sfEl.style.display = view === 'strategy' ? '' : 'none';
+      currentInvestor = null;
+      renderKpiBar(allInvestors);
+      renderList(allInvestors);
+      renderDetail();
+    }
+
+    /* âââ Investor list âââ */
     function renderList(investors) {
       const q = document.getElementById('investorSearch').value.toLowerCase();
       const f = document.getElementById('strategyFilter').value;
       const list = investors.filter(i =>
-        i.name.toLowerCase().includes(q) && (!f || i.strategyId === f)
+        i.type === activeView &&
+        i.name.toLowerCase().includes(q) &&
+        (activeView !== 'strategy' || !f || i.strategyId === f)
       );
       document.getElementById('investorCount').textContent = list.length;
       document.getElementById('investorList').innerHTML = list.map(i => `
@@ -537,18 +639,18 @@
             border-left:3px solid ${currentInvestor?.investorKey===i.investorKey?'#7c3aed':'transparent'};
             background:${currentInvestor?.investorKey===i.investorKey?'#ede9fe':'transparent'};transition:background 0.12s;">
           <div style="min-width:0;flex:1;">
-            <div style="font-size:12px;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${i.name}</div>
+            <div style="font-size:12px;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${i.name}${i.isMinor ? '<span style="font-size:9px;font-weight:700;color:#5b21b6;background:#ede9fe;padding:2px 7px;border-radius:6px;text-transform:uppercase;letter-spacing:.04em;margin-left:6px;">Minor</span>' : ''}</div>
             <div style="font-size:10px;color:#94a3b8;margin-top:1px;">${i.strategy}</div>
           </div>
           <div style="text-align:right;flex-shrink:0;">
-            <div style="font-size:12px;font-weight:600;color:#0f172a;font-family:ui-monospace,monospace;">${fmtR(i.current)}</div>
+            <div style="font-size:12px;font-weight:600;color:#0f172a;font-family:ui-monospace,monospace;">${fmtR(i.value ?? i.current)}</div>
             <div style="font-size:10px;font-weight:600;color:${pctClr(i.retPct)};">${fmtPct(i.retPct)}</div>
           </div>
         </div>
       `).join('') || `<div style="padding:20px;text-align:center;color:#94a3b8;font-size:12px;">No investors found</div>`;
     }
 
-    /* ─── Detail panel ─── */
+    /* âââ Detail panel âââ */
     function selectInvestor(investorKey) {
       const inv = allInvestors.find(i => i.investorKey === investorKey);
       if (!inv) return;
@@ -579,21 +681,22 @@
                 <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">${(i.name[0]||'?').toUpperCase()}</div>
                 <div style="min-width:0;">
                   <div style="font-size:16px;font-weight:700;color:#0f172a;">${i.name}</div>
-                  <div style="font-size:11px;color:#64748b;margin-top:1px;">${i.strategy}${i.email?' · '+i.email:''}</div>
+                  <div style="font-size:11px;color:#64748b;margin-top:1px;">${i.strategy}${i.email?' &middot; '+i.email:''}</div>
                 </div>
               </div>
             </div>
             <div style="text-align:right;flex-shrink:0;">
-              <div style="font-size:20px;font-weight:700;color:#0f172a;font-family:ui-monospace,monospace;">${fmtR2(i.current)}</div>
+              <div style="font-size:20px;font-weight:700;color:#0f172a;font-family:ui-monospace,monospace;">${fmtR2(i.value ?? i.current)}</div>
               <div style="font-size:12px;font-weight:600;color:${pctClr(i.retPct)};">${fmtPct(i.retPct)} all-time</div>
+              ${i.residualCash > 0 ? `<div style="font-size:10.5px;color:#64748b;margin-top:3px;font-family:ui-monospace,monospace;">Holdings ${fmtR2(i.holdingsValue)} &middot; <span style="color:#0e7490;">Cash ${fmtR2(i.residualCash)}</span></div>` : ''}
             </div>
           </div>
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px;">
             ${[
               ['Invested', fmtR(i.invested), '#64748b'],
-              ['P&L',      (i.pnl>=0?'+':'')+fmtR(i.pnl), pctClr(i.pnl)],
-              ['YTD', i.csrYtdPct != null ? fmtPct(i.csrYtdPct) : '—', pctClr(i.csrYtdPct || 0)],
-              ['Inception', fmtDate(i.inception)+' · '+i.days+'d', '#0f172a'],
+              ['P&L',      (i.pnl>=0?'+':'')+fmtR2(i.pnl), pctClr(i.pnl)],
+              ['YTD', i.csrYtdPct != null ? fmtPct(i.csrYtdPct) : '&mdash;', pctClr(i.csrYtdPct || 0)],
+              ['Inception', fmtDate(i.inception)+' &middot; '+i.days+'d', '#0f172a'],
             ].map(([l,v,c]) => `
               <div style="background:rgba(255,255,255,0.7);border-radius:8px;padding:8px 10px;">
                 <div style="font-size:10px;color:#94a3b8;font-weight:500;letter-spacing:0.04em;">${l.toUpperCase()}</div>
@@ -626,7 +729,7 @@
       else if (currentTab === 'transactions') el.innerHTML = renderTxnsTab(i);
     }
 
-    /* ─── Tab: Performance (merged: user P&L chart + calendar + strategy stats + holdings) ─── */
+    /* âââ Tab: Performance (merged: user P&L chart + calendar + strategy stats + holdings) âââ */
     function renderPerformanceTab(i) {
       const m = stratMetricsMap[i.userId] || {};
       const latest = m.latest || {};
@@ -636,7 +739,7 @@
       ];
       const topHoldings = i.holdings.slice(0, 5);
 
-      /* Calendar — computed per-investor from their inception date so the first
+      /* Calendar &mdash; computed per-investor from their inception date so the first
          partial month uses their entry NAV, not the prior month-end */
       const incDate = i.inception ? i.inception.slice(0, 10) : null;
       const cal = computeCalendar(stratNavMap[i.userId] || [], incDate);
@@ -671,10 +774,10 @@
                     const monthNum = idx + 1;
                     /* Hide cells before investor inception */
                     if (incYear && (+y < incYear || (+y === incYear && monthNum < incMonth))) {
-                      return `<td class="r ov-mono" style="background:#f8fafc;color:#e2e8f0;font-size:10.5px;">·</td>`;
+                      return `<td class="r ov-mono" style="background:#f8fafc;color:#e2e8f0;font-size:10.5px;">&middot;</td>`;
                     }
                     const v = byYear[y][monthNum];
-                    return `<td class="r ov-mono" style="background:${cellColor(v)};color:${v==null?'#cbd5e1':'#0f172a'};font-weight:${v==null?'400':'600'};font-size:10.5px;">${v==null?'—':v.toFixed(1)}</td>`;
+                    return `<td class="r ov-mono" style="background:${cellColor(v)};color:${v==null?'#cbd5e1':'#0f172a'};font-weight:${v==null?'400':'600'};font-size:10.5px;">${v==null?'&mdash;':v.toFixed(1)}</td>`;
                   }).join('')}
                   <td class="r ov-mono" style="font-weight:700;color:${pctClr(ytd)};">${fmtPctNoSign(ytd)}</td>
                 </tr>`;
@@ -688,7 +791,7 @@
         <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);margin-bottom:14px;">
           <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
             <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">SINCE INCEPTION RETURN (%)</div>
-            <div style="font-size:11px;color:${pctClr(i.csrRetPct)};font-weight:700;font-family:ui-monospace,monospace;">${i.csrRetPct != null ? (i.csrRetPct >= 0 ? '+' : '') + Number(i.csrRetPct).toFixed(2) + '%' : '—'}</div>
+            <div style="font-size:11px;color:${pctClr(i.csrRetPct)};font-weight:700;font-family:ui-monospace,monospace;">${i.csrRetPct != null ? (i.csrRetPct >= 0 ? '+' : '') + Number(i.csrRetPct).toFixed(2) + '%' : '&mdash;'}</div>
           </div>
           <div id="userPnlChart" style="width:100%;height:320px;"></div>
         </div>
@@ -715,7 +818,7 @@
               ${[['Sharpe', m.sharpe], ['Sortino', m.sortino], ['Vol %', m.vol], ['Max DD %', m.maxDD]].map(([l,v]) => `
                 <div style="text-align:center;padding:8px 4px;background:#f8fafc;border-radius:6px;">
                   <div style="font-size:9px;color:#94a3b8;font-weight:600;">${l}</div>
-                  <div style="font-size:11px;font-weight:700;color:#0f172a;margin-top:2px;font-family:ui-monospace,monospace;">${v == null ? '—' : v}</div>
+                  <div style="font-size:11px;font-weight:700;color:#0f172a;margin-top:2px;font-family:ui-monospace,monospace;">${v == null ? '&mdash;' : v}</div>
                 </div>`).join('')}
             </div>
           </div>
@@ -741,7 +844,7 @@
       `;
     }
 
-    /* Build user P&L series: starts at (inception, 0), then strategy NAV ratio × invested */
+    /* Build user P&L series: starts at (inception, 0), then strategy NAV ratio &times; invested */
     function renderUserPnlChart(i) {
       const el = document.getElementById('userPnlChart'); if (!el) return;
       const navs = stratNavMap[i.userId] || [];
@@ -773,7 +876,7 @@
       });
     }
 
-    /* ─── Tab: Risk ─── */
+    /* âââ Tab: Risk âââ */
     function renderRiskTab(i) {
       const m = stratMetricsMap[i.userId] || {};
       const cards = [
@@ -789,7 +892,7 @@
           ${cards.map(([l, v, hint, suffix]) => `
             <div style="background:#fff;border-radius:10px;padding:16px 18px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);">
               <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">${l.toUpperCase()}</div>
-              <div style="font-size:24px;font-weight:700;color:${l==='Max Drawdown'?'#dc2626':(l==='Annualised Return'?pctClr(v):'#0f172a')};margin-top:4px;font-family:ui-monospace,monospace;">${v == null ? '—' : v + (suffix||'')}</div>
+              <div style="font-size:24px;font-weight:700;color:${l==='Max Drawdown'?'#dc2626':(l==='Annualised Return'?pctClr(v):'#0f172a')};margin-top:4px;font-family:ui-monospace,monospace;">${v == null ? '&mdash;' : v + (suffix||'')}</div>
               <div style="font-size:11px;color:#64748b;margin-top:6px;line-height:1.4;">${hint}</div>
             </div>`).join('')}
         </div>
@@ -821,7 +924,7 @@
       _charts.set(el, chart);
     }
 
-    /* ─── Tab: Allocations ─── */
+    /* âââ Tab: Allocations âââ */
     function renderAllocationsTab(i) {
       return `
         <div style="display:grid;grid-template-columns:1fr 360px;gap:14px;">
@@ -840,7 +943,7 @@
                     <td class="r ov-mono">${fmtR2(h.priceR)}</td>
                     <td class="r ov-mono">${fmtR(h.currentR)}</td>
                     <td class="r ov-mono">${h.weight.toFixed(1)}%</td>
-                    <td class="r ov-mono" style="color:${pctClr(h.pnlR)};font-weight:600;">${(h.pnlR>=0?'+':'')+fmtR(h.pnlR)}</td>
+                    <td class="r ov-mono" style="color:${pctClr(h.pnlR)};font-weight:600;">${(h.pnlR>=0?'+':'')+fmtR2(h.pnlR)}</td>
                   </tr>`).join('') || `<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:20px;">No holdings</td></tr>`}
               </tbody>
             </table>
@@ -874,27 +977,218 @@
       });
     }
 
-    /* ─── Tab: Transactions ─── */
+    /* âââ Tab: Transactions âââ */
+
+    /* Classify a transactions row by name + direction. Returns:
+       { label, color, bg, sign } so the UI styles consistently. */
+    function classifyTxn(t) {
+      const name = String(t.name || t.description || '').toLowerCase();
+      const dir = String(t.direction || '').toLowerCase();
+      // direction=debit = money INTO MINT (deposits, investments, fees charged)
+      // direction=credit = money OUT of MINT (withdrawals, refunds, residual credits)
+      /* "Strategy Investment: X" for baskets, "Purchased X" for single stocks.
+         Also catch any row that has fee breakdown columns populated (base_amount_cents > 0)
+         so future transaction name changes don't break the classification. */
+      if (/strategy investment|invest|purchased/i.test(name) || Number(t.base_amount_cents) > 0) {
+        return { label: 'INVESTMENT', color: '#7c3aed', bg: '#ede9fe', sign: '-', isOutflow: true };
+      }
+      if (/withdraw/i.test(name)) {
+        return { label: 'WITHDRAWAL', color: '#dc2626', bg: '#fee2e2', sign: '-', isOutflow: true };
+      }
+      if (/fee/i.test(name)) {
+        return { label: 'FEE', color: '#b45309', bg: '#fef3c7', sign: '-', isOutflow: true };
+      }
+      if (/rebalance/i.test(name)) {
+        return { label: 'REBALANCE', color: '#0284c7', bg: '#e0f2fe', sign: '&middot;', isOutflow: false };
+      }
+      if (/reversal|refund/i.test(name)) {
+        return { label: 'REFUND', color: '#059669', bg: '#dcfce7', sign: '+', isOutflow: false };
+      }
+      if (dir === 'debit') {
+        return { label: 'DEPOSIT', color: '#059669', bg: '#dcfce7', sign: '+', isOutflow: false };
+      }
+      return { label: 'WITHDRAWAL', color: '#dc2626', bg: '#fee2e2', sign: '-', isOutflow: true };
+    }
+
     function renderTxnsTab(i) {
       const txns = i.txns || [];
       if (!txns.length) return `<div style="background:#fff;border-radius:10px;padding:30px;text-align:center;color:#94a3b8;">No transactions found.</div>`;
+
+      /* KPI summary across all this user's transactions. Fees are split by
+         where the money actually goes: broker (EasyEquities), custodian (ISIN),
+         and MINT's own revenue (the 3.8% txn fee). The 8% execution reserve is
+         tracked separately &mdash; it's the user's money, not a fee. */
+      let totalDeposits = 0, totalWithdrawals = 0, totalInvested = 0;
+      let feeBroker = 0, feeCustody = 0, feeMint = 0, bufferHeld = 0;
+      for (const t of txns) {
+        const amt = Number(t.amount) / 100;
+        const cls = classifyTxn(t);
+        if (cls.label === 'DEPOSIT') totalDeposits += amt;
+        else if (cls.label === 'WITHDRAWAL') totalWithdrawals += amt;
+        else if (cls.label === 'FEE') feeMint += amt;
+        else if (cls.label === 'INVESTMENT') {
+          totalInvested += Number(t.base_amount_cents || 0) / 100;
+          feeBroker  += Number(t.broker_fee_cents || 0) / 100;
+          feeCustody += Number(t.isin_fee_cents || 0) / 100;
+          feeMint    += Number(t.transaction_fee_cents || 0) / 100;
+          bufferHeld += Number(t.buffer_cents || 0) / 100;
+        }
+      }
+      /* Rebalance fees (admin-derived; not in the transactions table). Folded
+         into total fees so "Fees paid" reflects every cost the client bore. */
+      const rebFeeBroker = Number(i.rebFeeBroker || 0);
+      const rebFeeCustody = Number(i.rebFeeCustody || 0);
+      const rebFeeTotal = rebFeeBroker + rebFeeCustody;
+      const totalFees = feeBroker + feeCustody + feeMint + rebFeeTotal;
+
+      /* Execution-reserve movements come from the buffer_drawdowns_c ledger
+         (authoritative, per event). Falls back to nothing when empty. */
+      const dds = i.drawdowns || [];
+      let ddConsumed = 0, ddShortfall = 0, ddRefunded = 0;
+      for (const d of dds) {
+        const v = Number(d.delta_cents || 0) / 100;
+        if (d.event_type === 'slippage_drawdown') ddConsumed += v;
+        else if (d.event_type === 'shortfall') ddShortfall += v;
+        else if (/refund/.test(d.event_type || '')) ddRefunded += v;
+      }
+      const bufferRemaining = Math.max(0, bufferHeld - ddConsumed - ddRefunded);
+
+      const kpi = (label, value, color) => `
+        <div style="background:#f8fafc;border-radius:8px;padding:10px 12px;">
+          <div style="font-size:10px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">${label}</div>
+          <div style="font-size:14px;font-weight:700;color:${color};font-family:ui-monospace,monospace;margin-top:2px;">${fmtR2(value)}</div>
+        </div>`;
+
+      const ddTypeChip = (type) => {
+        const map = {
+          slippage_drawdown:   { t: 'Slippage', c: '#0284c7', bg: '#e0f2fe' },
+          shortfall:           { t: 'Shortfall', c: '#dc2626', bg: '#fee2e2' },
+          cancel_refund:       { t: 'Cancel refund', c: '#059669', bg: '#dcfce7' },
+          sale_refund:         { t: 'Sale refund', c: '#059669', bg: '#dcfce7' },
+          partial_sale_refund: { t: 'Partial refund', c: '#059669', bg: '#dcfce7' },
+        };
+        const m = map[type] || { t: type || '&mdash;', c: '#64748b', bg: '#f1f5f9' };
+        return `<span style="font-size:10px;color:${m.c};background:${m.bg};padding:2px 7px;border-radius:10px;font-weight:600;">${m.t}</span>`;
+      };
+
+      /* Buffer-events ledger section &mdash; admin-only; never shown to the user. */
+      const bufferEventsHtml = dds.length ? `
+        <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">EXECUTION RESERVE &mdash; BUFFER EVENTS (${dds.length})</div>
+            <div style="font-size:10px;color:#94a3b8;">Admin only &middot; not shown to client</div>
+          </div>
+          <table class="ov-table">
+            <thead><tr><th>Date</th><th>Transaction</th><th>Event</th><th class="r">Quoted</th><th class="r">Filled</th><th class="r">Qty</th><th class="r">Amount</th></tr></thead>
+            <tbody>
+              ${dds.map(d => {
+                const expR = d.expected_fill_cents != null ? Number(d.expected_fill_cents)/100 : null;
+                const actR = d.actual_fill_cents != null ? Number(d.actual_fill_cents)/100 : null;
+                const delta = Number(d.delta_cents || 0) / 100;
+                const isRefund = /refund/.test(d.event_type || '');
+                const amtColor = d.event_type === 'shortfall' ? '#dc2626' : (isRefund ? '#059669' : '#0284c7');
+                const amtSign = isRefund ? '+' : '&minus;';
+                return `<tr>
+                  <td>${fmtDate(d.created_at)}</td>
+                  <td style="color:#64748b;">${txnNameById[d.transaction_id] || (d.transaction_id ? d.transaction_id.slice(0,8) : '&mdash;')}</td>
+                  <td>${ddTypeChip(d.event_type)}</td>
+                  <td class="r ov-mono">${expR != null ? fmtR2(expR) : '&mdash;'}</td>
+                  <td class="r ov-mono">${actR != null ? fmtR2(actR) : '&mdash;'}</td>
+                  <td class="r ov-mono">${d.quantity != null ? d.quantity : '&mdash;'}</td>
+                  <td class="r ov-mono" style="color:${amtColor};font-weight:600;">${amtSign}${fmtR2(delta)}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>` : '';
+
       return `
+        <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);margin-bottom:14px;">
+          <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;margin-bottom:10px;">CASH FLOW SUMMARY</div>
+          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;">
+            ${kpi('Deposits', totalDeposits, '#059669')}
+            ${kpi('Invested (base)', totalInvested, '#7c3aed')}
+            ${kpi('Fees paid', totalFees, '#b45309')}
+            ${kpi('Buffer used', ddConsumed, '#0284c7')}
+            ${kpi('Buffer available', bufferRemaining, '#64748b')}
+            ${kpi('Withdrawals', totalWithdrawals, '#dc2626')}
+          </div>
+        </div>
+        <div style="background:#fff;border-radius:10px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);margin-bottom:14px;overflow:hidden;">
+          <button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.chev').style.transform=this.nextElementSibling.style.display==='none'?'rotate(0deg)':'rotate(180deg)';"
+            style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:14px;background:none;border:none;cursor:pointer;font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">
+            FEES &mdash; WHERE THE MONEY GOES
+            <span class="chev" style="transition:transform 0.2s;display:inline-block;">&#9662;</span>
+          </button>
+          <div style="display:none;padding:0 14px 14px;">
+            <div style="font-size:10px;color:#94a3b8;font-weight:600;margin-bottom:6px;letter-spacing:0.04em;">PURCHASE</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+              ${kpi('Broker (0.25%)', feeBroker, '#b45309')}
+              ${kpi('Custody / ISIN', feeCustody, '#b45309')}
+              ${kpi('MINT revenue (3.8%)', feeMint, '#059669')}
+            </div>
+            ${rebFeeTotal > 0 ? `
+            <div style="font-size:10px;color:#94a3b8;font-weight:600;margin:12px 0 6px;letter-spacing:0.04em;">REBALANCE${' '}&middot;${' '}<span style="color:#0e7490;">admin only</span></div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+              ${kpi('Reb. broker (0.5%)', rebFeeBroker, '#b45309')}
+              ${kpi('Reb. custody (R69/ISIN)', rebFeeCustody, '#b45309')}
+              ${kpi('Rebalance total', rebFeeTotal, '#b45309')}
+            </div>` : ''}
+          </div>
+        </div>
+        <div style="background:#fff;border-radius:10px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);margin-bottom:14px;overflow:hidden;">
+          <button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.chev').style.transform=this.nextElementSibling.style.display==='none'?'rotate(0deg)':'rotate(180deg)';"
+            style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:14px;background:none;border:none;cursor:pointer;font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">
+            EXECUTION RESERVE (8% BUFFER)
+            <span class="chev" style="transition:transform 0.2s;display:inline-block;">&#9662;</span>
+          </button>
+          <div style="display:none;padding:0 14px 14px;">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+              ${kpi('Held', bufferHeld, '#0f172a')}
+              ${kpi('Consumed', ddConsumed, '#0284c7')}
+              ${kpi('Refunded', ddRefunded, '#059669')}
+              ${kpi('Still locked', bufferRemaining, '#64748b')}
+            </div>
+            ${ddShortfall > 0 ? `<div style="margin-top:10px;font-size:11px;color:#dc2626;font-weight:600;">&#9888; Shortfall (slippage beyond buffer, absorbed by MINT): ${fmtR2(ddShortfall)}</div>` : ''}
+          </div>
+        </div>
+        ${bufferEventsHtml}
         <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);">
           <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;margin-bottom:10px;">TRANSACTIONS (${txns.length})</div>
           <table class="ov-table">
-            <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Status</th><th class="r">Amount</th></tr></thead>
+            <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Status</th><th class="r">Amount</th><th class="r">Breakdown</th></tr></thead>
             <tbody>
               ${txns.map(t => {
                 const amt = Number(t.amount) / 100;
-                const isDeposit = t.direction === 'debit';
-                const sign = isDeposit ? '+' : '-';
-                const clr  = isDeposit ? '#059669' : '#dc2626';
+                const cls = classifyTxn(t);
+                /* For investment rows, render the fee breakdown inline so the
+                   reviewer can see what went into the gross amount without
+                   leaving the page. */
+                let breakdownHtml = '&mdash;';
+                if (cls.label === 'INVESTMENT') {
+                  const base = Number(t.base_amount_cents || 0) / 100;
+                  const buffer = Number(t.buffer_cents || 0) / 100;
+                  const consumed = Number(t.buffer_consumed_cents || 0) / 100;
+                  const broker = Number(t.broker_fee_cents || 0) / 100;
+                  const isin = Number(t.isin_fee_cents || 0) / 100;
+                  const txnFee = Number(t.transaction_fee_cents || 0) / 100;
+                  const lines = [];
+                  if (base > 0) lines.push(`Base: ${fmtR2(base)}`);
+                  if (buffer > 0) lines.push(`Buffer 8%: ${fmtR2(buffer)} (used ${fmtR2(consumed)})`);
+                  if (broker > 0) lines.push(`Broker 0.25%: ${fmtR2(broker)}`);
+                  if (isin > 0) lines.push(`Custody/ISIN: ${fmtR2(isin)}`);
+                  if (txnFee > 0) lines.push(`Txn fee 3.8%: ${fmtR2(txnFee)}`);
+                  if (lines.length) {
+                    breakdownHtml = `<span style="font-size:10px;color:#64748b;line-height:1.5;">${lines.join('<br/>')}</span>`;
+                  }
+                }
                 return `<tr>
                   <td>${fmtDate(t.transaction_date)}</td>
-                  <td style="color:#64748b;">${t.name || t.description || '—'}</td>
-                  <td><span style="font-size:10px;color:${clr};background:${isDeposit?'#dcfce7':'#fee2e2'};padding:2px 7px;border-radius:10px;font-weight:600;">${isDeposit?'DEPOSIT':'WITHDRAWAL'}</span></td>
-                  <td><span style="font-size:10px;color:#64748b;background:#f1f5f9;padding:2px 7px;border-radius:10px;">${t.status||'—'}</span></td>
-                  <td class="r ov-mono" style="color:${clr};font-weight:600;">${sign}${fmtR2(amt)}</td>
+                  <td style="color:#64748b;">${t.name || t.description || '&mdash;'}</td>
+                  <td><span style="font-size:10px;color:${cls.color};background:${cls.bg};padding:2px 7px;border-radius:10px;font-weight:600;">${cls.label}</span></td>
+                  <td><span style="font-size:10px;color:#64748b;background:#f1f5f9;padding:2px 7px;border-radius:10px;">${t.status||'&mdash;'}</span></td>
+                  <td class="r ov-mono" style="color:${cls.color};font-weight:600;">${cls.sign}${fmtR2(amt)}</td>
+                  <td class="r">${breakdownHtml}</td>
                 </tr>`;
               }).join('')}
             </tbody>
@@ -903,7 +1197,7 @@
       `;
     }
 
-    /* ─── Init ─── */
+    /* âââ Init âââ */
     document.addEventListener('DOMContentLoaded', async () => {
       try {
         const { data: { session } } = await sb.auth.getSession();
@@ -926,7 +1220,7 @@
         document.getElementById('investorSearch').oninput = () => renderList(allInvestors);
         sf.onchange = () => renderList(allInvestors);
 
-        /* Realtime + interval refresh — debounced + in-flight guarded to avoid request storms */
+        /* Realtime + interval refresh &mdash; debounced + in-flight guarded to avoid request storms */
         let _refreshTimer = null, _refreshInFlight = false, _refreshQueued = false;
         const doRefresh = async () => {
           if (_refreshInFlight) { _refreshQueued = true; return; }
@@ -948,7 +1242,11 @@
           if (_refreshTimer) clearTimeout(_refreshTimer);
           _refreshTimer = setTimeout(doRefresh, 1500);
         };
-        ['stock_holdings_c','client_strategy_returns_c','stock_returns_c','transactions'].forEach(t => {
+        /* stock_intraday_c = the live market-price feed; subscribing here makes
+           PnLs move on each price tick (debounced) instead of only on the 60s
+           poll or a manual refresh. Requires the table to be in the
+           supabase_realtime publication (see docs/enable-realtime-prices.sql). */
+        ['stock_intraday_c','stock_holdings_c','client_strategy_returns_c','stock_returns_c','transactions'].forEach(t => {
           sb.channel('rt:'+t).on('postgres_changes', { event:'*', schema:'public', table:t }, scheduleRefresh).subscribe();
         });
         setInterval(scheduleRefresh, 60000);
