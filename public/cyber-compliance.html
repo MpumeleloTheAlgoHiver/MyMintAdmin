@@ -1105,7 +1105,11 @@ const loadPolicyChecks = async () => {
     // Most recent per policy_name
     const byName = {};
     checks.forEach(c => { if (!byName[c.policy_name]) byName[c.policy_name] = c; });
-    const latest = Object.values(byName);
+    const SEV = { critical: 0, high: 1, medium: 2, low: 3 };
+    const latest = Object.values(byName).sort((a, b) => {
+      if (a.passed !== b.passed) return a.passed ? 1 : -1;
+      return (SEV[a.severity] ?? 9) - (SEV[b.severity] ?? 9);
+    });
     const passed = latest.filter(c => c.passed).length;
     const total  = latest.length;
 
@@ -1172,7 +1176,11 @@ const doCheckNow = async () => {
 
     const byName = {};
     checks.forEach(c => { if (!byName[c.policy_name]) byName[c.policy_name] = c; });
-    const latest = Object.values(byName);
+    const SEV = { critical: 0, high: 1, medium: 2, low: 3 };
+    const latest = Object.values(byName).sort((a, b) => {
+      if (a.passed !== b.passed) return a.passed ? 1 : -1;
+      return (SEV[a.severity] ?? 9) - (SEV[b.severity] ?? 9);
+    });
     const passed = latest.filter(c => c.passed).length;
     const total  = latest.length;
 
