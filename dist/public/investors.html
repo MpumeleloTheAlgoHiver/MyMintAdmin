@@ -478,7 +478,7 @@
       /* Fetch active buy holdings with created_at for inception date */
       const { data: holdings } = await supabaseClient
         .from('stock_holdings_c')
-        .select('user_id, strategy_id, security_id, quantity, avg_fill, market_value, created_at, as_of_date')
+        .select('user_id, strategy_id, security_id, quantity, avg_fill, market_value, created_at, as_of_date, transaction_id')
         .eq('is_active', true)
         .eq('trade_side', 'BUY');
 
@@ -509,7 +509,7 @@
         /* Closed positions carry realised P&L: (avg_exit − avg_fill) × qty (same basis as app + returns job) */
         supabaseClient
           .from('stock_holdings_c')
-          .select('user_id, quantity, avg_fill, avg_exit')
+          .select('user_id, quantity, avg_fill, avg_exit, transaction_id')
           .eq('is_active', false)
           .in('user_id', userIds)
       ]);
@@ -525,6 +525,48 @@
         const f = Number(r.avg_fill) || 0, e = Number(r.avg_exit) || 0, q = Number(r.quantity) || 0;
         if (!f || !e || !q) return;
         realizedByUser[r.user_id] = (realizedByUser[r.user_id] || 0) + ((e - f) / 100) * q;
+      });
+
+      /* Held 8% buffer (cash element) per user, from the holdings' funding
+         transactions (each counted once, remaining = charged − slippage consumed). */
+      const fundTxnIds = [...new Set([...(holdings || []), ...(closedRows || [])].map(r => r.transaction_id).filter(Boolean))];
+      const bufferByUser = {};
+      if (fundTxnIds.length) {
+        const { data: fundTxns } = await supabaseClient
+          .from('transactions')
+          .select('id, user_id, buffer_cents, buffer_consumed_cents')
+          .in('id', fundTxnIds);
+        (fundTxns || []).forEach(t => {
+          const buf = Number(t.buffer_cents || 0) - Number(t.buffer_consumed_cents || 0);
+          bufferByUser[t.user_id] = (bufferByUser[t.user_id] || 0) + buf / 100;
+        });
+      }
+
+      /* Stable deployed cost per user, anchored to the EOD returns snapshot — the
+         SAME basis the Mint app uses, so app and CRM agree. Per strategy:
+         deployed = (basket + residual) − inception_pnl; summed across the user's
+         strategies (latest row per strategy). Robust where transaction amounts are
+         missing/0, and excludes the upfront fee (performance view). */
+      /* Only aggregate strategies the user CURRENTLY holds (active holdings) —
+         otherwise old/exited strategies in the returns history inflate invested
+         while `current` (live active holdings) doesn't include them. */
+      const activeStratByUser = {};
+      (holdings || []).forEach(r => {
+        if (r.user_id && r.strategy_id) (activeStratByUser[r.user_id] = activeStratByUser[r.user_id] || new Set()).add(r.strategy_id);
+      });
+      const { data: retRows } = await supabaseClient
+        .from('client_strategy_returns_c')
+        .select('user_id, strategy_id, basket_value, inception_pnl, as_of_date')
+        .in('user_id', userIds)
+        .order('as_of_date', { ascending: false });
+      const seenRet = {}, basketByUser = {}, inceptionByUser = {};
+      (retRows || []).forEach(r => {
+        const k = r.user_id + '|' + r.strategy_id;
+        if (seenRet[k]) return;       /* keep latest row per user+strategy */
+        seenRet[k] = 1;
+        if (!activeStratByUser[r.user_id]?.has(r.strategy_id)) return;  /* held strategies only */
+        basketByUser[r.user_id] = (basketByUser[r.user_id] || 0) + Number(r.basket_value || 0) / 100;
+        if (r.inception_pnl != null) inceptionByUser[r.user_id] = (inceptionByUser[r.user_id] || 0) + Number(r.inception_pnl) / 100;
       });
 
       const profMap = {};
@@ -599,13 +641,22 @@
         const days = inceptionDate ? Math.floor((Date.now() - new Date(inceptionDate)) / 86400000) : 0;
 
         /* ── Stable money-in → money-out P&L (matches the Mint app) ──
-           invested is anchored to the investor's actual deposits, NOT recomputed
-           from the cost of only the shares still held (which silently drops sold
-           shares on every rebalance and makes the % drift). Current value includes
-           rebalance residual cash so a rebalance doesn't look like a loss. */
+           invested = base + held 8% buffer the user deployed (EXCLUDES the upfront
+           fee, matching the app's performance view), NOT recomputed from the cost
+           of only the shares still held (which drifts on rebalances). Current value
+           includes the strategy's cash element (rebalance residual + buffer), so a
+           rebalance doesn't look like a loss and the buffer shows as cash. */
         const residualVal = residualByUser[u.userId] || 0;
-        const currentVal  = u.current + residualVal;
-        const invested    = (txnInvested[u.userId] > 0 ? txnInvested[u.userId] : u.costBasis);
+        const bufferVal   = bufferByUser[u.userId] || 0;
+        const cashElement = +(residualVal + bufferVal).toFixed(2);
+        const currentVal  = +(u.current + cashElement).toFixed(2);
+        /* invested = deployed (basket + residual − inception_pnl) + buffer. Buffer
+           is pass-through (in both invested and current), so it shows as cash
+           without creating P&L. Falls back to cost basis if no returns snapshot. */
+        const deployedBase = basketByUser[u.userId] != null
+          ? (basketByUser[u.userId] + residualVal - (inceptionByUser[u.userId] || 0))
+          : u.costBasis;
+        const invested    = +((deployedBase + bufferVal)).toFixed(2);
         const pnl         = +(currentVal - invested).toFixed(2);
         const returnPct   = invested > 0 ? +((pnl / invested) * 100).toFixed(2) : 0;
 
@@ -631,6 +682,8 @@
           invested,
           current: currentVal,
           residualCash: residualVal,
+          bufferCash: bufferVal,
+          cashElement,
           pnl,
           realized,
           unrealized,
@@ -967,6 +1020,7 @@
             return [
               { l: 'INVESTED',   v: fmtR(inv.invested),                                                   s: neutral,   note: null         },
               { l: 'VALUE',      v: fmtR(inv.current),                                                    s: neutral,   note: liveTimeStr  },
+              { l: 'CASH',       v: fmtR(inv.cashElement ?? 0),                                           s: neutral,   note: null         },
               { l: 'P&L',        v: (pnlPos ? '+' : '') + fmtR(inv.pnl),                                  s: fc(pnlPos),note: null         },
               { l: 'REALISED',   v: ((inv.realized ?? 0) >= 0 ? '+' : '') + fmtR(inv.realized ?? 0),      s: fc((inv.realized ?? 0) >= 0),   note: null },
               { l: 'UNREALISED', v: ((inv.unrealized ?? 0) >= 0 ? '+' : '') + fmtR(inv.unrealized ?? 0),  s: fc((inv.unrealized ?? 0) >= 0), note: null },
