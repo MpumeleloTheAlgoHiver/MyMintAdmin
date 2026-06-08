@@ -497,12 +497,13 @@ module.exports = async (req, res) => {
       const since     = url.searchParams.get('since')     || '';
       const limit     = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '100', 10)));
 
-      const validTables = ['profiles', 'stock_holdings_c', 'wallet_transactions', 'strategies_c', 'securities_c', 'user_onboarding', 'cc_incidents'];
-      const validOps    = ['INSERT', 'UPDATE', 'DELETE'];
+      const validOps = ['INSERT', 'UPDATE', 'DELETE'];
+      // Allow any table name that is alphanumeric/underscore (safe for query param)
+      const safeTable = /^[a-z0-9_]+$/.test(table) ? table : '';
 
       let qs = `/rest/v1/cc_audit_log?select=*&order=changed_at.desc&limit=${limit}`;
-      if (table     && validTables.includes(table))   qs += `&table_name=eq.${encodeURIComponent(table)}`;
-      if (operation && validOps.includes(operation))  qs += `&operation=eq.${encodeURIComponent(operation)}`;
+      if (safeTable) qs += `&table_name=eq.${encodeURIComponent(safeTable)}`;
+      if (operation && validOps.includes(operation)) qs += `&operation=eq.${encodeURIComponent(operation)}`;
       if (since) {
         const sinceDate = new Date(since);
         if (!isNaN(sinceDate.getTime())) qs += `&changed_at=gte.${sinceDate.toISOString()}`;

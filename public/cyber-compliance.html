@@ -384,24 +384,72 @@
 
     <!-- ── Audit Log Tab ───────────────────────────────────────────────── -->
     <div class="tab-pane" id="tab-audit">
-      <div class="card">
-        <div class="card-header"><span class="card-title">Database Audit Log</span>
-          <div style="font-size:12px;color:#8e8e93;">All inserts, updates and deletes on monitored tables</div>
+
+      <!-- Header row -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:#1c1c1e;">Database Audit Log</div>
+          <div style="font-size:13px;color:#8e8e93;margin-top:2px;">Every insert, update and delete across all monitored tables</div>
         </div>
-        <div class="filter-row">
-          <div class="filter-field"><label>Table</label>
-            <select id="auditFilterTable" onchange="loadAuditLog()">
-              <option value="">All tables</option>
-              <option>profiles</option><option>stock_holdings_c</option><option>wallet_transactions</option>
-              <option>strategies_c</option><option>securities_c</option><option>user_onboarding</option><option>cc_incidents</option>
-            </select></div>
-          <div class="filter-field"><label>Operation</label>
-            <select id="auditFilterOp" onchange="loadAuditLog()">
-              <option value="">All</option><option>INSERT</option><option>UPDATE</option><option>DELETE</option>
-            </select></div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span id="auditCount" style="font-size:12px;color:#636366;background:#f2f2f7;padding:4px 10px;border-radius:20px;"></span>
+          <button onclick="loadAuditLog()" style="padding:6px 14px;border-radius:8px;border:1.5px solid #7c3aed;background:#7c3aed;color:#fff;font-size:12px;font-weight:600;cursor:pointer;">↻ Refresh</button>
         </div>
-        <table>
-          <thead><tr><th>Table</th><th>Operation</th><th>Changed By</th><th>Changed At</th><th>Details</th></tr></thead>
+      </div>
+
+      <!-- Filter bar -->
+      <div style="background:#fff;border:1px solid #e5e5ea;border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+        <div style="display:flex;flex-direction:column;gap:4px;min-width:160px;">
+          <label style="font-size:11px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.05em;">Category</label>
+          <select id="auditFilterCat" onchange="onAuditCatChange()" style="padding:7px 10px;border-radius:8px;border:1px solid #d1d1d6;font-size:13px;color:#1c1c1e;background:#fff;cursor:pointer;">
+            <option value="">All Categories</option>
+            <option value="clients">👤 Client Data</option>
+            <option value="investments">💼 Investments & Holdings</option>
+            <option value="transactions">💰 Transactions</option>
+            <option value="comms">📧 Communications</option>
+            <option value="security">🛡️ Security / System</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;min-width:180px;">
+          <label style="font-size:11px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.05em;">Table</label>
+          <select id="auditFilterTable" onchange="loadAuditLog()" style="padding:7px 10px;border-radius:8px;border:1px solid #d1d1d6;font-size:13px;color:#1c1c1e;background:#fff;cursor:pointer;">
+            <option value="">All tables</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;min-width:140px;">
+          <label style="font-size:11px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.05em;">Operation</label>
+          <select id="auditFilterOp" onchange="loadAuditLog()" style="padding:7px 10px;border-radius:8px;border:1px solid #d1d1d6;font-size:13px;color:#1c1c1e;background:#fff;cursor:pointer;">
+            <option value="">All operations</option>
+            <option value="INSERT">INSERT</option>
+            <option value="UPDATE">UPDATE</option>
+            <option value="DELETE">DELETE</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:160px;">
+          <label style="font-size:11px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.05em;">Search</label>
+          <input id="auditSearch" type="text" placeholder="Filter by user, table or field…" oninput="renderAuditTable()" style="padding:7px 10px;border-radius:8px;border:1px solid #d1d1d6;font-size:13px;color:#1c1c1e;background:#fff;"/>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <table style="table-layout:fixed;">
+          <colgroup>
+            <col style="width:130px;">
+            <col style="width:110px;">
+            <col style="width:90px;">
+            <col style="width:160px;">
+            <col style="width:auto;">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Table</th>
+              <th>Operation</th>
+              <th>Changed By</th>
+              <th>What Changed</th>
+            </tr>
+          </thead>
           <tbody id="auditTableBody"><tr><td colspan="5" class="empty-state">Loading…</td></tr></tbody>
         </table>
       </div>
@@ -1015,41 +1063,164 @@ const loadIncidents = async () => {
 let _incDebounce;
 const debouncedLoadIncidents = () => { clearTimeout(_incDebounce); _incDebounce = setTimeout(loadIncidents, 350); };
 
-// ── Audit Log ───────────────────────────────────────────────────────────────
+// ── Audit Log ─────────────────────────────────────────────────────────────────
+const AUDIT_CATS = {
+  '':            { label: 'All Categories', tables: null },
+  clients:       { label: 'Client Data',      tables: ['profiles','user_onboarding','user_onboarding_pack_details'] },
+  investments:   { label: 'Investments',      tables: ['stock_holdings_c','strategies_c','securities_c','stock_returns_c','strategies_returns_c','rebalance_batch','rebalance_event'] },
+  transactions:  { label: 'Transactions',     tables: ['wallet_transactions'] },
+  comms:         { label: 'Communications',   tables: ['orderbook_email_runs'] },
+  security:      { label: 'Security/System',  tables: ['cc_incidents','cc_policy_checks','cc_uptime_log','cc_audit_log','cc_api_health'] }
+};
+
+let _auditAllLogs = [];
+
+const onAuditCatChange = () => {
+  const cat = document.getElementById('auditFilterCat').value;
+  const sel = document.getElementById('auditFilterTable');
+  const tables = AUDIT_CATS[cat]?.tables || null;
+  sel.innerHTML = '<option value="">All tables</option>';
+  (tables || Object.values(AUDIT_CATS).flatMap(c => c.tables || []).filter(Boolean))
+    .sort()
+    .forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; sel.appendChild(o); });
+  loadAuditLog();
+};
+
+const renderAuditTable = () => {
+  const cat    = document.getElementById('auditFilterCat').value;
+  const table  = document.getElementById('auditFilterTable').value;
+  const op     = document.getElementById('auditFilterOp').value;
+  const search = (document.getElementById('auditSearch')?.value || '').toLowerCase();
+  const catTables = AUDIT_CATS[cat]?.tables || null;
+
+  let logs = _auditAllLogs.filter(l => {
+    if (catTables && !catTables.includes(l.table_name)) return false;
+    if (table && l.table_name !== table) return false;
+    if (op    && l.operation  !== op)    return false;
+    if (search) {
+      const hay = [l.table_name, l.operation, l.changed_by || ''].join(' ').toLowerCase();
+      const fields = [...Object.keys(l.old_row || {}), ...Object.keys(l.new_row || {})].join(' ').toLowerCase();
+      if (!hay.includes(search) && !fields.includes(search)) return false;
+    }
+    return true;
+  });
+
+  const tbody = document.getElementById('auditTableBody');
+  const countEl = document.getElementById('auditCount');
+  if (countEl) countEl.textContent = `${logs.length} entr${logs.length === 1 ? 'y' : 'ies'}`;
+  document.getElementById('statAuditEntries').textContent = logs.length;
+
+  if (!logs.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No entries match your filters</td></tr>';
+    return;
+  }
+
+  const opBadge = op_ => {
+    const cfg = { INSERT: ['#dcfce7','#166534','INSERT'], UPDATE: ['#dbeafe','#1e40af','UPDATE'], DELETE: ['#fee2e2','#991b1b','DELETE'] };
+    const [bg,color,label] = cfg[op_] || ['#f2f2f7','#3c3c43', op_];
+    return `<span style="display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:.04em;background:${bg};color:${color};">${label}</span>`;
+  };
+
+  const relTime = ts => {
+    if (!ts) return '—';
+    const diff = Date.now() - new Date(ts).getTime();
+    if (diff < 60000)  return `${Math.round(diff/1000)}s ago`;
+    if (diff < 3600000) return `${Math.round(diff/60000)}m ago`;
+    if (diff < 86400000) return `${Math.round(diff/3600000)}h ago`;
+    return fmtDate(ts);
+  };
+
+  const fmtVal = v => {
+    if (v == null) return '<em style="color:#c7c7cc;">null</em>';
+    const s = typeof v === 'object' ? JSON.stringify(v) : String(v);
+    return escHtml(s.length > 60 ? s.slice(0, 60) + '…' : s);
+  };
+
+  const SKIP_FIELDS = new Set(['updated_at','created_at','__v']);
+
+  tbody.innerHTML = logs.map(l => {
+    const rid = l.new_row?.id || l.old_row?.id || '';
+    const ridStr = rid ? `<span style="font-size:10px;color:#8e8e93;font-family:monospace;display:block;margin-top:1px;">${String(rid).slice(0,8)}…</span>` : '';
+
+    let diffHtml = '';
+    if (l.operation === 'INSERT' && l.new_row) {
+      const keys = Object.keys(l.new_row).filter(k => !SKIP_FIELDS.has(k) && l.new_row[k] != null).slice(0, 5);
+      diffHtml = `<div style="font-size:11px;color:#166534;font-weight:600;margin-bottom:4px;">✦ New record</div>` +
+        keys.map(k => `<div style="margin-bottom:2px;font-size:11px;"><span style="color:#636366;min-width:80px;display:inline-block;">${escHtml(k)}</span><span style="color:#1c1c1e;font-family:monospace;">${fmtVal(l.new_row[k])}</span></div>`).join('');
+    } else if (l.operation === 'DELETE' && l.old_row) {
+      const keys = Object.keys(l.old_row).filter(k => !SKIP_FIELDS.has(k) && l.old_row[k] != null).slice(0, 5);
+      diffHtml = `<div style="font-size:11px;color:#991b1b;font-weight:600;margin-bottom:4px;">✦ Record deleted</div>` +
+        keys.map(k => `<div style="margin-bottom:2px;font-size:11px;"><span style="color:#636366;min-width:80px;display:inline-block;">${escHtml(k)}</span><span style="color:#636366;font-family:monospace;text-decoration:line-through;">${fmtVal(l.old_row[k])}</span></div>`).join('');
+    } else if (l.operation === 'UPDATE' && l.old_row && l.new_row) {
+      const changed = Object.keys(l.new_row).filter(k => !SKIP_FIELDS.has(k) && JSON.stringify(l.old_row[k]) !== JSON.stringify(l.new_row[k]));
+      if (changed.length) {
+        diffHtml = changed.slice(0, 6).map(k =>
+          `<div style="margin-bottom:4px;font-size:11px;display:flex;align-items:flex-start;gap:6px;">` +
+          `<span style="color:#636366;min-width:90px;flex-shrink:0;">${escHtml(k)}</span>` +
+          `<span style="color:#991b1b;text-decoration:line-through;font-family:monospace;">${fmtVal(l.old_row[k])}</span>` +
+          `<span style="color:#636366;flex-shrink:0;">→</span>` +
+          `<span style="color:#166534;font-family:monospace;">${fmtVal(l.new_row[k])}</span>` +
+          `</div>`).join('');
+        if (changed.length > 6) diffHtml += `<div style="font-size:10px;color:#8e8e93;">+${changed.length - 6} more fields</div>`;
+      } else {
+        diffHtml = '<span style="font-size:11px;color:#8e8e93;">No data changes recorded</span>';
+      }
+    }
+
+    const rowBg = l.operation === 'DELETE' ? 'background:#fff8f8;' : l.operation === 'INSERT' ? 'background:#f0fdf4;' : '';
+    return `<tr style="${rowBg}">
+      <td style="white-space:nowrap;">
+        <div style="font-size:12px;font-weight:500;color:#1c1c1e;" title="${escHtml(l.changed_at || '')}">${relTime(l.changed_at)}</div>
+        <div style="font-size:10px;color:#8e8e93;">${fmtDate(l.changed_at)}</div>
+      </td>
+      <td>
+        <div style="font-size:12px;font-family:monospace;color:#3c3c43;word-break:break-all;">${escHtml(l.table_name)}</div>
+        ${ridStr}
+      </td>
+      <td>${opBadge(l.operation)}</td>
+      <td>
+        <div style="font-size:12px;color:#1c1c1e;word-break:break-all;">${escHtml(l.changed_by || 'system')}</div>
+      </td>
+      <td>${diffHtml || '<span style="font-size:11px;color:#8e8e93;">—</span>'}</td>
+    </tr>`;
+  }).join('');
+};
+
 const loadAuditLog = async () => {
   const table = document.getElementById('auditFilterTable').value;
   const op    = document.getElementById('auditFilterOp').value;
-  let qs = '/api/cyber-compliance?action=list-audit-log&limit=100';
+  const tbody = document.getElementById('auditTableBody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Loading…</td></tr>';
+
+  let qs = '/api/cyber-compliance?action=list-audit-log&limit=200';
   if (table) qs += '&table=' + encodeURIComponent(table);
   if (op)    qs += '&operation=' + encodeURIComponent(op);
+
   try {
     const r = await fetch(qs, { headers: authH() });
     const d = await r.json();
-    const logs = d.logs || [];
-    const tbody = document.getElementById('auditTableBody');
-    if (!logs.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No audit entries yet — run the SQL triggers from sql/audit_triggers.sql in Supabase to enable audit logging</td></tr>';
+    _auditAllLogs = d.logs || [];
+    if (!_auditAllLogs.length) {
+      if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No audit entries yet — ensure audit triggers are enabled in Supabase</td></tr>';
       document.getElementById('statAuditEntries').textContent = '0';
+      const countEl = document.getElementById('auditCount');
+      if (countEl) countEl.textContent = '0 entries';
       return;
     }
-    document.getElementById('statAuditEntries').textContent = logs.length;
-    tbody.innerHTML = logs.map(l => {
-      const oldKeys = l.old_row ? Object.keys(l.old_row).filter(k => k !== 'updated_at') : [];
-      const changed = oldKeys.filter(k => JSON.stringify(l.old_row[k]) !== JSON.stringify(l.new_row?.[k]));
-      const diffHtml = changed.slice(0,3).map(k =>
-        `<div style="margin-bottom:2px;"><span style="font-size:10px;color:#636366;">${escHtml(k)}:</span> ` +
-        (l.old_row?.[k] != null ? `<span class="diff-old">${escHtml(String(l.old_row[k]).slice(0,40))}</span>` : '') +
-        (l.new_row?.[k] != null ? ` → <span class="diff-new">${escHtml(String(l.new_row[k]).slice(0,40))}</span>` : '') +
-        `</div>`).join('');
-      return `<tr>
-        <td style="font-family:monospace;font-size:12px;">${escHtml(l.table_name)}</td>
-        <td><span class="badge ${l.operation==='INSERT'?'pass':l.operation==='DELETE'?'fail':'p-medium'}">${l.operation}</span></td>
-        <td class="ts">${escHtml(l.changed_by||'system')}</td>
-        <td class="ts">${fmtDate(l.changed_at)}</td>
-        <td>${diffHtml || '<span style="font-size:11px;color:#8e8e93;">—</span>'}</td>
-      </tr>`;
-    }).join('');
-  } catch { document.getElementById('auditTableBody').innerHTML = '<tr><td colspan="5" class="empty-state">Failed to load audit log</td></tr>'; }
+    // Init table dropdown with all seen tables on first load
+    if (!table && !op) {
+      const seen = [...new Set(_auditAllLogs.map(l => l.table_name))].sort();
+      const sel = document.getElementById('auditFilterTable');
+      const cat = document.getElementById('auditFilterCat').value;
+      if (!cat) {
+        sel.innerHTML = '<option value="">All tables</option>';
+        seen.forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; sel.appendChild(o); });
+      }
+    }
+    renderAuditTable();
+  } catch {
+    if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Failed to load audit log</td></tr>';
+  }
 };
 
 // ── Policy Checks — per-environment tabs ─────────────────────────────────────
