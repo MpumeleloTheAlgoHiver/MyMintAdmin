@@ -1150,7 +1150,7 @@ const renderAuditTable = () => {
     } else if (l.operation === 'DELETE' && l.old_row) {
       const keys = Object.keys(l.old_row).filter(k => !SKIP_FIELDS.has(k) && l.old_row[k] != null).slice(0, 5);
       diffHtml = `<div style="font-size:11px;color:#991b1b;font-weight:600;margin-bottom:4px;">✦ Record deleted</div>` +
-        keys.map(k => `<div style="margin-bottom:2px;font-size:11px;"><span style="color:#636366;min-width:80px;display:inline-block;">${escHtml(k)}</span><span style="color:#636366;font-family:monospace;text-decoration:line-through;">${fmtVal(l.old_row[k])}</span></div>`).join('');
+        keys.map(k => `<div style="margin-bottom:2px;font-size:11px;"><span style="color:#636366;min-width:80px;display:inline-block;">${escHtml(k)}</span><span style="color:#991b1b;font-family:monospace;">${fmtVal(l.old_row[k])}</span></div>`).join('');
     } else if (l.operation === 'UPDATE' && l.old_row && l.new_row) {
       const changed = Object.keys(l.new_row).filter(k => !SKIP_FIELDS.has(k) && JSON.stringify(l.old_row[k]) !== JSON.stringify(l.new_row[k]));
       if (changed.length) {
