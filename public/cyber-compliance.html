@@ -433,7 +433,10 @@
       <div class="card">
         <div class="card-header">
           <span class="card-title" id="policyEnvTitle">CRM Admin — Policy Checks</span>
-          <div style="font-size:12px;color:#8e8e93;" id="policyEnvUrl">https://[this-crm]</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span id="policyLiveBadge" style="display:none;background:#fff3cd;color:#856404;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.04em;">⚡ LIVE CHECK</span>
+            <div style="font-size:12px;color:#8e8e93;" id="policyEnvUrl"></div>
+          </div>
         </div>
         <table>
           <thead><tr><th>Policy</th><th>Category</th><th>Severity</th><th>Result</th><th>Detail</th><th>Recommendation</th><th>Checked</th></tr></thead>
@@ -1060,20 +1063,30 @@ const switchPolicyEnv = async (env, btn) => {
     b.style.color         = active ? '#fff'    : '#3c3c43';
     b.style.borderColor   = active ? '#7c3aed' : '#e5e5ea';
   });
-  const meta = POLICY_ENV_META[env] || {};
+  const meta    = POLICY_ENV_META[env] || {};
   const titleEl = document.getElementById('policyEnvTitle');
   const urlEl   = document.getElementById('policyEnvUrl');
-  if (titleEl) titleEl.textContent = `${meta.emoji || ''} ${meta.label || env} — Policy Checks`;
-  if (urlEl)   urlEl.textContent   = meta.url || '';
+  const badge   = document.getElementById('policyLiveBadge');
+  if (titleEl) titleEl.textContent    = `${meta.emoji || ''} ${meta.label || env} — Policy Checks`;
+  if (urlEl)   urlEl.textContent      = meta.url || '';
+  if (badge)   badge.style.display    = (env === 'dev' || env === 'live') ? 'inline-block' : 'none';
   await loadPolicyChecks();
 };
 
 const loadPolicyChecks = async () => {
   const env   = _currentPolicyEnv;
   const tbody = document.getElementById('policyTableBody');
-  if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Loading…</td></tr>';
+  if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Running checks…</td></tr>';
+
+  // DEV and LIVE: always run live on-demand checks (no DB needed)
+  // CRM: use stored results from scheduled scans
+  const isLive = env === 'dev' || env === 'live';
+  const apiUrl = isLive
+    ? `/api/cyber-compliance?action=run-policy-checks-live&env=${env}`
+    : `/api/cyber-compliance?action=list-policy-checks&env=${env}&limit=200`;
+
   try {
-    const r = await fetch(`/api/cyber-compliance?action=list-policy-checks&env=${env}&limit=200`, { headers: authH() });
+    const r = await fetch(apiUrl, { headers: authH() });
     const d = await r.json();
     const checks = d.checks || [];
 

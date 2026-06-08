@@ -3,20 +3,21 @@
  * Cyber Compliance & Monitoring Centre — API handler
  *
  * Actions (via ?action= query param):
- *   list-incidents      GET  — paginated cc_incidents with filters
- *   create-incident     POST — create manual incident
- *   update-incident     POST — update incident (status, notes, etc.)
- *   confirm-resolve     POST — admin confirms a pending-resolve auto-incident
- *   delete-incident     POST — delete incident by id
- *   list-uptime         GET  — uptime log with optional service_key / env filter
- *   list-api-health     GET  — api health checks with optional env filter
- *   list-policy-checks  GET  — latest policy check results
- *   list-audit-log      GET  — db audit log with table/operation/date filters
- *   list-active-users   GET  — active/logged-in users from auth.users + profiles (new vs existing badge)
- *   badge-count         GET  — count of open incidents + failed checks (for red dot)
- *   health-summary      GET  — aggregated last check time, uptime %, API pass rate, policy pass rate
- *   run-migration       POST — admin only: runs cyber_compliance.sql + audit_triggers.sql via pg direct connection
- *   check-migration     GET  — checks which cc_ tables + triggers are installed
+ *   list-incidents           GET  — paginated cc_incidents with filters
+ *   create-incident          POST — create manual incident
+ *   update-incident          POST — update incident (status, notes, etc.)
+ *   confirm-resolve          POST — admin confirms a pending-resolve auto-incident
+ *   delete-incident          POST — delete incident by id
+ *   list-uptime              GET  — uptime log with optional service_key / env filter
+ *   list-api-health          GET  — api health checks with optional env filter
+ *   list-policy-checks       GET  — latest stored policy check results (CRM)
+ *   run-policy-checks-live   GET  — on-demand live HTTP policy scan for dev or live env
+ *   list-audit-log           GET  — db audit log with table/operation/date filters
+ *   list-active-users        GET  — active/logged-in users from auth.users + profiles
+ *   badge-count              GET  — count of open incidents + failed checks (for red dot)
+ *   health-summary           GET  — aggregated last check time, uptime %, API pass rate, policy pass rate
+ *   run-migration            POST — admin only: runs cyber_compliance.sql + audit_triggers.sql via pg
+ *   check-migration          GET  — checks which cc_ tables + triggers are installed
  */
 
 const { requireAdmin } = require('./_team');
@@ -271,6 +272,80 @@ module.exports = async (req, res) => {
         }
       }
       return sendJson(res, 200, { ok: true, checks: Array.isArray(rows) ? rows : [] });
+    }
+
+    // ── RUN POLICY CHECKS LIVE (on-demand, no DB) ─────────────────────────────
+    // Used for DEV and LIVE tabs: runs HTTP checks right now, returns results directly.
+    if (action === 'run-policy-checks-live') {
+      if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
+      const env = (url.searchParams.get('env') || '').replace(/[^a-z]/g, '');
+      const ENV_URLS = {
+        live: 'https://app.mymint.co.za',
+        dev:  'https://mint-development.vercel.app'
+      };
+      const targetUrl = ENV_URLS[env];
+      if (!targetUrl) return sendJson(res, 400, { error: 'env must be live or dev' });
+
+      const now = Date.now();
+      let httpResult = { ok: false, status: null, headers: {}, response_ms: 0, error: 'Not checked' };
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 9000);
+        const r = await fetch(targetUrl, {
+          method: 'GET',
+          headers: { 'User-Agent': 'MintCRM-PolicyCheck/1.0' },
+          signal: controller.signal,
+          redirect: 'follow'
+        });
+        clearTimeout(timer);
+        const hdrs = {};
+        r.headers.forEach((v, k) => { hdrs[k.toLowerCase()] = v; });
+        httpResult = { ok: r.ok || r.status < 500, status: r.status, headers: hdrs, response_ms: Date.now() - now, error: null };
+      } catch (err) {
+        httpResult = { ok: false, status: null, headers: {}, response_ms: Date.now() - now, error: err.message };
+      }
+
+      const h   = httpResult.headers;
+      const ts  = new Date().toISOString();
+      const mk  = (policy_name, category, passed, severity, detail, recommendation) =>
+        ({ policy_name, category, passed, severity, detail, recommendation, checked_at: ts, target_env: env });
+
+      const xcto = h['x-content-type-options'];
+      const xfo  = h['x-frame-options'];
+      const csp  = h['content-security-policy'] || '';
+      const hsts = h['strict-transport-security'];
+      const xpb  = h['x-powered-by'] || '';
+      const srv  = h['server'] || '';
+      const noLeak = !xpb && (!srv || !srv.match(/\d+\.\d+/) ||
+        ['cloudflare','vercel'].some(s => srv.toLowerCase().includes(s)));
+
+      const checks = [
+        mk('App Reachable', 'Availability', httpResult.ok, 'critical',
+          httpResult.ok ? `Responded HTTP ${httpResult.status} in ${httpResult.response_ms}ms`
+                        : `Unreachable: ${httpResult.error || `HTTP ${httpResult.status}`}`,
+          'Ensure the app is deployed and accessible at its public URL'),
+        mk('HTTPS Enforced', 'Transport Security', targetUrl.startsWith('https://') && httpResult.ok, 'critical',
+          targetUrl.startsWith('https://') ? (httpResult.ok ? 'HTTPS URL responds correctly' : 'HTTPS URL did not respond') : 'URL is not HTTPS',
+          'Always serve over HTTPS; configure host to force SSL'),
+        mk('Response Time', 'Performance', httpResult.ok && httpResult.response_ms <= 5000, 'medium',
+          httpResult.ok ? `${httpResult.response_ms}ms (threshold: 5000ms)` : 'No response',
+          'Response time should be under 5 seconds'),
+        mk('X-Content-Type-Options', 'Security Headers', xcto === 'nosniff', 'medium',
+          xcto ? `Header present: ${xcto}` : 'Header missing from response',
+          'Set X-Content-Type-Options: nosniff to prevent MIME-type sniffing'),
+        mk('Clickjacking Protection', 'Security Headers',
+          Boolean(xfo) || csp.includes('frame-ancestors'), 'high',
+          xfo ? `X-Frame-Options: ${xfo}` : (csp.includes('frame-ancestors') ? 'CSP frame-ancestors set' : 'Neither X-Frame-Options nor CSP frame-ancestors present'),
+          'Set X-Frame-Options: DENY or use CSP frame-ancestors'),
+        mk('HSTS Configured', 'Transport Security', Boolean(hsts), 'high',
+          hsts ? `Strict-Transport-Security: ${hsts}` : 'HSTS header not present',
+          'Configure Strict-Transport-Security to enforce HTTPS for repeat visitors'),
+        mk('No Server Version Disclosure', 'Information Security', noLeak, 'low',
+          [xpb && `X-Powered-By: ${xpb}`, srv && `Server: ${srv}`].filter(Boolean).join(' | ') || 'No version info leaked',
+          'Remove or sanitise X-Powered-By and Server headers')
+      ];
+
+      return sendJson(res, 200, { ok: true, checks, live: true, url: targetUrl, checked_at: ts });
     }
 
     // ── LIST AUDIT LOG ────────────────────────────────────────────────────────

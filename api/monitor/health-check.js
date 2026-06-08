@@ -584,7 +584,17 @@ const runHealthCheck = async () => {
     try {
       await sbInsert('cc_policy_checks', check);
     } catch (e) {
-      console.warn('[HealthCheck] Failed to log policy check:', e.message);
+      // If target_env column doesn't exist yet (pre-migration), retry without it
+      if (e.message && (e.message.includes('target_env') || e.message.includes('column'))) {
+        try {
+          const { target_env, ...checkWithoutEnv } = check;
+          await sbInsert('cc_policy_checks', checkWithoutEnv);
+        } catch (e2) {
+          console.warn('[HealthCheck] Failed to log policy check:', e2.message);
+        }
+      } else {
+        console.warn('[HealthCheck] Failed to log policy check:', e.message);
+      }
     }
   }
 
