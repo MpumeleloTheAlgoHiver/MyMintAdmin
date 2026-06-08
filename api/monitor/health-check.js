@@ -383,16 +383,27 @@ const runHealthCheck = async () => {
   }
 
   // ── 2. API endpoint health checks ────────────────────────────────────────
-  const crmEndpoints = [
-    { endpoint: '/api/team?action=list',                    label: 'Team List',              method: 'GET',  env: 'crm' },
-    { endpoint: '/api/cyber-compliance?action=list-incidents', label: 'CC Incidents List',     method: 'GET',  env: 'crm' },
-    { endpoint: '/api/cyber-compliance?action=badge-count', label: 'CC Badge Count',          method: 'GET',  env: 'crm' },
-    { endpoint: '/api/orderbook',                           label: 'Orderbook',               method: 'GET',  env: 'crm' },
-    { endpoint: '/api/investors/data?action=get-buffer-drawdowns', label: 'Investors Data',   method: 'GET',  env: 'crm' },
+  const MINT_LIVE_BASE = 'https://app.mymint.co.za';
+  const MINT_DEV_BASE  = 'https://mint-development.vercel.app';
+
+  const endpointDefs = [
+    // CRM endpoints
+    { base: crmBase,        endpoint: '/api/team?action=list',                           label: 'CRM: Team List',                  method: 'GET',  env: 'crm'  },
+    { base: crmBase,        endpoint: '/api/cyber-compliance?action=list-incidents',      label: 'CRM: CC Incidents List',          method: 'GET',  env: 'crm'  },
+    { base: crmBase,        endpoint: '/api/cyber-compliance?action=badge-count',         label: 'CRM: CC Badge Count',             method: 'GET',  env: 'crm'  },
+    { base: crmBase,        endpoint: '/api/orderbook',                                  label: 'CRM: Order Book',                 method: 'GET',  env: 'crm'  },
+    { base: crmBase,        endpoint: '/api/investors/data?action=get-buffer-drawdowns', label: 'CRM: Investors Data',             method: 'GET',  env: 'crm'  },
+    // Mint Live platform endpoints
+    { base: MINT_LIVE_BASE, endpoint: '/api/health',                                     label: 'Mint Live: Health',               method: 'GET',  env: 'live' },
+    { base: MINT_LIVE_BASE, endpoint: '/api/strategies/public',                          label: 'Mint Live: Public Strategies',    method: 'GET',  env: 'live' },
+    { base: MINT_LIVE_BASE, endpoint: '/api/auth/session',                               label: 'Mint Live: Auth Session',         method: 'GET',  env: 'live' },
+    // Mint Dev platform endpoints
+    { base: MINT_DEV_BASE,  endpoint: '/api/health',                                     label: 'Mint Dev: Health',                method: 'GET',  env: 'dev'  },
+    { base: MINT_DEV_BASE,  endpoint: '/api/strategies/public',                          label: 'Mint Dev: Public Strategies',     method: 'GET',  env: 'dev'  },
   ];
 
   const apiResults = await Promise.all(
-    crmEndpoints.map(e => checkApiEndpoint(crmBase, e.endpoint, e.label, e.method).then(r => ({ ...r, environment: e.env })))
+    endpointDefs.map(e => checkApiEndpoint(e.base, e.endpoint, e.label, e.method).then(r => ({ ...r, environment: e.env })))
   );
 
   // Write api health logs

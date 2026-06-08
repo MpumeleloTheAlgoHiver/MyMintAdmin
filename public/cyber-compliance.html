@@ -803,11 +803,25 @@ document.getElementById('signOutBtn').addEventListener('click', async () => {
   window.location.href = '/signin.html';
 });
 
+// ── Auto-refresh (30s) — reloads data for whichever tab is active ────────────
+let _autoRefreshTimer = null;
+const startAutoRefresh = () => {
+  if (_autoRefreshTimer) clearInterval(_autoRefreshTimer);
+  _autoRefreshTimer = setInterval(() => {
+    const loaders = {
+      live: loadLiveStatus, dev: loadDevStatus, api: loadApiHealth,
+      incidents: loadIncidents, audit: loadAuditLog, policy: loadPolicyChecks, activity: loadUserActivity
+    };
+    if (loaders[_activeTab]) loaders[_activeTab]();
+  }, 30000);
+};
+
 // ── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   loadLiveStatus();
   loadIncidents();
   loadPolicyChecks();
+  startAutoRefresh();
   setInterval(pollBadge, 60000);
   pollBadge();
 });

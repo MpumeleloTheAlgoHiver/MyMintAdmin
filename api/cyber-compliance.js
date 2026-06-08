@@ -340,6 +340,17 @@ module.exports = async (req, res) => {
       return sendJson(res, 200, { ok: true, activities: activities.slice(0, limit) });
     }
 
+    if (action === 'run-health-check') {
+      if (req.method !== 'POST') return sendJson(res, 405, { error: 'POST required' });
+      try {
+        const { runHealthCheck } = require('./monitor/health-check');
+        runHealthCheck().catch(e => console.error('[CC] On-demand health check error:', e?.message));
+        return sendJson(res, 200, { ok: true, message: 'Health check started — results available in 10–30s' });
+      } catch (e) {
+        return sendJson(res, 500, { error: e.message });
+      }
+    }
+
     return sendJson(res, 400, { error: `Unknown action: ${action}` });
 
   } catch (err) {

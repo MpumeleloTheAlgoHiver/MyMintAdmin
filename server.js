@@ -2070,9 +2070,38 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Client error reporting endpoint (no auth — public, rate-limited by IP)
+  // Client error reporting endpoint (no auth — public, IP rate-limited: 30 req/min)
   if (req.url.startsWith('/api/monitor/client-error')) {
     if (req.method !== 'POST') { sendJson(res, 405, { error: 'Method not allowed' }); return; }
+
+    // IP rate limiter — 30 requests per minute per IP
+    const clientIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
+    const _now = Date.now();
+    if (!global._ceRateMap) global._ceRateMap = new Map();
+    const ipEntry = global._ceRateMap.get(clientIp) || { count: 0, windowStart: _now };
+    if (_now - ipEntry.windowStart > 60000) { ipEntry.count = 0; ipEntry.windowStart = _now; }
+    ipEntry.count++;
+    global._ceRateMap.set(clientIp, ipEntry);
+    // Cleanup old entries every ~1000 requests
+    if (global._ceRateMap.size > 5000) {
+      for (const [k, v] of global._ceRateMap) { if (_now - v.windowStart > 120000) global._ceRateMap.delete(k); }
+    }
+    if (ipEntry.count > 30) {
+      sendJson(res, 429, { error: 'Rate limit exceeded — max 30 requests per minute' });
+      return;
+    }
+
+    // Map client-facing category names to valid cc_incidents.category constraint values
+    const CLIENT_CATEGORY_MAP = {
+      auth:    'access',
+      kyc:     'security',
+      trade:   'api',
+      wallet:  'api',
+      ui:      'software',
+      network: 'network',
+      other:   'other'
+    };
+
     (async () => {
       try {
         const body = await readJsonBody(req).catch(() => ({}));
@@ -2081,17 +2110,19 @@ const server = http.createServer((req, res) => {
         if (!title) { sendJson(res, 400, { error: 'title required' }); return; }
 
         if (['high', 'critical'].includes(severity) && supabaseUrl && supabaseServiceRoleKey) {
+          const rawCategory = String(body.category || 'other');
+          const dbCategory  = CLIENT_CATEGORY_MAP[rawCategory] || 'other';
           const incident = {
             title,
             description:    [body.description, body.page ? `Page: ${body.page}` : null, body.error_stack ? `Stack: ${String(body.error_stack).slice(0, 500)}` : null].filter(Boolean).join('\n') || null,
             priority:       severity === 'critical' ? 'critical' : 'high',
             status:         'open',
-            category:       ['auth','kyc','trade','wallet','ui','network'].includes(body.category) ? body.category : 'other',
+            category:       dbCategory,
             environment:    body.source === 'mint-platform' ? 'live' : 'general',
             auto_generated: true,
             pending_resolve: false,
             reported_by:    'Mint Platform (auto)',
-            service_key:    `client:${String(body.category || 'other')}`,
+            service_key:    `client:${rawCategory}`,
             created_at:     new Date().toISOString(),
             updated_at:     new Date().toISOString()
           };
