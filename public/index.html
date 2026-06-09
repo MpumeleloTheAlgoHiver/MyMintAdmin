@@ -322,7 +322,7 @@
       margin: 4px 6px;
     }
 
-    /* ââ Certificate viewer modal ââ */
+    /* ── Certificate viewer modal ── */
     .cert-modal-overlay {
       position: fixed;
       inset: 0;
@@ -493,7 +493,7 @@
       flex-shrink: 0;
     }
 
-    /* ââ Child documents modal ââ */
+    /* ── Child documents modal ── */
     .child-docs-overlay {
       position: fixed;
       inset: 0;
@@ -643,7 +643,7 @@
       }
     }
 
-    /* ââ Child KYC badge variants ââ */
+    /* ── Child KYC badge variants ── */
     .child-kyc-badge {
       display: inline-flex;
       align-items: center;
@@ -660,7 +660,7 @@
     .child-kyc-badge.accepted { background: #d1fae5; color: #065f46; }
     .child-kyc-badge.rejected { background: #fee2e2; color: #991b1b; }
 
-    /* ââ Certificate link button in child card ââ */
+    /* ── Certificate link button in child card ── */
     .cert-view-btn {
       display: inline-flex;
       align-items: center;
@@ -3295,9 +3295,9 @@
       margin-bottom: 14px;
     }
 
-    /* âââ Responsive âââ */
+    /* ═══ Responsive ═══ */
 
-    /* ââ Large tablets / narrow desktops ââ */
+    /* ── Large tablets / narrow desktops ── */
     @media screen and (max-width: 1200px) {
       .content-area {
         flex-direction: column;
@@ -3342,7 +3342,7 @@
       .client-stats-strip { grid-template-columns: repeat(2, 1fr); }
     }
 
-    /* ââ Small tablets ââ */
+    /* ── Small tablets ── */
     @media screen and (max-width: 900px) {
       .tnav-actions {
         order: 3;
@@ -3364,7 +3364,7 @@
       .clients-page-sub { font-size: 10.5px; }
     }
 
-    /* ââ Mobile ââ */
+    /* ── Mobile ── */
     @media screen and (max-width: 768px) {
       .sidebar {
         display: none;
@@ -3468,7 +3468,7 @@
       .user-count-badge { height: 26px; padding: 0 8px; font-size: 11px; }
     }
 
-    /* ââ Very small phones ââ */
+    /* ── Very small phones ── */
     @media screen and (max-width: 480px) {
       .top-nav { padding: 8px 10px; gap: 6px 8px; }
       .tnav-title-row { flex-wrap: wrap; gap: 6px; }
@@ -3495,7 +3495,7 @@
     }
   </style>
   <style>
-    /* ââ Premium Fintech Redesign ââ */
+    /* ── Premium Fintech Redesign ── */
     body { background: #f2f3f7; }
 
     /* Search icon */
@@ -3562,7 +3562,7 @@
     /* simple-view spacing */
     .simple-view { padding: 18px 24px 28px !important; }
 
-    /* ââ Title row ââ */
+    /* ── Title row ── */
     .clients-top-row { margin-bottom: 0; }
     .clients-title-inline { display: flex; align-items: center; gap: 10px; }
     .top-nav .filter-bar { background: none; border: none; border-radius: 0; padding: 0; margin: 0; box-shadow: none; justify-content: flex-start; }
@@ -3574,7 +3574,7 @@
     .user-count-dot { background: #7c3aed !important; width: 6px !important; height: 6px !important; border-radius: 50% !important; box-shadow: none !important; flex-shrink: 0; }
     .user-count-number { font-size: 12px !important; }
 
-    /* ââ Filter bar ââ */
+    /* ── Filter bar ── */
     .filter-bar { display: flex; align-items: center; justify-content: space-between; background: #ffffff; border: 1px solid #e8e8f0; border-radius: 12px; padding: 5px 8px; margin-bottom: 16px; gap: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
     .filter-bar-left { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
     .filter-bar-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; border-left: 1px solid #ebebf4; padding-left: 8px; margin-left: 4px; }
@@ -3600,9 +3600,9 @@
     .fpill-icon { width: 13px; height: 13px; fill: currentColor; flex-shrink: 0; }
     .fpill-chevron { width: 13px; height: 13px; fill: currentColor; flex-shrink: 0; opacity: 0.65; }
 
-    /* ââââââââââââââââââââââââââââââââââââââ
+    /* ══════════════════════════════════════
        COLLAPSED CARD ROW &mdash; premium polish
-    ââââââââââââââââââââââââââââââââââââââ */
+    ══════════════════════════════════════ */
     .simple-list { background: #ffffff !important; }
     .simple-item { background: #ffffff; transition: background 0.18s ease; }
     .simple-item:hover { background: #ffffff !important; }
@@ -3637,14 +3637,14 @@
     /* Group divider &mdash; subtler */
     .profile-group-divider { background: #f8f7ff !important; border-color: #eeebff !important; color: #b0aac8 !important; font-size: 9.5px !important; padding: 6px 16px !important; }
 
-    /* ââââââââââââââââââââââââââââââââââââââââââââââââââ
+    /* ══════════════════════════════════════════════════
        EXPANDED CARD &mdash; OPEN FRAME REDESIGN
        Concept: the card unfolds seamlessly. Left = a
        frameless sidebar column. Right = clean white panel.
        Zero purple in backgrounds. Zero nested card boxes.
-    ââââââââââââââââââââââââââââââââââââââââââââââââââââ */
+    ════════════════════════════════════════════════════ */
 
-    /* â  The expanded zone seamlessly extends the card */
+    /* ① The expanded zone seamlessly extends the card */
     .detailed-view {
       margin: 0 !important;
       border-top: 1px solid #ebebed !important;
@@ -3653,7 +3653,7 @@
       background: #ffffff !important;
       border-radius: 0 0 14px 14px !important;
     }
-    /* â¡ Content area: zero padding, zero gap &mdash; columns fill edge-to-edge */
+    /* ② Content area: zero padding, zero gap &mdash; columns fill edge-to-edge */
     .content-area {
       padding: 0 !important;
       gap: 0 !important;
@@ -3661,7 +3661,7 @@
       align-items: stretch !important;
     }
 
-    /* â¢ LEFT SIDEBAR &mdash; frameless, no border, no shadow
+    /* ③ LEFT SIDEBAR &mdash; frameless, no border, no shadow
           A clean column of data directly on the white card */
     .left-column {
       flex: 0 0 320px !important;
@@ -3791,7 +3791,7 @@
       color: #111827 !important;
     }
 
-    /* â£ RIGHT PANEL &mdash; padding on the outside, white card inside */
+    /* ④ RIGHT PANEL &mdash; padding on the outside, white card inside */
     .right-column {
       flex: 1 !important; min-width: 0 !important;
       background: #f6f7f9 !important;
@@ -3872,7 +3872,7 @@
       border-color: transparent !important; box-shadow: none !important;
     }
 
-    /* â¤ TIMELINE &mdash; left-border accent style, no icon circles */
+    /* ⑤ TIMELINE &mdash; left-border accent style, no icon circles */
     .timeline { padding: 20px !important; }
     .timeline-header {
       font-size: 0.65rem !important; font-weight: 700 !important; color: #c4c9d4 !important;
@@ -3936,7 +3936,7 @@
     .timeline-details-toggle:hover { color: #5b21b6 !important; }
     .timeline-details-content { font-size: 0.75rem !important; color: #6b7280 !important; }
 
-    /* â¥ HOLDINGS */
+    /* ⑥ HOLDINGS */
     .holdings-view { padding: 20px !important; }
     .holdings-header { margin-bottom: 14px !important; }
     .holdings-header h2 {
@@ -4241,8 +4241,8 @@
           <svg class="search-icon-svg" viewBox="0 0 20 20" aria-hidden="true"><path d="M13 11a5 5 0 10-1.41 1.41l3.54 3.55 1.41-1.42L13 11zm-5 1a4 4 0 110-8 4 4 0 010 8z"/></svg>
           <input type="search" placeholder="Search by name, email or UID&hellip;" aria-label="Search profiles">
         </div>
-        <button class="quick-filter-pill table-view-toggle-btn" id="completedTableViewBtn" type="button" aria-expanded="false" aria-controls="completedTablePanel">Table view â¾</button>
-        <button class="quick-filter-pill table-view-toggle-btn" id="notCompletedEmailViewBtn" type="button" aria-expanded="false" aria-controls="notCompletedEmailPanel">Email view â¾</button>
+        <button class="quick-filter-pill table-view-toggle-btn" id="completedTableViewBtn" type="button" aria-expanded="false" aria-controls="completedTablePanel">Table view ▾</button>
+        <button class="quick-filter-pill table-view-toggle-btn" id="notCompletedEmailViewBtn" type="button" aria-expanded="false" aria-controls="notCompletedEmailPanel">Email view ▾</button>
       </div>
     </div>
 
@@ -4541,7 +4541,7 @@
                         Triggered an event <span style="color: #dc2626;">webinar-email-follow-up</span>
                       </div>
                       <div class="timeline-details-toggle">
-                        Hide data Ë
+                        Hide data ˄
                       </div>
                       <div class="timeline-details">
                         <div class="timeline-details-content">
@@ -4596,7 +4596,7 @@
                   <div class="holdings-section">
                     <button class="holdings-section-toggle" type="button" aria-expanded="true">
                       <span class="holdings-section-title">Strategy</span>
-                      <span class="holdings-section-chevron">â¾</span>
+                      <span class="holdings-section-chevron">▾</span>
                     </button>
 
                     <div class="holdings-section-content" data-holdings-strategy>
@@ -4617,7 +4617,7 @@
                             <div class="holding-icons">
                               <div class="holding-icon icon-orange">C</div>
                               <div class="holding-icon icon-gold">G</div>
-                              <div class="holding-icon icon-brown">â¬¡</div>
+                              <div class="holding-icon icon-brown">⬡</div>
                             </div>
                             <span class="holding-count">+7</span>
                             <span class="holding-label">Holdings</span>
@@ -4665,7 +4665,7 @@
                           <div class="holding-tag">High</div>
                           <div class="holdings-container">
                             <div class="holding-icons">
-                              <div class="holding-icon icon-gray">â¬¡</div>
+                              <div class="holding-icon icon-gray">⬡</div>
                               <div class="holding-icon icon-brown">A</div>
                               <div class="holding-icon icon-purple">OU</div>
                             </div>
@@ -4680,7 +4680,7 @@
                   <div class="holdings-section">
                     <button class="holdings-section-toggle" type="button" aria-expanded="true">
                       <span class="holdings-section-title">Individual stocks</span>
-                      <span class="holdings-section-chevron">â¾</span>
+                      <span class="holdings-section-chevron">▾</span>
                     </button>
 
                     <div class="holdings-section-content" data-holdings-stocks>
@@ -4757,7 +4757,7 @@
     <div class="modal-card">
       <div class="modal-header">
         <div class="modal-title">Add phone number</div>
-        <button class="modal-close" id="phoneModalClose" aria-label="Close">â</button>
+        <button class="modal-close" id="phoneModalClose" aria-label="Close">✕</button>
       </div>
       <div class="modal-body">
         <label for="phoneInput">Phone number</label>
@@ -4774,7 +4774,7 @@
     <div class="modal-card">
       <div class="modal-header">
         <div class="modal-title">Select document</div>
-        <button class="modal-close" id="imageModalClose" aria-label="Close">â</button>
+        <button class="modal-close" id="imageModalClose" aria-label="Close">✕</button>
       </div>
       <div class="modal-body">
         <div class="image-list" id="imageList"></div>
@@ -5051,6 +5051,20 @@
       imageList.innerHTML = '';
 
       images.forEach((img, index) => {
+        if (img && img.__divider) {
+          const header = document.createElement('div');
+          header.style.cssText = 'margin:14px 4px 6px;font-weight:700;font-size:13px;color:#334155;display:flex;gap:8px;align-items:center;';
+          header.innerHTML = `${escapeHtml(img.__divider)} <span style="background:#eef2ff;color:#4338ca;border-radius:999px;padding:1px 8px;font-size:11px;">${Number(img.__count) || 0}</span>`;
+          imageList.appendChild(header);
+          return;
+        }
+        if (img && img.__empty) {
+          const empty = document.createElement('div');
+          empty.textContent = img.__empty;
+          empty.style.cssText = 'padding:4px 12px 10px;color:#94a3b8;font-size:13px;';
+          imageList.appendChild(empty);
+          return;
+        }
         const imageId = img?.id || img?.previewId || img?.imageId || img?.resourceId;
         const archivedUrl = img?.archivedUrl || img?.signed_url || '';
         if (!imageId) return;
@@ -5749,7 +5763,7 @@
         <div class="timeline-content">
           <div class="timeline-title">${title}</div>
           ${details ? `
-            <div class="timeline-details-toggle">Show data Ë</div>
+            <div class="timeline-details-toggle">Show data ˅</div>
             <div class="timeline-details" style="display: none;">
               <div class="timeline-details-content">${details}</div>
             </div>
@@ -6321,7 +6335,7 @@
           <div class="pack-section-card" data-pack-section-index="${absoluteIndex}">
             <button class="pack-section-header pack-section-toggle" type="button" data-pack-section-toggle aria-expanded="true">
               <div class="pack-section-title">${escapeHtml(section.title)}</div>
-              <span class="pack-section-caret">â¾</span>
+              <span class="pack-section-caret">▾</span>
             </button>
             <div class="pack-section-body">
               <div class="pack-section-grid${isInfoSection ? ' info-scroll' : ''}">
@@ -7004,7 +7018,7 @@
           if (csCard) csCard.style.display = 'none';
         }
 
-        // ââ Right column: hydrate history, hide irrelevant tabs, add download pack ââ
+        // ── Right column: hydrate history, hide irrelevant tabs, add download pack ──
         const rightColumn = clone.querySelector('.right-column');
         if (rightColumn) {
           // Hide KYC tab, Pack tab, Documents tab &mdash; not relevant for children
@@ -7030,12 +7044,12 @@
           if (holdingsTab) holdingsTab.style.display = '';
           const packDetailsTab = rightColumn.querySelector('[data-view="pack-details"]');
           if (packDetailsTab) {
-            packDetailsTab.textContent = 'â Download Pack';
+            packDetailsTab.textContent = '↓ Download Pack';
             packDetailsTab.dataset.childDownloadPack = String(child.id);
             packDetailsTab.removeAttribute('data-view');
           }
 
-          // ââ Hydrate history timeline with real family_transactions ââ
+          // ── Hydrate history timeline with real family_transactions ──
           const historyView = rightColumn.querySelector('.history-view');
           if (historyView) {
             const childParentIds = [child.primary_user_id, child.parent_id]
@@ -7062,15 +7076,15 @@
                 </div>`;
             } else {
               const txTypeConfig = {
-                allowance: { icon: 'ð°', color: '#22c55e', label: 'Allowance' },
-                investment: { icon: 'ð', color: '#7c3aed', label: 'Investment' },
-                member_joined: { icon: 'ð¤', color: '#3b82f6', label: 'Member Joined' },
-                goal_funding: { icon: 'ð¯', color: '#f59e0b', label: 'Goal Funding' },
+                allowance: { icon: '💰', color: '#22c55e', label: 'Allowance' },
+                investment: { icon: '📈', color: '#7c3aed', label: 'Investment' },
+                member_joined: { icon: '👤', color: '#3b82f6', label: 'Member Joined' },
+                goal_funding: { icon: '🎯', color: '#f59e0b', label: 'Goal Funding' },
               };
 
               let txRows = '';
               childTxs.forEach(tx => {
-                const cfg = txTypeConfig[tx.type] || { icon: 'ð', color: '#6b7280', label: tx.type || 'Transaction' };
+                const cfg = txTypeConfig[tx.type] || { icon: '📋', color: '#6b7280', label: tx.type || 'Transaction' };
                 const amt = Number(tx.amount || 0);
                 const amtStr = amt >= 0 ? `+R ${amt.toFixed(2)}` : `-R ${Math.abs(amt).toFixed(2)}`;
                 const amtColor = amt >= 0 ? '#22c55e' : '#ef4444';
@@ -7123,7 +7137,7 @@
             }
           }
 
-          // ââ Hydrate holdings view using the child's linked auth user ID ââ
+          // ── Hydrate holdings view using the child's linked auth user ID ──
           if (child.linked_user_id) {
             renderHoldingsForItem(clone, child.linked_user_id);
           } else {
@@ -7155,7 +7169,7 @@
       });
     };
 
-    // ââ Certificate modal logic ââ
+    // ── Certificate modal logic ──
     const certModalOverlay = document.getElementById('certModalOverlay');
     const certModalTitle = document.getElementById('certModalTitle');
     const certModalBody = document.getElementById('certModalBody');
@@ -7812,7 +7826,7 @@
         return;
       }
 
-      // ââ Download Pack for child: certificate + formatted PDF ââ
+      // ── Download Pack for child: certificate + formatted PDF ──
       const downloadPackBtn = e.target.closest('[data-child-download-pack]');
       if (downloadPackBtn) {
         e.preventDefault();
@@ -7840,7 +7854,7 @@
             const childKyc = normalizeKycStatusText(child.kyc_status || 'pending');
             const kycLabel = childKyc === 'completed' ? 'Verified' : childKyc === 'rejected' ? 'Rejected' : 'Pending';
 
-            // ââ Build PDF with child details ââ
+            // ── Build PDF with child details ──
             const doc = new JsPdfCtor({ orientation: 'portrait', unit: 'mm', format: 'a4' });
             const pageW = doc.internal.pageSize.getWidth();
             let y = 20;
@@ -7979,7 +7993,7 @@
             const pdfBlob = doc.output('blob');
             zip.file(`${safeFileName}_Details.pdf`, pdfBlob);
 
-            // ââ Download every document the Documents modal would show ââ
+            // ── Download every document the Documents modal would show ──
             // Mirrors getChildDocuments(child): certificate + matching files
             // across CHILD_DOC_BUCKETS, fetched via resolveBucketObjectUrl.
             try {
@@ -8013,7 +8027,7 @@
               console.warn('Could not enumerate child documents for pack:', docsErr);
             }
 
-            // ââ Generate and download ZIP ââ
+            // ── Generate and download ZIP ──
             const zipBlob = await zip.generateAsync({ type: 'blob' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(zipBlob);
@@ -8153,12 +8167,12 @@
       if (completedTableViewBtn) {
         completedTableViewBtn.classList.toggle('visible', completedFilterActive);
         completedTableViewBtn.setAttribute('aria-expanded', completedFilterActive && completedTableOpen ? 'true' : 'false');
-        completedTableViewBtn.textContent = completedTableOpen && completedFilterActive ? 'Table view â´' : 'Table view â¾';
+        completedTableViewBtn.textContent = completedTableOpen && completedFilterActive ? 'Table view ▴' : 'Table view ▾';
       }
       if (notCompletedEmailViewBtn) {
         notCompletedEmailViewBtn.classList.toggle('visible', emailViewFilterActive);
         notCompletedEmailViewBtn.setAttribute('aria-expanded', emailViewFilterActive && notCompletedEmailOpen ? 'true' : 'false');
-        notCompletedEmailViewBtn.textContent = notCompletedEmailOpen && emailViewFilterActive ? 'Email view â´' : 'Email view â¾';
+        notCompletedEmailViewBtn.textContent = notCompletedEmailOpen && emailViewFilterActive ? 'Email view ▴' : 'Email view ▾';
       }
       if (notCompletedEmailPanelTitle) {
         notCompletedEmailPanelTitle.textContent = activeProfileFilters.kyc === 'all'
@@ -8407,7 +8421,7 @@
         <div class="holding-card strategy-group-card" data-strategy-group="${safeGroupId}">
           <div class="holding-header">
             <div>
-              <div class="holding-title">${escapeHtml(strategyName)} <span class="strategy-group-chevron">â¾</span></div>
+              <div class="holding-title">${escapeHtml(strategyName)} <span class="strategy-group-chevron">▾</span></div>
             </div>
             <div>
               <div class="holding-price ${escapeHtml(pnlPriceClass)}">${escapeHtml(pnlStr)}</div>
@@ -10055,7 +10069,7 @@
           completedTablePanel.setAttribute('aria-hidden', completedTableOpen ? 'false' : 'true');
         }
         if (completedTableViewBtn) {
-          completedTableViewBtn.textContent = completedTableOpen ? 'Table view â´' : 'Table view â¾';
+          completedTableViewBtn.textContent = completedTableOpen ? 'Table view ▴' : 'Table view ▾';
           completedTableViewBtn.setAttribute('aria-expanded', completedTableOpen ? 'true' : 'false');
         }
         if (completedTableOpen) {
@@ -10074,7 +10088,7 @@
           notCompletedEmailPanel.setAttribute('aria-hidden', notCompletedEmailOpen ? 'false' : 'true');
         }
         if (notCompletedEmailViewBtn) {
-          notCompletedEmailViewBtn.textContent = notCompletedEmailOpen ? 'Email view â´' : 'Email view â¾';
+          notCompletedEmailViewBtn.textContent = notCompletedEmailOpen ? 'Email view ▴' : 'Email view ▾';
           notCompletedEmailViewBtn.setAttribute('aria-expanded', notCompletedEmailOpen ? 'true' : 'false');
         }
         if (notCompletedEmailOpen) {
@@ -10209,56 +10223,77 @@
           }
 
           const externalUserId = item?.dataset?.externalUserId;
-          if (!externalUserId) {
-            console.warn('No Sumsub external user id found for this profile.');
-            return;
-          }
+          const profileId = item?.dataset?.profileId;
 
           (async () => {
-            try {
-              const applicant = await fetchApplicantByExternalId(externalUserId);
-              const applicantId = applicant?.id || applicant?.applicantId || applicant?.applicant_id;
-              if (!applicantId) {
-                console.warn('No applicantId found in Sumsub response.');
-                return;
-              }
+            const KIND_LABELS = {
+              selfie: 'Liveness selfie', dha_portrait: 'Home Affairs portrait',
+              id_front: 'ID document (front)', id_back: 'ID document (back)',
+              id_portrait: 'ID portrait', signature: 'Signature',
+              idv_report: 'Identity verification report (PDF)', liveness_report: 'Liveness report (PDF)',
+              kyc_bureau: 'Bureau KYC snapshot (JSON)'
+            };
+            const prettify = (s) => String(s || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-              const metadata = await fetchApplicantMetadata(applicantId);
-              const inspectionId = applicant?.inspectionId || applicant?.review?.inspectionId || findFirstValueByKeys(applicant, ['inspectionId']);
-              const items = Array.isArray(metadata)
-                ? metadata
-                : (metadata?.resources || metadata?.items || metadata?.images || metadata?.data?.resources || [metadata]);
-
-              if (!inspectionId || !items.length) {
-                console.warn('Missing inspectionId or image list from responses.', { inspectionId, metadata });
-                return;
-              }
-
-              openImageModal(inspectionId, items);
-            } catch (error) {
-              console.error('Sumsub image error:', error);
-              const profileId = item?.dataset?.profileId;
-              if (!profileId) return;
+            // 1) Archived documents (Experian + any archived Sumsub) by profile id.
+            const experianDocs = [];
+            const archivedSumsubDocs = [];
+            if (profileId) {
               try {
                 const archived = await fetchArchivedSumsubDocuments(profileId);
-                if (!archived.length) return;
-
-                const offlineItems = archived.map((row, index) => ({
-                  id: row.image_id || `archived-${index + 1}`,
-                  fileMetadata: {
-                    fileName: row.file_name || `Archived-${index + 1}`,
-                    fileType: row.file_type || row.mime_type || 'Archived document'
-                  },
-                  addedDate: row.archived_at,
-                  archivedUrl: row.signed_url,
-                  source: 'archive'
-                }));
-
-                openImageModal(null, offlineItems);
+                archived.forEach((row, index) => {
+                  const meta = row.resource_metadata || {};
+                  const provider = String(meta.provider || meta.source || '').toLowerCase();
+                  const isExperian = provider.includes('experian');
+                  const kind = meta.kind || row.image_id || 'document';
+                  const mapped = {
+                    id: row.image_id || `archived-${index + 1}`,
+                    fileMetadata: {
+                      fileName: isExperian ? (KIND_LABELS[kind] || prettify(kind)) : (row.file_name || `Document ${index + 1}`),
+                      fileType: row.file_type || row.mime_type || 'Archived document'
+                    },
+                    addedDate: row.archived_at,
+                    archivedUrl: row.signed_url,
+                    source: 'archive'
+                  };
+                  (isExperian ? experianDocs : archivedSumsubDocs).push(mapped);
+                });
               } catch (archiveError) {
-                console.error('Archive fallback load failed:', archiveError);
+                console.error('Archive load failed:', archiveError);
               }
             }
+
+            // 2) Live Sumsub documents (current applicant), if linked.
+            let liveSumsubItems = [];
+            let liveInspectionId = null;
+            if (externalUserId) {
+              try {
+                const applicant = await fetchApplicantByExternalId(externalUserId);
+                const applicantId = applicant?.id || applicant?.applicantId || applicant?.applicant_id;
+                if (applicantId) {
+                  const metadata = await fetchApplicantMetadata(applicantId);
+                  liveInspectionId = applicant?.inspectionId || applicant?.review?.inspectionId || findFirstValueByKeys(applicant, ['inspectionId']);
+                  const items = Array.isArray(metadata)
+                    ? metadata
+                    : (metadata?.resources || metadata?.items || metadata?.images || metadata?.data?.resources || [metadata]);
+                  if (liveInspectionId && Array.isArray(items)) liveSumsubItems = items.filter(Boolean);
+                }
+              } catch (error) {
+                console.error('Sumsub live image error:', error);
+              }
+            }
+
+            // 3) Render both providers as separate, labelled sections in one modal.
+            const sumsubCombined = [...archivedSumsubDocs, ...liveSumsubItems];
+            const combined = [];
+            combined.push({ __divider: 'Experian documents', __count: experianDocs.length });
+            if (experianDocs.length) combined.push(...experianDocs);
+            else combined.push({ __empty: 'No Experian documents archived for this user.' });
+            combined.push({ __divider: 'Sumsub documents', __count: sumsubCombined.length });
+            if (sumsubCombined.length) combined.push(...sumsubCombined);
+            else combined.push({ __empty: 'No Sumsub documents found for this user.' });
+
+            openImageModal(liveInspectionId, combined);
           })();
         }
       }
@@ -10346,10 +10381,10 @@
         if (!details) return;
         if (details.style.display === 'none') {
           details.style.display = 'block';
-          toggle.textContent = 'Hide data Ë';
+          toggle.textContent = 'Hide data ˄';
         } else {
           details.style.display = 'none';
-          toggle.textContent = 'Show data Ë';
+          toggle.textContent = 'Show data ˅';
         }
       }
 

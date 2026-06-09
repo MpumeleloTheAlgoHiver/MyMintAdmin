@@ -843,7 +843,7 @@
         </div>
       </div>
 
-      <!-- ââ Market Ticker Sub-bar ââ -->
+      <!-- ── Market Ticker Sub-bar ── -->
       <div style="overflow:hidden;background:#f1f5f9;border-bottom:1px solid #e2e8f0;height:50px;display:flex;align-items:center;width:100%;flex-shrink:0;">
         <div id="ovTickerTrack" class="ov-ticker-anim" style="display:flex;align-items:center;white-space:nowrap;">
           <span style="font-size:13px;color:#94a3b8;padding:0 20px;font-family:ui-monospace,monospace;letter-spacing:0.02em;">Loading market data&hellip;</span>
@@ -853,7 +853,7 @@
       <div class="dashboard-shell">
         <div class="max-w-7xl mx-auto px-5 py-5 space-y-4">
 
-          <!-- âââââââââââââââ OVERVIEW TAB âââââââââââââââ -->
+          <!-- ═══════════════ OVERVIEW TAB ═══════════════ -->
           <div id="tabOverviewPanel">
             <!-- hidden compat elements kept for existing JS references -->
             <div class="hidden">
@@ -870,14 +870,14 @@
               <span id="usersBankValue"></span>
             </div>
 
-            <!-- ââ Strategy Management inline panel (shown when no strategy selected) ââ -->
+            <!-- ── Strategy Management inline panel (shown when no strategy selected) ── -->
             <div id="tabStrategiesInline">
             </div><!-- /tabStrategiesInline -->
 
-            <!-- ââ Strategy content: shown only when a strategy is selected ââ -->
+            <!-- ── Strategy content: shown only when a strategy is selected ── -->
             <div id="ovStratContent" style="display:none;">
 
-            <!-- ââ Strategy Title Bar ââ -->
+            <!-- ── Strategy Title Bar ── -->
             <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;">
               <div>
                 <div id="ovStratName" style="font-size:18px;font-weight:600;color:#0f172a;letter-spacing:-0.01em;line-height:1.25;">Select a strategy</div>
@@ -895,12 +895,12 @@
               </div>
             </div>
 
-            <!-- ââ KPI Strip (7 cols) ââ -->
+            <!-- ── KPI Strip (7 cols) ── -->
             <div id="ovKpiStrip" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">
               <!-- populated by JS -->
             </div>
 
-            <!-- ââ Main Grid: Performance Chart (8fr) + Sector (4fr) ââ -->
+            <!-- ── Main Grid: Performance Chart (8fr) + Sector (4fr) ── -->
             <div style="display:grid;grid-template-columns:8fr 4fr;gap:12px;margin-bottom:12px;">
               <!-- Performance Chart -->
               <div style="background:white;border-radius:12px;padding:16px;box-shadow:0 0 0 1px rgba(0,0,0,0.05),0 1px 4px rgba(0,0,0,0.06);">
@@ -927,7 +927,7 @@
               </div>
             </div>
 
-            <!-- ââ Bottom Grid: Holdings/News (7fr) + Investors (5fr) ââ -->
+            <!-- ── Bottom Grid: Holdings/News (7fr) + Investors (5fr) ── -->
             <div style="display:grid;grid-template-columns:7fr 5fr;gap:12px;">
               <!-- Left Panel: Composition vs News & Insights -->
               <div style="background:white;border-radius:12px;display:flex;flex-direction:column;box-shadow:0 0 0 1px rgba(0,0,0,0.05),0 1px 4px rgba(0,0,0,0.06);overflow:hidden;">
@@ -990,7 +990,7 @@
             </div><!-- /ovStratContent -->
           </div>
 
-          <!-- âââââââââââââââ STRATEGIES TAB âââââââââââââââ -->
+          <!-- ═══════════════ STRATEGIES TAB ═══════════════ -->
           <div id="tabStrategiesPanel" class="hidden">
             <!-- hidden compat elements -->
               <div class="hidden">
@@ -1018,7 +1018,7 @@
                 <div id="strategiesList"></div>
               </div>
 
-            <!-- ââ MAIN WORKSPACE ââ -->
+            <!-- ── MAIN WORKSPACE ── -->
             <div
               class="bg-white rounded-b-3xl rounded-tr-3xl border border-slate-200 shadow-sm overflow-visible mt-0"
             >
@@ -1239,7 +1239,7 @@
                     </div>
                     <!-- Active state badges -->
                     <span id="holdingSortBadge" style="display:none;font-size:10px;font-weight:600;color:#7c3aed;background:#f5f3ff;padding:3px 9px;border-radius:20px;"></span>
-                    <button type="button" id="holdingResetBtn" onclick="resetHoldingFilters()" style="display:none;font-size:10px;font-weight:600;color:#94a3b8;padding:3px 9px;border:1px solid #e2e8f0;border-radius:20px;background:#fff;cursor:pointer;">â Reset</button>
+                    <button type="button" id="holdingResetBtn" onclick="resetHoldingFilters()" style="display:none;font-size:10px;font-weight:600;color:#94a3b8;padding:3px 9px;border:1px solid #e2e8f0;border-radius:20px;background:#fff;cursor:pointer;">✕ Reset</button>
                   </div>
 
                   <!-- Holdings table -->
@@ -1282,8 +1282,8 @@
             </div>
           </div>
 
-          <!-- âââââââââââââââ FACTSHEETS TAB âââââââââââââââ -->
-          <!-- âââââââââââââââ REBALANCING TAB âââââââââââââââ -->
+          <!-- ═══════════════ FACTSHEETS TAB ═══════════════ -->
+          <!-- ═══════════════ REBALANCING TAB ═══════════════ -->
           <!-- REBALANCING MODAL -->
           <div id="rebalancingModal" class="hidden fixed inset-0 z-[8000] flex items-start justify-center p-4" style="background:rgba(15,23,42,0.45);padding-top:48px;overflow-y:auto;">
             <div style="width:100%;max-width:1100px;background:#f8fafc;border-radius:16px;overflow:hidden;box-shadow:0 24px 48px rgba(0,0,0,0.22);">
@@ -1402,7 +1402,7 @@
                           <th class="text-right px-4 py-2">Lots</th>
                           <th class="text-right px-4 py-2">Current</th>
                           <th class="text-right px-4 py-2">New</th>
-                          <th class="text-right px-4 py-2">Î</th>
+                          <th class="text-right px-4 py-2">Δ</th>
                           <th class="text-right px-4 py-2">P/L</th>
                         </tr>
                       </thead>
@@ -1655,7 +1655,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js" crossorigin="anonymous"></script>
     <script>
-      /* ââ DEBUG: capture all uncaught errors with full details ââ */
+      /* ── DEBUG: capture all uncaught errors with full details ── */
       window.__dbgLog = [];
       window.__dbgBreadcrumb = (label) => {
         const entry = { t: Date.now(), label };
@@ -1761,7 +1761,7 @@
       let allStrategiesFullData = [];
       let formHoldings = [];
 
-      /* ââ Holdings table column config âââââââââââââââââââââââââââââââââ */
+      /* ── Holdings table column config ───────────────────────────────── */
       const _HC = [
         { k:'last_close',     l:'Prev Close',        t:'Source: stock_returns_c.current_price', v:true,  isReturn:false },
         { k:'prev_close',     l:'Current Price',     t:'Source: stock_intraday_c.current_price', v:true,  isReturn:false },
@@ -1780,7 +1780,7 @@
       ];
       let _holdingSort   = { key: null, dir: 1 };
       let _holdingFilter = { col: '', sign: 'all' };
-      /* âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ */
+      /* ─────────────────────────────────────────────────────────────────── */
 
       let editingStrategyId = null;
       let activeStrategyTabId = null;
@@ -1788,12 +1788,12 @@
       let globalSecuritiesMap = new Map();
       let strategyWorkspaceVisible = false;
       let strategyInvestorFilter = "all";   // "all" | "invested" | "not-invested"
-      let strategyInvestedIds = new Set();  // strategy IDs that have â¥1 real investor
+      let strategyInvestedIds = new Set();  // strategy IDs that have ≥1 real investor
       let strategyYtdMap     = new Map();   // strategy_id &rarr; ytd_pct (already in % form, e.g. 14.19)
       let strategyReturnsMap = new Map();   // strategy_id &rarr; full strategies_returns_c latest row
       let currentAdminName = null;          // logged-in admin's full name, loaded at init
 
-      /* ââ View-only mode for invested strategies ââââââââââââââââââââââââ */
+      /* ── View-only mode for invested strategies ──────────────────────── */
       let strategyViewOnlyMode = false;
       let _strategyTabPwCallback = null;  // called after correct password
 
@@ -1876,7 +1876,7 @@
           holdingsContainer.querySelectorAll("input[data-shares]").forEach(el => { el.readOnly = true; el.style.background = "transparent"; el.style.border = "none"; });
         }
       };
-      /* âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ */
+      /* ─────────────────────────────────────────────────────────────────── */
 
       const setStrategyWorkspaceVisible = (visible) => {
         strategyWorkspaceVisible = visible;
@@ -1950,7 +1950,7 @@
         const listEl = document.getElementById('returnInsightsList');
         if (!listEl) return;
 
-        /* ââ Alerts tab ââ */
+        /* ── Alerts tab ── */
         if (tab === 'alerts') {
           const symStratMap = _getSymbolStrategyMap();
           const _alertBase = (_riViewMode === 'strategy' && _riFilterSymbols)
@@ -1964,7 +1964,7 @@
           if (!alerts.length) {
             listEl.innerHTML = `
               <div style="text-align:center;padding:32px 16px;">
-                <div style="font-size:28px;margin-bottom:8px;">â</div>
+                <div style="font-size:28px;margin-bottom:8px;">✅</div>
                 <div style="font-size:12px;font-weight:700;color:#16a34a;margin-bottom:4px;">No alerts</div>
                 <div style="font-size:11px;color:#94a3b8;">All strategy assets are above the &minus;4% threshold.</div>
               </div>`;
@@ -2000,7 +2000,7 @@
           return;
         }
 
-        /* ââ Strategy mode: render strategy-level rows from strategies_returns_c ââ */
+        /* ── Strategy mode: render strategy-level rows from strategies_returns_c ── */
         if (_riViewMode === 'strategy') {
           const stratFieldMap = {
             '1d':  '1d_pct',  '5d':  '5d_pct',  '1m':  '1m_pct',  '6m':  '6m_pct',
@@ -2025,7 +2025,7 @@
             const holdings = (strat && Array.isArray(strat.holdings)) ? strat.holdings : [];
             const dataBySym = {};
             (_returnInsightsData || []).forEach(a => { dataBySym[a.symbol] = a; });
-            /* For 1D: pre-compute today_basket (cents) = Î£(current_price_cents &times; shares) */
+            /* For 1D: pre-compute today_basket (cents) = Σ(current_price_cents &times; shares) */
             let _todayBasket1d = 0;
             const _stratBvRow = strategyReturnsMap.get(_riSelectedStratId) || {};
             const _stratBv = _stratBvRow.basket_value != null ? Number(_stratBvRow.basket_value) : null;
@@ -2118,7 +2118,7 @@
             let v;
             if (tab === '1d') {
               const hlds = Array.isArray(s.holdings) ? s.holdings : [];
-              /* today_basket (cents) = Î£(current_price_cents &times; shares) */
+              /* today_basket (cents) = Σ(current_price_cents &times; shares) */
               let todayBasket = 0, hasPrice = 0;
               hlds.forEach(h => {
                 const sym = h.ticker || h.symbol || '';
@@ -2278,7 +2278,7 @@
 
       const _fetchedPeriods = new Set(['daily', 'ytd', 'alerts']); /* already loaded via Supabase */
 
-      /* ââ Return Insights view-mode state ââ */
+      /* ── Return Insights view-mode state ── */
       let _riViewMode     = 'assets'; /* 'assets' | 'strategy' */
       let _riFilterSymbols = null;    /* Set<string> of symbols when mode = strategy */
       let _riSelectedStratId = null;  /* selected strategy id when in strategy mode */
@@ -2359,7 +2359,7 @@
         if (_browsePanelLoaded) return;
         _browsePanelLoaded = true;
 
-        /* ââ Return Insights: fetch strategy assets with all return metrics ââ */
+        /* ── Return Insights: fetch strategy assets with all return metrics ── */
         try {
           const stratSymbols = new Set();
           (allStrategiesFullData || []).forEach(s => {
@@ -2414,7 +2414,7 @@
           if (listEl) listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">Data unavailable</div>';
         }
 
-        /* ââ News from News_articles ââ */
+        /* ── News from News_articles ── */
         const listEl = document.getElementById('stratBrowseNewsList');
         if (!listEl) return;
         try {
@@ -2611,7 +2611,7 @@
         "Dec",
       ];
 
-      /* âââââââââââââââââââââââ TAB SWITCHING âââââââââââââââââââââââ */
+      /* ─────────────────────── TAB SWITCHING ─────────────────────── */
       const _tabTitleMap = {
         tabOverview: 'Overview',
         tabStrategies: 'Strategy Management',
@@ -2792,7 +2792,7 @@
       });
 
 
-      /* âââââââââââââââââââââââ OVERVIEW TAB LOGIC âââââââââââââââââââââââ */
+      /* ─────────────────────── OVERVIEW TAB LOGIC ─────────────────────── */
       const renderOverviewStrategyItem = (strategy) => {
         const wrapper = document.createElement("div");
         wrapper.className =
@@ -3271,7 +3271,7 @@
                   : "",
                 `<span style="color:#94a3b8">Risk:</span> <span style="color:${riskColor(d.risk)}">${d.risk}</span>`,
                 d.isFeatured
-                  ? '<span style="background:#fef3c7;color:#b45309;padding:1px 6px;border-radius:999px;font-size:11px">â Featured</span>'
+                  ? '<span style="background:#fef3c7;color:#b45309;padding:1px 6px;border-radius:999px;font-size:11px">★ Featured</span>'
                   : "",
               ]
                 .filter(Boolean)
@@ -3342,7 +3342,7 @@
         strategyChart.__strategyChartResizeObserver = resizeObserver;
       };
 
-      /* âââââââââââââââââââââââ STRATEGIES TAB LOGIC âââââââââââââââââââââââ */
+      /* ─────────────────────── STRATEGIES TAB LOGIC ─────────────────────── */
       const calculateMinInvestmentFromHoldings = (holdings, securitiesMap) => {
         if (!holdings || !holdings.length) return null;
         let total = 0,
@@ -3367,7 +3367,7 @@
       let securitiesLoading = false;
       let holdingsQuantityMap = {};
 
-      /* ââ Security Metrics Helper ââââââââââââââââââââââââââââââââââââââââââ
+      /* ── Security Metrics Helper ──────────────────────────────────────────
          Fetches the latest row from security_metrics_c for each given security ID
          and returns an object keyed by security_id with columns mapped to the
          names the rest of the codebase expects.
@@ -3377,7 +3377,7 @@
            r_ytd       (decimal) &rarr; ytd_performance (percentage &times;100)
            WTD_Return  (decimal) &rarr; wtd_performance (percentage &times;100)
            1M_Return   (decimal) &rarr; mtd_performance (percentage &times;100)
-      âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ */
+      ─────────────────────────────────────────────────────────────────────── */
       /* Fetch period returns from stock_returns_c (latest row per security_id).
          Values are already in % form (e.g. 3.225 = 3.225%), no &times;100 needed. */
       const fetchStockReturnsBySec = async (secIds) => {
@@ -3446,7 +3446,7 @@
 
       /* Fetch latest intraday row per security from stock_intraday_c.
          current_price &rarr; "Current Price" (Rand)
-         1d_abs Ã· 100  &rarr; "Day Change %"  */
+         1d_abs ÷ 100  &rarr; "Day Change %"  */
       const fetchIntradayBySec = async (secIds) => {
         if (!secIds || !secIds.length) return {};
         const map = {};
@@ -3772,7 +3772,7 @@
         return "R " + (Number(val)).toFixed(2);
       };
 
-      /* ââ Per-column sort value extractor âââââââââââââââââââââââââââââ */
+      /* ── Per-column sort value extractor ───────────────────────────── */
       const _hcSortVal = (k, h) => {
         switch (k) {
           case 'last_close':     return h.last_price ? h.last_price : 0;
@@ -3797,7 +3797,7 @@
         }
       };
 
-      /* ââ Per-column cell renderer âââââââââââââââââââââââââââââââââââââ */
+      /* ── Per-column cell renderer ───────────────────────────────────── */
       const _hcRender = (k, h) => {
         const fp = (v) => {
           const n = v != null ? Number(v) : null;
@@ -3834,7 +3834,7 @@
         }
       };
 
-      /* ââ Main render function âââââââââââââââââââââââââââââââââââââââââ */
+      /* ── Main render function ───────────────────────────────────────── */
       const renderFormHoldings = () => {
         const _sbtn = document.getElementById('strategySubmitBtn');
         if (_sbtn) _sbtn.style.display = formHoldings.length > 0 ? '' : 'none';
@@ -3847,8 +3847,8 @@
         const visCols = _HC.filter(c => c.v);
         const thS     = `padding:9px 16px;text-align:right;font-size:11px;font-weight:600;color:#94a3b8;letter-spacing:0.4px;white-space:nowrap;cursor:pointer;user-select:none;`;
         const arr     = (k) => _holdingSort.key !== k
-          ? ` <span style="opacity:0.3;font-size:9px;">â</span>`
-          : _holdingSort.dir > 0 ? ` <span style="color:#7c3aed;font-size:9px;">â²</span>` : ` <span style="color:#7c3aed;font-size:9px;">â¼</span>`;
+          ? ` <span style="opacity:0.3;font-size:9px;">⇅</span>`
+          : _holdingSort.dir > 0 ? ` <span style="color:#7c3aed;font-size:9px;">▲</span>` : ` <span style="color:#7c3aed;font-size:9px;">▼</span>`;
 
         /* thead */
         if (thead) {
@@ -3983,7 +3983,7 @@
         const hasFilter = _holdingFilter.col && _holdingFilter.sign !== 'all';
         if (hasSort || hasFilter) {
           const parts = [];
-          if (hasSort)   parts.push(`Sort: ${_holdingSort.key} ${_holdingSort.dir > 0 ? 'â²' : 'â¼'}`);
+          if (hasSort)   parts.push(`Sort: ${_holdingSort.key} ${_holdingSort.dir > 0 ? '▲' : '▼'}`);
           if (hasFilter) parts.push(`Filter: ${_holdingFilter.col} ${_holdingFilter.sign === 'pos' ? '> 0' : '< 0'}`);
           badge.textContent  = parts.join(' &middot; ');
           badge.style.display    = '';
@@ -4499,7 +4499,7 @@
               : "text-slate-500");
       };
 
-      /* ââ Strategist picker modal ââ */
+      /* ── Strategist picker modal ── */
       const STRATEGIST_LIST = ['Lonwabo Damane', 'Lethabo Maloma', 'Juan van Wyk'];
 
       const pickStrategist = () => new Promise((resolve) => {
@@ -4751,7 +4751,7 @@
         }
       };
 
-      /* âââââââââââââââââââââââ FACTSHEETS TAB LOGIC âââââââââââââââââââââââ */
+      /* ─────────────────────── FACTSHEETS TAB LOGIC ─────────────────────── */
 
       /* --- sparkline SVG helper --- */
       const _fsSparkSVG = (data) => {
@@ -4860,7 +4860,7 @@
         const statParts = [`<span style="color:#64748b;font-size:12px;">${holdingCount} holding${holdingCount!==1?'s':''}</span>`];
         if (inv) statParts.push(`<span style="color:#cbd5e1;font-size:13px;">&middot;</span><span style="color:#059669;font-weight:600;font-size:12px;">1+ investors</span>`);
         statParts.push(`<span style="color:#cbd5e1;font-size:13px;">&middot;</span><span style="color:#64748b;font-size:12px;">${s.is_public ? 'Public' : 'Private'}</span>`);
-        if (s.is_featured) statParts.push(`<span style="color:#cbd5e1;font-size:13px;">&middot;</span><span style="color:#d97706;font-weight:600;font-size:12px;">â Featured</span>`);
+        if (s.is_featured) statParts.push(`<span style="color:#cbd5e1;font-size:13px;">&middot;</span><span style="color:#d97706;font-weight:600;font-size:12px;">★ Featured</span>`);
 
         const desc = (s.description || '').trim();
 
@@ -5310,7 +5310,7 @@
         }
       });
 
-      /* âââââââââââââââââââââââ DATA LOADING âââââââââââââââââââââââ */
+      /* ─────────────────────── DATA LOADING ─────────────────────── */
       const loadStrategies = async () => {
         window.__dbgBreadcrumb('loadStrategies:start');
         const { data, error } = await supabaseClient
@@ -5410,9 +5410,9 @@
         initOverviewDashboard(strategies, _overviewSecMap).catch(err => console.error('[Overview] init error:', err));
       };
 
-      /* âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+      /* ═══════════════════════════════════════════════════════════════
          OVERVIEW DASHBOARD v2 &mdash; Lovable-style layout
-      âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ */
+      ═══════════════════════════════════════════════════════════════ */
       let _ovAllStrategies = window._ovAllStrategies = [];
       let _ovSecMap = new Map();
       let _ovPerfChartInst = null;
@@ -5466,7 +5466,7 @@
         return `${ccy} ${n.toFixed(2)}`;
       };
 
-      /* ââ Custom strategy dropdown helpers ââ */
+      /* ── Custom strategy dropdown helpers ── */
       const _ovClosePanel = () => {
         const panel = document.getElementById('ovStratPanel');
         const btn   = document.getElementById('ovStratBtn');
@@ -5517,14 +5517,14 @@
           const selClass = isSel ? ' selected' : '';
           const delay  = (itemCounter++ * 0.025).toFixed(3);
 
-          /* ââ Status dot: green if live or has investors, grey otherwise ââ */
+          /* ── Status dot: green if live or has investors, grey otherwise ── */
           const dotGreen = hasInv || s.is_public;
           const dotTitle = hasInv ? 'Has investors' : s.is_public ? 'Live &mdash; no investors yet' : 'Not live, no investors';
           const dot = dotGreen
             ? `<span title="${dotTitle}" style="width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 0 2px rgba(16,185,129,0.2);flex-shrink:0;"></span>`
             : `<span title="${dotTitle}" style="width:8px;height:8px;border-radius:50%;background:#e2e8f0;flex-shrink:0;"></span>`;
 
-          /* ââ Icon badges ââ */
+          /* ── Icon badges ── */
           /* Users badge */
           const usersBadge = hasInv
             ? `<span title="Has investors" style="display:inline-flex;align-items:center;gap:3px;padding:2px 5px;border-radius:5px;background:#dcfce7;color:#16a34a;font-size:9.5px;font-weight:600;flex-shrink:0;">
@@ -5659,7 +5659,7 @@
         if (content) content.style.display = 'block';
         const holdings = Array.isArray(strat.holdings) ? strat.holdings : [];
 
-        /* ââ No holdings &rarr; open management form so user can add assets first ââ */
+        /* ── No holdings &rarr; open management form so user can add assets first ── */
         if (holdings.length === 0) {
           /* Keep the label updated but show the management panel instead */
           const stratMgmtPanel = document.getElementById('tabStrategiesPanel');
@@ -5684,7 +5684,7 @@
           ? _stratRetHistory[_stratRetHistory.length - 1]
           : null;
 
-        /* ââ Compute annualised volatility from daily returns (std dev &times; â252) ââ */
+        /* ── Compute annualised volatility from daily returns (std dev &times; √252) ── */
         let calcVolatility = null;
         let calcMaxDrawdown = null;
         if (_stratRetHistory && _stratRetHistory.length >= 2) {
@@ -5694,7 +5694,7 @@
             const variance = dailyPcts.reduce((s, v) => s + (v - mean) ** 2, 0) / (dailyPcts.length - 1);
             calcVolatility = Math.sqrt(variance) * Math.sqrt(252);
           }
-          /* ââ Compute max drawdown from basket_value series ââ */
+          /* ── Compute max drawdown from basket_value series ── */
           const navs = _stratRetHistory.map(r => Number(r.basket_value)).filter(v => v > 0);
           if (navs.length >= 2) {
             let peak = navs[0], maxDD = 0;
@@ -5794,7 +5794,7 @@
           }
         });
 
-        /* ââ Weighted portfolio YTD/1Y from security-level returns (fallback when strategies_returns_c is empty) ââ */
+        /* ── Weighted portfolio YTD/1Y from security-level returns (fallback when strategies_returns_c is empty) ── */
         let calcYtd = null, calc1y = null;
         if (investRows.length) {
           let ytdSum = 0, ytdWeight = 0, r1ySum = 0, r1yWeight = 0;
@@ -5843,7 +5843,7 @@
         ovRenderPerfChart(analytics, strat.name || 'Strategy');
         window.__dbgBreadcrumb('ovSelect:render-sectorchart');
         ovRenderSectorChart(holdings, secMap);
-        /* ââ Fetch pending rebalance batches for this strategy ââ */
+        /* ── Fetch pending rebalance batches for this strategy ── */
         window.__dbgBreadcrumb('ovSelect:fetch-pending-rebalance');
         let pendingRebalance = null;
         try {
@@ -5992,7 +5992,7 @@
         ovBuildStratDrop();
       };
 
-      /* ââ Bottom Section Tab Switching Logic ââ */
+      /* ── Bottom Section Tab Switching Logic ── */
       window.switchBottomTab = (tab) => {
         const btnComp = document.getElementById('btnTabComposition');
         const btnNews = document.getElementById('btnTabNews');
@@ -6013,7 +6013,7 @@
         }
       };
 
-      /* ââ News & Insights Fetching ââ */
+      /* ── News & Insights Fetching ── */
       window.fetchNewsInsights = async function() {
         const listEl = document.getElementById('ovNewsList');
         if (!listEl) return;
@@ -6438,7 +6438,7 @@
           return;
         }
 
-        /* ââ Aggregate holdings per (user, family_member, minute-of-purchase)
+        /* ── Aggregate holdings per (user, family_member, minute-of-purchase)
               so each separate buy event surfaces as its own card. Splitting on:
               - user_id: distinguishes different investors
               - family_member_id: a parent who bought for two children gets one
@@ -6507,7 +6507,7 @@
             u.inception = r.created_at;
         });
 
-        /* ââ Merge pending buy-side rebalance clients &mdash; pending events come
+        /* ── Merge pending buy-side rebalance clients &mdash; pending events come
               from one batch and don't carry a created_at on the event, so we
               key them under a per-(user, family_member) 'pending' bucket. */
         if (pendingRebalance && pendingRebalance.events) {
@@ -6524,7 +6524,7 @@
             });
         }
 
-        /* ââ Full-amount formatter (no K/m abbreviation) ââ */
+        /* ── Full-amount formatter (no K/m abbreviation) ── */
         const fmtR = (v) => {
           const neg = v < 0;
           const [int, dec] = Math.abs(v).toFixed(2).split('.');
@@ -6622,7 +6622,7 @@
         window._ovInvestorStrat = strat;
       };
 
-      /* ââ Investor preview modal &mdash; full detail panel from investors.html ââ */
+      /* ── Investor preview modal &mdash; full detail panel from investors.html ── */
       window.ovShowInvestorPreview = (idx) => {
         const r = (window._ovInvestorRows || [])[idx];
         if (!r) return;
@@ -6647,7 +6647,7 @@
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                 </a>
                 <button onclick="document.getElementById('ovInvestorModal').remove()"
-                  style="width:26px;height:26px;border-radius:7px;background:#f1f5f9;border:none;color:#64748b;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">â</button>
+                  style="width:26px;height:26px;border-radius:7px;background:#f1f5f9;border:none;color:#64748b;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
               </div>
             </div>
             <!-- iframe fills remaining height -->
@@ -6849,7 +6849,7 @@
         renderHoldings(orderedSecurities);
       };
 
-      /* âââââââââââââââââââââââ AUTH & EVENT LISTENERS âââââââââââââââââââââââ */
+      /* ─────────────────────── AUTH & EVENT LISTENERS ─────────────────────── */
       const requireSession = async () => {
         const { data } = await supabaseClient.auth.getSession();
         if (!data.session) {
@@ -7089,7 +7089,7 @@
 
       /* strategyName is now a hidden field driven by the draft-tab input */
 
-      /* ââ shared tab context-menu dropdown ââ */
+      /* ── shared tab context-menu dropdown ── */
       let _tabMenuOpen = null;
       const _tabMenuEl = (() => {
         const el = document.createElement("div");
@@ -7111,7 +7111,7 @@
         _tabMenuEl.style.display = "none";
         _tabMenuOpen = null;
       };
-      /* ââ Strategy Details Modal ââ */
+      /* ── Strategy Details Modal ── */
       const openStrategyDetailsModal = (strategy) => {
         const existing = document.getElementById("_stratDetailsModal");
         if (existing) existing.remove();
@@ -7452,7 +7452,7 @@
         await loadStrategies();
       };
 
-      /* ââ Load which strategies have real investors ââ */
+      /* ── Load which strategies have real investors ── */
       /* Fetch period returns from strategies_returns_c (latest row per strategy) */
       const loadStrategyYtd = async () => {
         const strategies = allStrategiesFullData || [];
@@ -7506,7 +7506,7 @@
         /* If strategies haven't loaded yet, keep skeleton; will be called again on load */
         if (!strategies.length) return;
 
-        /* ââ SECURITY CARD MODE (shown while creating / editing a strategy) ââ */
+        /* ── SECURITY CARD MODE (shown while creating / editing a strategy) ── */
         if (strategyWorkspaceVisible) {
           if (!allSecuritiesCache) return; /* wait for securities to load */
 
@@ -8134,17 +8134,17 @@
         loadUserStats().catch(err => console.error('[Init] loadUserStats failed:', err));
       });
 
-      /* âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+      /* ═══════════════════════════════════════════════════════════════════
          REBALANCING ENGINE
          Ported from mint-harmony-engine (TypeScript &rarr; plain JS)
-      âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ */
+      ═══════════════════════════════════════════════════════════════════ */
 
-      /* ââ Constants ââ */
+      /* ── Constants ── */
       const REB_BROKERAGE_RATE = 0.005; // 0.5%
       const REB_OFF_CUSTODY_FEE = 69;   // R69
       const REB_WALLET_TABLE = "wallets";
 
-      /* ââ Engine functions ââ */
+      /* ── Engine functions ── */
       function rebGetDivisors(n) {
         if (n <= 0) return [];
         const divs = [];
@@ -8651,11 +8651,11 @@
       }
 
       /* Per-strategy residual cash bucket. balance_cents in CENTS;
-         app math in Rands &rarr; Ã·100 on read, &times;100 on write.
+         app math in Rands &rarr; ÷100 on read, &times;100 on write.
 
          Scoped to (user_id, strategy_id, family_member_id):
-         - family_member_id NULL â parent's own residual
-         - family_member_id <uuid> â that child's residual for the strategy
+         - family_member_id NULL ⇒ parent's own residual
+         - family_member_id <uuid> ⇒ that child's residual for the strategy
          The current rebalance UI is per-parent so writes pass NULL; the
          column is in place so a future per-family-member rebalance can
          split residuals without further schema work. MINT already reads
@@ -8727,7 +8727,7 @@
         }
       }
 
-      /* ââ State ââ */
+      /* ── State ── */
       let rebIsins = [];           // [{code, description, unitsPerLot, currentPrice, weightPercent}]
       let rebRawHoldings = {};     // code &rarr; [{userId, name, quantity}]
       let rebSelectedIsin = null;
@@ -8749,7 +8749,7 @@
       let rebSelectedFamilyMemberId = null;
       let rebFamilyMembersForStrategy = []; // [{id, label}] populated per strategy
 
-      /* ââ Helpers ââ */
+      /* ── Helpers ── */
       const rebFmtZAR = n => `R\u00A0${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       function rebClientsForIsin(isin) {
         if (!isin) return [];
@@ -8870,7 +8870,7 @@
         }
       }
 
-      /* ââ Init strategy selector ââ */
+      /* ── Init strategy selector ── */
       function rebInitStrategySelector() {
         const sel = document.getElementById("rebStrategySelect");
         if (!sel) return;
@@ -8901,7 +8901,7 @@
         });
       })();
 
-      /* ââ Load strategy holdings into ISINs (+ fetch live client holdings) ââ */
+      /* ── Load strategy holdings into ISINs (+ fetch live client holdings) ── */
       async function rebLoadStrategy(strategyId) {
         rebSelectedIsin = null;
         rebSelectedStep = null;
@@ -9110,9 +9110,9 @@
         } catch (e) { console.warn("rebLoadStrategy: holdings fetch failed", e); }
           }
 
-        /* ââ Repopulate the owner-scope dropdown with this strategy's
+        /* ── Repopulate the owner-scope dropdown with this strategy's
            distinct family members. Preserves the current selection if
-           still applicable. ââ */
+           still applicable. ── */
         try {
           const fmSel = document.getElementById("rebFamilyScopeSelect");
           if (fmSel) {
@@ -9127,7 +9127,7 @@
           }
         } catch (e) { /* harmless */ }
 
-        /* ââ Fetch pending rebalance batch for this strategy ââ */
+        /* ── Fetch pending rebalance batch for this strategy ── */
         try {
           const { data: pendingBatches } = await supabaseClient
             .from('rebalance_batch')
@@ -9166,7 +9166,7 @@
         rebRenderAll();
       }
 
-      /* ââ Master render ââ */
+      /* ── Master render ── */
       function rebRenderAll() {
         rebRenderIsinsTable();
         rebRenderSteps();
@@ -9190,7 +9190,7 @@
         if (metaEl) metaEl.textContent = `${fundedCount} of ${entries.length} client${entries.length !== 1 ? "s" : ""} funded`;
       }
 
-      /* ââ ISINs table ââ */
+      /* ── ISINs table ── */
       function rebRenderIsinsTable() {
         const tbody = document.getElementById("rebIsinsBody");
         const priceHeader = document.getElementById("rebPriceHeader");
@@ -9241,7 +9241,7 @@
         });
       }
 
-      /* ââ Divisibility steps ââ */
+      /* ── Divisibility steps ── */
       function rebRenderSteps() {
         const container = document.getElementById("rebStepsList");
         const metaEl = document.getElementById("rebEngineMeta");
@@ -9304,7 +9304,7 @@
         }
       }
 
-      /* ââ Client impact preview ââ */
+      /* ── Client impact preview ── */
       function rebRenderImpact() {
         const tbody = document.getElementById("rebImpactBody");
         const metaEl = document.getElementById("rebImpactMeta");
@@ -9332,7 +9332,7 @@
             <th class="text-right px-4 py-2">Lots</th>
             <th class="text-right px-4 py-2">Current</th>
             <th class="text-right px-4 py-2">New</th>
-            <th class="text-right px-4 py-2">Î</th>
+            <th class="text-right px-4 py-2">Δ</th>
             <th class="text-right px-4 py-2">P/L</th>
           `;
         };
@@ -9533,7 +9533,7 @@
         const hasErrors = impacts.some(i => i.hasNegative);
         const pendingUids2 = new Set();
         if (rebPendingRebalance) rebPendingRebalance.events.forEach(ev => pendingUids2.add(String(ev.user_id)));
-        if (metaEl) metaEl.textContent = `${rebSelectedIsin.code} &middot; ${impacts.length} clients${hasErrors ? " &middot; â  Negative holdings" : ""}`;
+        if (metaEl) metaEl.textContent = `${rebSelectedIsin.code} &middot; ${impacts.length} clients${hasErrors ? " &middot; ⚠ Negative holdings" : ""}`;
 
         const clientById = Object.fromEntries((clients || []).map(c => [String(c.id), c]));
         tbody.innerHTML = impacts.map(imp => {
@@ -9559,7 +9559,7 @@
         }).join("");
       }
 
-      /* ââ Header state (commit btn + negative badge) ââ */
+      /* ── Header state (commit btn + negative badge) ── */
       function rebUpdateHeader() {
         const commitBtn = document.getElementById("rebCommitBtn");
         const negBadge = document.getElementById("rebNegativeBadge");
@@ -9588,7 +9588,7 @@
         }
       }
 
-      /* ââ Sell Modal ââ */
+      /* ── Sell Modal ── */
       function rebShowSellModal() {
         if (!rebSelectedIsin || !rebSelectedStep) return;
         const clients = rebClientsForIsin(rebSelectedIsin);
@@ -9623,7 +9623,7 @@
         modal.classList.remove("hidden");
       }
 
-      /* ââ Buy Modal ââ */
+      /* ── Buy Modal ── */
       async function rebShowBuyModal(netCapital) {
         const modal = document.getElementById("rebBuyModal");
         const metaEl = document.getElementById("rebBuyModalMeta");
@@ -10133,7 +10133,7 @@
       }
 
       async function rebPersistCommittedTradeSequence() {
-        /* ââ Validation ââ */
+        /* ── Validation ── */
         const buyModal = document.getElementById("rebBuyModal");
         const buySelection = buyModal?._buySelection;
         if (!buySelection?.exec || !buySelection?.instrument) {
@@ -10162,7 +10162,7 @@
         const extraBuySelection = buySelection.extraBuy || null;
         const extraBuyExec = extraBuySelection?.exec || null;
 
-        /* ââ Guard: block if a PENDING batch already exists for this strategy ââ */
+        /* ── Guard: block if a PENDING batch already exists for this strategy ── */
         const { data: pendingBatches, error: pendingErr } = await supabaseClient
           .from("rebalance_batch")
           .select("id, status, sell_isin_code, buy_isin_code, created_at")
@@ -10176,7 +10176,7 @@
           );
         }
 
-        /* ââ Resolve security IDs ââ */
+        /* ── Resolve security IDs ── */
 
         const symbolsToResolve = [
           rebSelectedIsin.fullSymbol,
@@ -10209,7 +10209,7 @@
           throw new Error("Secondary buy security must be different from the primary buy security.");
         }
 
-        /* ââ Capture pre-rebalance snapshots (for reversal) ââ */
+        /* ── Capture pre-rebalance snapshots (for reversal) ── */
         const strategyRef = (allStrategiesFullData || []).find((s) => String(s.id) === String(strategyId));
         const holdingsSnapshotBefore = strategyRef?.holdings
           ? JSON.parse(JSON.stringify(strategyRef.holdings))
@@ -10224,7 +10224,7 @@
           buyExec,
         });
 
-        /* ââ Generate batch ID & metadata ââ */
+        /* ── Generate batch ID & metadata ── */
         const rebalanceBatchId = (window.crypto && typeof window.crypto.randomUUID === "function")
           ? window.crypto.randomUUID()
           : ("10000000-1000-4000-8000-100000000000".replace(/[018]/g, c =>
@@ -10232,7 +10232,7 @@
             ));
         const strategyNameSnapshot = strategyRef?.short_name || strategyRef?.name || "";
 
-        /* ââ Read existing active positions (read-only &mdash; to compute sell quantities) ââ */
+        /* ── Read existing active positions (read-only &mdash; to compute sell quantities) ── */
         const userIds = [...new Set([
           ...clients.map((c) => String(c.id)),
           ...(buyExec.clientAllocations || []).map((a) => String(a.clientId)),
@@ -10244,7 +10244,7 @@
           ...(extraBuySecurityId ? [extraBuySecurityId] : []),
         ])];
 
-        /* ââ Read existing active positions (read-only &mdash; to compute sell quantities) ââ */
+        /* ── Read existing active positions (read-only &mdash; to compute sell quantities) ── */
         const { data: existingRows, error: existingErr } = await supabaseClient
           .from("stock_holdings_c")
           .select("id, user_id, security_id, quantity, trade_side, is_active")
@@ -10287,7 +10287,7 @@
            fill & settle only touches the correct (user, family_member) rows. */
         const familyMemberIdForEvents = rebSelectedFamilyMemberId || null;
 
-        /* ââ Build SELL events &rarr; rebalance_event ââ */
+        /* ── Build SELL events &rarr; rebalance_event ── */
         const sellEventRows = _sellRowMeta
           .filter((m) => m.soldQty > 0)
           .map((m) => ({
@@ -10306,7 +10306,7 @@
             updated_at: nowIso,
           }));
 
-        /* ââ Build primary BUY events &rarr; rebalance_event ââ */
+        /* ── Build primary BUY events &rarr; rebalance_event ── */
         const buyEventRows = (buyExec.clientAllocations || [])
           .map((alloc) => ({
             batch_id: rebalanceBatchId,
@@ -10325,7 +10325,7 @@
           }))
           .filter((row) => row.quantity > 0);
 
-        /* ââ Build extra BUY events (wallet-funded) &rarr; rebalance_event ââ */
+        /* ── Build extra BUY events (wallet-funded) &rarr; rebalance_event ── */
         let extraBuyEventRows = [];
         if (extraBuyExec) {
           extraBuyEventRows = (extraBuyExec.clientAllocations || [])
@@ -10347,18 +10347,18 @@
             .filter((row) => row.quantity > 0);
         }
 
-        /* ââ Compute batch-level totals ââ */
+        /* ── Compute batch-level totals ── */
         const totalSellQty = sellEventRows.reduce((s, r) => s + Number(r.quantity || 0), 0);
         const totalBuyQty = buyEventRows.reduce((s, r) => s + Number(r.quantity || 0), 0);
         const totalExtraBuyQty = extraBuyEventRows.reduce((s, r) => s + Number(r.quantity || 0), 0);
         const sellModal = document.getElementById("rebSellModal");
         const netProceeds = sellModal?._execData?.netProceeds || 0;
 
-        /* ââ Get current admin user ID ââ */
+        /* ── Get current admin user ID ── */
         const { data: sessionData } = await supabaseClient.auth.getSession();
         const currentUserId = sessionData?.session?.user?.id || null;
 
-        /* ââ Insert rebalance_batch (PENDING) ââ */
+        /* ── Insert rebalance_batch (PENDING) ── */
         const { error: batchErr } = await supabaseClient
           .from("rebalance_batch")
           .insert({
@@ -10384,7 +10384,7 @@
           });
         if (batchErr) throw new Error(batchErr.message || "Failed to create rebalance batch.");
 
-        /* ââ Insert all rebalance events ââ */
+        /* ── Insert all rebalance events ── */
         /* stock_holdings_c is NOT touched &mdash;
            Positions settle only when the admin fills & settles the batch
            via the orderbook. This keeps client-facing data clean. */
@@ -10396,11 +10396,11 @@
           if (eventsErr) throw new Error(eventsErr.message || "Failed to insert rebalance events.");
         }
 
-        /* ââ stock_holdings_c is NOT touched ââ
+        /* ── stock_holdings_c is NOT touched ──
            Positions settle only when the admin fills & settles the batch
            via the orderbook. This keeps client-facing data clean. */
 
-        /* ââ Update wallet credits (admin-internal bookkeeping) ââ */
+        /* ── Update wallet credits (admin-internal bookkeeping) ── */
         const walletBeforeByClient = buySelection.walletBeforeByClient || {};
         const walletAfterMainByClient = buySelection.walletAfterMainByClient || {};
         const finalWalletByClient = {};
@@ -10662,7 +10662,7 @@
         };
       }
 
-      /* ââ Wallet Modal: per-user wallet view + wallet-only buy ââ
+      /* ── Wallet Modal: per-user wallet view + wallet-only buy ──
          Opens when the Wallet Pool badge is clicked. Lists each client's
          rebalance_residual, lets admin pick a security + qty/lot to buy
          funded purely from those wallet balances. Uniformity rule applies:
@@ -10786,7 +10786,7 @@
                       <div class="flex justify-between"><span class="font-semibold text-slate-700">Total cost</span><span class="font-mono font-bold">${rebFmtZAR(totalCost)}</span></div>
                     </div>
 
-                    ${!everyoneAffords && anyAfford ? `<p class="text-xs text-red-600">â  ${perUserPlan.filter((p) => !p.afford).length} client(s) can't afford this allocation &mdash; lower the buy/lot to unblock.</p>` : ''}
+                    ${!everyoneAffords && anyAfford ? `<p class="text-xs text-red-600">⚠ ${perUserPlan.filter((p) => !p.afford).length} client(s) can't afford this allocation &mdash; lower the buy/lot to unblock.</p>` : ''}
                     ${!anyAfford ? `<p class="text-xs text-amber-600">No clients have enough wallet for ${buyPerLot} share(s)/lot.</p>` : ''}
 
                     <button id="rebWalletBuyCommitBtn" ${everyoneAffords ? '' : 'disabled'}
@@ -10848,7 +10848,7 @@
       async function rebPersistWalletOnlyBuy({ instrument, buyPerLot, perUserPlan, pricePerShare }) {
         if (!instrument || !rebSelectedStrategyId) throw new Error("Missing strategy or buy instrument.");
         const buyQtyPerLot = Math.max(0, Math.floor(Number(buyPerLot) || 0));
-        if (buyQtyPerLot <= 0) throw new Error("Buy per lot must be â¥ 1.");
+        if (buyQtyPerLot <= 0) throw new Error("Buy per lot must be ≥ 1.");
         if (!(pricePerShare > 0)) throw new Error("Buy security has no live price.");
         const strategyId = rebSelectedStrategyId;
 
@@ -11025,7 +11025,7 @@
         });
       }
 
-      /* ââ Wire up rebalancing event listeners (deferred) ââ */
+      /* ── Wire up rebalancing event listeners (deferred) ── */
       window.addEventListener("DOMContentLoaded", () => {
         const rebPriceHeader = document.getElementById("rebPriceHeader");
         if (rebPriceHeader) {

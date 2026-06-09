@@ -289,7 +289,7 @@
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg";
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    /* âââ State âââ */
+    /* ─── State ─── */
     let allInvestors = [], allStrategies = [], stratNavMap = {}, stratMetricsMap = {}, txnNameById = {};
     let activeView = 'strategy'; // 'strategy' | 'security'
     let currentInvestor = null, currentTab = 'performance';
@@ -301,7 +301,7 @@
       else if (window.echarts) { try { const inst = echarts.getInstanceByDom(el); if (inst) inst.dispose(); } catch(e) {} }
     }
 
-    /* âââ Formatters âââ */
+    /* ─── Formatters ─── */
     const fmtR    = n => 'R' + (Number(n) || 0).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     const fmtR2   = n => 'R' + (Number(n) || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const fmtPct  = n => (n == null || isNaN(n)) ? '&mdash;' : ((n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%');
@@ -310,7 +310,7 @@
     const fmtDate = s => s ? new Date(s).toLocaleDateString('en-ZA', { day:'2-digit', month:'short', year:'numeric' }) : '&mdash;';
     const fmtDateShort = s => s ? new Date(s).toLocaleDateString('en-ZA', { day:'2-digit', month:'short' }) : '&mdash;';
 
-    /* âââ Risk math (from daily NAV series) âââ */
+    /* ─── Risk math (from daily NAV series) ─── */
     function computeMetrics(navSeries) {
       if (!navSeries || navSeries.length < 2) return { sharpe:null, vol:null, maxDD:null, sortino:null };
       const rets = [];
@@ -377,7 +377,7 @@
       return out;
     }
 
-    /* âââ Data Load âââ */
+    /* ─── Data Load ─── */
     async function loadAll() {
       /* Fetch via server-side endpoint which uses the service role key,
          bypassing Supabase RLS so ALL investors are always visible to admins. */
@@ -394,7 +394,7 @@
         residualByKey[key] = (residualByKey[key] || 0) + (Number(r.balance_cents)||0)/100;
       });
 
-      /* Rebalance fees per (user|familyMember) — admin reconciliation only.
+      /* Rebalance fees per (user|familyMember) � admin reconciliation only.
          A rebalance posts a R0 audit transaction, so its sell/buy brokerage (0.5%)
          + custody (R69 per ISIN side) never reach the transactions fee columns.
          We derive them here from settled, non-reversed rebalance_event rows so the
@@ -534,7 +534,7 @@
         const earliestDep = deposits.length ? deposits[deposits.length-1].transaction_date : null;
         const inception = earliestDep || u.inception;
         const days = inception ? Math.floor((Date.now() - new Date(inception)) / 86400000) : 0;
-        /* Annualise; clamp to -100% to avoid NaN/complex roots when retPct â¤ -100% */
+        /* Annualise; clamp to -100% to avoid NaN/complex roots when retPct ≤ -100% */
         let annualised = retPct;
         if (days > 30) {
           const safe = Math.max(1 + retPct/100, 0.0001);
@@ -555,7 +555,7 @@
            strategy_rebalance_residuals; it's the client's money but sits as cash,
            not positions. Broken out from holdings value in the detail view. */
         const residualCash = residualByKey[`${u.userId}:${u.familyMemberId || ''}:${u.strategyId || ''}`] || 0;
-        /* holdingsValue = LIVE positions value (current = Σ live price × qty),
+        /* holdingsValue = LIVE positions value (current = Σ live price � qty),
            which matches the orderbook. csrAum (basket_value snapshot) can be stale
            after a rebalance, so we use current here. value = positions + cash. */
         const holdingsValue = current;
@@ -581,7 +581,7 @@
       return investors;
     }
 
-    /* âââ KPI Bar âââ */
+    /* ─── KPI Bar ─── */
     function renderKpiBar(investors) {
       const visible = investors.filter(i => i.type === activeView);
       /* TOTAL AUM includes residual cash (i.value = holdings + residual) so the
@@ -610,7 +610,7 @@
       ).join('');
     }
 
-    /* âââ View toggle âââ */
+    /* ─── View toggle ─── */
     function switchView(view) {
       activeView = view;
       const stBtn = document.getElementById('tabStrategy');
@@ -629,7 +629,7 @@
       renderDetail();
     }
 
-    /* âââ Investor list âââ */
+    /* ─── Investor list ─── */
     function renderList(investors) {
       const q = document.getElementById('investorSearch').value.toLowerCase();
       const f = document.getElementById('strategyFilter').value;
@@ -656,7 +656,7 @@
       `).join('') || `<div style="padding:20px;text-align:center;color:#94a3b8;font-size:12px;">No investors found</div>`;
     }
 
-    /* âââ Detail panel âââ */
+    /* ─── Detail panel ─── */
     function selectInvestor(investorKey) {
       const inv = allInvestors.find(i => i.investorKey === investorKey);
       if (!inv) return;
@@ -735,7 +735,7 @@
       else if (currentTab === 'transactions') el.innerHTML = renderTxnsTab(i);
     }
 
-    /* âââ Tab: Performance (merged: user P&L chart + calendar + strategy stats + holdings) âââ */
+    /* ─── Tab: Performance (merged: user P&L chart + calendar + strategy stats + holdings) ─── */
     function renderPerformanceTab(i) {
       const m = stratMetricsMap[i.userId] || {};
       const latest = m.latest || {};
@@ -882,7 +882,7 @@
       });
     }
 
-    /* âââ Tab: Risk âââ */
+    /* ─── Tab: Risk ─── */
     function renderRiskTab(i) {
       const m = stratMetricsMap[i.userId] || {};
       const cards = [
@@ -930,7 +930,7 @@
       _charts.set(el, chart);
     }
 
-    /* âââ Tab: Allocations âââ */
+    /* ─── Tab: Allocations ─── */
     function renderAllocationsTab(i) {
       return `
         <div style="display:grid;grid-template-columns:1fr 360px;gap:14px;">
@@ -983,7 +983,7 @@
       });
     }
 
-    /* âââ Tab: Transactions âââ */
+    /* ─── Tab: Transactions ─── */
 
     /* Classify a transactions row by name + direction. Returns:
        { label, color, bg, sign } so the UI styles consistently. */
@@ -1134,7 +1134,7 @@
               ${kpi('MINT revenue (3.8%)', feeMint, '#059669')}
             </div>
             ${rebFeeTotal > 0 ? `
-            <div style="font-size:10px;color:#94a3b8;font-weight:600;margin:12px 0 6px;letter-spacing:0.04em;">REBALANCE${' '}&middot;${' '}<span style="color:#0e7490;">admin only</span></div>
+            <div style="font-size:10px;color:#94a3b8;font-weight:600;margin:12px 0 6px;letter-spacing:0.04em;">REBALANCE${'�'}&middot;${'�'}<span style="color:#0e7490;">admin only</span></div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
               ${kpi('Reb. broker (0.5%)', rebFeeBroker, '#b45309')}
               ${kpi('Reb. custody (R69/ISIN)', rebFeeCustody, '#b45309')}
@@ -1203,7 +1203,7 @@
       `;
     }
 
-    /* âââ Init âââ */
+    /* ─── Init ─── */
     document.addEventListener('DOMContentLoaded', async () => {
       try {
         const { data: { session } } = await sb.auth.getSession();
