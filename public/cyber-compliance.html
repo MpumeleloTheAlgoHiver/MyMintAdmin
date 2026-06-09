@@ -12,8 +12,12 @@
     .sidebar{position:fixed;left:0;top:0;width:220px;height:100vh;background:#fff;border-right:1px solid #e5e5ea;display:flex;flex-direction:column;z-index:1000;}
     .sidebar-header{display:flex;align-items:center;gap:10px;padding:20px 20px 16px;border-bottom:1px solid #f2f2f7;}
     .sidebar-logo{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-    .sidebar-brand-name{font-size:14px;font-weight:700;color:#1c1c1e;line-height:1.2;}
-    .sidebar-brand-sub{font-size:10px;color:#8e8e93;font-weight:500;letter-spacing:.04em;text-transform:uppercase;}
+    .sidebar-brand{display:flex;flex-direction:column;}
+    .sidebar-brand-name{font-size:14px;font-weight:700;color:#0f172a;letter-spacing:-0.01em;line-height:1.2;}
+    .sidebar-brand-sub{font-size:10px;color:#94a3b8;font-weight:500;letter-spacing:.04em;text-transform:uppercase;}
+    #viewSwitcherDropdown{display:grid;grid-template-rows:0fr;transition:grid-template-rows 0.2s ease;}
+    #viewSwitcherDropdown.vs-open{grid-template-rows:1fr;}
+    #viewSwitcherDropdown>div{overflow:hidden;}
     .sidebar-nav{flex:1;display:flex;flex-direction:column;gap:2px;padding:14px 12px;overflow-y:auto;}
     .sidebar-section-label{font-size:10px;font-weight:600;color:#8e8e93;letter-spacing:.07em;text-transform:uppercase;padding:8px 8px 4px;margin-top:6px;}
     .nav-icon{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;text-decoration:none;color:#64748b;font-size:13px;font-weight:500;white-space:nowrap;transition:all .15s ease;}
@@ -169,17 +173,121 @@
 </head>
 <body>
 <aside class="sidebar">
-  <div class="sidebar-header">
-    <a class="sidebar-logo" href="/index.html"><img src="/icon.png" alt="Mint" style="width:36px;height:36px;border-radius:10px;"></a>
-    <div><div class="sidebar-brand-name">Mint</div><div class="sidebar-brand-sub">Admin Panel</div></div>
+  <div class="sidebar-header" style="cursor:pointer;position:relative;user-select:none;" onclick="mintHubDropdownToggle(event)">
+    <div class="sidebar-logo">
+      <img src="/icon.png" alt="Mint logo" style="width:34px;height:34px;border-radius:8px;" />
+    </div>
+    <div class="sidebar-brand" style="flex:1;min-width:0;">
+      <span class="sidebar-brand-name">Mint</span>
+      <span class="sidebar-brand-sub">Mint Hub</span>
+    </div>
+    <svg id="mintHubChevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0;transition:transform 0.2s;margin-right:-2px;"><polyline points="6 9 12 15 18 9"/></svg>
+    <div id="mintHubDropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:8px;right:8px;background:white;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.14),0 0 0 1px rgba(139,92,246,0.12);z-index:9999;overflow:hidden;" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f5f3ff;border-bottom:1px solid #ede9fe;">
+        <img src="/icon.png" style="width:26px;height:26px;border-radius:7px;flex-shrink:0;" />
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:700;color:#0f172a;line-height:1.3;">Mint Hub</div>
+          <div style="font-size:10px;color:#7c3aed;font-weight:500;">Admin Portal &middot; Active</div>
+        </div>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div onclick="mintAppLaunch()" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-top:1px solid #f1f5f9;" onmouseover="this.style.background='#f5f3ff'" onmouseout="this.style.background=''">
+        <div style="width:26px;height:26px;border-radius:7px;background:#f0fdf4;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <img src="/icon.png" style="width:18px;height:18px;border-radius:4px;" />
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:11px;font-weight:600;color:#0f172a;line-height:1.3;">Mint App</div>
+          <div style="font-size:10px;color:#059669;font-weight:500;">Investor-facing portal</div>
+        </div>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
   </div>
+  <script>
+  function mintHubDropdownToggle(e) {
+    e.stopPropagation();
+    const dd = document.getElementById('mintHubDropdown');
+    const ch = document.getElementById('mintHubChevron');
+    const open = dd.style.display !== 'block';
+    dd.style.display = open ? 'block' : 'none';
+    if (ch) ch.style.transform = open ? 'rotate(180deg)' : '';
+    if (open) {
+      setTimeout(() => {
+        const close = (ev) => {
+          if (!ev.target.closest('.sidebar-header')) {
+            dd.style.display = 'none';
+            if (ch) ch.style.transform = '';
+            document.removeEventListener('click', close);
+          }
+        };
+        document.addEventListener('click', close);
+      }, 0);
+    }
+  }
+  function mintAppLaunch() {
+    const dd = document.getElementById('mintHubDropdown');
+    const ch = document.getElementById('mintHubChevron');
+    if (dd) dd.style.display = 'none';
+    if (ch) ch.style.transform = '';
+    const ov = document.getElementById('mintAppOverlay');
+    const fr = document.getElementById('mintAppFrame');
+    if (ov && fr) { fr.src = 'https://mint-henna.vercel.app/'; ov.style.display = 'block'; }
+  }
+  function mintAppClose() {
+    const ov = document.getElementById('mintAppOverlay');
+    const fr = document.getElementById('mintAppFrame');
+    if (ov) ov.style.display = 'none';
+    if (fr) fr.src = '';
+  }
+  function viewSwitcherToggle(e) {
+    e.stopPropagation();
+    const dd = document.getElementById('viewSwitcherDropdown');
+    const ch = document.getElementById('viewSwitcherChevron');
+    const open = !dd.classList.contains('vs-open');
+    dd.classList.toggle('vs-open', open);
+    if (ch) ch.style.transform = open ? 'rotate(180deg)' : '';
+    if (open) {
+      setTimeout(() => {
+        const close = (ev) => {
+          if (!ev.target.closest('#viewSwitcherBtn') && !ev.target.closest('#viewSwitcherDropdown')) {
+            dd.classList.remove('vs-open');
+            if (ch) ch.style.transform = '';
+            document.removeEventListener('click', close);
+          }
+        };
+        document.addEventListener('click', close);
+      }, 0);
+    }
+  }
+  </script>
+
+  <!-- Investments View Switcher -->
+  <div style="padding:0 12px 2px;">
+    <button id="viewSwitcherBtn" onclick="viewSwitcherToggle(event)"
+      style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:10px;background:#ede9fe;border:none;cursor:pointer;text-align:left;box-sizing:border-box;transition:background 0.15s;outline:none;" onmouseover="this.style.background='#ddd6fe'" onmouseout="this.style.background='#ede9fe'">
+      <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#7c3aed;flex-shrink:0;"><path d="M3 3h7v7H3zm0 11h7v7H3zm11-11h7v7h-7zm0 11h7v7h-7z"/></svg>
+      <span style="flex:1;font-size:13px;font-weight:600;color:#5b21b6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Investments</span>
+      <svg id="viewSwitcherChevron" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" style="width:12px;height:12px;flex-shrink:0;transition:transform 0.2s;"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <div id="viewSwitcherDropdown">
+      <div>
+        <div style="padding:3px 0 2px 10px;">
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;background:#f5f3ff;">
+            <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#7c3aed;flex-shrink:0;"><path d="M3 3h7v7H3zm0 11h7v7H3zm11-11h7v7h-7zm0 11h7v7h-7z"/></svg>
+            <span style="flex:1;font-size:12px;font-weight:600;color:#5b21b6;">Investments</span>
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#7c3aed" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <nav class="sidebar-nav">
     <span class="sidebar-section-label">Main</span>
     <a class="nav-icon" href="/index.html"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>Clients</a>
     <a class="nav-icon" href="/studio.html"><svg viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>Client View Studio</a>
     <span class="sidebar-section-label">Investments</span>
     <a class="nav-icon" href="/dashboard.html"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>Dashboard</a>
-    <a class="nav-icon" href="/strategies.html"><svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zm0 11h7v7H3zm11-11h7v7h-7zm0 11h7v7h-7z"/></svg>Strategies</a>
     <a class="nav-icon" href="/factsheets.html"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>Factsheets</a>
     <a class="nav-icon" href="/investors.html"><svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>Investors</a>
     <a class="nav-icon" href="/orderbook.html"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>Order Book</a>
