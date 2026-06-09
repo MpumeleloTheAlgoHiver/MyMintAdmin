@@ -44,11 +44,6 @@
     .tab-btn:hover:not(.active){color:#1c1c1e;}
     .tab-pane{display:none;}
     .tab-pane.active{display:block;}
-    /* Sub-tabs (inside Status pane) */
-    .sub-tab-bar{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;}
-    .sub-tab-btn{padding:8px 18px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid #e5e5ea;background:#fff;color:#636366;white-space:nowrap;transition:all .15s;}
-    .sub-tab-btn.active{background:#1c1c1e;color:#fff;border-color:#1c1c1e;}
-    .sub-tab-btn:hover:not(.active){background:#f2f2f7;color:#1c1c1e;}
     /* Stats strip */
     .stats-row{display:flex;gap:14px;margin-bottom:22px;flex-wrap:wrap;}
     .stat-card{background:#fff;border-radius:14px;padding:14px 18px;flex:1;min-width:110px;border:1px solid #e5e5ea;}
@@ -59,10 +54,12 @@
     .stat-value.warn{color:#ff9500;}
     /* Service cards */
     .service-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-bottom:22px;}
-    .service-card{background:#fff;border-radius:14px;border:1px solid #e5e5ea;padding:18px 20px;}
+    .service-card{background:#fff;border-radius:14px;border:1px solid #e5e5ea;padding:18px 20px;cursor:pointer;transition:box-shadow .15s,border-color .15s;}
+    .service-card:hover{box-shadow:0 2px 10px rgba(0,0,0,.08);}
     .service-card.up{border-left:4px solid #34c759;}
     .service-card.down{border-left:4px solid #ff3b30;}
     .service-card.unknown{border-left:4px solid #c7c7cc;}
+    .service-card.selected{box-shadow:0 0 0 2px #1c1c1e;}
     .sc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
     .sc-name{font-size:14px;font-weight:700;color:#1c1c1e;}
     .sc-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
@@ -317,15 +314,9 @@
 
     <!-- ── Status Tab ──────────────────────────────────────────────────── -->
     <div class="tab-pane active" id="tab-status">
-      <div class="sub-tab-bar">
-        <button class="sub-tab-btn active" id="stab-mint-live" onclick="switchStatusTab('mint-live',this)">🟢 Live Status</button>
-        <button class="sub-tab-btn" id="stab-mint-dev"  onclick="switchStatusTab('mint-dev',this)">🔵 Dev Status</button>
-        <button class="sub-tab-btn" id="stab-crm"       onclick="switchStatusTab('crm',this)">🖥️ CRM Admin Status</button>
-        <button class="sub-tab-btn" id="stab-supabase"  onclick="switchStatusTab('supabase',this)">🗄️ Supabase Status</button>
-      </div>
       <div class="service-grid" id="statusServiceGrid"></div>
       <div class="card">
-        <div class="card-header"><span class="card-title" id="statusTableTitle">Recent Uptime Log — Live Status</span></div>
+        <div class="card-header"><span class="card-title" id="statusTableTitle">Recent Uptime Log</span></div>
         <table><thead><tr><th>Service</th><th>Status</th><th>Response</th><th>Status Code</th><th>Checked</th></tr></thead>
         <tbody id="statusUptimeTable"></tbody></table>
       </div>
@@ -937,7 +928,7 @@ const renderServiceGrid = (logs, gridId, envFilter) => {
     return;
   }
   document.getElementById(gridId).innerHTML = cards.map(c => `
-    <div class="service-card ${c.is_up ? 'up' : 'down'}">
+    <div class="service-card ${c.is_up ? 'up' : 'down'}" data-skey="${escHtml(c.service_key)}" onclick="selectStatusCard('${escHtml(c.service_key)}')">
       <div class="sc-header">
         <span class="sc-name">${escHtml(c.service_name)}</span>
         <span class="sc-badge ${c.is_up ? 'up' : 'down'}">${c.is_up ? '● UP' : '● DOWN'}</span>
@@ -966,28 +957,26 @@ const renderUptimeTable = (logs, tbodyId, envFilter) => {
     </tr>`).join('');
 };
 
-// ── Status sub-tab ──────────────────────────────────────────────────────────
-let _activeStatusKey = 'mint-live';
-const STATUS_LABELS = {
-  'mint-live': 'Live Status',
-  'mint-dev':  'Dev Status',
-  'crm':       'CRM Admin Status',
-  'supabase':  'Supabase Status'
+// ── Status tab (card-click to filter) ───────────────────────────────────────
+let _activeStatusKey = null;
+
+const selectStatusCard = (key) => {
+  _activeStatusKey = key;
+  document.querySelectorAll('#statusServiceGrid .service-card').forEach(el => {
+    el.classList.toggle('selected', el.dataset.skey === key);
+  });
+  const logs = _uptimeLogs.filter(l => l.service_key === key);
+  renderUptimeTable(logs, 'statusUptimeTable', null);
+  const titleEl = document.getElementById('statusTableTitle');
+  if (titleEl) titleEl.textContent = `Recent Uptime Log — ${logs[0]?.service_name || key}`;
 };
 
 const renderStatusSubTab = () => {
-  const logs = _uptimeLogs.filter(l => l.service_key === _activeStatusKey);
-  renderServiceGrid(logs, 'statusServiceGrid', null);
-  renderUptimeTable(logs, 'statusUptimeTable', null);
-  const titleEl = document.getElementById('statusTableTitle');
-  if (titleEl) titleEl.textContent = `Recent Uptime Log — ${STATUS_LABELS[_activeStatusKey] || _activeStatusKey}`;
-};
-
-const switchStatusTab = (key, btn) => {
-  _activeStatusKey = key;
-  document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  renderStatusSubTab();
+  renderServiceGrid(_uptimeLogs, 'statusServiceGrid', null);
+  // Auto-select first card if nothing selected yet
+  const firstKey = _uptimeLogs.length ? _uptimeLogs[0].service_key : null;
+  const keyToSelect = _activeStatusKey || firstKey;
+  if (keyToSelect) selectStatusCard(keyToSelect);
 };
 
 const loadStatusData = async () => {
