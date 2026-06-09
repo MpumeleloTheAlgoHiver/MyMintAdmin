@@ -478,7 +478,7 @@
       /* Fetch active buy holdings with created_at for inception date */
       const { data: holdings } = await supabaseClient
         .from('stock_holdings_c')
-        .select('user_id, strategy_id, security_id, quantity, avg_fill, market_value, created_at, as_of_date')
+        .select('user_id, strategy_id, security_id, quantity, avg_fill, market_value, created_at, as_of_date, transaction_id')
         .eq('is_active', true)
         .eq('trade_side', 'BUY');
 
@@ -488,7 +488,7 @@
       const secIds     = [...new Set(holdings.map(r => r.security_id).filter(Boolean))];
 
       /* Fetch profiles, transactions, and live security prices in parallel */
-      const [{ data: profiles }, { data: txnRows }, { data: secPrices }] = await Promise.all([
+      const [{ data: profiles }, { data: txnRows }, { data: secPrices }, { data: residualRows }, { data: closedRows }] = await Promise.all([
         supabaseClient.from('profiles').select('id, first_name, last_name, email').in('id', userIds),
         supabaseClient
           .from('transactions')
@@ -500,8 +500,74 @@
         supabaseClient
           .from('securities_c')
           .select('id, last_price, AsOfTime')
-          .in('id', secIds)
+          .in('id', secIds),
+        /* Residual cash from rebalances — counts toward current value (same as the app) */
+        supabaseClient
+          .from('strategy_rebalance_residuals')
+          .select('user_id, balance_cents')
+          .in('user_id', userIds),
+        /* Closed positions carry realised P&L: (avg_exit − avg_fill) × qty (same basis as app + returns job) */
+        supabaseClient
+          .from('stock_holdings_c')
+          .select('user_id, quantity, avg_fill, avg_exit, transaction_id')
+          .eq('is_active', false)
+          .in('user_id', userIds)
       ]);
+
+      /* Residual cash + accumulated realised P&L per user (rands) */
+      const residualByUser = {};
+      (residualRows || []).forEach(r => {
+        if (!r.user_id) return;
+        residualByUser[r.user_id] = (residualByUser[r.user_id] || 0) + Number(r.balance_cents || 0) / 100;
+      });
+      const realizedByUser = {};
+      (closedRows || []).forEach(r => {
+        const f = Number(r.avg_fill) || 0, e = Number(r.avg_exit) || 0, q = Number(r.quantity) || 0;
+        if (!f || !e || !q) return;
+        realizedByUser[r.user_id] = (realizedByUser[r.user_id] || 0) + ((e - f) / 100) * q;
+      });
+
+      /* Held 8% buffer (cash element) per user, from the holdings' funding
+         transactions (each counted once, remaining = charged − slippage consumed). */
+      const fundTxnIds = [...new Set([...(holdings || []), ...(closedRows || [])].map(r => r.transaction_id).filter(Boolean))];
+      const bufferByUser = {};
+      if (fundTxnIds.length) {
+        const { data: fundTxns } = await supabaseClient
+          .from('transactions')
+          .select('id, user_id, buffer_cents, buffer_consumed_cents')
+          .in('id', fundTxnIds);
+        (fundTxns || []).forEach(t => {
+          const buf = Number(t.buffer_cents || 0) - Number(t.buffer_consumed_cents || 0);
+          bufferByUser[t.user_id] = (bufferByUser[t.user_id] || 0) + buf / 100;
+        });
+      }
+
+      /* Stable deployed cost per user, anchored to the EOD returns snapshot — the
+         SAME basis the Mint app uses, so app and CRM agree. Per strategy:
+         deployed = (basket + residual) − inception_pnl; summed across the user's
+         strategies (latest row per strategy). Robust where transaction amounts are
+         missing/0, and excludes the upfront fee (performance view). */
+      /* Only aggregate strategies the user CURRENTLY holds (active holdings) —
+         otherwise old/exited strategies in the returns history inflate invested
+         while `current` (live active holdings) doesn't include them. */
+      const activeStratByUser = {};
+      (holdings || []).forEach(r => {
+        if (r.user_id && r.strategy_id) (activeStratByUser[r.user_id] = activeStratByUser[r.user_id] || new Set()).add(r.strategy_id);
+      });
+      const { data: retRows } = await supabaseClient
+        .from('client_strategy_returns_c')
+        .select('user_id, strategy_id, basket_value, inception_pnl, as_of_date')
+        .in('user_id', userIds)
+        .order('as_of_date', { ascending: false });
+      const seenRet = {}, basketByUser = {}, inceptionByUser = {};
+      (retRows || []).forEach(r => {
+        const k = r.user_id + '|' + r.strategy_id;
+        if (seenRet[k]) return;       /* keep latest row per user+strategy */
+        seenRet[k] = 1;
+        if (!activeStratByUser[r.user_id]?.has(r.strategy_id)) return;  /* held strategies only */
+        basketByUser[r.user_id] = (basketByUser[r.user_id] || 0) + Number(r.basket_value || 0) / 100;
+        if (r.inception_pnl != null) inceptionByUser[r.user_id] = (inceptionByUser[r.user_id] || 0) + Number(r.inception_pnl) / 100;
+      });
 
       const profMap = {};
       (profiles || []).forEach(p => { profMap[p.id] = p; });
@@ -574,13 +640,29 @@
           || (u.inceptionDate ? u.inceptionDate.split('T')[0] : null);
         const days = inceptionDate ? Math.floor((Date.now() - new Date(inceptionDate)) / 86400000) : 0;
 
-        /* ── Live price-based P&L (matches Mint app real-time data) ── */
-        const currentVal = u.current;
-        const base       = u.costBasis > 0 ? u.costBasis : (txnInvested[u.userId] || 0);
-        const pnl        = +(currentVal - base).toFixed(2);
-        const returnPct  = base > 0 ? +((pnl / base) * 100).toFixed(2) : 0;
+        /* ── Stable money-in → money-out P&L (matches the Mint app) ──
+           invested = base + held 8% buffer the user deployed (EXCLUDES the upfront
+           fee, matching the app's performance view), NOT recomputed from the cost
+           of only the shares still held (which drifts on rebalances). Current value
+           includes the strategy's cash element (rebalance residual + buffer), so a
+           rebalance doesn't look like a loss and the buffer shows as cash. */
+        const residualVal = residualByUser[u.userId] || 0;
+        const bufferVal   = bufferByUser[u.userId] || 0;
+        const cashElement = +(residualVal + bufferVal).toFixed(2);
+        const currentVal  = +(u.current + cashElement).toFixed(2);
+        /* invested = deployed (basket + residual − inception_pnl) + buffer. Buffer
+           is pass-through (in both invested and current), so it shows as cash
+           without creating P&L. Falls back to cost basis if no returns snapshot. */
+        const deployedBase = basketByUser[u.userId] != null
+          ? (basketByUser[u.userId] + residualVal - (inceptionByUser[u.userId] || 0))
+          : u.costBasis;
+        const invested    = +((deployedBase + bufferVal)).toFixed(2);
+        const pnl         = +(currentVal - invested).toFixed(2);
+        const returnPct   = invested > 0 ? +((pnl / invested) * 100).toFixed(2) : 0;
 
-        const invested = u.costBasis;   /* cost basis = investor's principal in NAV model */
+        /* Split into realised (locked in from sells) + unrealised (open positions) */
+        const realized   = +((realizedByUser[u.userId] || 0).toFixed(2));
+        const unrealized = +((pnl - realized).toFixed(2));
 
         /* Geometric annualisation: ((1 + r)^(365/days) − 1) × 100 */
         const annualised = days > 30
@@ -599,7 +681,12 @@
           valueFull: currentVal,
           invested,
           current: currentVal,
+          residualCash: residualVal,
+          bufferCash: bufferVal,
+          cashElement,
           pnl,
+          realized,
+          unrealized,
           returnPct,
           days,
           annualised,
@@ -616,6 +703,8 @@
       const aum  = investors.reduce((s, i) => s + (i.current || 0), 0);
       const inv  = investors.reduce((s, i) => s + (i.invested || 0), 0);
       const pnl  = aum - inv;
+      const realised   = investors.reduce((s, i) => s + (i.realized || 0), 0);
+      const unrealised = investors.reduce((s, i) => s + (i.unrealized || 0), 0);
       const avg  = investors.length ? investors.reduce((s, i) => s + i.returnPct, 0) / investors.length : 0;
       const sorted = [...investors].sort((a, b) => b.returnPct - a.returnPct);
       const best = sorted[0];
@@ -624,6 +713,8 @@
         { l: 'TOTAL AUM',       v: fmtR(aum),    c: '#0f172a' },
         { l: 'TOTAL INVESTED',  v: fmtR(inv),     c: '#64748b' },
         { l: 'TOTAL P&L',       v: (pnl >= 0 ? '+' : '') + fmtR(pnl), c: pnl >= 0 ? '#059669' : '#dc2626' },
+        { l: 'REALISED P&L',    v: (realised >= 0 ? '+' : '') + fmtR(realised), c: realised >= 0 ? '#059669' : '#dc2626' },
+        { l: 'UNREALISED P&L',  v: (unrealised >= 0 ? '+' : '') + fmtR(unrealised), c: unrealised >= 0 ? '#059669' : '#dc2626' },
         { l: 'AVG RETURN',      v: fmtPct(avg),   c: avg >= 0 ? '#059669' : '#dc2626' },
         { l: 'BEST PERFORMER',  v: best  ? `${best.name.split(' ')[0]} ${fmtPct(best.returnPct)}`  : '—', c: '#059669' },
         { l: 'WORST PERFORMER', v: worst ? `${worst.name.split(' ')[0]} ${fmtPct(worst.returnPct)}` : '—', c: '#dc2626' }
@@ -929,7 +1020,10 @@
             return [
               { l: 'INVESTED',   v: fmtR(inv.invested),                                                   s: neutral,   note: null         },
               { l: 'VALUE',      v: fmtR(inv.current),                                                    s: neutral,   note: liveTimeStr  },
+              { l: 'CASH',       v: fmtR(inv.cashElement ?? 0),                                           s: neutral,   note: null         },
               { l: 'P&L',        v: (pnlPos ? '+' : '') + fmtR(inv.pnl),                                  s: fc(pnlPos),note: null         },
+              { l: 'REALISED',   v: ((inv.realized ?? 0) >= 0 ? '+' : '') + fmtR(inv.realized ?? 0),      s: fc((inv.realized ?? 0) >= 0),   note: null },
+              { l: 'UNREALISED', v: ((inv.unrealized ?? 0) >= 0 ? '+' : '') + fmtR(inv.unrealized ?? 0),  s: fc((inv.unrealized ?? 0) >= 0), note: null },
               { l: 'DAYS',       v: inv.days ?? '—',                                                      s: neutral,   note: null         },
               { l: 'ANNUALISED', v: fmtPct(inv.annualised),                                               s: fc(annPos),note: null         },
               { l: 'MAX DD',     v: maxDDStr,                                                              s: ddVal != null ? fc(ddVal >= 0) : neutral, note: null }
