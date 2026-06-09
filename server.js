@@ -9,7 +9,7 @@ const teamHandler = require('./api/team');
 const mintMorningsHandler = require('./api/mint-mornings');
 const webhooksHandler = require('./api/webhooks');
 const cyberComplianceHandler = require('./api/cyber-compliance');
-const { runHealthCheck } = require('./api/monitor/health-check');
+const { runHealthCheck } = require('./api/monitor/_health-check');
 
 const port = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, 'public');
@@ -2149,7 +2149,7 @@ const server = http.createServer((req, res) => {
           const savedRows = await mutateSupabaseJson('/rest/v1/cc_incidents', incident, null, 'POST');
           // Send alert email for all high/critical client incidents
           try {
-            const { sendAlertEmail } = require('./api/monitor/health-check');
+            const { sendAlertEmail } = require('./api/monitor/_health-check');
             const saved = Array.isArray(savedRows) ? savedRows[0] : incident;
             sendAlertEmail(saved || incident).catch(() => {});
           } catch {}

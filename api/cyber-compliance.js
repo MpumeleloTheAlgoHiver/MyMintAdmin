@@ -144,7 +144,7 @@ module.exports = async (req, res) => {
       // Send alert email for all new high/critical incidents
       if (['high', 'critical'].includes(payload.priority)) {
         try {
-          const { sendAlertEmail } = require('./monitor/health-check');
+          const { sendAlertEmail } = require('./monitor/_health-check');
           sendAlertEmail(created || payload).catch(() => {});
         } catch {}
       }
@@ -701,7 +701,7 @@ module.exports = async (req, res) => {
     if (action === 'run-health-check') {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'POST required' });
       try {
-        const { runHealthCheck } = require('./monitor/health-check');
+        const { runHealthCheck } = require('./monitor/_health-check');
         runHealthCheck().catch(e => console.error('[CC] On-demand health check error:', e?.message));
         return sendJson(res, 200, { ok: true, message: 'Health check started — results available in 10–30s' });
       } catch (e) {
