@@ -584,7 +584,7 @@
         const value = holdingsValue + cashComponent;
         return {
           type: isStrategy ? 'strategy' : 'security',
-          userId: u.userId, investorKey, familyMemberId: u.familyMemberId, isMinor: !!u.familyMemberId, name, email: prof.email, mintNo: prof.mint_number, computershareNumber: prof.computershare_number || null,
+          userId: u.userId, investorKey, familyMemberId: u.familyMemberId, isMinor: !!u.familyMemberId, name, email: prof.email, mintNo: prof.mint_number, computershareNumber: (u.familyMemberId ? (famMap[u.familyMemberId] || {}).computershare_number : prof.computershare_number) || null,
           strategy: strat.short_name || strat.name || (isStrategy ? '&mdash;' : 'Direct securities'), strategyId: u.strategyId,
           strategyDesc: strat.description, riskLevel: strat.risk_level,
           invested, current, pnl, retPct: +retPct.toFixed(2),

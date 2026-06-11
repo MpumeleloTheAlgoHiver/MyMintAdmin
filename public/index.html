@@ -6907,6 +6907,12 @@
             sep.style.display = parts.length ? '' : 'none';
           }
         });
+        // Computershare / MP number for the child (from family_members).
+        const childCsNum = String(child.computershare_number || '').trim();
+        clone.querySelectorAll('[data-row-cs]').forEach(el => {
+          el.textContent = childCsNum;
+          el.style.display = childCsNum ? '' : 'none';
+        });
 
         // KYC badge &rarr; show child KYC status
         const childCertStatus = normalizeChildCertificateStatus(child.certificate_verification_status || 'pending');
@@ -8581,7 +8587,7 @@
           const [familyRes, familyTxRes] = await Promise.all([
             supabaseClient
               .from('family_members')
-              .select('id, primary_user_id, parent_id, linked_user_id, relationship, first_name, last_name, gender, date_of_birth, id_number, available_balance, avatar_url, avatar_color, mint_number, spouse_email, certificate_url, certificate_verification_status, kyc_status, kyc_reviewed_by, kyc_reviewed_at, created_at, updated_at')
+              .select('id, primary_user_id, parent_id, linked_user_id, relationship, first_name, last_name, gender, date_of_birth, id_number, available_balance, avatar_url, avatar_color, mint_number, computershare_number, spouse_email, certificate_url, certificate_verification_status, kyc_status, kyc_reviewed_by, kyc_reviewed_at, created_at, updated_at')
               .order('created_at', { ascending: false }),
             supabaseClient
               .from('family_transactions')

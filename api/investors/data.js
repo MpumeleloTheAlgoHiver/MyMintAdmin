@@ -111,7 +111,7 @@ module.exports = async (req, res) => {
         ? sbGet(`transactions?select=id,user_id,family_member_id,amount,direction,name,description,status,transaction_date,broker_fee_cents,isin_fee_cents,transaction_fee_cents,base_amount_cents,buffer_cents,buffer_consumed_cents&user_id=in.(${userIds.join(',')})&order=transaction_date.desc`)
         : Promise.resolve([]),
       famIds.length
-        ? sbGet(`family_members?select=id,first_name,last_name&id=in.(${famIds.join(',')})`)
+        ? sbGet(`family_members?select=id,first_name,last_name,computershare_number&id=in.(${famIds.join(',')})`)
         : Promise.resolve([]),
       /* Execution-reserve (8% buffer) ledger — the per-event audit trail of how
          each transaction's buffer was consumed (slippage_drawdown / shortfall)
