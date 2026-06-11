@@ -6895,17 +6895,12 @@
         setText(clone, '[data-website]', '-');
         setText(clone, '[data-phone]', '-');
 
-        // Row subtitle for child card
+        // Row subtitle for child card — keep it minimal like the parent rows:
+        // just the UID line + the MP number below. Gender/age/parent live in the detail.
         clone.querySelectorAll('[data-row-email]').forEach(el => {
-          const parts = [];
-          if (childGender) parts.push(childGender);
-          if (currentAge !== null) parts.push(`Age: ${currentAge}`);
-          if (parentLinks.length) parts.push(`Parent: ${parentSummary}`);
-          el.textContent = parts.join(' &middot; ') || '';
+          el.textContent = '';
           const sep = el.nextElementSibling;
-          if (sep && sep.classList.contains('simple-uid-sep')) {
-            sep.style.display = parts.length ? '' : 'none';
-          }
+          if (sep && sep.classList.contains('simple-uid-sep')) sep.style.display = 'none';
         });
         // Computershare / MP number for the child (from family_members).
         const childCsNum = String(child.computershare_number || '').trim();
@@ -6981,6 +6976,7 @@
               { label: 'Current Age', value: currentAge !== null ? String(currentAge) : '-' },
               { label: 'ID Number', value: child.id_number || '-' },
               { label: 'Mint Number', value: child.mint_number || '-' },
+              { label: 'Computershare Number', value: child.computershare_number || '-' },
               { label: 'Balance', value: child.available_balance != null ? `R ${(Number(child.available_balance) / 100).toFixed(2)}` : 'R 0.00' },
               { label: 'Certificate Status', value: certificateLabel },
               { label: 'Created', value: child.created_at || '-' },
