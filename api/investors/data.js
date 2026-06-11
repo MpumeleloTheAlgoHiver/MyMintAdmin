@@ -88,7 +88,7 @@ module.exports = async (req, res) => {
 
     const [profiles, secMeta, secReturns, secIntraday, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches] = await Promise.all([
       userIds.length
-        ? sbGet(`profiles?select=id,first_name,last_name,email,mint_number&id=in.(${userIds.join(',')})`)
+        ? sbGet(`profiles?select=id,first_name,last_name,email,mint_number,computershare_number&id=in.(${userIds.join(',')})`)
         : Promise.resolve([]),
       secIds.length
         ? sbGet(`securities_c?select=id,symbol,name,sector,logo_url&id=in.(${secIds.join(',')})`)

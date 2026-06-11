@@ -4333,6 +4333,7 @@
                   <span class="simple-uid-sep" aria-hidden="true">&middot;</span>
                   <span class="simple-uid" data-uid>UID: AA-0000-XX</span>
                 </div>
+                <div class="simple-row-cs" data-row-cs style="display:none;font-size:11px;font-weight:600;color:#0e7490;font-family:ui-monospace,monospace;margin-top:2px;letter-spacing:0.04em;"></div>
               </div>
             </div>
             <div class="simple-mid">
@@ -6681,6 +6682,12 @@
           if (sep && sep.classList.contains('simple-uid-sep')) {
             sep.style.display = profile.email ? '' : 'none';
           }
+        });
+        // Computershare / MP number — shown under the email when the client has one.
+        const csNum = String(profile.computershare_number || '').trim();
+        clone.querySelectorAll('[data-row-cs]').forEach(el => {
+          el.textContent = csNum;
+          el.style.display = csNum ? '' : 'none';
         });
         clone.querySelectorAll('[data-row-kyc]').forEach(el => {
           el.textContent = effectiveKycState.label;
