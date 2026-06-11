@@ -9943,10 +9943,6 @@
     const refreshAndDownloadPackZip = async (item) => {
       const externalUserId = item?.dataset?.externalUserId;
       const profileId = item?.dataset?.profileId;
-      if (!externalUserId) {
-        console.warn('No Sumsub external user id found for this profile.');
-        return;
-      }
 
       const JsZip = window.JSZip;
       if (!JsZip) {
@@ -9954,50 +9950,88 @@
         return;
       }
 
-      const applicant = await fetchApplicantByExternalId(externalUserId);
-      await persistPackForProfile(item, applicant);
-
-      const applicantId = applicant?.id || applicant?.applicantId || applicant?.applicant_id;
-      if (!applicantId) {
-        throw new Error('No applicantId found in Sumsub response.');
-      }
-
-      const metadata = await fetchApplicantMetadata(applicantId);
-      const inspectionId = applicant?.inspectionId || applicant?.review?.inspectionId || findFirstValueByKeys(applicant, ['inspectionId']);
-      const items = resolveMetadataItems(metadata);
-
-      const safeBase = sanitizeFilename(externalUserId || profileId || applicantId || 'pack') || 'pack';
+      const safeBase = sanitizeFilename(externalUserId || profileId || 'pack') || 'pack';
       const zip = new JsZip();
-      zip.file(`sumsub-${safeBase}.json`, JSON.stringify(applicant, null, 2));
-      const pdfSections = buildCompletePackSections(applicant);
-      const pdfReport = buildPackPdfReport(applicant, pdfSections, getJsPdfConstructor());
-      if (pdfReport) {
-        zip.file(pdfReport.filename, pdfReport.doc.output('blob'));
+      const docsFolder = zip.folder('documents');
+      const usedNames = new Map();
+      const uniqueName = (folder, baseName) => {
+        const key = folder + '/' + baseName;
+        const count = usedNames.get(key) || 0;
+        usedNames.set(key, count + 1);
+        if (count === 0) return baseName;
+        const ext = baseName.match(/(\.[^.]*)$/)?.[1] || '';
+        return `${baseName.replace(/(\.[^.]*)?$/, '')}-${count + 1}${ext}`;
+      };
+
+      // 1) Sumsub pack JSON + PDF + live documents (only when the profile is linked).
+      if (externalUserId) {
+        try {
+          const applicant = await fetchApplicantByExternalId(externalUserId);
+          await persistPackForProfile(item, applicant);
+          zip.file(`sumsub-${safeBase}.json`, JSON.stringify(applicant, null, 2));
+          const pdfSections = buildCompletePackSections(applicant);
+          const pdfReport = buildPackPdfReport(applicant, pdfSections, getJsPdfConstructor());
+          if (pdfReport) zip.file(pdfReport.filename, pdfReport.doc.output('blob'));
+
+          const applicantId = applicant?.id || applicant?.applicantId || applicant?.applicant_id;
+          if (applicantId) {
+            const metadata = await fetchApplicantMetadata(applicantId);
+            const inspectionId = applicant?.inspectionId || applicant?.review?.inspectionId || findFirstValueByKeys(applicant, ['inspectionId']);
+            const items = resolveMetadataItems(metadata);
+            if (inspectionId && items.length) {
+              const sumsubFolder = docsFolder.folder('sumsub');
+              await Promise.all(items.map(async (docItem, index) => {
+                const imageId = resolveImageId(docItem);
+                if (!imageId) return;
+                try {
+                  const blob = await fetchApplicantImage(inspectionId, imageId);
+                  sumsubFolder.file(uniqueName('sumsub', resolveDocumentFileName(docItem, index)), blob);
+                } catch (error) { console.error('Sumsub doc download failed:', error); }
+              }));
+            }
+          }
+        } catch (e) { console.error('Sumsub pack fetch failed:', e); }
       }
 
-      if (inspectionId && items.length) {
-        const docsFolder = zip.folder('documents');
-        const usedNames = new Map();
+      // 2) Archived documents (Experian + archived Sumsub) via the service-role endpoint.
+      if (profileId) {
+        try {
+          const archived = await fetchArchivedSumsubDocuments(profileId);
+          await Promise.all((archived || []).map(async (row) => {
+            if (!row?.signed_url) return;
+            const meta = row.resource_metadata || {};
+            const provider = String(meta.provider || meta.source || '').toLowerCase();
+            const folderName = provider.includes('experian') ? 'experian' : 'sumsub-archive';
+            try {
+              const resp = await fetch(row.signed_url);
+              if (!resp.ok) return;
+              const blob = await resp.blob();
+              const name = sanitizeFilename(row.file_name || meta.kind || row.image_id || 'document') || 'document';
+              docsFolder.folder(folderName).file(uniqueName(folderName, name), blob);
+            } catch (error) { console.error('Archive doc download failed:', error); }
+          }));
+        } catch (e) { console.error('Archive docs fetch failed:', e); }
+      }
 
-        const fetchPromises = items.map(async (docItem, index) => {
-          const imageId = resolveImageId(docItem);
-          if (!imageId) return;
-
-          try {
-            const blob = await fetchApplicantImage(inspectionId, imageId);
-            const baseName = resolveDocumentFileName(docItem, index);
-            const duplicateCount = usedNames.get(baseName) || 0;
-            usedNames.set(baseName, duplicateCount + 1);
-            const finalName = duplicateCount === 0
-              ? baseName
-              : `${baseName.replace(/(\.[^.]*)?$/, '')}-${duplicateCount + 1}${baseName.match(/(\.[^.]*)$/)?.[1] || ''}`;
-            docsFolder.file(finalName, blob);
-          } catch (error) {
-            console.error('Document download failed:', error);
-          }
-        });
-
-        await Promise.all(fetchPromises);
+      // 3) Signed documents (signed agreements + bank confirmations).
+      if (profileId) {
+        try {
+          const { data: files } = await supabaseClient.storage
+            .from('signed-agreements')
+            .list(profileId, { limit: 100, sortBy: { column: 'name', order: 'desc' } });
+          const signedFolder = docsFolder.folder('signed');
+          await Promise.all((files || []).map(async (f) => {
+            if (!f?.name || !(f.id || f.metadata)) return;
+            try {
+              const url = await resolveBucketObjectUrl('signed-agreements', `${profileId}/${f.name}`);
+              if (!url) return;
+              const resp = await fetch(url);
+              if (!resp.ok) return;
+              const blob = await resp.blob();
+              signedFolder.file(uniqueName('signed', sanitizeFilename(f.name) || 'signed.pdf'), blob);
+            } catch (error) { console.error('Signed doc download failed:', error); }
+          }));
+        } catch (e) { console.error('Signed docs fetch failed:', e); }
       }
 
       const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -10195,15 +10229,10 @@
 
         if (tab.dataset.pack === 'true') {
           const item = tab.closest('.simple-item');
-          const externalUserId = item?.dataset?.externalUserId;
-          if (!externalUserId) {
-            console.warn('No Sumsub external user id found for this profile.');
-            return;
-          }
           if (tab.classList.contains('is-loading')) return;
           tab.classList.add('is-loading');
           refreshAndDownloadPackZip(item)
-            .catch(err => console.error('Sumsub error:', err))
+            .catch(err => console.error('Pack download error:', err))
             .finally(() => {
               tab.classList.remove('is-loading');
             });
@@ -10283,7 +10312,30 @@
               }
             }
 
-            // 3) Render both providers as separate, labelled sections in one modal.
+            // 3) Signed documents (signed agreements / bank confirmations) by profile id.
+            const signedDocs = [];
+            if (profileId) {
+              try {
+                const { data: files } = await supabaseClient.storage
+                  .from('signed-agreements')
+                  .list(profileId, { limit: 100, sortBy: { column: 'name', order: 'desc' } });
+                for (const f of (files || [])) {
+                  if (!f?.name || !(f.id || f.metadata)) continue; // skip folders
+                  const url = await resolveBucketObjectUrl('signed-agreements', `${profileId}/${f.name}`);
+                  const label = /^agreement/i.test(f.name) ? 'Account agreement'
+                    : /^bank-confirmation/i.test(f.name) ? 'Bank confirmation'
+                    : prettify(f.name.replace(/\.[^.]+$/, ''));
+                  signedDocs.push({
+                    id: 'signed-' + f.name,
+                    fileMetadata: { fileName: label, fileType: 'PDF' },
+                    addedDate: String(f.updated_at || f.created_at || '').slice(0, 10),
+                    archivedUrl: url,
+                  });
+                }
+              } catch (e) { console.error('Signed docs load failed:', e); }
+            }
+
+            // 4) Render every source as separate, labelled sections in one modal.
             const sumsubCombined = [...archivedSumsubDocs, ...liveSumsubItems];
             const combined = [];
             combined.push({ __divider: 'Experian documents', __count: experianDocs.length });
@@ -10292,6 +10344,9 @@
             combined.push({ __divider: 'Sumsub documents', __count: sumsubCombined.length });
             if (sumsubCombined.length) combined.push(...sumsubCombined);
             else combined.push({ __empty: 'No Sumsub documents found for this user.' });
+            combined.push({ __divider: 'Signed documents', __count: signedDocs.length });
+            if (signedDocs.length) combined.push(...signedDocs);
+            else combined.push({ __empty: 'No signed documents found for this user.' });
 
             openImageModal(liveInspectionId, combined);
           })();
