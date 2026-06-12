@@ -15,7 +15,17 @@ module.exports = async (req, res) => {
     return sendJson(res, 401, { error: 'Missing Authorization bearer token' });
   }
 
-  const wallet_id = req.query.wallet_id;
+  let wallet_id;
+  if (req.query && req.query.wallet_id) {
+    wallet_id = req.query.wallet_id;
+  } else {
+    // Parse from URL for local dev where req.query is undefined
+    try {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      wallet_id = url.searchParams.get('wallet_id');
+    } catch(e) {}
+  }
+
   if (!wallet_id) {
     return sendJson(res, 400, { error: 'Missing wallet_id' });
   }
