@@ -30,7 +30,7 @@ module.exports = async (req, res) => {
       fetch(`${supabaseUrl}/rest/v1/${path}`, { headers: sbH }).then((r) => r.json());
 
     const [holdings, strategies] = await Promise.all([
-      sbGet('stock_holdings_c?select=user_id,family_member_id,security_id,strategy_id,quantity,avg_fill,expected_fill:%22Expected_fill%22,market_value,created_at&is_active=eq.true&trade_side=eq.BUY'),
+      sbGet('stock_holdings_c?select=user_id,family_member_id,security_id,strategy_id,quantity,avg_fill,expected_fill:%22Expected_fill%22,market_value,transaction_id,created_at&is_active=eq.true&trade_side=eq.BUY'),
       sbGet('strategies_c?select=id,name,short_name,description,risk_level,sector'),
     ]);
 
@@ -88,7 +88,7 @@ module.exports = async (req, res) => {
 
     const [profiles, secMeta, secReturns, secIntraday, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches] = await Promise.all([
       userIds.length
-        ? sbGet(`profiles?select=id,first_name,last_name,email,mint_number&id=in.(${userIds.join(',')})`)
+        ? sbGet(`profiles?select=id,first_name,last_name,email,mint_number,computershare_number&id=in.(${userIds.join(',')})`)
         : Promise.resolve([]),
       secIds.length
         ? sbGet(`securities_c?select=id,symbol,name,sector,logo_url&id=in.(${secIds.join(',')})`)
@@ -111,7 +111,7 @@ module.exports = async (req, res) => {
         ? sbGet(`transactions?select=id,user_id,family_member_id,amount,direction,name,description,status,transaction_date,broker_fee_cents,isin_fee_cents,transaction_fee_cents,base_amount_cents,buffer_cents,buffer_consumed_cents&user_id=in.(${userIds.join(',')})&order=transaction_date.desc`)
         : Promise.resolve([]),
       famIds.length
-        ? sbGet(`family_members?select=id,first_name,last_name&id=in.(${famIds.join(',')})`)
+        ? sbGet(`family_members?select=id,first_name,last_name,computershare_number&id=in.(${famIds.join(',')})`)
         : Promise.resolve([]),
       /* Execution-reserve (8% buffer) ledger — the per-event audit trail of how
          each transaction's buffer was consumed (slippage_drawdown / shortfall)

@@ -8,6 +8,8 @@ const sumsubArchiveHandler = require('./api/sumsub/archive');
 const teamHandler = require('./api/team');
 const mintMorningsHandler = require('./api/mint-mornings');
 const webhooksHandler = require('./api/webhooks');
+const cyberComplianceHandler = require('./api/cyber-compliance');
+const { runHealthCheck } = require('./api/monitor/_health-check');
 
 const port = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, 'public');
@@ -2138,6 +2140,116 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Cyber Compliance & Monitoring Centre
+  if (req.url.startsWith('/api/cyber-compliance')) {
+    const token = parseBearerToken(req.headers.authorization);
+    if (!token) { sendJson(res, 401, { error: 'Missing Authorization bearer token' }); return; }
+    (async () => {
+      try {
+        await fetchSupabaseJson('/auth/v1/user', token, false);
+        if (req.method !== 'GET') {
+          req.body = await readJsonBody(req).catch(() => ({}));
+        }
+        await cyberComplianceHandler(req, res);
+      } catch (err) {
+        if (!res.headersSent) sendJson(res, err.status || 500, { error: err.message });
+      }
+    })();
+    return;
+  }
+
+  // Client error reporting endpoint (no auth — public, IP rate-limited: 30 req/min)
+  if (req.url.startsWith('/api/monitor/client-error')) {
+    // CORS — allow browser POST from Mint client domains
+    const ALLOWED_ORIGINS = [
+      'https://app.mymint.co.za',
+      'https://mint-development.vercel.app',
+      'https://www.mymint.co.za'
+    ];
+    const reqOrigin = req.headers.origin || '';
+    const corsOrigin = ALLOWED_ORIGINS.includes(reqOrigin) ? reqOrigin : ALLOWED_ORIGINS[0];
+    res.setHeader('Access-Control-Allow-Origin',  corsOrigin);
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Vary', 'Origin');
+
+    // Handle preflight
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    if (req.method !== 'POST') { sendJson(res, 405, { error: 'Method not allowed' }); return; }
+
+    // IP rate limiter — 30 requests per minute per IP
+    const clientIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
+    const _now = Date.now();
+    if (!global._ceRateMap) global._ceRateMap = new Map();
+    const ipEntry = global._ceRateMap.get(clientIp) || { count: 0, windowStart: _now };
+    if (_now - ipEntry.windowStart > 60000) { ipEntry.count = 0; ipEntry.windowStart = _now; }
+    ipEntry.count++;
+    global._ceRateMap.set(clientIp, ipEntry);
+    // Cleanup old entries every ~1000 requests
+    if (global._ceRateMap.size > 5000) {
+      for (const [k, v] of global._ceRateMap) { if (_now - v.windowStart > 120000) global._ceRateMap.delete(k); }
+    }
+    if (ipEntry.count > 30) {
+      sendJson(res, 429, { error: 'Rate limit exceeded — max 30 requests per minute' });
+      return;
+    }
+
+    // Map client-facing category names to valid cc_incidents.category constraint values
+    const CLIENT_CATEGORY_MAP = {
+      auth:    'access',
+      kyc:     'security',
+      trade:   'api',
+      wallet:  'api',
+      ui:      'software',
+      network: 'network',
+      other:   'other'
+    };
+
+    (async () => {
+      try {
+        const body = await readJsonBody(req).catch(() => ({}));
+        const severity = String(body.severity || 'low');
+        const title    = String(body.title || 'Client error').slice(0, 200).trim();
+        if (!title) { sendJson(res, 400, { error: 'title required' }); return; }
+
+        if (['high', 'critical'].includes(severity) && supabaseUrl && supabaseServiceRoleKey) {
+          const rawCategory = String(body.category || 'other');
+          const dbCategory  = CLIENT_CATEGORY_MAP[rawCategory] || 'other';
+          const incident = {
+            title,
+            description:    [body.description, body.page ? `Page: ${body.page}` : null, body.error_stack ? `Stack: ${String(body.error_stack).slice(0, 500)}` : null].filter(Boolean).join('\n') || null,
+            priority:       severity === 'critical' ? 'critical' : 'high',
+            status:         'open',
+            category:       dbCategory,
+            environment:    body.source === 'mint-platform' ? 'live' : 'general',
+            auto_generated: true,
+            pending_resolve: false,
+            reported_by:    'Mint Platform (auto)',
+            service_key:    `client:${rawCategory}`,
+            created_at:     new Date().toISOString(),
+            updated_at:     new Date().toISOString()
+          };
+          const savedRows = await mutateSupabaseJson('/rest/v1/cc_incidents', incident, null, 'POST');
+          // Send alert email for all high/critical client incidents
+          try {
+            const { sendAlertEmail } = require('./api/monitor/_health-check');
+            const saved = Array.isArray(savedRows) ? savedRows[0] : incident;
+            sendAlertEmail(saved || incident).catch(() => {});
+          } catch {}
+        }
+        sendJson(res, 200, { ok: true });
+      } catch (err) {
+        sendJson(res, 500, { error: err.message });
+      }
+    })();
+    return;
+  }
+
   // Team management routes
   if (req.url.startsWith('/api/team')) {
     (async () => {
@@ -2210,6 +2322,18 @@ process.on('unhandledRejection', (reason) => {
   console.error('[Process] Unhandled promise rejection:', reason?.message || reason);
 });
 
+// ── Health check scheduler (every 15 minutes) ────────────────────────────────
+const startHealthCheckScheduler = () => {
+  const INTERVAL_MS = 15 * 60 * 1000;
+  setTimeout(() => {
+    runHealthCheck().catch(err => console.error('[HealthCheck] Startup run error:', err?.message || err));
+  }, 30000);
+  setInterval(() => {
+    runHealthCheck().catch(err => console.error('[HealthCheck] Scheduled run error:', err?.message || err));
+  }, INTERVAL_MS);
+  console.log('[HealthCheck] Scheduler started — running every 15 minutes');
+};
+
 const startServer = (portToUse) => {
   server.listen(portToUse, () => {
     console.log(`Server running at http://localhost:${portToUse}`);
@@ -2218,6 +2342,7 @@ const startServer = (portToUse) => {
     }
     startMarketDataScheduler();
     startMintMorningsScheduler();
+    startHealthCheckScheduler();
   });
 };
 

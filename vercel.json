@@ -3,8 +3,11 @@
   "framework": null,
   "outputDirectory": "public",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)", "destination": "/$1" }
+    { "source": "/(.*).html", "destination": "/public/$1.html" },
+    { "source": "/api/sumsub/image", "destination": "/api/sumsub/applicant" },
+    { "source": "/api/sumsub/metadata", "destination": "/api/sumsub/applicant" },
+    { "source": "/api/orderbook/archive-upsert", "destination": "/api/orderbook/archive" },
+    { "source": "/api/(.*)", "destination": "/api/$1" }
   ],
   "crons": [
     {
@@ -13,4 +16,3 @@
     }
   ]
 }
-
