@@ -4,7 +4,7 @@ const https = require('https');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const sumsubArchiveHandler = require('./api/sumsub/archive');
+const sumsubApplicantHandler = require('./api/sumsub/applicant');
 const teamHandler = require('./api/team');
 const mintMorningsHandler = require('./api/mint-mornings');
 const webhooksHandler = require('./api/webhooks');
@@ -1372,7 +1372,7 @@ const server = http.createServer((req, res) => {
           req.body = await readJsonBody(req);
         }
 
-        await sumsubArchiveHandler(req, res);
+        await sumsubApplicantHandler(req, res);
       } catch (error) {
         sendJson(res, 500, {
           error: 'Could not handle sumsub archive request',
@@ -1609,15 +1609,15 @@ const server = http.createServer((req, res) => {
   }
 
   if ((req.url.startsWith('/api/add-wallet') || req.url.startsWith('/api/send-eft-email')) && req.method === 'POST') {
-    return require('./api/send-eft-email')(req, res);
+    return require('./api/wallet')(req, res);
   }
 
   if (req.url.startsWith('/api/edit-wallet-balance') && req.method === 'POST') {
-    return require('./api/edit-wallet-balance')(req, res);
+    return require('./api/wallet')(req, res);
   }
 
   if (req.url.startsWith('/api/latest-wallet-transaction') && req.method === 'GET') {
-    return require('./api/latest-wallet-transaction')(req, res);
+    return require('./api/wallet')(req, res);
   }
 
   if (req.url.startsWith('/api/upload-wallet-payments') && req.method === 'POST') {

@@ -6,7 +6,12 @@
     { "source": "/(.*).html", "destination": "/public/$1.html" },
     { "source": "/api/sumsub/image", "destination": "/api/sumsub/applicant" },
     { "source": "/api/sumsub/metadata", "destination": "/api/sumsub/applicant" },
-    { "source": "/api/orderbook/archive-upsert", "destination": "/api/orderbook/archive" }
+    { "source": "/api/sumsub/archive", "destination": "/api/sumsub/applicant" },
+    { "source": "/api/orderbook/archive-upsert", "destination": "/api/orderbook/archive" },
+    { "source": "/api/send-eft-email", "destination": "/api/wallet" },
+    { "source": "/api/add-wallet", "destination": "/api/wallet" },
+    { "source": "/api/edit-wallet-balance", "destination": "/api/wallet" },
+    { "source": "/api/latest-wallet-transaction", "destination": "/api/wallet" }
   ],
   "crons": [
     {
