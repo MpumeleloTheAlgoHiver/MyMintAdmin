@@ -592,11 +592,13 @@ module.exports = async (req, res) => {
       }
     }
 
-    // APP-SETTINGS-GET — admin only. Returns a settings JSON blob by key
-    // (default 'fees') from the app_settings table.
+    // APP-SETTINGS-GET — any authenticated team member. Returns a settings JSON
+    // blob by key (default 'fees'). Read-only and non-sensitive (fee values), so
+    // staff pages (dashboard/investors rebalance) can read it; editing stays
+    // admin-only via app-settings-save.
     if (action === 'app-settings-get') {
       if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
-      const result = await requireAdmin(req, res);
+      const result = await requireAuth(req, res);
       if (!result) return;
       const key = (url.searchParams.get('key') || 'fees').trim();
       try {

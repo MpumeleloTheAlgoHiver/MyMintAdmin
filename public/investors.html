@@ -417,7 +417,7 @@
          + custody (R69 per ISIN side) never reach the transactions fee columns.
          We derive them here from settled, non-reversed rebalance_event rows so the
          Transactions tab can show "Rebalance fees" and the audit reconciles fully. */
-      const REB_BROKERAGE_RATE = 0.005, REB_CUSTODY_FEE = 69;
+      const REB_BROKERAGE_RATE = (APP_FEES && +APP_FEES.rebBrokerageRate) || 0.005, REB_CUSTODY_FEE = (APP_FEES && +APP_FEES.rebCustodyFee) || 69;
       const settledBatchIds = new Set((rebBatches||[]).filter(b => String(b.status||'').toUpperCase() === 'SETTLED').map(b => b.id));
       const rebFeeByOwner = {}; // key -> { broker, custody }
       const custodySeen = {};   // key -> Set of `${batch}:${reasonGroup}`
@@ -1226,6 +1226,21 @@
       `;
     }
 
+    /* ─── App fee config (rebalance fee reconciliation reads custody/brokerage
+       from app_settings('fees') so the CRM App Settings page controls them) ─── */
+    let APP_FEES = null;
+    async function loadAppFees() {
+      try {
+        const { data } = await sb.auth.getSession();
+        if (!data || !data.session || !data.session.access_token) return;
+        const res = await fetch('/api/team?action=app-settings-get&key=fees', {
+          headers: { Authorization: 'Bearer ' + data.session.access_token }
+        });
+        const j = await res.json();
+        if (j && j.value) APP_FEES = j.value;
+      } catch (e) { /* keep defaults */ }
+    }
+
     /* ─── Init ─── */
     document.addEventListener('DOMContentLoaded', async () => {
       try {
@@ -1238,6 +1253,7 @@
         }
       } catch (e) { console.warn('Auth check failed', e); }
 
+      await loadAppFees();
       try {
         allInvestors = await loadAll();
         renderKpiBar(allInvestors);
