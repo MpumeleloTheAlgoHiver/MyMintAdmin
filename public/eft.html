@@ -812,17 +812,19 @@
         return;
       }
 
-      // Fetch the latest top-up amount from wallet_transactions
+      // Fetch the latest top-up amount using the new backend API endpoint
       let topUpAmount = null;
       try {
-        const { data: txns } = await supabaseClient
-          .from('wallet_transactions')
-          .select('amount')
-          .eq('wallet_id', walletId)
-          .order('created_at', { ascending: false })
-          .limit(1);
-        if (txns && txns.length > 0) {
-          topUpAmount = Number(txns[0].amount);
+        const session = await supabaseClient.auth.getSession();
+        const token = session.data.session?.access_token;
+        if (token) {
+          const res = await fetch(`/api/latest-wallet-transaction?wallet_id=${encodeURIComponent(walletId)}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const json = await res.json();
+          if (json.ok && json.amount != null) {
+            topUpAmount = Number(json.amount);
+          }
         }
       } catch (e) {
         console.warn('Could not fetch latest wallet transaction:', e.message);
@@ -947,7 +949,7 @@
             <tr>
               <td style="padding:48px 24px;text-align:center;">
                 <p style="margin:0 0 16px 0;font-size:11px;color:#8e8eb2;line-height:18px;text-align:justify;">
-                  MINT (Pty) Ltd is an authorised Financial Services Provider (FSP 55118) regulated by the Financial Sector Conduct Authority and a registered Credit Provider (NCRCP22892) under the National Credit Act. All investment activity carries risk, including the possible loss of capital and liquidity constraints. Any information provided here is educational in nature, does not constitute personalised financial advice, and should not be relied on as a recommendation to buy or sell securities. Please consider whether investing is appropriate for your circumstances and consult an independent adviser where necessary.
+                  MINT Platforms (Pty) Ltd is an authorised Financial Services Provider (FSP 55118) regulated by the Financial Sector Conduct Authority and a registered Credit Provider (NCRCP22892) under the National Credit Act. All investment activity carries risk, including the possible loss of capital and liquidity constraints. Any information provided here is educational in nature, does not constitute personalised financial advice, and should not be relied on as a recommendation to buy or sell securities. Please consider whether investing is appropriate for your circumstances and consult an independent adviser where necessary.
                 </p>
                 <p style="margin:0;font-size:12px;color:#8e8eb2;line-height:22px;">
                   &copy; 2026 MINT. All rights reserved. <br>

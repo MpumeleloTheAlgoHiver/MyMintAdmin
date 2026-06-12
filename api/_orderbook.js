@@ -378,7 +378,7 @@ const handleSendTradeConfirmation = async (req, res, token) => {
           <!-- Footer -->
           <tr>
             <td style="padding:24px 36px 32px 36px;border-top:1px solid #f0f0f3;">
-              <p style="margin:0 0 12px 0;font-size:10px;color:#94a3b8;line-height:1.6;text-align:justify;">MINT (Pty) Ltd is an authorised Financial Services Provider (FSP 55118) regulated by the Financial Sector Conduct Authority and a registered Credit Provider (NCRCP22892) under the National Credit Act. All investment activity carries risk, including the possible loss of capital and liquidity constraints. Any information provided here is educational in nature, does not constitute personalised financial advice, and should not be relied on as a recommendation to buy or sell securities.</p>
+              <p style="margin:0 0 12px 0;font-size:10px;color:#94a3b8;line-height:1.6;text-align:justify;">MINT Platforms (Pty) Ltd is an authorised Financial Services Provider (FSP 55118) regulated by the Financial Sector Conduct Authority and a registered Credit Provider (NCRCP22892) under the National Credit Act. All investment activity carries risk, including the possible loss of capital and liquidity constraints. Any information provided here is educational in nature, does not constitute personalised financial advice, and should not be relied on as a recommendation to buy or sell securities.</p>
               <p style="margin:0;font-size:10px;color:#94a3b8;">&copy; ${new Date().getFullYear()} MINT. All rights reserved. &middot; ${currentDateStr} &middot; <a href="https://www.mymint.co.za" style="color:#94a3b8;text-decoration:underline;">mymint.co.za</a></p>
             </td>
           </tr>

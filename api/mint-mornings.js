@@ -392,7 +392,7 @@ ${restArticleCards}
 <tr>
 <td style="padding:16px 18px;background:#FFFFFF;border:1px solid #F0F1F6;border-radius:22px;">
 <div style="font-family:${F};font-size:11px;line-height:17px;color:#7B8194;">
-MINT (Pty) Ltd is an authorised Financial Services Provider (FSP 55118) regulated by the Financial Sector Conduct Authority. All investment activity carries risk including the possible loss of capital. Nothing in this email constitutes personalised financial advice.
+MINT Platforms (Pty) Ltd is an authorised Financial Services Provider (FSP 55118) regulated by the Financial Sector Conduct Authority. All investment activity carries risk including the possible loss of capital. Nothing in this email constitutes personalised financial advice.
 <br/><br/>
 News content sourced from Alliance News South Africa. Copyright &copy; ${new Date().getFullYear()} Alliance News Ltd. All rights reserved.
 </div>
