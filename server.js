@@ -1003,7 +1003,7 @@ const server = http.createServer((req, res) => {
 
       <!-- Regulatory Footer -->
       <div style="padding:40px;background-color:#f8fafc;font-size:11px;color:#94a3b8;line-height:1.5;">
-        <p style="font-size:11px;margin-bottom:12px;">MINT (Pty) Ltd is an authorised Financial Services Provider (FSP 55118) regulated by the Financial Sector Conduct Authority and a registered Credit Provider (NCRCP22892) under the National Credit Act.</p>
+        <p style="font-size:11px;margin-bottom:12px;">MINT Platforms (Pty) Ltd is an authorised Financial Services Provider (FSP 55118) regulated by the Financial Sector Conduct Authority and a registered Credit Provider (NCRCP22892) under the National Credit Act.</p>
         <p style="font-size:11px;margin-bottom:12px;">All investment activity carries risk, including the possible loss of capital and liquidity constraints. Any information provided is educational in nature and does not constitute personalised financial advice.</p>
         <p style="font-size:11px;margin-bottom:0;">&copy; 2026 MINT. All rights reserved.<br>
         Date: ${currentDateStr}<br>
@@ -1745,91 +1745,11 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.url.startsWith('/api/edit-wallet-balance') && req.method === 'POST') {
-    const token = parseBearerToken(req.headers.authorization);
-    if (!token) {
-      sendJson(res, 401, { error: 'Missing Authorization bearer token' });
-      return;
-    }
+    return require('./api/edit-wallet-balance')(req, res);
+  }
 
-    (async () => {
-      try {
-        await fetchSupabaseJson('/auth/v1/user', token, false);
-        const body = await readJsonBody(req);
-        const { wallet_id, new_balance } = body;
-
-        if (!wallet_id || typeof new_balance !== 'number' || new_balance < 0) {
-          sendJson(res, 400, { error: 'Invalid wallet_id or new_balance (must be >= 0)' });
-          return;
-        }
-
-        if (!supabaseUrl || !supabaseServiceRoleKey) {
-          sendJson(res, 500, { error: 'Supabase not configured' });
-          return;
-        }
-
-        const sbHeaders = {
-          apikey: supabaseServiceRoleKey,
-          Authorization: `Bearer ${supabaseServiceRoleKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation',
-          'Accept': 'application/json'
-        };
-
-        // Fetch current wallet
-        const getRes = await fetch(`${supabaseUrl}/rest/v1/wallets?id=eq.${encodeURIComponent(wallet_id)}&select=id,user_id,balance`, { headers: sbHeaders });
-        const wallets = await getRes.json();
-        if (!getRes.ok || !Array.isArray(wallets) || wallets.length === 0) {
-          sendJson(res, 404, { error: 'Wallet not found' });
-          return;
-        }
-
-        const wallet = wallets[0];
-        const oldBalance = Number(wallet.balance);
-        const diff = new_balance - oldBalance;
-
-        // Update wallet balance
-        const updateRes = await fetch(`${supabaseUrl}/rest/v1/wallets?id=eq.${encodeURIComponent(wallet_id)}`, {
-          method: 'PATCH',
-          headers: sbHeaders,
-          body: JSON.stringify({ balance: new_balance, updated_at: new Date().toISOString() })
-        });
-        if (!updateRes.ok && updateRes.status !== 204) {
-          const err = await updateRes.json().catch(() => ({}));
-          throw new Error(err.message || 'Failed to update wallet');
-        }
-
-        // Record adjustment transaction (only if there's a difference)
-        if (diff !== 0) {
-          await fetch(`${supabaseUrl}/rest/v1/wallet_transactions`, {
-            method: 'POST',
-            headers: sbHeaders,
-            body: JSON.stringify({
-              wallet_id: wallet.id,
-              user_id: wallet.user_id,
-              amount: diff,
-              transaction_type: 'adjustment',
-              reference: `Admin adjustment: ${oldBalance} → ${new_balance}`,
-              created_at: new Date().toISOString()
-            })
-          });
-        }
-
-        sendJson(res, 200, {
-          ok: true,
-          wallet_id: wallet.id,
-          old_balance: oldBalance,
-          new_balance,
-          adjustment: diff
-        });
-      } catch (error) {
-        sendJson(res, 500, {
-          error: 'Could not edit wallet balance',
-          details: error?.message || 'Unknown error'
-        });
-      }
-    })();
-
-    return;
+  if (req.url.startsWith('/api/latest-wallet-transaction') && req.method === 'GET') {
+    return require('./api/latest-wallet-transaction')(req, res);
   }
 
   if (req.url.startsWith('/api/upload-wallet-payments') && req.method === 'POST') {

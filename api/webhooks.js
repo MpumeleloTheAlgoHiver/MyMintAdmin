@@ -219,7 +219,7 @@ const buildWelcomeHtml = (firstName) => `<!DOCTYPE html>
                 <tr>
                   <td style="padding-top:32px;text-align:center;">
                     <p style="font-size:10px;font-weight:600;letter-spacing:0.15em;color:#0f172a;text-transform:uppercase;margin:0 0 12px 0;">INVEST &bull; BORROW &bull; PROTECT</p>
-                    <p style="font-size:10px;color:#94a3b8;line-height:1.6;margin:0;">&copy; ${new Date().getFullYear()} MINT (Pty) Ltd &middot; FSP 55118 &middot; NCRCP22892</p>
+                    <p style="font-size:10px;color:#94a3b8;line-height:1.6;margin:0;">&copy; ${new Date().getFullYear()} MINT Platforms (Pty) Ltd &middot; FSP 55118 &middot; NCRCP22892</p>
                   </td>
                 </tr>
               </table>
@@ -270,7 +270,7 @@ const buildWalletFundedHtml = ({ firstName, amount, newBalance, walletId }) => {
   </table>
 </td></tr>
 <tr><td style="padding:16px 36px 28px;border-top:1px solid #f0f0f3;">
-  <p style="margin:0;font-size:10px;color:#94a3b8;">MINT (Pty) Ltd · FSP 55118 · <a href="https://www.mymint.co.za" style="color:#94a3b8;">&copy; ${new Date().getFullYear()} MINT</a></p>
+  <p style="margin:0;font-size:10px;color:#94a3b8;">MINT Platforms (Pty) Ltd · FSP 55118 · <a href="https://www.mymint.co.za" style="color:#94a3b8;">&copy; ${new Date().getFullYear()} MINT</a></p>
 </td></tr>
 </table></td></tr></table>
 </body></html>`;
