@@ -592,6 +592,14 @@ const getSumsubAuthHeaders = (method, pathWithQuery) => {
 
 
 const server = http.createServer((req, res) => {
+  if (req.url === '/api/config' && req.method === 'GET') {
+    sendJson(res, 200, {
+      supabaseUrl: process.env.SUPABASE_URL || '',
+      supabaseAnonKey: process.env.SUPABASE_ANON_KEY || ''
+    });
+    return;
+  }
+
   if (req.url === '/favicon.ico') {
     fs.readFile(path.join(publicDir, 'icon.png'), (err, data) => {
       if (err) { res.writeHead(204); res.end(); return; }

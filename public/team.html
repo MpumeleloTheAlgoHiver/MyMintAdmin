@@ -346,479 +346,482 @@
   </div>
 
   <script>
-    const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    const ALL_PAGES = [
-      { key: 'clients',    label: 'Clients',     href: '/index.html' },
-      { key: 'dashboard',  label: 'Dashboard',   href: '/dashboard.html' },
-      { key: 'strategies', label: 'Strategies',  href: '/strategies.html' },
-      { key: 'factsheets', label: 'Factsheets',  href: '/factsheets.html' },
-      { key: 'investors',  label: 'Investors',   href: '/investors.html' },
-      { key: 'eft',        label: 'EFT Payments',href: '/eft.html' },
-      { key: 'orderbook',  label: 'Order Book',  href: '/orderbook.html' },
-      { key: 'settings',   label: 'Settings',    href: '/settings.html' },
-    ];
-
-    let currentToken = null;
-    let myMemberId = null;
-
-    const authHeaders = () => ({ 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' });
-
-    const requireSession = async () => {
-      const { data } = await supabaseClient.auth.getSession();
-      if (!data.session) { window.location.href = '/signin.html'; return false; }
-      currentToken = data.session.access_token;
-      const email = data.session.user.email || '';
-      document.getElementById('sidebarUserEmail').textContent = email || 'Admin';
-      document.getElementById('sidebarAvatarInitials').textContent = email ? email[0].toUpperCase() : 'A';
-      return true;
-    };
-
-    const api = async (method, path, body) => {
-      const res = await fetch(path, {
-        method,
-        headers: authHeaders(),
-        ...(body ? { body: JSON.stringify(body) } : {})
-      });
-      return res.json();
-    };
-
-    const buildPageGrid = (containerId, selectedKeys = []) => {
-      const grid = document.getElementById(containerId);
-      grid.innerHTML = ALL_PAGES.map(p => `
-        <label class="page-check">
-          <input type="checkbox" value="${p.key}" ${selectedKeys.includes(p.key) ? 'checked' : ''}>
-          ${p.label}
-        </label>
-      `).join('');
-    };
-
-    const getCheckedPages = (containerId) => {
-      return Array.from(document.querySelectorAll(`#${containerId} input[type=checkbox]:checked`))
-        .map(cb => cb.value);
-    };
-
-    const renderTable = (members) => {
-      const body = document.getElementById('teamTableBody');
-      if (!members.length) {
-        body.innerHTML = '<tr><td colspan="6" class="empty-state">No team members yet. Invite someone to get started.</td></tr>';
-        return;
-      }
-      body.innerHTML = members.map(m => {
-        const isSelf = m.id === myMemberId;
-        const perms = m.page_access || [];
-        const pages = m.role === 'admin'
-          ? '<span class="badge badge-admin">All pages</span>'
-          : (perms.length
-              ? `<div class="page-chips">${perms.map(k => `<span class="page-chip">${k}</span>`).join('')}</div>`
-              : '<span style="color:#8e8e93;font-size:12px;">No access</span>');
-        const status = m.status === 'pending'
-          ? '<span class="badge badge-pending">Pending</span>'
-          : '<span class="badge badge-active">Active</span>';
-        const resendBtn = m.status === 'pending'
-          ? `<button class="btn btn-sm btn-ghost" onclick='resendInvite(${JSON.stringify(m.id)},${JSON.stringify(m.email)})'>Resend</button>`
-          : '';
-        return `
-          <tr>
-            <td>
-              <div style="font-weight:600">${m.full_name || '—'}</div>
-              <div style="font-size:11px;color:#8e8e93;margin-top:2px">${m.email}</div>
-            </td>
-            <td><span class="badge badge-${m.role}">${m.role === 'admin' ? 'Admin' : 'Staff'}</span></td>
-            <td>${pages}</td>
-            <td>${status}</td>
-            <td>
-              <div class="td-actions">
-                ${resendBtn}
-                <button class="btn btn-sm btn-ghost" onclick='openEdit(${JSON.stringify(m.id)},${JSON.stringify(m.role)},${JSON.stringify(perms)})'>Edit</button>
-                ${!m.email.endsWith('@mymint.co.za') ? `<button class="btn btn-sm" style="background:#fff8e1;color:#b45309;" onclick='openUpdateEmail(${JSON.stringify(m.id)},${JSON.stringify(m.email)})'>Update Email</button>` : ''}
-                ${isSelf ? '' : `<button class="btn btn-sm btn-danger" onclick='removeMember(${JSON.stringify(m.id)},${JSON.stringify(m.full_name || m.email)})'>Remove</button>`}
-              </div>
-            </td>
-          </tr>
-        `;
-      }).join('');
-    };
-
-    const updateStats = (members) => {
-      document.getElementById('statTotal').textContent = members.length;
-      document.getElementById('statAdmins').textContent = members.filter(m => m.role === 'admin').length;
-      document.getElementById('statActive').textContent = members.filter(m => m.status !== 'pending').length;
-      document.getElementById('statPending').textContent = members.filter(m => m.status === 'pending').length;
-    };
-
-    // ── Tabs ────────────────────────────────────────────────────────────────
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const tab = btn.getAttribute('data-tab');
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
-        document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
-        if (tab === 'audit') loadAudit();
-        if (tab === 'impersonation') loadImpersonation();
-      });
-    });
-
-    document.getElementById('auditRefreshBtn').addEventListener('click', loadAudit);
-    document.getElementById('impRefreshBtn').addEventListener('click', loadImpersonation);
-    document.getElementById('impApplyBtn').addEventListener('click', loadImpersonation);
-    document.getElementById('impClearBtn').addEventListener('click', () => {
-      document.getElementById('impAdmin').value = '';
-      document.getElementById('impClient').value = '';
-      document.getElementById('impFrom').value = '';
-      document.getElementById('impTo').value = '';
-      loadImpersonation();
-    });
-    ['impAdmin','impClient','impFrom','impTo'].forEach(id => {
-      document.getElementById(id).addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') loadImpersonation();
-      });
-    });
-
-    const fmtAuditWhen = (iso) => {
-      if (!iso) return '';
-      const d = new Date(iso);
-      if (isNaN(d)) return '';
-      const diff = Math.floor((Date.now() - d.getTime()) / 1000);
-      if (diff < 60)    return diff + 's ago';
-      if (diff < 3600)  return Math.floor(diff / 60) + 'm ago';
-      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-      return d.toLocaleString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    };
-
-    const describeAudit = (entry) => {
-      const d = entry.details || {};
-      const escape = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      switch (entry.action) {
-        case 'invite': {
-          const reissue = d.reissue ? ' (re-issued)' : '';
-          const role = d.role ? ` as <strong>${escape(d.role)}</strong>` : '';
-          const pages = (d.page_access && d.page_access.length) ? ` — pages: ${d.page_access.map(escape).join(', ')}` : '';
-          const sent = d.email_sent === false ? ' · email not sent' : '';
-          return `Invited${role}${reissue}${pages}${sent}`;
+(async () => {
+      const _cfg = await fetch('/api/config').then(r => r.json()).catch(() => ({}));
+      const SUPABASE_URL = _cfg.supabaseUrl || '';
+      const SUPABASE_ANON_KEY = _cfg.supabaseAnonKey || '';
+      const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  
+      const ALL_PAGES = [
+        { key: 'clients',    label: 'Clients',     href: '/index.html' },
+        { key: 'dashboard',  label: 'Dashboard',   href: '/dashboard.html' },
+        { key: 'strategies', label: 'Strategies',  href: '/strategies.html' },
+        { key: 'factsheets', label: 'Factsheets',  href: '/factsheets.html' },
+        { key: 'investors',  label: 'Investors',   href: '/investors.html' },
+        { key: 'eft',        label: 'EFT Payments',href: '/eft.html' },
+        { key: 'orderbook',  label: 'Order Book',  href: '/orderbook.html' },
+        { key: 'settings',   label: 'Settings',    href: '/settings.html' },
+      ];
+  
+      let currentToken = null;
+      let myMemberId = null;
+  
+      const authHeaders = () => ({ 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' });
+  
+      const requireSession = async () => {
+        const { data } = await supabaseClient.auth.getSession();
+        if (!data.session) { window.location.href = '/signin.html'; return false; }
+        currentToken = data.session.access_token;
+        const email = data.session.user.email || '';
+        document.getElementById('sidebarUserEmail').textContent = email || 'Admin';
+        document.getElementById('sidebarAvatarInitials').textContent = email ? email[0].toUpperCase() : 'A';
+        return true;
+      };
+  
+      const api = async (method, path, body) => {
+        const res = await fetch(path, {
+          method,
+          headers: authHeaders(),
+          ...(body ? { body: JSON.stringify(body) } : {})
+        });
+        return res.json();
+      };
+  
+      const buildPageGrid = (containerId, selectedKeys = []) => {
+        const grid = document.getElementById(containerId);
+        grid.innerHTML = ALL_PAGES.map(p => `
+          <label class="page-check">
+            <input type="checkbox" value="${p.key}" ${selectedKeys.includes(p.key) ? 'checked' : ''}>
+            ${p.label}
+          </label>
+        `).join('');
+      };
+  
+      const getCheckedPages = (containerId) => {
+        return Array.from(document.querySelectorAll(`#${containerId} input[type=checkbox]:checked`))
+          .map(cb => cb.value);
+      };
+  
+      const renderTable = (members) => {
+        const body = document.getElementById('teamTableBody');
+        if (!members.length) {
+          body.innerHTML = '<tr><td colspan="6" class="empty-state">No team members yet. Invite someone to get started.</td></tr>';
+          return;
         }
-        case 'update': {
-          const before = d.before || {};
-          const after = d.after || {};
-          const parts = [];
-          if (before.role !== after.role) parts.push(`role: ${escape(before.role || '—')} → <strong>${escape(after.role)}</strong>`);
-          const beforePages = (before.page_access || []).slice().sort().join(',');
-          const afterPages  = (after.page_access  || []).slice().sort().join(',');
-          if (beforePages !== afterPages) parts.push(`pages: ${escape(beforePages || '—')} → <strong>${escape(afterPages || '—')}</strong>`);
-          return parts.length ? parts.join(' · ') : 'No changes';
+        body.innerHTML = members.map(m => {
+          const isSelf = m.id === myMemberId;
+          const perms = m.page_access || [];
+          const pages = m.role === 'admin'
+            ? '<span class="badge badge-admin">All pages</span>'
+            : (perms.length
+                ? `<div class="page-chips">${perms.map(k => `<span class="page-chip">${k}</span>`).join('')}</div>`
+                : '<span style="color:#8e8e93;font-size:12px;">No access</span>');
+          const status = m.status === 'pending'
+            ? '<span class="badge badge-pending">Pending</span>'
+            : '<span class="badge badge-active">Active</span>';
+          const resendBtn = m.status === 'pending'
+            ? `<button class="btn btn-sm btn-ghost" onclick='resendInvite(${JSON.stringify(m.id)},${JSON.stringify(m.email)})'>Resend</button>`
+            : '';
+          return `
+            <tr>
+              <td>
+                <div style="font-weight:600">${m.full_name || '—'}</div>
+                <div style="font-size:11px;color:#8e8e93;margin-top:2px">${m.email}</div>
+              </td>
+              <td><span class="badge badge-${m.role}">${m.role === 'admin' ? 'Admin' : 'Staff'}</span></td>
+              <td>${pages}</td>
+              <td>${status}</td>
+              <td>
+                <div class="td-actions">
+                  ${resendBtn}
+                  <button class="btn btn-sm btn-ghost" onclick='openEdit(${JSON.stringify(m.id)},${JSON.stringify(m.role)},${JSON.stringify(perms)})'>Edit</button>
+                  ${!m.email.endsWith('@mymint.co.za') ? `<button class="btn btn-sm" style="background:#fff8e1;color:#b45309;" onclick='openUpdateEmail(${JSON.stringify(m.id)},${JSON.stringify(m.email)})'>Update Email</button>` : ''}
+                  ${isSelf ? '' : `<button class="btn btn-sm btn-danger" onclick='removeMember(${JSON.stringify(m.id)},${JSON.stringify(m.full_name || m.email)})'>Remove</button>`}
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      };
+  
+      const updateStats = (members) => {
+        document.getElementById('statTotal').textContent = members.length;
+        document.getElementById('statAdmins').textContent = members.filter(m => m.role === 'admin').length;
+        document.getElementById('statActive').textContent = members.filter(m => m.status !== 'pending').length;
+        document.getElementById('statPending').textContent = members.filter(m => m.status === 'pending').length;
+      };
+  
+      // ── Tabs ────────────────────────────────────────────────────────────────
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tab = btn.getAttribute('data-tab');
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+          document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+          if (tab === 'audit') loadAudit();
+          if (tab === 'impersonation') loadImpersonation();
+        });
+      });
+  
+      document.getElementById('auditRefreshBtn').addEventListener('click', loadAudit);
+      document.getElementById('impRefreshBtn').addEventListener('click', loadImpersonation);
+      document.getElementById('impApplyBtn').addEventListener('click', loadImpersonation);
+      document.getElementById('impClearBtn').addEventListener('click', () => {
+        document.getElementById('impAdmin').value = '';
+        document.getElementById('impClient').value = '';
+        document.getElementById('impFrom').value = '';
+        document.getElementById('impTo').value = '';
+        loadImpersonation();
+      });
+      ['impAdmin','impClient','impFrom','impTo'].forEach(id => {
+        document.getElementById(id).addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') loadImpersonation();
+        });
+      });
+  
+      const fmtAuditWhen = (iso) => {
+        if (!iso) return '';
+        const d = new Date(iso);
+        if (isNaN(d)) return '';
+        const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+        if (diff < 60)    return diff + 's ago';
+        if (diff < 3600)  return Math.floor(diff / 60) + 'm ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+        return d.toLocaleString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      };
+  
+      const describeAudit = (entry) => {
+        const d = entry.details || {};
+        const escape = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        switch (entry.action) {
+          case 'invite': {
+            const reissue = d.reissue ? ' (re-issued)' : '';
+            const role = d.role ? ` as <strong>${escape(d.role)}</strong>` : '';
+            const pages = (d.page_access && d.page_access.length) ? ` — pages: ${d.page_access.map(escape).join(', ')}` : '';
+            const sent = d.email_sent === false ? ' · email not sent' : '';
+            return `Invited${role}${reissue}${pages}${sent}`;
+          }
+          case 'update': {
+            const before = d.before || {};
+            const after = d.after || {};
+            const parts = [];
+            if (before.role !== after.role) parts.push(`role: ${escape(before.role || '—')} → <strong>${escape(after.role)}</strong>`);
+            const beforePages = (before.page_access || []).slice().sort().join(',');
+            const afterPages  = (after.page_access  || []).slice().sort().join(',');
+            if (beforePages !== afterPages) parts.push(`pages: ${escape(beforePages || '—')} → <strong>${escape(afterPages || '—')}</strong>`);
+            return parts.length ? parts.join(' · ') : 'No changes';
+          }
+          case 'remove':
+            return `Removed${d.role ? ' (was ' + escape(d.role) + ')' : ''}`;
+          case 'signup':
+            return `Completed signup${d.full_name ? ' as ' + escape(d.full_name) : ''}`;
+          case 'impersonate': {
+            const env = d.mint_environment ? ` <strong>${escape(d.mint_environment)}</strong>` : '';
+            const name = d.target_name ? ` (${escape(d.target_name)})` : '';
+            return `Viewed Mint as client${name} on${env}`;
+          }
+          default:
+            return escape(JSON.stringify(d));
         }
-        case 'remove':
-          return `Removed${d.role ? ' (was ' + escape(d.role) + ')' : ''}`;
-        case 'signup':
-          return `Completed signup${d.full_name ? ' as ' + escape(d.full_name) : ''}`;
-        case 'impersonate': {
-          const env = d.mint_environment ? ` <strong>${escape(d.mint_environment)}</strong>` : '';
-          const name = d.target_name ? ` (${escape(d.target_name)})` : '';
-          return `Viewed Mint as client${name} on${env}`;
+      };
+  
+      const renderAudit = (entries) => {
+        const body = document.getElementById('auditTableBody');
+        if (!entries.length) {
+          body.innerHTML = '<tr><td colspan="5" class="empty-state">No activity yet.</td></tr>';
+          return;
         }
-        default:
-          return escape(JSON.stringify(d));
-      }
-    };
-
-    const renderAudit = (entries) => {
-      const body = document.getElementById('auditTableBody');
-      if (!entries.length) {
-        body.innerHTML = '<tr><td colspan="5" class="empty-state">No activity yet.</td></tr>';
-        return;
-      }
-      const escape = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      body.innerHTML = entries.map(e => `
-        <tr>
-          <td><span class="audit-when">${fmtAuditWhen(e.created_at)}</span></td>
-          <td><span class="audit-action audit-${e.action}">${escape(e.action)}</span></td>
-          <td>${escape(e.target_email || '—')}</td>
-          <td>${escape(e.actor_email || (e.action === 'signup' ? 'self' : '—'))}</td>
-          <td><span class="audit-detail">${describeAudit(e)}</span></td>
-        </tr>
-      `).join('');
-    };
-
-    const renderImpersonation = (entries) => {
-      const body = document.getElementById('impTableBody');
-      if (!entries.length) {
-        body.innerHTML = '<tr><td colspan="5" class="empty-state">No impersonation events match these filters.</td></tr>';
-        return;
-      }
-      const escape = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      body.innerHTML = entries.map(e => {
-        const d = e.details || {};
-        const env = (d.mint_environment || '').toLowerCase();
-        const envBadge = env
-          ? `<span class="env-badge env-${env === 'live' ? 'live' : 'dev'}">${escape(env)}</span>`
-          : '<span style="color:#8e8e93;font-size:12px;">—</span>';
-        const targetName = d.target_name ? `<div style="font-size:11px;color:#8e8e93;margin-top:2px">${escape(d.target_name)}</div>` : '';
-        return `
+        const escape = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        body.innerHTML = entries.map(e => `
           <tr>
             <td><span class="audit-when">${fmtAuditWhen(e.created_at)}</span></td>
-            <td>${escape(e.actor_email || '—')}</td>
-            <td>
-              <div>${escape(e.target_email || '—')}</div>
-              ${targetName}
-            </td>
-            <td>${envBadge}</td>
-            <td><span class="audit-detail">${escape(d.mint_base || '')}</span></td>
+            <td><span class="audit-action audit-${e.action}">${escape(e.action)}</span></td>
+            <td>${escape(e.target_email || '—')}</td>
+            <td>${escape(e.actor_email || (e.action === 'signup' ? 'self' : '—'))}</td>
+            <td><span class="audit-detail">${describeAudit(e)}</span></td>
           </tr>
-        `;
-      }).join('');
-    };
-
-    async function loadImpersonation() {
-      const notice = document.getElementById('impNotice');
-      notice.style.display = 'none';
-      document.getElementById('impTableBody').innerHTML = '<tr><td colspan="5" class="empty-state">Loading...</td></tr>';
-      const params = new URLSearchParams({ action: 'audit-list', audit_action: 'impersonate', limit: '200' });
-      const admin = document.getElementById('impAdmin').value.trim();
-      const client = document.getElementById('impClient').value.trim();
-      const from = document.getElementById('impFrom').value.trim();
-      const to = document.getElementById('impTo').value.trim();
-      if (admin) params.set('actor_email', admin);
-      if (client) params.set('target_email', client);
-      if (from) params.set('from', from + 'T00:00:00Z');
-      if (to) params.set('to', to + 'T23:59:59Z');
-      const data = await api('GET', '/api/team?' + params.toString());
-      if (!data.ok) {
-        document.getElementById('impTableBody').innerHTML = `<tr><td colspan="5" class="empty-state">${data.error || 'Could not load impersonation log'}</td></tr>`;
-        return;
-      }
-      if (data.notice) {
-        notice.textContent = data.notice;
-        notice.style.display = 'block';
-      }
-      renderImpersonation(data.entries || []);
-    }
-
-    async function loadAudit() {
-      const notice = document.getElementById('auditNotice');
-      notice.style.display = 'none';
-      document.getElementById('auditTableBody').innerHTML = '<tr><td colspan="5" class="empty-state">Loading...</td></tr>';
-      const data = await api('GET', '/api/team?action=audit-list&limit=200');
-      if (!data.ok) {
-        document.getElementById('auditTableBody').innerHTML = `<tr><td colspan="5" class="empty-state">${data.error || 'Could not load audit log'}</td></tr>`;
-        return;
-      }
-      if (data.notice) {
-        notice.textContent = data.notice;
-        notice.style.display = 'block';
-      }
-      renderAudit(data.entries || []);
-    }
-
-    const loadTeam = async () => {
-      const data = await api('GET', '/api/team?action=list');
-      if (data.ok) {
-        updateStats(data.members);
-        renderTable(data.members);
-      } else {
-        document.getElementById('teamTableBody').innerHTML = '<tr><td colspan="6" class="empty-state">Could not load team from database (Access Denied or Not Configured locally)</td></tr>';
-        updateStats([]);
-      }
-    };
-
-    // Invite modal
-    document.getElementById('inviteBtn').addEventListener('click', () => {
-      document.getElementById('inviteName').value = '';
-      document.getElementById('inviteEmail').value = '';
-      document.getElementById('inviteRole').value = 'staff';
-      buildPageGrid('invitePageGrid');
-      document.getElementById('invitePageAccessSection').style.display = 'block';
-      document.getElementById('inviteOverlay').classList.add('open');
-    });
-
-    document.getElementById('inviteRole').addEventListener('change', (e) => {
-      document.getElementById('invitePageAccessSection').style.display =
-        e.target.value === 'staff' ? 'block' : 'none';
-    });
-
-    document.getElementById('inviteCancelBtn').addEventListener('click', () => {
-      document.getElementById('inviteOverlay').classList.remove('open');
-    });
-
-    document.getElementById('inviteSubmitBtn').addEventListener('click', async () => {
-      const email = document.getElementById('inviteEmail').value.trim().toLowerCase();
-      const full_name = document.getElementById('inviteName').value.trim();
-      const role = document.getElementById('inviteRole').value;
-      const page_access = role === 'staff' ? getCheckedPages('invitePageGrid') : [];
-
-      if (!email) { alert('Email is required'); return; }
-      if (!email.endsWith('@mymint.co.za')) { alert('Only @mymint.co.za email addresses can be invited.'); return; }
-
-      const btn = document.getElementById('inviteSubmitBtn');
-      btn.textContent = 'Sending…';
-      btn.disabled = true;
-
-      const data = await api('POST', '/api/team?action=invite', { email, full_name, role, page_access });
-      btn.textContent = 'Send Invite';
-      btn.disabled = false;
-
-      if (data.ok) {
-        document.getElementById('inviteOverlay').classList.remove('open');
-        await loadTeam();
-        if (!data.emailSent && data.signupLink) {
-          showInviteLink(email, data.signupLink, data.emailReason);
-        }
-      } else {
-        alert(data.error || 'Failed to invite member');
-      }
-    });
-
-    // Resend invitation — re-issues the token and re-sends the email (or shows the new link).
-    window.resendInvite = async (id, email) => {
-      if (!confirm(`Resend invitation to ${email}? The previous link will stop working.`)) return;
-      const data = await api('POST', '/api/team?action=resend', { id });
-      if (!data.ok) { alert(data.error || 'Could not resend invitation'); return; }
-      await loadTeam();
-      if (data.emailSent) {
-        alert('Invitation email sent to ' + email);
-      } else if (data.signupLink) {
-        showInviteLink(email, data.signupLink, data.emailReason);
-      } else {
-        alert(`Could not send invitation email to ${email}.\n\nReason: ${data.emailReason || 'Unknown error'}\n\nCheck that RESEND_API_KEY is set in your environment.`);
-      }
-    };
-
-    // Modal that shows the signup link to copy when email delivery wasn't possible.
-    function showInviteLink(email, link, reason) {
-      const overlay = document.getElementById('linkOverlay');
-      document.getElementById('linkEmail').textContent = email;
-      document.getElementById('linkUrl').textContent = link;
-      document.getElementById('linkReason').textContent = reason
-        ? 'Email could not be sent: ' + reason
-        : 'Share this link with the invitee — it expires in 7 days.';
-      document.getElementById('linkCopyBtn').onclick = async () => {
-        try { await navigator.clipboard.writeText(link); document.getElementById('linkCopyBtn').textContent = 'Copied'; }
-        catch { document.getElementById('linkCopyBtn').textContent = 'Copy failed'; }
+        `).join('');
       };
-      overlay.classList.add('open');
-    }
-
-    // Edit modal
-    window.openEdit = (id, role, page_access) => {
-      document.getElementById('editMemberId').value = id;
-      document.getElementById('editRole').value = role;
-      buildPageGrid('editPageGrid', page_access);
-      document.getElementById('editPageAccessSection').style.display = role === 'staff' ? 'block' : 'none';
-      document.getElementById('editOverlay').classList.add('open');
-    };
-
-    document.getElementById('editRole').addEventListener('change', (e) => {
-      document.getElementById('editPageAccessSection').style.display =
-        e.target.value === 'staff' ? 'block' : 'none';
-    });
-
-    document.getElementById('editCancelBtn').addEventListener('click', () => {
-      document.getElementById('editOverlay').classList.remove('open');
-    });
-
-    document.getElementById('editSubmitBtn').addEventListener('click', async () => {
-      const id = document.getElementById('editMemberId').value;
-      const role = document.getElementById('editRole').value;
-      const page_access = role === 'staff' ? getCheckedPages('editPageGrid') : [];
-
-      const btn = document.getElementById('editSubmitBtn');
-      btn.textContent = 'Saving…';
-      btn.disabled = true;
-
-      const data = await api('PATCH', '/api/team?action=update', { id, role, page_access });
-      btn.textContent = 'Save Changes';
-      btn.disabled = false;
-
-      if (data.ok) {
-        document.getElementById('editOverlay').classList.remove('open');
-        await loadTeam();
-      } else {
-        alert(data.error || 'Failed to update member');
+  
+      const renderImpersonation = (entries) => {
+        const body = document.getElementById('impTableBody');
+        if (!entries.length) {
+          body.innerHTML = '<tr><td colspan="5" class="empty-state">No impersonation events match these filters.</td></tr>';
+          return;
+        }
+        const escape = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        body.innerHTML = entries.map(e => {
+          const d = e.details || {};
+          const env = (d.mint_environment || '').toLowerCase();
+          const envBadge = env
+            ? `<span class="env-badge env-${env === 'live' ? 'live' : 'dev'}">${escape(env)}</span>`
+            : '<span style="color:#8e8e93;font-size:12px;">—</span>';
+          const targetName = d.target_name ? `<div style="font-size:11px;color:#8e8e93;margin-top:2px">${escape(d.target_name)}</div>` : '';
+          return `
+            <tr>
+              <td><span class="audit-when">${fmtAuditWhen(e.created_at)}</span></td>
+              <td>${escape(e.actor_email || '—')}</td>
+              <td>
+                <div>${escape(e.target_email || '—')}</div>
+                ${targetName}
+              </td>
+              <td>${envBadge}</td>
+              <td><span class="audit-detail">${escape(d.mint_base || '')}</span></td>
+            </tr>
+          `;
+        }).join('');
+      };
+  
+      async function loadImpersonation() {
+        const notice = document.getElementById('impNotice');
+        notice.style.display = 'none';
+        document.getElementById('impTableBody').innerHTML = '<tr><td colspan="5" class="empty-state">Loading...</td></tr>';
+        const params = new URLSearchParams({ action: 'audit-list', audit_action: 'impersonate', limit: '200' });
+        const admin = document.getElementById('impAdmin').value.trim();
+        const client = document.getElementById('impClient').value.trim();
+        const from = document.getElementById('impFrom').value.trim();
+        const to = document.getElementById('impTo').value.trim();
+        if (admin) params.set('actor_email', admin);
+        if (client) params.set('target_email', client);
+        if (from) params.set('from', from + 'T00:00:00Z');
+        if (to) params.set('to', to + 'T23:59:59Z');
+        const data = await api('GET', '/api/team?' + params.toString());
+        if (!data.ok) {
+          document.getElementById('impTableBody').innerHTML = `<tr><td colspan="5" class="empty-state">${data.error || 'Could not load impersonation log'}</td></tr>`;
+          return;
+        }
+        if (data.notice) {
+          notice.textContent = data.notice;
+          notice.style.display = 'block';
+        }
+        renderImpersonation(data.entries || []);
       }
-    });
-
-    // Update Email modal
-    window.openUpdateEmail = (id, currentEmail) => {
-      document.getElementById('emailMemberId').value = id;
-      document.getElementById('emailCurrent').value = currentEmail;
-      document.getElementById('emailNew').value = '';
-      document.getElementById('emailError').style.display = 'none';
-      document.getElementById('emailOverlay').classList.add('open');
-    };
-
-    document.getElementById('emailCancelBtn').addEventListener('click', () => {
-      document.getElementById('emailOverlay').classList.remove('open');
-    });
-
-    document.getElementById('emailOverlay').addEventListener('click', (e) => {
-      if (e.target.id === 'emailOverlay') document.getElementById('emailOverlay').classList.remove('open');
-    });
-
-    document.getElementById('emailSubmitBtn').addEventListener('click', async () => {
-      const id = document.getElementById('emailMemberId').value;
-      const new_email = document.getElementById('emailNew').value.trim().toLowerCase();
-      const errBox = document.getElementById('emailError');
-      errBox.style.display = 'none';
-
-      if (!new_email) { errBox.textContent = 'Enter the new email address.'; errBox.style.display = 'block'; return; }
-      if (!new_email.endsWith('@mymint.co.za')) { errBox.textContent = 'Must be a @mymint.co.za address.'; errBox.style.display = 'block'; return; }
-
-      const btn = document.getElementById('emailSubmitBtn');
-      btn.disabled = true; btn.textContent = 'Updating…';
-
-      const data = await api('POST', '/api/team?action=update-email', { id, new_email });
-      btn.disabled = false; btn.textContent = 'Update Email';
-
-      if (data.ok) {
-        document.getElementById('emailOverlay').classList.remove('open');
-        await loadTeam();
-        const note = data.authUpdated
-          ? 'Email updated. The member can now sign in with their new address.'
-          : 'Team record updated. Note: no Supabase Auth account was found for this member — they may need to accept a fresh invitation.';
-        alert(note);
-      } else {
-        errBox.textContent = data.error || 'Failed to update email.';
-        errBox.style.display = 'block';
+  
+      async function loadAudit() {
+        const notice = document.getElementById('auditNotice');
+        notice.style.display = 'none';
+        document.getElementById('auditTableBody').innerHTML = '<tr><td colspan="5" class="empty-state">Loading...</td></tr>';
+        const data = await api('GET', '/api/team?action=audit-list&limit=200');
+        if (!data.ok) {
+          document.getElementById('auditTableBody').innerHTML = `<tr><td colspan="5" class="empty-state">${data.error || 'Could not load audit log'}</td></tr>`;
+          return;
+        }
+        if (data.notice) {
+          notice.textContent = data.notice;
+          notice.style.display = 'block';
+        }
+        renderAudit(data.entries || []);
       }
-    });
-
-    // Remove
-    window.removeMember = async (id, name) => {
-      if (!confirm(`Remove ${name} from the team?`)) return;
-      const data = await api('DELETE', '/api/team?action=remove', { id });
-      if (data.ok) {
-        await loadTeam();
-      } else {
-        alert(data.error || 'Failed to remove member');
-      }
-    };
-
-    // Close overlays on backdrop click
-    ['inviteOverlay', 'editOverlay'].forEach(id => {
-      document.getElementById(id).addEventListener('click', (e) => {
-        if (e.target.id === id) document.getElementById(id).classList.remove('open');
+  
+      const loadTeam = async () => {
+        const data = await api('GET', '/api/team?action=list');
+        if (data.ok) {
+          updateStats(data.members);
+          renderTable(data.members);
+        } else {
+          document.getElementById('teamTableBody').innerHTML = '<tr><td colspan="6" class="empty-state">Could not load team from database (Access Denied or Not Configured locally)</td></tr>';
+          updateStats([]);
+        }
+      };
+  
+      // Invite modal
+      document.getElementById('inviteBtn').addEventListener('click', () => {
+        document.getElementById('inviteName').value = '';
+        document.getElementById('inviteEmail').value = '';
+        document.getElementById('inviteRole').value = 'staff';
+        buildPageGrid('invitePageGrid');
+        document.getElementById('invitePageAccessSection').style.display = 'block';
+        document.getElementById('inviteOverlay').classList.add('open');
       });
-    });
-
-    document.getElementById('signOutBtn').addEventListener('click', async () => {
-      await supabaseClient.auth.signOut();
-      window.location.href = '/signin.html';
-    });
-
-    (async () => {
-      const ok = await requireSession();
-      if (!ok) return;
-
-      // Verify this user is an admin
-      const me = await api('GET', '/api/team?action=me');
-      if (!me.ok || me.role !== 'admin') {
-        window.location.href = '/index.html';
-        return;
+  
+      document.getElementById('inviteRole').addEventListener('change', (e) => {
+        document.getElementById('invitePageAccessSection').style.display =
+          e.target.value === 'staff' ? 'block' : 'none';
+      });
+  
+      document.getElementById('inviteCancelBtn').addEventListener('click', () => {
+        document.getElementById('inviteOverlay').classList.remove('open');
+      });
+  
+      document.getElementById('inviteSubmitBtn').addEventListener('click', async () => {
+        const email = document.getElementById('inviteEmail').value.trim().toLowerCase();
+        const full_name = document.getElementById('inviteName').value.trim();
+        const role = document.getElementById('inviteRole').value;
+        const page_access = role === 'staff' ? getCheckedPages('invitePageGrid') : [];
+  
+        if (!email) { alert('Email is required'); return; }
+        if (!email.endsWith('@mymint.co.za')) { alert('Only @mymint.co.za email addresses can be invited.'); return; }
+  
+        const btn = document.getElementById('inviteSubmitBtn');
+        btn.textContent = 'Sending…';
+        btn.disabled = true;
+  
+        const data = await api('POST', '/api/team?action=invite', { email, full_name, role, page_access });
+        btn.textContent = 'Send Invite';
+        btn.disabled = false;
+  
+        if (data.ok) {
+          document.getElementById('inviteOverlay').classList.remove('open');
+          await loadTeam();
+          if (!data.emailSent && data.signupLink) {
+            showInviteLink(email, data.signupLink, data.emailReason);
+          }
+        } else {
+          alert(data.error || 'Failed to invite member');
+        }
+      });
+  
+      // Resend invitation — re-issues the token and re-sends the email (or shows the new link).
+      window.resendInvite = async (id, email) => {
+        if (!confirm(`Resend invitation to ${email}? The previous link will stop working.`)) return;
+        const data = await api('POST', '/api/team?action=resend', { id });
+        if (!data.ok) { alert(data.error || 'Could not resend invitation'); return; }
+        await loadTeam();
+        if (data.emailSent) {
+          alert('Invitation email sent to ' + email);
+        } else if (data.signupLink) {
+          showInviteLink(email, data.signupLink, data.emailReason);
+        } else {
+          alert(`Could not send invitation email to ${email}.\n\nReason: ${data.emailReason || 'Unknown error'}\n\nCheck that RESEND_API_KEY is set in your environment.`);
+        }
+      };
+  
+      // Modal that shows the signup link to copy when email delivery wasn't possible.
+      function showInviteLink(email, link, reason) {
+        const overlay = document.getElementById('linkOverlay');
+        document.getElementById('linkEmail').textContent = email;
+        document.getElementById('linkUrl').textContent = link;
+        document.getElementById('linkReason').textContent = reason
+          ? 'Email could not be sent: ' + reason
+          : 'Share this link with the invitee — it expires in 7 days.';
+        document.getElementById('linkCopyBtn').onclick = async () => {
+          try { await navigator.clipboard.writeText(link); document.getElementById('linkCopyBtn').textContent = 'Copied'; }
+          catch { document.getElementById('linkCopyBtn').textContent = 'Copy failed'; }
+        };
+        overlay.classList.add('open');
       }
-      myMemberId = me.id || null;
-
-      await loadTeam();
-    })();
+  
+      // Edit modal
+      window.openEdit = (id, role, page_access) => {
+        document.getElementById('editMemberId').value = id;
+        document.getElementById('editRole').value = role;
+        buildPageGrid('editPageGrid', page_access);
+        document.getElementById('editPageAccessSection').style.display = role === 'staff' ? 'block' : 'none';
+        document.getElementById('editOverlay').classList.add('open');
+      };
+  
+      document.getElementById('editRole').addEventListener('change', (e) => {
+        document.getElementById('editPageAccessSection').style.display =
+          e.target.value === 'staff' ? 'block' : 'none';
+      });
+  
+      document.getElementById('editCancelBtn').addEventListener('click', () => {
+        document.getElementById('editOverlay').classList.remove('open');
+      });
+  
+      document.getElementById('editSubmitBtn').addEventListener('click', async () => {
+        const id = document.getElementById('editMemberId').value;
+        const role = document.getElementById('editRole').value;
+        const page_access = role === 'staff' ? getCheckedPages('editPageGrid') : [];
+  
+        const btn = document.getElementById('editSubmitBtn');
+        btn.textContent = 'Saving…';
+        btn.disabled = true;
+  
+        const data = await api('PATCH', '/api/team?action=update', { id, role, page_access });
+        btn.textContent = 'Save Changes';
+        btn.disabled = false;
+  
+        if (data.ok) {
+          document.getElementById('editOverlay').classList.remove('open');
+          await loadTeam();
+        } else {
+          alert(data.error || 'Failed to update member');
+        }
+      });
+  
+      // Update Email modal
+      window.openUpdateEmail = (id, currentEmail) => {
+        document.getElementById('emailMemberId').value = id;
+        document.getElementById('emailCurrent').value = currentEmail;
+        document.getElementById('emailNew').value = '';
+        document.getElementById('emailError').style.display = 'none';
+        document.getElementById('emailOverlay').classList.add('open');
+      };
+  
+      document.getElementById('emailCancelBtn').addEventListener('click', () => {
+        document.getElementById('emailOverlay').classList.remove('open');
+      });
+  
+      document.getElementById('emailOverlay').addEventListener('click', (e) => {
+        if (e.target.id === 'emailOverlay') document.getElementById('emailOverlay').classList.remove('open');
+      });
+  
+      document.getElementById('emailSubmitBtn').addEventListener('click', async () => {
+        const id = document.getElementById('emailMemberId').value;
+        const new_email = document.getElementById('emailNew').value.trim().toLowerCase();
+        const errBox = document.getElementById('emailError');
+        errBox.style.display = 'none';
+  
+        if (!new_email) { errBox.textContent = 'Enter the new email address.'; errBox.style.display = 'block'; return; }
+        if (!new_email.endsWith('@mymint.co.za')) { errBox.textContent = 'Must be a @mymint.co.za address.'; errBox.style.display = 'block'; return; }
+  
+        const btn = document.getElementById('emailSubmitBtn');
+        btn.disabled = true; btn.textContent = 'Updating…';
+  
+        const data = await api('POST', '/api/team?action=update-email', { id, new_email });
+        btn.disabled = false; btn.textContent = 'Update Email';
+  
+        if (data.ok) {
+          document.getElementById('emailOverlay').classList.remove('open');
+          await loadTeam();
+          const note = data.authUpdated
+            ? 'Email updated. The member can now sign in with their new address.'
+            : 'Team record updated. Note: no Supabase Auth account was found for this member — they may need to accept a fresh invitation.';
+          alert(note);
+        } else {
+          errBox.textContent = data.error || 'Failed to update email.';
+          errBox.style.display = 'block';
+        }
+      });
+  
+      // Remove
+      window.removeMember = async (id, name) => {
+        if (!confirm(`Remove ${name} from the team?`)) return;
+        const data = await api('DELETE', '/api/team?action=remove', { id });
+        if (data.ok) {
+          await loadTeam();
+        } else {
+          alert(data.error || 'Failed to remove member');
+        }
+      };
+  
+      // Close overlays on backdrop click
+      ['inviteOverlay', 'editOverlay'].forEach(id => {
+        document.getElementById(id).addEventListener('click', (e) => {
+          if (e.target.id === id) document.getElementById(id).classList.remove('open');
+        });
+      });
+  
+      document.getElementById('signOutBtn').addEventListener('click', async () => {
+        await supabaseClient.auth.signOut();
+        window.location.href = '/signin.html';
+      });
+  
+      (async () => {
+        const ok = await requireSession();
+        if (!ok) return;
+  
+        // Verify this user is an admin
+        const me = await api('GET', '/api/team?action=me');
+        if (!me.ok || me.role !== 'admin') {
+          window.location.href = '/index.html';
+          return;
+        }
+        myMemberId = me.id || null;
+  
+        await loadTeam();
+      })();
+})();
   </script>
 </body>
 </html>

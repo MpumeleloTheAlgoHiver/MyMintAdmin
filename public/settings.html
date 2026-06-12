@@ -306,27 +306,30 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-      const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
-      const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-      (async () => {
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        if (!session) { window.location.href = '/signin.html'; return; }
-        const email = session?.user?.email || '';
-        document.getElementById('sidebarUserEmail').textContent = email || 'Admin';
-        document.getElementById('sidebarAvatarInitials').textContent = email ? email[0].toUpperCase() : 'A';
-        document.getElementById('accountRowEmail').textContent = email;
-        document.querySelector('html').style.opacity = '1';
-      })();
-
-      async function signOut() {
-        await supabaseClient.auth.signOut();
-        window.location.href = '/signin.html';
-      }
-
-      document.getElementById('signOutBtn').addEventListener('click', signOut);
-      document.getElementById('logoutRow').addEventListener('click', signOut);
+(async () => {
+      const _cfg = await fetch('/api/config').then(r => r.json()).catch(() => ({}));
+      const SUPABASE_URL = _cfg.supabaseUrl || '';
+      const SUPABASE_ANON_KEY = _cfg.supabaseAnonKey || '';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  
+        (async () => {
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          if (!session) { window.location.href = '/signin.html'; return; }
+          const email = session?.user?.email || '';
+          document.getElementById('sidebarUserEmail').textContent = email || 'Admin';
+          document.getElementById('sidebarAvatarInitials').textContent = email ? email[0].toUpperCase() : 'A';
+          document.getElementById('accountRowEmail').textContent = email;
+          document.querySelector('html').style.opacity = '1';
+        })();
+  
+        async function signOut() {
+          await supabaseClient.auth.signOut();
+          window.location.href = '/signin.html';
+        }
+  
+        document.getElementById('signOutBtn').addEventListener('click', signOut);
+        document.getElementById('logoutRow').addEventListener('click', signOut);
+})();
     </script>
   <script>
     window.addEventListener('access-guard:ready', function (e) {

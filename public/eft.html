@@ -439,758 +439,761 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    const requireSession = async () => {
-      const { data } = await supabaseClient.auth.getSession();
-      if (!data.session) { window.location.href = '/signin.html'; return false; }
-      return true;
-    };
-
-    const signOutBtn = document.getElementById('signOutBtn');
-    if (signOutBtn) {
-      signOutBtn.addEventListener('click', async () => {
-        await supabaseClient.auth.signOut();
-        window.location.href = '/signin.html';
-      });
-    }
-
-    (async () => {
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      const email = session?.user?.email || '';
-      const nameEl = document.getElementById('sidebarUserEmail');
-      const avatarEl = document.getElementById('sidebarAvatarInitials');
-      if (nameEl && email) nameEl.textContent = email;
-      if (avatarEl && email) avatarEl.textContent = email.charAt(0).toUpperCase();
-    })();
-
-    const formatCurrency = (value) => {
-      if (value === null || value === undefined) return 'R 0.00';
-      const numeric = Number(value);
-      if (Number.isNaN(numeric)) return 'R 0.00';
-      return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(numeric);
-    };
-
-    /* ── Client Search ── */
-    let allProfiles = [];
-    const clientSearch = document.getElementById('clientSearch');
-    const searchSuggestions = document.getElementById('searchSuggestions');
-    const selectedClientId = document.getElementById('selectedClientId');
-    const selectedClientInfo = document.getElementById('selectedClientInfo');
-    const selectedClientName = document.getElementById('selectedClientName');
-
-    clientSearch.addEventListener('input', async (e) => {
-      const query = e.target.value.toLowerCase().trim();
-      if (query.length === 0) {
-        searchSuggestions.classList.remove('show');
-        selectedClientId.value = '';
-        selectedClientInfo.style.display = 'none';
-        return;
-      }
-
-      if (allProfiles.length === 0) {
-        const { data } = await supabaseClient.from('profiles').select('id, first_name, last_name, email, mint_number');
-        allProfiles = data || [];
-      }
-
-      const filtered = allProfiles.filter(p => {
-        const fullName = `${p.first_name || ''} ${p.last_name || ''}`.toLowerCase();
-        const email = (p.email || '').toLowerCase();
-        return fullName.includes(query) || email.includes(query) || (p.mint_number && p.mint_number.toLowerCase().includes(query));
-      }).slice(0, 8);
-
-      searchSuggestions.innerHTML = filtered.map(p => `
-        <div class="search-suggestion-item" data-id="${p.id}" data-name="${p.first_name} ${p.last_name}">
-          <div style="font-weight:600;color:#1e293b;">${p.first_name} ${p.last_name}</div>
-          <div style="font-size:11px;color:#94a3b8;">${p.email || ''}</div>
-        </div>
-      `).join('');
-
-      searchSuggestions.classList.add('show');
-      document.querySelectorAll('.search-suggestion-item').forEach(item => {
-        item.addEventListener('click', () => {
-          const id = item.dataset.id;
-          const name = item.dataset.name;
-          selectedClientId.value = id;
-          clientSearch.value = name;
-          searchSuggestions.classList.remove('show');
-          selectedClientName.textContent = name;
-          document.getElementById('selectedClientType').value = 'parent';
-          selectedClientInfo.style.display = 'block';
-
-          // Show child selection options if this parent has children
-          const childSelectionOptions = document.getElementById('childSelectionOptions');
-          const childRadios = document.getElementById('childRadios');
-
-          const parentChildren = childrenByParent && childrenByParent[id];
-          if (parentChildren && parentChildren.length > 0) {
-            childRadios.innerHTML = parentChildren
-              .map(child => `
-                <label style="display:block;margin-bottom:8px;cursor:pointer;padding:8px;border-radius:4px;border:1px solid #e2e8f0;" class="child-option" data-child-id="${child.id}" data-parent-id="${id}">
-                  <input type="radio" name="childSelect" value="${child.id}" style="margin-right:6px;" />
-                  <span style="color:#1e293b;font-size:12px;">${child.first_name} ${child.last_name}</span>
-                  <span style="color:#94a3b8;font-size:11px;margin-left:4px;">(R ${((child.available_balance || 0) / 100).toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2})})</span>
-                </label>
-              `).join('');
-
-            childSelectionOptions.style.display = 'block';
-
-            // Add click handlers for child options
-            document.querySelectorAll('.child-option').forEach(label => {
-              label.addEventListener('click', (e) => {
-                const childId = label.dataset.childId;
-                const parentId = label.dataset.parentId;
-                const childName = label.querySelector('span').textContent;
-
-                selectedClientId.value = childId;
-                document.getElementById('selectedClientType').value = 'child';
-                selectedClientName.textContent = childName + ' (Child)';
-              });
-            });
-          } else {
-            childSelectionOptions.style.display = 'none';
-          }
+(async () => {
+      const _cfg = await fetch('/api/config').then(r => r.json()).catch(() => ({}));
+      const SUPABASE_URL = _cfg.supabaseUrl || '';
+      const SUPABASE_ANON_KEY = _cfg.supabaseAnonKey || '';
+      const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  
+      const requireSession = async () => {
+        const { data } = await supabaseClient.auth.getSession();
+        if (!data.session) { window.location.href = '/signin.html'; return false; }
+        return true;
+      };
+  
+      const signOutBtn = document.getElementById('signOutBtn');
+      if (signOutBtn) {
+        signOutBtn.addEventListener('click', async () => {
+          await supabaseClient.auth.signOut();
+          window.location.href = '/signin.html';
         });
-      });
-    });
-
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('.search-box-wrapper')) {
-        searchSuggestions.classList.remove('show');
       }
-    });
-
-    let childrenByParent = {};
-
-    /* ── Add to Wallet Form ── */
-    const addWalletForm = document.getElementById('addWalletForm');
-    const walletAmount = document.getElementById('walletAmount');
-    const addWalletAlert = document.getElementById('addWalletAlert');
-    const addWalletSuccess = document.getElementById('addWalletSuccess');
-
-    addWalletForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const clientId = selectedClientId.value.trim();
-      const amount = Number(walletAmount.value || 0);
-      const accountType = document.getElementById('selectedClientType').value || 'parent';
-
-      addWalletAlert.style.display = 'none';
-      addWalletSuccess.style.display = 'none';
-
-      if (!clientId) {
-        addWalletAlert.textContent = 'Please select a client';
-        addWalletAlert.style.display = 'block';
-        return;
-      }
-
-      if (amount <= 0) {
-        addWalletAlert.textContent = 'Please enter a valid amount';
-        addWalletAlert.style.display = 'block';
-        return;
-      }
-
-      try {
+  
+      (async () => {
         const { data: { session } } = await supabaseClient.auth.getSession();
-        const response = await fetch('/api/send-eft-email?action=add-wallet', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-          body: JSON.stringify({ user_id: clientId, amount, account_type: accountType }),
-        });
-
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Failed to add to wallet');
-
-        addWalletSuccess.textContent = `Successfully added ${formatCurrency(amount)} to wallet`;
-        addWalletSuccess.style.display = 'block';
-
-        walletAmount.value = '';
-        selectedClientId.value = '';
-        clientSearch.value = '';
-        document.getElementById('selectedClientType').value = 'parent';
-        document.getElementById('childSelectionOptions').style.display = 'none';
-        selectedClientInfo.style.display = 'none';
-
-        loadPaidEfts();
-      } catch (err) {
-        addWalletAlert.textContent = err.message;
-        addWalletAlert.style.display = 'block';
-      }
-    });
-
-    /* ── Load Users with Wallets ── */
-    async function loadPaidEfts() {
-      const tableBody = document.getElementById('paidEftTableBody');
-      const totalWalletCount = document.getElementById('totalWalletCount');
-      const totalWalletAmount = document.getElementById('totalWalletAmount');
-
-      try {
-        const { data: wallets, error } = await supabaseClient
-          .from('wallets')
-          .select('id, user_id, balance, currency, updated_at, created_at, mint_number, mailer')
-          .gt('balance', 0)
-          .order('updated_at', { ascending: false });
-
-        if (error) throw error;
-
-        if (!wallets || wallets.length === 0) {
-          tableBody.innerHTML = '<tr><td colspan="6" class="empty-state">No users with wallet balance</td></tr>';
-          totalWalletCount.textContent = '0';
-          totalWalletAmount.textContent = formatCurrency(0);
+        const email = session?.user?.email || '';
+        const nameEl = document.getElementById('sidebarUserEmail');
+        const avatarEl = document.getElementById('sidebarAvatarInitials');
+        if (nameEl && email) nameEl.textContent = email;
+        if (avatarEl && email) avatarEl.textContent = email.charAt(0).toUpperCase();
+      })();
+  
+      const formatCurrency = (value) => {
+        if (value === null || value === undefined) return 'R 0.00';
+        const numeric = Number(value);
+        if (Number.isNaN(numeric)) return 'R 0.00';
+        return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(numeric);
+      };
+  
+      /* ── Client Search ── */
+      let allProfiles = [];
+      const clientSearch = document.getElementById('clientSearch');
+      const searchSuggestions = document.getElementById('searchSuggestions');
+      const selectedClientId = document.getElementById('selectedClientId');
+      const selectedClientInfo = document.getElementById('selectedClientInfo');
+      const selectedClientName = document.getElementById('selectedClientName');
+  
+      clientSearch.addEventListener('input', async (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        if (query.length === 0) {
+          searchSuggestions.classList.remove('show');
+          selectedClientId.value = '';
+          selectedClientInfo.style.display = 'none';
           return;
         }
-
-        const userIds = wallets.map(w => w.user_id).filter(Boolean);
-        let profilesMap = {};
-
-        if (userIds.length > 0) {
-          const { data: profiles } = await supabaseClient
-            .from('profiles')
-            .select('id, first_name, last_name, mint_number, email')
-            .in('id', userIds);
-          if (profiles) {
-            profiles.forEach(p => { profilesMap[p.id] = p; });
-          }
+  
+        if (allProfiles.length === 0) {
+          const { data } = await supabaseClient.from('profiles').select('id, first_name, last_name, email, mint_number');
+          allProfiles = data || [];
         }
-
-        // Load children for all parents
-        const { data: children } = await supabaseClient
-          .from('family_members')
-          .select('id, first_name, last_name, available_balance, parent_id')
-          .eq('relationship', 'child');
-
-        childrenByParent = {};
-        if (children) {
-          children.forEach(child => {
-            if (!childrenByParent[child.parent_id]) {
-              childrenByParent[child.parent_id] = [];
-            }
-            childrenByParent[child.parent_id].push(child);
-          });
-        }
-
-        const generateReference = (userId, firstName) => {
-          if (!userId || !firstName) return '—';
-          const first4Letters = firstName.substring(0, 4).toUpperCase();
-          const last4Digits = userId.slice(-4).toLowerCase();
-          return `${first4Letters}-${last4Digits}`;
-        };
-
-        const totalAmount = wallets.reduce((sum, w) => sum + (Number(w.balance) || 0), 0);
-        totalWalletCount.textContent = wallets.length.toString();
-        totalWalletAmount.textContent = formatCurrency(totalAmount);
-
-        tableBody.innerHTML = wallets
-          .map(wallet => {
-            const p = profilesMap[wallet.user_id] || {};
-            const lastUpdate = new Date(wallet.updated_at).toLocaleDateString('en-ZA');
-            const reference = wallet.mint_number || p.mint_number || generateReference(wallet.user_id, p.first_name);
-            const hasChildren = childrenByParent[wallet.user_id] && childrenByParent[wallet.user_id].length > 0;
-            const parentName = `${p.first_name || ''} ${p.last_name || ''}`;
-            const isSent = wallet.mailer === 'sent';
-            
-            const actionButton = isSent
-              ? `<span style="color:#059669;font-weight:600;font-size:12px;">Sent</span>`
-              : `<button class="btn btn-primary" style="padding:6px 12px;font-size:11px;" onclick="sendWalletEmail('${wallet.id}', '${p.email || ''}', '${p.first_name || ''}', '${reference}', '${wallet.balance}', '${wallet.currency || 'ZAR'}', '${wallet.created_at}')">Send</button>`;
-
-            const childrenHtml = hasChildren
-              ? childrenByParent[wallet.user_id]
-                  .map(child => `
-                    <tr class="child-row" style="display:none;background:#f8fafc;" data-parent-id="${wallet.user_id}" data-child-id="${child.id}">
-                      <td style="color:#94a3b8;"></td>
-                      <td style="color:#64748b;padding-left:40px;"><span style="color:#7c3aed;font-weight:600;">↳</span> ${child.first_name} ${child.last_name} <span style="color:#7c3aed;font-size:11px;font-weight:600;">(Child)</span> <span style="color:#94a3b8;font-size:12px;">- Managed by ${parentName}</span></td>
-                      <td style="font-weight:700;color:#059669;">${formatCurrency((child.available_balance || 0) / 100)}</td>
-                      <td></td>
-                      <td></td>
-                    </tr>
-                  `).join('')
-              : '';
-
-            return `
-              <tr class="parent-row" data-parent-id="${wallet.user_id}">
-                <td style="color:#94a3b8;">${lastUpdate}</td>
-                <td style="font-weight:600;color:#1e293b;cursor:${hasChildren ? 'pointer' : 'default'};" class="parent-name" data-client-id="${wallet.user_id}" data-client-name="${parentName}">${parentName}${hasChildren ? ' <span style="color:#7c3aed;">▼</span>' : ''}</td>
-                <td style="font-weight:700;color:#059669;">${formatCurrency(wallet.balance)}</td>
-                <td style="font-family:monospace;color:#7c3aed;font-weight:600;">${reference}</td>
-                <td>${actionButton}</td>
-                <td><button class="btn" style="padding:4px 10px;font-size:11px;background:#f1f5f9;color:#64748b;" onclick="openEditWallet('${wallet.id}', '${parentName.replace(/'/g, '\&#39;')}', ${wallet.balance})">✏️</button></td>
-              </tr>
-              ${childrenHtml}
-            `;
-          })
-          .join('');
-
-        // Add click handlers for expandable parent rows
-        document.querySelectorAll('.parent-name').forEach(nameCell => {
-          const parentRow = nameCell.closest('.parent-row');
-          const parentId = parentRow.dataset.parentId;
-          const childRows = document.querySelectorAll(`.child-row[data-parent-id="${parentId}"]`);
-
-          if (childRows.length > 0) {
-            nameCell.addEventListener('click', (e) => {
-              e.stopPropagation();
-              childRows.forEach(row => {
-                row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+  
+        const filtered = allProfiles.filter(p => {
+          const fullName = `${p.first_name || ''} ${p.last_name || ''}`.toLowerCase();
+          const email = (p.email || '').toLowerCase();
+          return fullName.includes(query) || email.includes(query) || (p.mint_number && p.mint_number.toLowerCase().includes(query));
+        }).slice(0, 8);
+  
+        searchSuggestions.innerHTML = filtered.map(p => `
+          <div class="search-suggestion-item" data-id="${p.id}" data-name="${p.first_name} ${p.last_name}">
+            <div style="font-weight:600;color:#1e293b;">${p.first_name} ${p.last_name}</div>
+            <div style="font-size:11px;color:#94a3b8;">${p.email || ''}</div>
+          </div>
+        `).join('');
+  
+        searchSuggestions.classList.add('show');
+        document.querySelectorAll('.search-suggestion-item').forEach(item => {
+          item.addEventListener('click', () => {
+            const id = item.dataset.id;
+            const name = item.dataset.name;
+            selectedClientId.value = id;
+            clientSearch.value = name;
+            searchSuggestions.classList.remove('show');
+            selectedClientName.textContent = name;
+            document.getElementById('selectedClientType').value = 'parent';
+            selectedClientInfo.style.display = 'block';
+  
+            // Show child selection options if this parent has children
+            const childSelectionOptions = document.getElementById('childSelectionOptions');
+            const childRadios = document.getElementById('childRadios');
+  
+            const parentChildren = childrenByParent && childrenByParent[id];
+            if (parentChildren && parentChildren.length > 0) {
+              childRadios.innerHTML = parentChildren
+                .map(child => `
+                  <label style="display:block;margin-bottom:8px;cursor:pointer;padding:8px;border-radius:4px;border:1px solid #e2e8f0;" class="child-option" data-child-id="${child.id}" data-parent-id="${id}">
+                    <input type="radio" name="childSelect" value="${child.id}" style="margin-right:6px;" />
+                    <span style="color:#1e293b;font-size:12px;">${child.first_name} ${child.last_name}</span>
+                    <span style="color:#94a3b8;font-size:11px;margin-left:4px;">(R ${((child.available_balance || 0) / 100).toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2})})</span>
+                  </label>
+                `).join('');
+  
+              childSelectionOptions.style.display = 'block';
+  
+              // Add click handlers for child options
+              document.querySelectorAll('.child-option').forEach(label => {
+                label.addEventListener('click', (e) => {
+                  const childId = label.dataset.childId;
+                  const parentId = label.dataset.parentId;
+                  const childName = label.querySelector('span').textContent;
+  
+                  selectedClientId.value = childId;
+                  document.getElementById('selectedClientType').value = 'child';
+                  selectedClientName.textContent = childName + ' (Child)';
+                });
               });
-              const arrowSpan = nameCell.querySelector('span');
-              if (arrowSpan) {
-                arrowSpan.textContent = arrowSpan.textContent === '▼' ? '▶' : '▼';
-              }
-            });
-          }
-        });
-
-        // Add click handlers for child rows to select them in form
-        document.querySelectorAll('.child-row').forEach(row => {
-          const childCell = row.querySelector('td:nth-child(2)');
-          if (childCell) {
-            childCell.style.cursor = 'pointer';
-            childCell.addEventListener('click', (e) => {
-              e.stopPropagation();
-              const childId = row.dataset.childId;
-              const childName = childCell.textContent.match(/↳\s+([^(]+)/)[1].trim();
-              selectedClientId.value = childId;
-              clientSearch.value = childName;
-              selectedClientName.textContent = childName;
-              document.getElementById('selectedClientType').value = 'child';
-              selectedClientInfo.style.display = 'block';
-              searchSuggestions.classList.remove('show');
-            });
-          }
-        });
-      } catch (err) {
-        tableBody.innerHTML = `<tr><td colspan="6" class="empty-state">Error: ${err.message}</td></tr>`;
-      }
-    }
-
-    const showToast = (message, type = 'success') => {
-      const toast = document.createElement('div');
-      toast.textContent = message;
-      Object.assign(toast.style, {
-        position: 'fixed',
-        bottom: '24px',
-        right: '24px',
-        backgroundColor: type === 'success' ? '#10b981' : '#ef4444',
-        color: '#ffffff',
-        padding: '16px 24px',
-        borderRadius: '8px',
-        fontSize: '14px',
-        fontWeight: '500',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-        zIndex: '9999',
-        opacity: '0',
-        transform: 'translateY(20px)',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-      });
-      
-      const icon = document.createElement('span');
-      icon.innerHTML = type === 'success' ? '&#10004;' : '&#9888;';
-      toast.prepend(icon);
-      
-      document.body.appendChild(toast);
-      
-      requestAnimationFrame(() => {
-        toast.style.opacity = '1';
-        toast.style.transform = 'translateY(0)';
-      });
-      
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateY(20px)';
-        setTimeout(() => toast.remove(), 300);
-      }, 4000);
-    };
-
-    window.sendWalletEmail = async (walletId, email, firstName, mintNumber, balance, currency, createdAt) => {
-      if (!email) {
-        alert('Client email not found');
-        return;
-      }
-
-      // Fetch the latest top-up amount using the new backend API endpoint
-      let topUpAmount = null;
-      try {
-        const session = await supabaseClient.auth.getSession();
-        const token = session.data.session?.access_token;
-        if (token) {
-          const res = await fetch(`/api/latest-wallet-transaction?wallet_id=${encodeURIComponent(walletId)}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const json = await res.json();
-          if (json.ok && json.amount != null) {
-            topUpAmount = Number(json.amount);
-          }
-        }
-      } catch (e) {
-        console.warn('Could not fetch latest wallet transaction:', e.message);
-      }
-
-      const fmtAmount = topUpAmount != null
-        ? Number(topUpAmount).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        : null;
-
-      const topUpSection = fmtAmount != null ? `
-                    <tr>
-                      <td class="padding-mobile" style="padding:0 48px 8px 48px;">
-                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:16px;overflow:hidden;">
-                          <tr>
-                            <td style="padding:24px;text-align:center;">
-                              <p style="margin:0;font-size:11px;color:#059669;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">Amount Allocated</p>
-                              <p style="margin:8px 0 0 0;font-size:32px;font-weight:700;color:#059669;letter-spacing:-0.5px;">${currency} ${fmtAmount}</p>
-                            </td>
-                          </tr>
-                        </table>
-                      </td>
-                    </tr>` : '';
-      
-      const htmlTemplate = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
-  <meta name="color-scheme" content="light dark">
-  <meta name="supported-color-schemes" content="light dark">
-  <title>Funds Allocated – MINT</title>
-  <style type="text/css">
-    body { margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important; background-color: #f5f5f7; }
-    table, td, a { margin: 0; padding: 0; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
-    table, td { border-spacing: 0; border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
-    img { border: 0; outline: none; text-decoration: none; display: block; max-width: 100%; height: auto; }
-    body { width: 100% !important; line-height: 1.5; -webkit-font-smoothing: antialiased; text-align: center; }
-    @media (prefers-color-scheme: dark) {
-      body, .email-wrapper { background-color: #000000 !important; }
-      .email-body { background-color: #0d0d12 !important; border-color: #1a1a24 !important; }
-      .text-primary { color: #ffffff !important; }
-      .text-secondary { color: #8e8eb2 !important; }
-      .divider { border-top-color: #1a1a24 !important; }
-    }
-    @media screen and (max-width: 480px) {
-      .email-body { width: 100% !important; border-radius: 0 !important; border: none !important; }
-      .padding-mobile { padding: 40px 24px !important; }
-      .feature-col-a, .feature-col-b { display: block !important; width: 100% !important; padding: 0 !important; }
-      .feature-col-b { margin-top: 40px !important; text-align: center !important; }
-      .cta-btn, .cta-btn a { display: block !important; width: 100% !important; }
-      .trust-table td { display: block !important; width: 100% !important; border: none !important; padding: 12px 0 !important; }
-    }
-  </style>
-</head>
-<body style="margin:0;padding:0;background-color:#f5f5f7;text-align:center;">
-  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f5f5f7;">
-    Confirmed: Your funds have been successfully allocated to your MINT wallet.
-  </div>
-  <table class="email-wrapper" role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#f5f5f7;text-align:center;">
-    <tr>
-      <td align="center" style="padding:48px 16px;">
-        <div style="max-width:600px;margin:0 auto;">
-          <table class="email-body" role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" align="center" style="max-width:600px;background-color:#ffffff;border-radius:24px;border:1px solid #eef0f7;overflow:hidden;box-shadow:0 12px 40px rgba(49,0,94,0.06);text-align:left;margin:0 auto;">
-            <tr>
-              <td>
-                <img src="https://my-mint-admin.vercel.app/images/Mailer%20Funds%20put.avif" width="600" alt="Funds Allocated" style="display:block;width:100%;height:auto;">
-              </td>
-            </tr>
-            <tr>
-              <td class="padding-mobile" style="padding:64px 48px 24px 48px;">
-                <h1 class="text-primary" style="margin:0 0 16px 0;font-size:32px;font-weight:700;color:#31005e;letter-spacing:-0.8px;line-height:1.1;">
-                  Funds Allocated.
-                </h1>
-                <p class="text-secondary" style="margin:0;font-size:16px;line-height:26px;color:#555c70;font-weight:400;">
-                  Hi <span style="font-weight:600;color:#31005e;" class="text-primary">${firstName}</span>, your transfer has been successfully processed. The funds are now active in your MINT Wallet and ready to be deployed.
-                </p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:0 48px;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                  <tr><td class="divider" style="border-top:1px solid #eef0f7;padding-top:40px;"></td></tr>
-                </table>
-              </td>
-            </tr>
-            ${topUpSection}
-            <tr>
-              <td class="padding-mobile" style="padding:0 48px 32px 48px;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                  <tr>
-                    <td class="feature-col-a" valign="middle" style="width:55%;padding-right:20px;text-align:center;">
-                      <p style="margin:0;font-size:11px;color:#8e8eb2;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">MINT Number</p>
-                      <p class="text-primary" style="margin:6px 0 36px 0;font-size:16px;font-weight:500;color:#31005e;">${mintNumber}</p>
-                      <p style="margin:0;font-size:11px;color:#8e8eb2;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">Wallet Balance</p>
-                      <p style="margin:6px 0 0 0;font-size:32px;font-weight:700;color:#5c3bcf;letter-spacing:-0.5px;">${currency} ${balance}</p>
-                    </td>
-                    <td class="feature-col-b" valign="middle" style="width:45%;text-align:right;">
-                      <img src="https://my-mint-admin.vercel.app/images/wallet-illustration.svg" alt="Wallet Illustration" width="180" style="display:inline-block;border-radius:16px;">
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-
-            <tr>
-              <td class="padding-mobile" style="padding:0 48px 64px 48px;text-align:center;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto;">
-                  <tr>
-                    <td style="border-radius:100px;background-color:#5c3bcf;text-align:center;box-shadow: 0 4px 14px rgba(92,59,207,0.25);">
-                      <a href="https://app.mymint.co.za" target="_blank" style="display:inline-block;padding:16px 40px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:100px;letter-spacing:0.5px;">
-                        Invest Now
-                      </a>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-            <tr>
-              <td style="padding:48px 24px;text-align:center;">
-                <p style="margin:0 0 16px 0;font-size:11px;color:#8e8eb2;line-height:18px;text-align:justify;">
-                  MINT Platforms (Pty) Ltd is an authorised Financial Services Provider (FSP 55118) regulated by the Financial Sector Conduct Authority and a registered Credit Provider (NCRCP22892) under the National Credit Act. All investment activity carries risk, including the possible loss of capital and liquidity constraints. Any information provided here is educational in nature, does not constitute personalised financial advice, and should not be relied on as a recommendation to buy or sell securities. Please consider whether investing is appropriate for your circumstances and consult an independent adviser where necessary.
-                </p>
-                <p style="margin:0;font-size:12px;color:#8e8eb2;line-height:22px;">
-                  &copy; 2026 MINT. All rights reserved. <br>
-                  Date: ${new Date(createdAt).toLocaleDateString('en-ZA')} <br>
-                  <a href="https://www.mymint.co.za" style="color:#8e8eb2;text-decoration:underline;margin-top:8px;display:inline-block;">www.mymint.co.za</a>
-                </p>
-              </td>
-            </tr>
-          </table>
-        </div>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-
-      try {
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        const response = await fetch('/api/send-eft-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-          body: JSON.stringify({ to: email, subject: 'Funds Allocated - MINT', html: htmlTemplate, walletId }),
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Failed to send email');
-        
-        showToast('Email has been successfully sent!');
-        loadPaidEfts();
-      } catch (err) {
-        showToast('Error sending email: ' + err.message, 'error');
-      }
-    };
-
-    /* ── Edit Wallet Balance ── */
-    let _editWalletId = null;
-
-    window.openEditWallet = (walletId, clientName, currentBalance) => {
-      _editWalletId = walletId;
-      document.getElementById('editWalletClientName').textContent = clientName;
-      document.getElementById('editWalletOldBalance').textContent = formatCurrency(currentBalance);
-      document.getElementById('editWalletNewBalance').value = currentBalance;
-      document.getElementById('editWalletError').style.display = 'none';
-      document.getElementById('editWalletModal').classList.remove('hidden');
-    };
-
-    window.saveWalletEdit = async () => {
-      const newBalance = Number(document.getElementById('editWalletNewBalance').value);
-      const errorEl = document.getElementById('editWalletError');
-      errorEl.style.display = 'none';
-
-      if (isNaN(newBalance) || newBalance < 0) {
-        errorEl.textContent = 'Please enter a valid balance (>= 0)';
-        errorEl.style.display = 'block';
-        return;
-      }
-
-      const saveBtn = document.getElementById('editWalletSaveBtn');
-      saveBtn.disabled = true;
-      saveBtn.textContent = 'Saving...';
-
-      try {
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        const response = await fetch('/api/edit-wallet-balance', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-          body: JSON.stringify({ wallet_id: _editWalletId, new_balance: newBalance }),
-        });
-
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Failed to update balance');
-
-        document.getElementById('editWalletModal').classList.add('hidden');
-        showToast(`Balance updated: ${formatCurrency(result.old_balance)} → ${formatCurrency(result.new_balance)}`);
-        loadPaidEfts();
-      } catch (err) {
-        errorEl.textContent = err.message;
-        errorEl.style.display = 'block';
-      } finally {
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'Save';
-      }
-    };
-
-    /* ── CSV Upload for Offline Payments - COMMENTED OUT FOR LATER ── */
-    /*
-    const walletCsvUpload = document.getElementById('walletCsvUpload');
-    const walletCsvResults = document.getElementById('walletCsvResults');
-    const walletCsvResultsBody = document.getElementById('walletCsvResultsBody');
-    const walletCsvCommitBtn = document.getElementById('walletCsvCommitBtn');
-    let parsedCsvPayments = [];
-
-    if (walletCsvUpload) {
-      walletCsvUpload.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const { data: profiles } = await supabaseClient.from('profiles').select('id, email, first_name, last_name');
-        const profilesByEmail = {};
-        (profiles || []).forEach(p => { profilesByEmail[p.email?.toLowerCase()] = p; });
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const text = event.target.result;
-          const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-          parsedCsvPayments = [];
-
-          lines.forEach((line, idx) => {
-            if (idx === 0) return; // Skip header
-            const parts = line.split(',').map(p => p.trim());
-            const email = parts[0]?.toLowerCase();
-            const amount = Number(parts[1]);
-            const reference = parts[2] || '';
-
-            const profile = profilesByEmail[email];
-            if (profile && amount > 0) {
-              parsedCsvPayments.push({
-                email,
-                amount,
-                reference,
-                userId: profile.id,
-                userName: `${profile.first_name} ${profile.last_name}`
-              });
+            } else {
+              childSelectionOptions.style.display = 'none';
             }
           });
-
-          walletCsvResultsBody.innerHTML = '';
-          if (parsedCsvPayments.length > 0) {
-            parsedCsvPayments.forEach((dep) => {
-              const tr = document.createElement('tr');
-              tr.innerHTML = `
-                <td style="padding:12px 16px;font-size:12px;font-weight:600;color:#374151;">${dep.userName}</td>
-                <td style="padding:12px 16px;font-size:12px;font-weight:700;color:#059669;text-align:right;">${formatCurrency(dep.amount)}</td>
-                <td style="padding:12px 16px;font-size:12px;color:#94a3b8;">${dep.reference || '—'}</td>
-              `;
-              walletCsvResultsBody.appendChild(tr);
-            });
-          } else {
-            walletCsvResultsBody.innerHTML = `<tr><td colspan="3" style="padding:24px;text-align:center;font-size:12px;color:#94a3b8;">No matching emails found.</td></tr>`;
-          }
-          walletCsvResults.style.display = 'block';
-        };
-        reader.readAsText(file);
-        e.target.value = '';
+        });
       });
-    }
-
-    if (walletCsvCommitBtn) {
-      walletCsvCommitBtn.addEventListener('click', async () => {
-        if (parsedCsvPayments.length === 0) return;
+  
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.search-box-wrapper')) {
+          searchSuggestions.classList.remove('show');
+        }
+      });
+  
+      let childrenByParent = {};
+  
+      /* ── Add to Wallet Form ── */
+      const addWalletForm = document.getElementById('addWalletForm');
+      const walletAmount = document.getElementById('walletAmount');
+      const addWalletAlert = document.getElementById('addWalletAlert');
+      const addWalletSuccess = document.getElementById('addWalletSuccess');
+  
+      addWalletForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+  
+        const clientId = selectedClientId.value.trim();
+        const amount = Number(walletAmount.value || 0);
+        const accountType = document.getElementById('selectedClientType').value || 'parent';
+  
+        addWalletAlert.style.display = 'none';
+        addWalletSuccess.style.display = 'none';
+  
+        if (!clientId) {
+          addWalletAlert.textContent = 'Please select a client';
+          addWalletAlert.style.display = 'block';
+          return;
+        }
+  
+        if (amount <= 0) {
+          addWalletAlert.textContent = 'Please enter a valid amount';
+          addWalletAlert.style.display = 'block';
+          return;
+        }
+  
         try {
           const { data: { session } } = await supabaseClient.auth.getSession();
-          const response = await fetch('/api/upload-wallet-payments', {
+          const response = await fetch('/api/send-eft-email?action=add-wallet', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-            body: JSON.stringify({ payments: parsedCsvPayments }),
+            body: JSON.stringify({ user_id: clientId, amount, account_type: accountType }),
           });
+  
           const result = await response.json();
-          if (!response.ok) throw new Error(result.error || 'Failed to upload payments');
-          alert('Payments uploaded successfully!');
-          walletCsvResults.style.display = 'none';
-          parsedCsvPayments = [];
+          if (!response.ok) throw new Error(result.error || 'Failed to add to wallet');
+  
+          addWalletSuccess.textContent = `Successfully added ${formatCurrency(amount)} to wallet`;
+          addWalletSuccess.style.display = 'block';
+  
+          walletAmount.value = '';
+          selectedClientId.value = '';
+          clientSearch.value = '';
+          document.getElementById('selectedClientType').value = 'parent';
+          document.getElementById('childSelectionOptions').style.display = 'none';
+          selectedClientInfo.style.display = 'none';
+  
           loadPaidEfts();
         } catch (err) {
-          alert(`Error: ${err.message}`);
+          addWalletAlert.textContent = err.message;
+          addWalletAlert.style.display = 'block';
         }
       });
-    }
-    */
-
-    /* ── Payment History Modal - COMMENTED OUT FOR LATER ── */
-    /*
-    const paymentHistoryModal = document.getElementById('paymentHistoryModal');
-    const paymentHistoryClose = document.getElementById('paymentHistoryClose');
-
-    const showPaymentHistory = async (userId, clientName) => {
-      const { data: transactions, error } = await supabaseClient
-        .from('wallet_transactions')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        alert('Error loading payment history');
-        return;
+  
+      /* ── Load Users with Wallets ── */
+      async function loadPaidEfts() {
+        const tableBody = document.getElementById('paidEftTableBody');
+        const totalWalletCount = document.getElementById('totalWalletCount');
+        const totalWalletAmount = document.getElementById('totalWalletAmount');
+  
+        try {
+          const { data: wallets, error } = await supabaseClient
+            .from('wallets')
+            .select('id, user_id, balance, currency, updated_at, created_at, mint_number, mailer')
+            .gt('balance', 0)
+            .order('updated_at', { ascending: false });
+  
+          if (error) throw error;
+  
+          if (!wallets || wallets.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="6" class="empty-state">No users with wallet balance</td></tr>';
+            totalWalletCount.textContent = '0';
+            totalWalletAmount.textContent = formatCurrency(0);
+            return;
+          }
+  
+          const userIds = wallets.map(w => w.user_id).filter(Boolean);
+          let profilesMap = {};
+  
+          if (userIds.length > 0) {
+            const { data: profiles } = await supabaseClient
+              .from('profiles')
+              .select('id, first_name, last_name, mint_number, email')
+              .in('id', userIds);
+            if (profiles) {
+              profiles.forEach(p => { profilesMap[p.id] = p; });
+            }
+          }
+  
+          // Load children for all parents
+          const { data: children } = await supabaseClient
+            .from('family_members')
+            .select('id, first_name, last_name, available_balance, parent_id')
+            .eq('relationship', 'child');
+  
+          childrenByParent = {};
+          if (children) {
+            children.forEach(child => {
+              if (!childrenByParent[child.parent_id]) {
+                childrenByParent[child.parent_id] = [];
+              }
+              childrenByParent[child.parent_id].push(child);
+            });
+          }
+  
+          const generateReference = (userId, firstName) => {
+            if (!userId || !firstName) return '—';
+            const first4Letters = firstName.substring(0, 4).toUpperCase();
+            const last4Digits = userId.slice(-4).toLowerCase();
+            return `${first4Letters}-${last4Digits}`;
+          };
+  
+          const totalAmount = wallets.reduce((sum, w) => sum + (Number(w.balance) || 0), 0);
+          totalWalletCount.textContent = wallets.length.toString();
+          totalWalletAmount.textContent = formatCurrency(totalAmount);
+  
+          tableBody.innerHTML = wallets
+            .map(wallet => {
+              const p = profilesMap[wallet.user_id] || {};
+              const lastUpdate = new Date(wallet.updated_at).toLocaleDateString('en-ZA');
+              const reference = wallet.mint_number || p.mint_number || generateReference(wallet.user_id, p.first_name);
+              const hasChildren = childrenByParent[wallet.user_id] && childrenByParent[wallet.user_id].length > 0;
+              const parentName = `${p.first_name || ''} ${p.last_name || ''}`;
+              const isSent = wallet.mailer === 'sent';
+              
+              const actionButton = isSent
+                ? `<span style="color:#059669;font-weight:600;font-size:12px;">Sent</span>`
+                : `<button class="btn btn-primary" style="padding:6px 12px;font-size:11px;" onclick="sendWalletEmail('${wallet.id}', '${p.email || ''}', '${p.first_name || ''}', '${reference}', '${wallet.balance}', '${wallet.currency || 'ZAR'}', '${wallet.created_at}')">Send</button>`;
+  
+              const childrenHtml = hasChildren
+                ? childrenByParent[wallet.user_id]
+                    .map(child => `
+                      <tr class="child-row" style="display:none;background:#f8fafc;" data-parent-id="${wallet.user_id}" data-child-id="${child.id}">
+                        <td style="color:#94a3b8;"></td>
+                        <td style="color:#64748b;padding-left:40px;"><span style="color:#7c3aed;font-weight:600;">↳</span> ${child.first_name} ${child.last_name} <span style="color:#7c3aed;font-size:11px;font-weight:600;">(Child)</span> <span style="color:#94a3b8;font-size:12px;">- Managed by ${parentName}</span></td>
+                        <td style="font-weight:700;color:#059669;">${formatCurrency((child.available_balance || 0) / 100)}</td>
+                        <td></td>
+                        <td></td>
+                      </tr>
+                    `).join('')
+                : '';
+  
+              return `
+                <tr class="parent-row" data-parent-id="${wallet.user_id}">
+                  <td style="color:#94a3b8;">${lastUpdate}</td>
+                  <td style="font-weight:600;color:#1e293b;cursor:${hasChildren ? 'pointer' : 'default'};" class="parent-name" data-client-id="${wallet.user_id}" data-client-name="${parentName}">${parentName}${hasChildren ? ' <span style="color:#7c3aed;">▼</span>' : ''}</td>
+                  <td style="font-weight:700;color:#059669;">${formatCurrency(wallet.balance)}</td>
+                  <td style="font-family:monospace;color:#7c3aed;font-weight:600;">${reference}</td>
+                  <td>${actionButton}</td>
+                  <td><button class="btn" style="padding:4px 10px;font-size:11px;background:#f1f5f9;color:#64748b;" onclick="openEditWallet('${wallet.id}', '${parentName.replace(/'/g, '\&#39;')}', ${wallet.balance})">✏️</button></td>
+                </tr>
+                ${childrenHtml}
+              `;
+            })
+            .join('');
+  
+          // Add click handlers for expandable parent rows
+          document.querySelectorAll('.parent-name').forEach(nameCell => {
+            const parentRow = nameCell.closest('.parent-row');
+            const parentId = parentRow.dataset.parentId;
+            const childRows = document.querySelectorAll(`.child-row[data-parent-id="${parentId}"]`);
+  
+            if (childRows.length > 0) {
+              nameCell.addEventListener('click', (e) => {
+                e.stopPropagation();
+                childRows.forEach(row => {
+                  row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+                });
+                const arrowSpan = nameCell.querySelector('span');
+                if (arrowSpan) {
+                  arrowSpan.textContent = arrowSpan.textContent === '▼' ? '▶' : '▼';
+                }
+              });
+            }
+          });
+  
+          // Add click handlers for child rows to select them in form
+          document.querySelectorAll('.child-row').forEach(row => {
+            const childCell = row.querySelector('td:nth-child(2)');
+            if (childCell) {
+              childCell.style.cursor = 'pointer';
+              childCell.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const childId = row.dataset.childId;
+                const childName = childCell.textContent.match(/↳\s+([^(]+)/)[1].trim();
+                selectedClientId.value = childId;
+                clientSearch.value = childName;
+                selectedClientName.textContent = childName;
+                document.getElementById('selectedClientType').value = 'child';
+                selectedClientInfo.style.display = 'block';
+                searchSuggestions.classList.remove('show');
+              });
+            }
+          });
+        } catch (err) {
+          tableBody.innerHTML = `<tr><td colspan="6" class="empty-state">Error: ${err.message}</td></tr>`;
+        }
       }
-
-      document.getElementById('paymentHistoryTitle').textContent = `Payment History - ${clientName}`;
-      document.getElementById('paymentHistorySubtitle').textContent = `Total transactions: ${transactions?.length || 0}`;
-
-      const historyBody = document.getElementById('paymentHistoryBody');
-      if (!transactions || transactions.length === 0) {
-        historyBody.innerHTML = '<tr><td colspan="4" style="padding:24px;text-align:center;font-size:12px;color:#94a3b8;">No payment history</td></tr>';
-      } else {
-        historyBody.innerHTML = transactions.map(tx => {
-          const date = new Date(tx.created_at).toLocaleDateString('en-ZA');
-          const time = new Date(tx.created_at).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
-          return `
-            <tr style="border-bottom:1px solid #f1f5f9;">
-              <td style="padding:12px;font-size:12px;color:#94a3b8;">${date} ${time}</td>
-              <td style="padding:12px;font-size:12px;font-weight:700;color:#059669;text-align:right;">${formatCurrency(tx.amount)}</td>
-              <td style="padding:12px;font-size:12px;color:#64748b;text-transform:capitalize;">${tx.transaction_type}</td>
-              <td style="padding:12px;font-size:12px;color:#94a3b8;font-family:monospace;">${tx.reference || '—'}</td>
-            </tr>
-          `;
-        }).join('');
-      }
-
-      paymentHistoryModal.classList.remove('hidden');
-    };
-
-    paymentHistoryClose.addEventListener('click', () => {
-      paymentHistoryModal.classList.add('hidden');
-    });
-
-    paymentHistoryModal.addEventListener('click', (e) => {
-      if (e.target === paymentHistoryModal) {
-        paymentHistoryModal.classList.add('hidden');
-      }
-    });
-
-    // Update Table to Show Clickable Client Names
-    const originalLoadPaidEfts = loadPaidEfts;
-    loadPaidEfts = async function() {
-      await originalLoadPaidEfts.call(this);
-      // Add click handlers to client names
-      document.querySelectorAll('[data-client-id]').forEach(el => {
-        el.style.cursor = 'pointer';
-        el.style.textDecoration = 'underline';
-        el.addEventListener('click', () => {
-          const clientId = el.dataset.clientId;
-          const clientName = el.dataset.clientName;
-          showPaymentHistory(clientId, clientName);
+  
+      const showToast = (message, type = 'success') => {
+        const toast = document.createElement('div');
+        toast.textContent = message;
+        Object.assign(toast.style, {
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          backgroundColor: type === 'success' ? '#10b981' : '#ef4444',
+          color: '#ffffff',
+          padding: '16px 24px',
+          borderRadius: '8px',
+          fontSize: '14px',
+          fontWeight: '500',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          zIndex: '9999',
+          opacity: '0',
+          transform: 'translateY(20px)',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
         });
+        
+        const icon = document.createElement('span');
+        icon.innerHTML = type === 'success' ? '&#10004;' : '&#9888;';
+        toast.prepend(icon);
+        
+        document.body.appendChild(toast);
+        
+        requestAnimationFrame(() => {
+          toast.style.opacity = '1';
+          toast.style.transform = 'translateY(0)';
+        });
+        
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateY(20px)';
+          setTimeout(() => toast.remove(), 300);
+        }, 4000);
+      };
+  
+      window.sendWalletEmail = async (walletId, email, firstName, mintNumber, balance, currency, createdAt) => {
+        if (!email) {
+          alert('Client email not found');
+          return;
+        }
+  
+        // Fetch the latest top-up amount using the new backend API endpoint
+        let topUpAmount = null;
+        try {
+          const session = await supabaseClient.auth.getSession();
+          const token = session.data.session?.access_token;
+          if (token) {
+            const res = await fetch(`/api/latest-wallet-transaction?wallet_id=${encodeURIComponent(walletId)}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const json = await res.json();
+            if (json.ok && json.amount != null) {
+              topUpAmount = Number(json.amount);
+            }
+          }
+        } catch (e) {
+          console.warn('Could not fetch latest wallet transaction:', e.message);
+        }
+  
+        const fmtAmount = topUpAmount != null
+          ? Number(topUpAmount).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : null;
+  
+        const topUpSection = fmtAmount != null ? `
+                      <tr>
+                        <td class="padding-mobile" style="padding:0 48px 8px 48px;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:16px;overflow:hidden;">
+                            <tr>
+                              <td style="padding:24px;text-align:center;">
+                                <p style="margin:0;font-size:11px;color:#059669;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">Amount Allocated</p>
+                                <p style="margin:8px 0 0 0;font-size:32px;font-weight:700;color:#059669;letter-spacing:-0.5px;">${currency} ${fmtAmount}</p>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>` : '';
+        
+        const htmlTemplate = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+  <html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
+    <meta name="color-scheme" content="light dark">
+    <meta name="supported-color-schemes" content="light dark">
+    <title>Funds Allocated – MINT</title>
+    <style type="text/css">
+      body { margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important; background-color: #f5f5f7; }
+      table, td, a { margin: 0; padding: 0; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+      table, td { border-spacing: 0; border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+      img { border: 0; outline: none; text-decoration: none; display: block; max-width: 100%; height: auto; }
+      body { width: 100% !important; line-height: 1.5; -webkit-font-smoothing: antialiased; text-align: center; }
+      @media (prefers-color-scheme: dark) {
+        body, .email-wrapper { background-color: #000000 !important; }
+        .email-body { background-color: #0d0d12 !important; border-color: #1a1a24 !important; }
+        .text-primary { color: #ffffff !important; }
+        .text-secondary { color: #8e8eb2 !important; }
+        .divider { border-top-color: #1a1a24 !important; }
+      }
+      @media screen and (max-width: 480px) {
+        .email-body { width: 100% !important; border-radius: 0 !important; border: none !important; }
+        .padding-mobile { padding: 40px 24px !important; }
+        .feature-col-a, .feature-col-b { display: block !important; width: 100% !important; padding: 0 !important; }
+        .feature-col-b { margin-top: 40px !important; text-align: center !important; }
+        .cta-btn, .cta-btn a { display: block !important; width: 100% !important; }
+        .trust-table td { display: block !important; width: 100% !important; border: none !important; padding: 12px 0 !important; }
+      }
+    </style>
+  </head>
+  <body style="margin:0;padding:0;background-color:#f5f5f7;text-align:center;">
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f5f5f7;">
+      Confirmed: Your funds have been successfully allocated to your MINT wallet.
+    </div>
+    <table class="email-wrapper" role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#f5f5f7;text-align:center;">
+      <tr>
+        <td align="center" style="padding:48px 16px;">
+          <div style="max-width:600px;margin:0 auto;">
+            <table class="email-body" role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" align="center" style="max-width:600px;background-color:#ffffff;border-radius:24px;border:1px solid #eef0f7;overflow:hidden;box-shadow:0 12px 40px rgba(49,0,94,0.06);text-align:left;margin:0 auto;">
+              <tr>
+                <td>
+                  <img src="https://my-mint-admin.vercel.app/images/Mailer%20Funds%20put.avif" width="600" alt="Funds Allocated" style="display:block;width:100%;height:auto;">
+                </td>
+              </tr>
+              <tr>
+                <td class="padding-mobile" style="padding:64px 48px 24px 48px;">
+                  <h1 class="text-primary" style="margin:0 0 16px 0;font-size:32px;font-weight:700;color:#31005e;letter-spacing:-0.8px;line-height:1.1;">
+                    Funds Allocated.
+                  </h1>
+                  <p class="text-secondary" style="margin:0;font-size:16px;line-height:26px;color:#555c70;font-weight:400;">
+                    Hi <span style="font-weight:600;color:#31005e;" class="text-primary">${firstName}</span>, your transfer has been successfully processed. The funds are now active in your MINT Wallet and ready to be deployed.
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:0 48px;">
+                  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                    <tr><td class="divider" style="border-top:1px solid #eef0f7;padding-top:40px;"></td></tr>
+                  </table>
+                </td>
+              </tr>
+              ${topUpSection}
+              <tr>
+                <td class="padding-mobile" style="padding:0 48px 32px 48px;">
+                  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                    <tr>
+                      <td class="feature-col-a" valign="middle" style="width:55%;padding-right:20px;text-align:center;">
+                        <p style="margin:0;font-size:11px;color:#8e8eb2;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">MINT Number</p>
+                        <p class="text-primary" style="margin:6px 0 36px 0;font-size:16px;font-weight:500;color:#31005e;">${mintNumber}</p>
+                        <p style="margin:0;font-size:11px;color:#8e8eb2;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">Wallet Balance</p>
+                        <p style="margin:6px 0 0 0;font-size:32px;font-weight:700;color:#5c3bcf;letter-spacing:-0.5px;">${currency} ${balance}</p>
+                      </td>
+                      <td class="feature-col-b" valign="middle" style="width:45%;text-align:right;">
+                        <img src="https://my-mint-admin.vercel.app/images/wallet-illustration.svg" alt="Wallet Illustration" width="180" style="display:inline-block;border-radius:16px;">
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+  
+              <tr>
+                <td class="padding-mobile" style="padding:0 48px 64px 48px;text-align:center;">
+                  <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto;">
+                    <tr>
+                      <td style="border-radius:100px;background-color:#5c3bcf;text-align:center;box-shadow: 0 4px 14px rgba(92,59,207,0.25);">
+                        <a href="https://app.mymint.co.za" target="_blank" style="display:inline-block;padding:16px 40px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:100px;letter-spacing:0.5px;">
+                          Invest Now
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+              <tr>
+                <td style="padding:48px 24px;text-align:center;">
+                  <p style="margin:0 0 16px 0;font-size:11px;color:#8e8eb2;line-height:18px;text-align:justify;">
+                    MINT Platforms (Pty) Ltd is an authorised Financial Services Provider (FSP 55118) regulated by the Financial Sector Conduct Authority and a registered Credit Provider (NCRCP22892) under the National Credit Act. All investment activity carries risk, including the possible loss of capital and liquidity constraints. Any information provided here is educational in nature, does not constitute personalised financial advice, and should not be relied on as a recommendation to buy or sell securities. Please consider whether investing is appropriate for your circumstances and consult an independent adviser where necessary.
+                  </p>
+                  <p style="margin:0;font-size:12px;color:#8e8eb2;line-height:22px;">
+                    &copy; 2026 MINT. All rights reserved. <br>
+                    Date: ${new Date(createdAt).toLocaleDateString('en-ZA')} <br>
+                    <a href="https://www.mymint.co.za" style="color:#8e8eb2;text-decoration:underline;margin-top:8px;display:inline-block;">www.mymint.co.za</a>
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </body>
+  </html>`;
+  
+        try {
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          const response = await fetch('/api/send-eft-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+            body: JSON.stringify({ to: email, subject: 'Funds Allocated - MINT', html: htmlTemplate, walletId }),
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'Failed to send email');
+          
+          showToast('Email has been successfully sent!');
+          loadPaidEfts();
+        } catch (err) {
+          showToast('Error sending email: ' + err.message, 'error');
+        }
+      };
+  
+      /* ── Edit Wallet Balance ── */
+      let _editWalletId = null;
+  
+      window.openEditWallet = (walletId, clientName, currentBalance) => {
+        _editWalletId = walletId;
+        document.getElementById('editWalletClientName').textContent = clientName;
+        document.getElementById('editWalletOldBalance').textContent = formatCurrency(currentBalance);
+        document.getElementById('editWalletNewBalance').value = currentBalance;
+        document.getElementById('editWalletError').style.display = 'none';
+        document.getElementById('editWalletModal').classList.remove('hidden');
+      };
+  
+      window.saveWalletEdit = async () => {
+        const newBalance = Number(document.getElementById('editWalletNewBalance').value);
+        const errorEl = document.getElementById('editWalletError');
+        errorEl.style.display = 'none';
+  
+        if (isNaN(newBalance) || newBalance < 0) {
+          errorEl.textContent = 'Please enter a valid balance (>= 0)';
+          errorEl.style.display = 'block';
+          return;
+        }
+  
+        const saveBtn = document.getElementById('editWalletSaveBtn');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+  
+        try {
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          const response = await fetch('/api/edit-wallet-balance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+            body: JSON.stringify({ wallet_id: _editWalletId, new_balance: newBalance }),
+          });
+  
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'Failed to update balance');
+  
+          document.getElementById('editWalletModal').classList.add('hidden');
+          showToast(`Balance updated: ${formatCurrency(result.old_balance)} → ${formatCurrency(result.new_balance)}`);
+          loadPaidEfts();
+        } catch (err) {
+          errorEl.textContent = err.message;
+          errorEl.style.display = 'block';
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save';
+        }
+      };
+  
+      /* ── CSV Upload for Offline Payments - COMMENTED OUT FOR LATER ── */
+      /*
+      const walletCsvUpload = document.getElementById('walletCsvUpload');
+      const walletCsvResults = document.getElementById('walletCsvResults');
+      const walletCsvResultsBody = document.getElementById('walletCsvResultsBody');
+      const walletCsvCommitBtn = document.getElementById('walletCsvCommitBtn');
+      let parsedCsvPayments = [];
+  
+      if (walletCsvUpload) {
+        walletCsvUpload.addEventListener('change', async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+  
+          const { data: profiles } = await supabaseClient.from('profiles').select('id, email, first_name, last_name');
+          const profilesByEmail = {};
+          (profiles || []).forEach(p => { profilesByEmail[p.email?.toLowerCase()] = p; });
+  
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const text = event.target.result;
+            const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+            parsedCsvPayments = [];
+  
+            lines.forEach((line, idx) => {
+              if (idx === 0) return; // Skip header
+              const parts = line.split(',').map(p => p.trim());
+              const email = parts[0]?.toLowerCase();
+              const amount = Number(parts[1]);
+              const reference = parts[2] || '';
+  
+              const profile = profilesByEmail[email];
+              if (profile && amount > 0) {
+                parsedCsvPayments.push({
+                  email,
+                  amount,
+                  reference,
+                  userId: profile.id,
+                  userName: `${profile.first_name} ${profile.last_name}`
+                });
+              }
+            });
+  
+            walletCsvResultsBody.innerHTML = '';
+            if (parsedCsvPayments.length > 0) {
+              parsedCsvPayments.forEach((dep) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                  <td style="padding:12px 16px;font-size:12px;font-weight:600;color:#374151;">${dep.userName}</td>
+                  <td style="padding:12px 16px;font-size:12px;font-weight:700;color:#059669;text-align:right;">${formatCurrency(dep.amount)}</td>
+                  <td style="padding:12px 16px;font-size:12px;color:#94a3b8;">${dep.reference || '—'}</td>
+                `;
+                walletCsvResultsBody.appendChild(tr);
+              });
+            } else {
+              walletCsvResultsBody.innerHTML = `<tr><td colspan="3" style="padding:24px;text-align:center;font-size:12px;color:#94a3b8;">No matching emails found.</td></tr>`;
+            }
+            walletCsvResults.style.display = 'block';
+          };
+          reader.readAsText(file);
+          e.target.value = '';
+        });
+      }
+  
+      if (walletCsvCommitBtn) {
+        walletCsvCommitBtn.addEventListener('click', async () => {
+          if (parsedCsvPayments.length === 0) return;
+          try {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            const response = await fetch('/api/upload-wallet-payments', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+              body: JSON.stringify({ payments: parsedCsvPayments }),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Failed to upload payments');
+            alert('Payments uploaded successfully!');
+            walletCsvResults.style.display = 'none';
+            parsedCsvPayments = [];
+            loadPaidEfts();
+          } catch (err) {
+            alert(`Error: ${err.message}`);
+          }
+        });
+      }
+      */
+  
+      /* ── Payment History Modal - COMMENTED OUT FOR LATER ── */
+      /*
+      const paymentHistoryModal = document.getElementById('paymentHistoryModal');
+      const paymentHistoryClose = document.getElementById('paymentHistoryClose');
+  
+      const showPaymentHistory = async (userId, clientName) => {
+        const { data: transactions, error } = await supabaseClient
+          .from('wallet_transactions')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+  
+        if (error) {
+          alert('Error loading payment history');
+          return;
+        }
+  
+        document.getElementById('paymentHistoryTitle').textContent = `Payment History - ${clientName}`;
+        document.getElementById('paymentHistorySubtitle').textContent = `Total transactions: ${transactions?.length || 0}`;
+  
+        const historyBody = document.getElementById('paymentHistoryBody');
+        if (!transactions || transactions.length === 0) {
+          historyBody.innerHTML = '<tr><td colspan="4" style="padding:24px;text-align:center;font-size:12px;color:#94a3b8;">No payment history</td></tr>';
+        } else {
+          historyBody.innerHTML = transactions.map(tx => {
+            const date = new Date(tx.created_at).toLocaleDateString('en-ZA');
+            const time = new Date(tx.created_at).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
+            return `
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="padding:12px;font-size:12px;color:#94a3b8;">${date} ${time}</td>
+                <td style="padding:12px;font-size:12px;font-weight:700;color:#059669;text-align:right;">${formatCurrency(tx.amount)}</td>
+                <td style="padding:12px;font-size:12px;color:#64748b;text-transform:capitalize;">${tx.transaction_type}</td>
+                <td style="padding:12px;font-size:12px;color:#94a3b8;font-family:monospace;">${tx.reference || '—'}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+  
+        paymentHistoryModal.classList.remove('hidden');
+      };
+  
+      paymentHistoryClose.addEventListener('click', () => {
+        paymentHistoryModal.classList.add('hidden');
       });
-    };
-    */
-
-    requireSession().then(ok => {
-      if (!ok) return;
-      loadPaidEfts();
-    });
+  
+      paymentHistoryModal.addEventListener('click', (e) => {
+        if (e.target === paymentHistoryModal) {
+          paymentHistoryModal.classList.add('hidden');
+        }
+      });
+  
+      // Update Table to Show Clickable Client Names
+      const originalLoadPaidEfts = loadPaidEfts;
+      loadPaidEfts = async function() {
+        await originalLoadPaidEfts.call(this);
+        // Add click handlers to client names
+        document.querySelectorAll('[data-client-id]').forEach(el => {
+          el.style.cursor = 'pointer';
+          el.style.textDecoration = 'underline';
+          el.addEventListener('click', () => {
+            const clientId = el.dataset.clientId;
+            const clientName = el.dataset.clientName;
+            showPaymentHistory(clientId, clientName);
+          });
+        });
+      };
+      */
+  
+      requireSession().then(ok => {
+        if (!ok) return;
+        loadPaidEfts();
+      });
+})();
   </script>
 
   <script>
