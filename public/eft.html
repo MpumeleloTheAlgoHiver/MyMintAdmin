@@ -811,6 +811,40 @@
         alert('Client email not found');
         return;
       }
+
+      // Fetch the latest top-up amount from wallet_transactions
+      let topUpAmount = null;
+      try {
+        const { data: txns } = await supabaseClient
+          .from('wallet_transactions')
+          .select('amount')
+          .eq('wallet_id', walletId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (txns && txns.length > 0) {
+          topUpAmount = Number(txns[0].amount);
+        }
+      } catch (e) {
+        console.warn('Could not fetch latest wallet transaction:', e.message);
+      }
+
+      const fmtAmount = topUpAmount != null
+        ? Number(topUpAmount).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : null;
+
+      const topUpSection = fmtAmount != null ? `
+                    <tr>
+                      <td class="padding-mobile" style="padding:0 48px 8px 48px;">
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:16px;overflow:hidden;">
+                          <tr>
+                            <td style="padding:24px;text-align:center;">
+                              <p style="margin:0;font-size:11px;color:#059669;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">Amount Allocated</p>
+                              <p style="margin:8px 0 0 0;font-size:32px;font-weight:700;color:#059669;letter-spacing:-0.5px;">${currency} ${fmtAmount}</p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>` : '';
       
       const htmlTemplate = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en">
@@ -876,6 +910,7 @@
                 </table>
               </td>
             </tr>
+            ${topUpSection}
             <tr>
               <td class="padding-mobile" style="padding:0 48px 32px 48px;">
                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
