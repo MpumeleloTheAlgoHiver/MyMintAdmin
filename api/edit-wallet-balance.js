@@ -56,20 +56,12 @@ module.exports = async (req, res) => {
     const oldBalance = Number(wallet.balance);
     const diff = new_balance - oldBalance;
 
-    // Record adjustment transaction (only if there's a difference)
+    // Directly set the wallet balance — no DB trigger dependency
     if (diff !== 0) {
-      // The DB trigger 'process_wallet_transaction' will automatically update the wallets.balance
-      await requestSupabaseJson('/rest/v1/wallet_transactions', {
-        method: 'POST',
+      await requestSupabaseJson(`/rest/v1/wallets?id=eq.${encodeURIComponent(wallet_id)}`, {
+        method: 'PATCH',
         useServiceRoleAuth: true,
-        body: {
-          wallet_id: wallet.id,
-          user_id: wallet.user_id,
-          amount: diff,
-          transaction_type: 'adjustment',
-          reference: `Admin adjustment: ${oldBalance} → ${new_balance}`,
-          created_at: new Date().toISOString()
-        }
+        body: { balance: new_balance, updated_at: new Date().toISOString() }
       });
     }
 

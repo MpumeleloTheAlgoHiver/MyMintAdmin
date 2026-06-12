@@ -99,13 +99,19 @@ const handleAddWallet = async (req, res, token) => {
   try {
     if (existing && existing.length > 0) {
       const wallet = existing[0];
-      // We rely on the DB trigger process_wallet_transaction to update the balance
       walletId = wallet.id;
+      const currentBalance = Number(wallet.balance || 0);
+      const newBalance = currentBalance + numericAmount;
+      await requestSupabaseJson(`/rest/v1/wallets?id=eq.${encodeURIComponent(walletId)}`, {
+        method: 'PATCH',
+        useServiceRoleAuth: true,
+        body: { balance: newBalance, updated_at: new Date().toISOString() },
+      });
     } else {
       const created = await requestSupabaseJson('/rest/v1/wallets', {
         method: 'POST',
         useServiceRoleAuth: true,
-        body: { user_id, balance: 0, currency: 'ZAR' },
+        body: { user_id, balance: numericAmount, currency: 'ZAR' },
         extraHeaders: { Prefer: 'return=representation' },
       });
       if (Array.isArray(created) && created[0]) {
@@ -118,19 +124,7 @@ const handleAddWallet = async (req, res, token) => {
     return sendJson(res, 500, { error: 'wallet-upsert: ' + e.message });
   }
 
-  if (walletId) {
-    try {
-      await requestSupabaseJson('/rest/v1/wallet_transactions', {
-        method: 'POST',
-        useServiceRoleAuth: true,
-        body: { wallet_id: walletId, user_id, amount: numericAmount, transaction_type: 'manual' },
-      });
-    } catch (e) {
-      console.error('wallet_transactions insert failed:', e.message);
-    }
-  }
-
-  return sendJson(res, 200, { success: true });
+  return sendJson(res, 200, { success: true, wallet_id: walletId, amount: numericAmount });
 };
 
 module.exports = async (req, res) => {

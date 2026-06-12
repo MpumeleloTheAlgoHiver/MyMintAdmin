@@ -605,6 +605,9 @@
           const result = await response.json();
           if (!response.ok) throw new Error(result.error || 'Failed to add to wallet');
   
+          window._recentTopUps = window._recentTopUps || {};
+          window._recentTopUps[clientId] = amount;
+
           addWalletSuccess.textContent = `Successfully added ${formatCurrency(amount)} to wallet`;
           addWalletSuccess.style.display = 'block';
   
@@ -695,7 +698,7 @@
               
               const actionButton = isSent
                 ? `<span style="color:#059669;font-weight:600;font-size:12px;">Sent</span>`
-                : `<button class="btn btn-primary" style="padding:6px 12px;font-size:11px;" onclick="sendWalletEmail('${wallet.id}', '${p.email || ''}', '${p.first_name || ''}', '${reference}', '${wallet.balance}', '${wallet.currency || 'ZAR'}', '${wallet.created_at}')">Send</button>`;
+                : `<button class="btn btn-primary" style="padding:6px 12px;font-size:11px;" onclick="sendWalletEmail('${wallet.id}', '${p.email || ''}', '${p.first_name || ''}', '${reference}', '${wallet.balance}', '${wallet.currency || 'ZAR'}', '${wallet.created_at}', '${wallet.user_id}')">Send</button>`;
   
               const childrenHtml = hasChildren
                 ? childrenByParent[wallet.user_id]
@@ -808,28 +811,36 @@
         }, 4000);
       };
   
-      window.sendWalletEmail = async (walletId, email, firstName, mintNumber, balance, currency, createdAt) => {
+      window.sendWalletEmail = async (walletId, email, firstName, mintNumber, balance, currency, createdAt, userId) => {
         if (!email) {
           alert('Client email not found');
           return;
         }
+
+        const fmtBalance = Number(balance).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   
-        // Fetch the latest top-up amount using the new backend API endpoint
-        let topUpAmount = null;
-        try {
-          const session = await supabaseClient.auth.getSession();
-          const token = session.data.session?.access_token;
-          if (token) {
-            const res = await fetch(`/api/latest-wallet-transaction?wallet_id=${encodeURIComponent(walletId)}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const json = await res.json();
-            if (json.ok && json.amount != null) {
-              topUpAmount = Number(json.amount);
+        // Check recent top-ups in memory first (set when admin added money this session)
+        let topUpAmount = (window._recentTopUps && userId && window._recentTopUps[userId] != null)
+          ? Number(window._recentTopUps[userId])
+          : null;
+
+        // Fall back to querying the latest wallet transaction from the API
+        if (topUpAmount == null) {
+          try {
+            const session = await supabaseClient.auth.getSession();
+            const token = session.data.session?.access_token;
+            if (token) {
+              const res = await fetch(`/api/latest-wallet-transaction?wallet_id=${encodeURIComponent(walletId)}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+              const json = await res.json();
+              if (json.ok && json.amount != null) {
+                topUpAmount = Number(json.amount);
+              }
             }
+          } catch (e) {
+            console.warn('Could not fetch latest wallet transaction:', e.message);
           }
-        } catch (e) {
-          console.warn('Could not fetch latest wallet transaction:', e.message);
         }
   
         const fmtAmount = topUpAmount != null
@@ -922,8 +933,8 @@
                       <td class="feature-col-a" valign="middle" style="width:55%;padding-right:20px;text-align:center;">
                         <p style="margin:0;font-size:11px;color:#8e8eb2;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">MINT Number</p>
                         <p class="text-primary" style="margin:6px 0 36px 0;font-size:16px;font-weight:500;color:#31005e;">${mintNumber}</p>
-                        <p style="margin:0;font-size:11px;color:#8e8eb2;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">Wallet Balance</p>
-                        <p style="margin:6px 0 0 0;font-size:32px;font-weight:700;color:#5c3bcf;letter-spacing:-0.5px;">${currency} ${balance}</p>
+                        <p style="margin:0;font-size:11px;color:#8e8eb2;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">Total Wallet Balance</p>
+                        <p style="margin:6px 0 0 0;font-size:32px;font-weight:700;color:#5c3bcf;letter-spacing:-0.5px;">${currency} ${fmtBalance}</p>
                       </td>
                       <td class="feature-col-b" valign="middle" style="width:45%;text-align:right;">
                         <img src="https://my-mint-admin.vercel.app/images/wallet-illustration.svg" alt="Wallet Illustration" width="180" style="display:inline-block;border-radius:16px;">
