@@ -1,4 +1,7 @@
 {
+  "buildCommand": "",
+  "framework": null,
+  "outputDirectory": "public",
   "rewrites": [
     { "source": "/(.*).html", "destination": "/public/$1.html" },
     { "source": "/api/sumsub/image", "destination": "/api/sumsub/applicant" },

@@ -368,10 +368,11 @@
                 <th>Wallet Amount (ZAR)</th>
                 <th>Reference</th>
                 <th>Send Notice</th>
+                <th>Edit</th>
               </tr>
             </thead>
             <tbody id="paidEftTableBody">
-              <tr><td colspan="4" class="empty-state">Loading clients...</td></tr>
+              <tr><td colspan="6" class="empty-state">Loading clients...</td></tr>
             </tbody>
           </table>
         </div>
@@ -379,6 +380,32 @@
 
     </div>
   </main>
+
+  <!-- Edit Wallet Balance Modal -->
+  <div id="editWalletModal" class="modal-backdrop hidden">
+    <div class="modal-content" style="max-width:380px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <p style="font-size:14px;font-weight:700;color:#0f172a;margin:0;">Edit Wallet Balance</p>
+        <button onclick="document.getElementById('editWalletModal').classList.add('hidden')" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:22px;padding:0;line-height:1;">&times;</button>
+      </div>
+      <div id="editWalletClientName" style="font-size:13px;color:#64748b;margin-bottom:16px;"></div>
+      <div style="display:flex;gap:12px;margin-bottom:16px;">
+        <div style="flex:1;background:#f8fafc;border-radius:8px;padding:12px;text-align:center;">
+          <div style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;">Current Balance</div>
+          <div id="editWalletOldBalance" style="font-size:18px;font-weight:700;color:#1e293b;"></div>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:16px;">
+        <label class="form-label">New Balance (ZAR)</label>
+        <input type="number" id="editWalletNewBalance" class="form-input" placeholder="0.00" step="0.01" min="0" />
+      </div>
+      <div id="editWalletError" class="alert alert-error" style="display:none;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="document.getElementById('editWalletModal').classList.add('hidden')" class="btn" style="background:#f1f5f9;color:#64748b;">Cancel</button>
+        <button id="editWalletSaveBtn" class="btn btn-primary" onclick="saveWalletEdit()">Save</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Payment History Modal - COMMENTED OUT FOR LATER -->
   <!--
@@ -609,7 +636,7 @@
         if (error) throw error;
 
         if (!wallets || wallets.length === 0) {
-          tableBody.innerHTML = '<tr><td colspan="4" class="empty-state">No users with wallet balance</td></tr>';
+          tableBody.innerHTML = '<tr><td colspan="6" class="empty-state">No users with wallet balance</td></tr>';
           totalWalletCount.textContent = '0';
           totalWalletAmount.textContent = formatCurrency(0);
           return;
@@ -688,6 +715,7 @@
                 <td style="font-weight:700;color:#059669;">${formatCurrency(wallet.balance)}</td>
                 <td style="font-family:monospace;color:#7c3aed;font-weight:600;">${reference}</td>
                 <td>${actionButton}</td>
+                <td><button class="btn" style="padding:4px 10px;font-size:11px;background:#f1f5f9;color:#64748b;" onclick="openEditWallet('${wallet.id}', '${parentName.replace(/'/g, '\&#39;')}', ${wallet.balance})">✏️</button></td>
               </tr>
               ${childrenHtml}
             `;
@@ -733,7 +761,7 @@
           }
         });
       } catch (err) {
-        tableBody.innerHTML = `<tr><td colspan="5" class="empty-state">Error: ${err.message}</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="6" class="empty-state">Error: ${err.message}</td></tr>`;
       }
     }
 
@@ -915,6 +943,56 @@
         loadPaidEfts();
       } catch (err) {
         showToast('Error sending email: ' + err.message, 'error');
+      }
+    };
+
+    /* ── Edit Wallet Balance ── */
+    let _editWalletId = null;
+
+    window.openEditWallet = (walletId, clientName, currentBalance) => {
+      _editWalletId = walletId;
+      document.getElementById('editWalletClientName').textContent = clientName;
+      document.getElementById('editWalletOldBalance').textContent = formatCurrency(currentBalance);
+      document.getElementById('editWalletNewBalance').value = currentBalance;
+      document.getElementById('editWalletError').style.display = 'none';
+      document.getElementById('editWalletModal').classList.remove('hidden');
+    };
+
+    window.saveWalletEdit = async () => {
+      const newBalance = Number(document.getElementById('editWalletNewBalance').value);
+      const errorEl = document.getElementById('editWalletError');
+      errorEl.style.display = 'none';
+
+      if (isNaN(newBalance) || newBalance < 0) {
+        errorEl.textContent = 'Please enter a valid balance (>= 0)';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      const saveBtn = document.getElementById('editWalletSaveBtn');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+
+      try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        const response = await fetch('/api/edit-wallet-balance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ wallet_id: _editWalletId, new_balance: newBalance }),
+        });
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Failed to update balance');
+
+        document.getElementById('editWalletModal').classList.add('hidden');
+        showToast(`Balance updated: ${formatCurrency(result.old_balance)} → ${formatCurrency(result.new_balance)}`);
+        loadPaidEfts();
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.style.display = 'block';
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
       }
     };
 

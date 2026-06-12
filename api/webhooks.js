@@ -236,7 +236,7 @@ const buildWelcomeHtml = (firstName) => `<!DOCTYPE html>
 
 
 
-const buildWalletFundedHtml = ({ firstName, amount, walletId }) => {
+const buildWalletFundedHtml = ({ firstName, amount, newBalance, walletId }) => {
   const fmt = (n) => 'R ' + Number(n).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Wallet Funded</title></head>
@@ -253,9 +253,13 @@ const buildWalletFundedHtml = ({ firstName, amount, walletId }) => {
   <p style="margin:0 0 24px;font-size:14px;color:#475569;line-height:1.6;">Your Mint wallet has been funded. The amount is ready to invest.</p>
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#faf7ff;border:1px solid #ede5ff;border-radius:12px;margin-bottom:24px;">
     <tr>
-      <td style="padding:20px;text-align:center;">
+      <td style="padding:20px;text-align:center;width:50%;border-right:1px solid #ede5ff;">
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#7c3aed;margin-bottom:6px;">Amount Added</div>
-        <div style="font-size:28px;font-weight:800;color:#0f172a;">${fmt(amount)}</div>
+        <div style="font-size:26px;font-weight:800;color:#0f172a;">${fmt(amount)}</div>
+      </td>
+      <td style="padding:20px;text-align:center;width:50%;">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#059669;margin-bottom:6px;">New Balance</div>
+        <div style="font-size:26px;font-weight:800;color:#059669;">${fmt(newBalance)}</div>
       </td>
     </tr>
   </table>
@@ -296,15 +300,25 @@ async function handleWalletFunded(record, trigger) {
   const profile = Array.isArray(profiles) ? profiles[0] : null;
   if (!profile?.email) throw new Error('No profile/email found for user ' + userId);
 
+  // Fetch the wallet's current balance (after the transaction trigger has updated it)
+  let newBalance = 0;
+  try {
+    const wallets = await sbGet(`/rest/v1/wallets?user_id=eq.${encodeURIComponent(userId)}&select=balance&limit=1`);
+    const wallet = Array.isArray(wallets) ? wallets[0] : null;
+    newBalance = Number(wallet?.balance || 0);
+  } catch (e) {
+    console.warn('[Webhook] Could not fetch wallet balance for email:', e.message);
+  }
+
   const amount = record.amount || 0;
   await sendEmail({
     to: profile.email,
     subject: `Funds received — R ${Number(amount).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`,
-    html: buildWalletFundedHtml({ firstName: profile.first_name, amount, walletId: record.wallet_id }),
+    html: buildWalletFundedHtml({ firstName: profile.first_name, amount, newBalance, walletId: record.wallet_id }),
     emailType: 'wallet_funded',
-    metadata: { wallet_id: record.wallet_id, amount, user_id: userId }
+    metadata: { wallet_id: record.wallet_id, amount, new_balance: newBalance, user_id: userId }
   });
-  console.log(`[Webhook] Wallet funded email sent to ${profile.email}`);
+  console.log(`[Webhook] Wallet funded email sent to ${profile.email} (added: ${amount}, new balance: ${newBalance})`);
 }
 
 async function handleTradeConfirmation(record, trigger) {
