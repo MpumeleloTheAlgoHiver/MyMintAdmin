@@ -146,7 +146,11 @@ module.exports = async (req, res) => {
   try {
     await fetchSupabaseJson('/auth/v1/user', token, false);
 
-    const action = (req.query && req.query.action) || (req.url || '').includes('action=add-wallet') && 'add-wallet';
+    const isAddWallet = (req.query && req.query.action === 'add-wallet') 
+                     || (req.url || '').includes('action=add-wallet') 
+                     || (req.url || '').includes('/api/add-wallet');
+    const action = isAddWallet ? 'add-wallet' : null;
+
     if (action === 'add-wallet') {
       return handleAddWallet(req, res, token);
     }
