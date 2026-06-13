@@ -1,0 +1,64 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import CrmLayout from "@/components/CrmLayout";
+import SignIn from "@/pages/SignIn";
+import Team from "@/pages/Team";
+import Placeholder from "@/pages/Placeholder";
+
+const queryClient = new QueryClient();
+
+function Shell() {
+  const { loading, authed } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-r-transparent" />
+      </div>
+    );
+  }
+  if (!authed) return <SignIn />;
+
+  return (
+    <CrmLayout>
+      <Routes>
+        {/* Reference page (fully ported). */}
+        <Route path="/team" element={<Team />} />
+
+        {/* Placeholders — Fable ports these to real data next, one by one. */}
+        <Route path="/" element={<Placeholder title="Clients" />} />
+        <Route path="/studio" element={<Placeholder title="Client View Studio" />} />
+        <Route path="/dashboard" element={<Placeholder title="Dashboard" />} />
+        <Route path="/strategies" element={<Placeholder title="Strategies" />} />
+        <Route path="/factsheets" element={<Placeholder title="Factsheets" />} />
+        <Route path="/investors" element={<Placeholder title="Investors" />} />
+        <Route path="/orderbook" element={<Placeholder title="Order Book" />} />
+        <Route path="/eft" element={<Placeholder title="EFT Payments" />} />
+        <Route path="/mint-mornings" element={<Placeholder title="Mint Mornings" />} />
+        <Route path="/emailers" element={<Placeholder title="Emailers & Triggers" />} />
+        <Route path="/settings" element={<Placeholder title="Settings" />} />
+        <Route path="/app-settings" element={<Placeholder title="App Settings" />} />
+        <Route path="/compliance" element={<Placeholder title="Cyber Compliance" />} />
+        <Route path="*" element={<Placeholder title="Not Found" />} />
+      </Routes>
+    </CrmLayout>
+  );
+}
+
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <Shell />
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}
