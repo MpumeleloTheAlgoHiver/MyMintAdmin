@@ -17,14 +17,14 @@ untouched). The live vanilla CRM (`public/**`) keeps running the whole time.
 - [x] **Clients** (`/`) ← `index.html` — profiles + KYC + invested + children *(list; deep detail panel = follow-up)*
 - [x] **Team** (`/team`) ← `team.html` — members table *(invite/edit actions = follow-up)*
 - [x] **App Settings** (`/app-settings`) ← `app-settings.html` — fees editor (full)
-- [ ] **EFT Payments** (`/eft`) ← `eft.html`
-- [ ] **Strategies** (`/strategies`) ← `strategies.html`
-- [ ] **Factsheets** (`/factsheets`) ← `factsheets.html`
-- [ ] **Mint Mornings** (`/mint-mornings`) ← `mint-mornings.html`
-- [ ] **Emailers & Triggers** (`/emailers`) ← `emailers.html`
-- [ ] **Cyber Compliance** (`/compliance`) ← `cyber-compliance.html`
-- [ ] **Client View Studio** (`/studio`) ← `studio.html`
-- [ ] **Settings** (`/settings`) ← `settings.html`
+- [x] **EFT Payments** (`/eft`) ← `eft.html` — wallets + balances *(upload/send actions = follow-up)*
+- [x] **Strategies** (`/strategies`) ← `strategies.html` — strategy grid
+- [x] **Factsheets** (`/factsheets`) ← `factsheets.html` — strategy returns cards
+- [x] **Mint Mornings** (`/mint-mornings`) ← `mint-mornings.html` — status + preview
+- [x] **Emailers & Triggers** (`/emailers`) ← `emailers.html` — email log *(trigger config = follow-up)*
+- [x] **Cyber Compliance** (`/compliance`) ← `cyber-compliance.html` — health KPIs + incidents *(admin actions = follow-up)*
+- [x] **Client View Studio** (`/studio`) ← `studio.html` — client list + impersonate preview
+- [x] **Settings** (`/settings`) ← `settings.html` — account + admin links
 - [ ] **Investors** (`/investors`) ← `investors.html` *(data-rich: value/P&L breakdown)*
 - [ ] **Order Book** (`/orderbook`) ← `orderbook.html` *(HARD, large)*
 - [ ] **Dashboard** (`/dashboard`) ← `dashboard.html` *(HARDEST: rebalance engine — parity-check)*

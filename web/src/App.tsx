@@ -11,6 +11,11 @@ import Clients from "@/pages/Clients";
 import Strategies from "@/pages/Strategies";
 import Eft from "@/pages/Eft";
 import Compliance from "@/pages/Compliance";
+import MintMornings from "@/pages/MintMornings";
+import Emailers from "@/pages/Emailers";
+import Settings from "@/pages/Settings";
+import Studio from "@/pages/Studio";
+import Factsheets from "@/pages/Factsheets";
 import Placeholder from "@/pages/Placeholder";
 
 const queryClient = new QueryClient();
@@ -38,14 +43,16 @@ function Shell() {
         <Route path="/eft" element={<Eft />} />
         <Route path="/compliance" element={<Compliance />} />
 
-        {/* Placeholders — ported to real data next, one by one. */}
-        <Route path="/studio" element={<Placeholder title="Client View Studio" />} />
+        <Route path="/studio" element={<Studio />} />
+        <Route path="/factsheets" element={<Factsheets />} />
+        <Route path="/mint-mornings" element={<MintMornings />} />
+        <Route path="/emailers" element={<Emailers />} />
+        <Route path="/settings" element={<Settings />} />
+
+        {/* Heavy pages — ported last with parity checks. */}
         <Route path="/dashboard" element={<Placeholder title="Dashboard" />} />
-        <Route path="/factsheets" element={<Placeholder title="Factsheets" />} />
         <Route path="/investors" element={<Placeholder title="Investors" />} />
         <Route path="/orderbook" element={<Placeholder title="Order Book" />} />
-        <Route path="/mint-mornings" element={<Placeholder title="Mint Mornings" />} />
-        <Route path="/emailers" element={<Placeholder title="Emailers & Triggers" />} />
         <Route path="*" element={<Placeholder title="Not Found" />} />
       </Routes>
     </CrmLayout>
