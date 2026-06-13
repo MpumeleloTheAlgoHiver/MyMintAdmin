@@ -2661,11 +2661,10 @@
       let usersHtml = '';
       if (users.length) {
         const allowReverse = allowReverseOpt && editable && !cleanup && !!row.strategyId;
-        // Pinned investors float to the top of this strategy's investor list.
-        const sortedUsers = users.slice().sort((a, b) =>
-          (orderbookPins.has(buildInvestorKey(b)) ? 1 : 0) - (orderbookPins.has(buildInvestorKey(a)) ? 1 : 0)
-        );
-        const uBody = sortedUsers.map((u, i) => {
+        // The blue pin (per investor row) pins the WHOLE order book to the top of
+        // the Snapshots list — keyed by the book id, not the investor.
+        const bookIdForPin = options.bookId != null ? String(options.bookId) : '';
+        const uBody = users.map((u, i) => {
           const deleteCell = cleanup
             ? `<td class="cleanup-delete-col"><button type="button" class="cleanup-delete-btn" data-cleanup-delete data-book-id="${escapeHtml(cleanupBookId)}" data-row-index="${escapeHtml(cleanupRowIndex)}" data-user-id="${escapeHtml(String(u.userId || ''))}" title="Remove this investor from this orderbook snapshot">&times;</button></td>`
             : '';
@@ -2687,8 +2686,10 @@
             : '';
           const investorKey = buildInvestorKey(u);
           const isSelected = selectedInvestorKey === investorKey;
-          const isPinned = orderbookPins.has(investorKey);
-          const pinCell = `<td class="pin-investor-col"><button type="button" class="pin-order-btn${isPinned ? ' is-pinned' : ''}" data-pin-investor data-pin-key="${escapeHtml(investorKey)}" data-user-id="${escapeHtml(String(u.userId || ''))}" title="${isPinned ? 'Unpin from top' : 'Pin to top'}" aria-pressed="${isPinned}"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H19v-2l-3-2z"/></svg></button></td>`;
+          const isPinned = !!bookIdForPin && orderbookPins.has(bookIdForPin);
+          const pinCell = bookIdForPin
+            ? `<td class="pin-investor-col"><button type="button" class="pin-order-btn${isPinned ? ' is-pinned' : ''}" data-pin-investor data-pin-key="${escapeHtml(bookIdForPin)}" title="${isPinned ? 'Unpin this order book from top' : 'Pin this order book to top'}" aria-pressed="${isPinned}"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H19v-2l-3-2z"/></svg></button></td>`
+            : '';
           // Show purchase time so two buys of the same strategy by the same
           // user are visually distinguishable.
           const buyTime = u.createdAtBucket
@@ -2709,7 +2710,7 @@
         `;
         }).join('');
 
-        const pinHeader = '<th class="pin-investor-col" aria-label="Pin"></th>';
+        const pinHeader = bookIdForPin ? '<th class="pin-investor-col" aria-label="Pin"></th>' : '';
         const deleteHeader = cleanup ? '<th class="cleanup-delete-col" aria-label="Remove"></th>' : '';
         const reverseHeader = allowReverse ? '<th class="reverse-investor-col" aria-label="Reverse"></th>' : '';
 
@@ -4659,6 +4660,11 @@
           // 'newest' &mdash; biggest sequence first
           sorted = activeBooks.slice().sort((a, b) => (b.sequence || 0) - (a.sequence || 0));
         }
+
+        // Pinned order books float to the very top (stable within the chosen sort).
+        sorted = sorted.slice().sort((a, b) =>
+          (orderbookPins.has(String(b.id)) ? 1 : 0) - (orderbookPins.has(String(a.id)) ? 1 : 0)
+        );
 
         filledOrderbooksList.innerHTML = sorted.map((book) => {
           const rows = Array.isArray(book.rows) ? book.rows : [];
