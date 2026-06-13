@@ -7,6 +7,7 @@ import CrmLayout from "@/components/CrmLayout";
 import SignIn from "@/pages/SignIn";
 import Team from "@/pages/Team";
 import AppSettings from "@/pages/AppSettings";
+import Clients from "@/pages/Clients";
 import Placeholder from "@/pages/Placeholder";
 
 const queryClient = new QueryClient();
@@ -29,9 +30,9 @@ function Shell() {
         {/* Ported pages (real data). */}
         <Route path="/team" element={<Team />} />
         <Route path="/app-settings" element={<AppSettings />} />
+        <Route path="/" element={<Clients />} />
 
-        {/* Placeholders — Fable ports these to real data next, one by one. */}
-        <Route path="/" element={<Placeholder title="Clients" />} />
+        {/* Placeholders — ported to real data next, one by one. */}
         <Route path="/studio" element={<Placeholder title="Client View Studio" />} />
         <Route path="/dashboard" element={<Placeholder title="Dashboard" />} />
         <Route path="/strategies" element={<Placeholder title="Strategies" />} />
