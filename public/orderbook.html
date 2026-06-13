@@ -1172,9 +1172,9 @@
     .pin-investor-col { width: 36px; text-align: center; }
     .orderbook-section-row td.orderbook-section-cell {
       position: sticky; left: 0;
-      background: #f1f5f9; color: #334155;
-      font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
-      padding: 8px 14px; border-top: 2px solid #cbd5e1; border-bottom: 1px solid #e2e8f0;
+      background: transparent; color: #b6bfca;
+      font-size: 10.5px; font-weight: 500; letter-spacing: .01em;
+      padding: 12px 14px 4px; border: 0;
     }
     .investor-row { cursor: pointer; transition: background 0.12s ease; }
     .investor-row:hover { background: #f5f3ff; }
@@ -5350,11 +5350,12 @@
     // section or the snapshot card below.
     const renderOrderbookPinnedAndLive = (pinnedBook, pinnedRows, liveRows) => {
       if (!orderbookTableBody || !orderbookCount || !exportOrderbookBtn) return;
-      orderbookCount.textContent = `${liveRows.length} live · ${pinnedRows.length} pinned`;
-      exportOrderbookBtn.disabled = (pinnedRows.length + liveRows.length) === 0;
+      const total = pinnedRows.length + liveRows.length;
+      orderbookCount.textContent = `${total} record${total === 1 ? '' : 's'}`;
+      exportOrderbookBtn.disabled = total === 0;
 
       const pinnedHtml = pinnedRows.length
-        ? renderSectionHeaderRow(`📌 Pinned — Order Book ${pinnedBook.sequence}`)
+        ? renderSectionHeaderRow(`Order Book ${pinnedBook.sequence}`)
           + pinnedRows.map((row) => buildOrderbookRowHtml(row, {
               keyPrefix: 'p:',
               detailOpts: {
@@ -5366,7 +5367,7 @@
             })).join('')
         : '';
 
-      const liveHtml = renderSectionHeaderRow('Live / new orders')
+      const liveHtml = renderSectionHeaderRow('Live')
         + (liveRows.length
           ? liveRows.map((row) => buildOrderbookRowHtml(row)).join('')
           : '<tr><td class="orderbook-empty-row" colspan="14">No new orders yet.</td></tr>');
