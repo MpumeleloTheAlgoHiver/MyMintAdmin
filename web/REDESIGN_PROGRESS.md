@@ -25,7 +25,7 @@ untouched). The live vanilla CRM (`public/**`) keeps running the whole time.
 - [x] **Cyber Compliance** (`/compliance`) ← `cyber-compliance.html` — health KPIs + incidents *(admin actions = follow-up)*
 - [x] **Client View Studio** (`/studio`) ← `studio.html` — client list + impersonate preview
 - [x] **Settings** (`/settings`) ← `settings.html` — account + admin links
-- [ ] **Investors** (`/investors`) ← `investors.html` *(data-rich: value/P&L breakdown)*
+- [x] **Investors** (`/investors`) ← `investors.html` — live value (positions+residual+buffer) + P&L (unrealised+realised) per investor *(per-investor detail drilldown = follow-up)*
 - [ ] **Order Book** (`/orderbook`) ← `orderbook.html` *(HARD, large)*
 - [ ] **Dashboard** (`/dashboard`) ← `dashboard.html` *(HARDEST: rebalance engine — parity-check)*
 

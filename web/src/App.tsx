@@ -16,6 +16,7 @@ import Emailers from "@/pages/Emailers";
 import Settings from "@/pages/Settings";
 import Studio from "@/pages/Studio";
 import Factsheets from "@/pages/Factsheets";
+import Investors from "@/pages/Investors";
 import Placeholder from "@/pages/Placeholder";
 
 const queryClient = new QueryClient();
@@ -49,9 +50,10 @@ function Shell() {
         <Route path="/emailers" element={<Emailers />} />
         <Route path="/settings" element={<Settings />} />
 
+        <Route path="/investors" element={<Investors />} />
+
         {/* Heavy pages — ported last with parity checks. */}
         <Route path="/dashboard" element={<Placeholder title="Dashboard" />} />
-        <Route path="/investors" element={<Placeholder title="Investors" />} />
         <Route path="/orderbook" element={<Placeholder title="Order Book" />} />
         <Route path="*" element={<Placeholder title="Not Found" />} />
       </Routes>
