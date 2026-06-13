@@ -1158,6 +1158,18 @@
       cursor: not-allowed;
     }
     .reverse-investor-btn svg { width: 14px; height: 14px; }
+    /* Pin-to-top button (blue) on fresh orders */
+    .ob-actions-wrap { display: inline-flex; align-items: center; gap: 6px; }
+    .pin-order-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 26px; height: 26px; flex-shrink: 0;
+      border-radius: 7px; border: 1px solid #bfdbfe; background: #eff6ff;
+      color: #2563eb; cursor: pointer; padding: 0; transition: all 0.12s ease;
+    }
+    .pin-order-btn:hover { background: #dbeafe; border-color: #93c5fd; }
+    .pin-order-btn svg { width: 13px; height: 13px; }
+    .pin-order-btn.is-pinned { background: #2563eb; border-color: #2563eb; color: #fff; box-shadow: 0 1px 4px rgba(37,99,235,.35); }
+    .orderbook-pinned-row > td { background: #f5f9ff; }
     .investor-row { cursor: pointer; transition: background 0.12s ease; }
     .investor-row:hover { background: #f5f3ff; }
     .investor-row.selected { background: #ede9fe; box-shadow: inset 4px 0 0 #7c3aed; }
@@ -1597,6 +1609,9 @@
     const strateBirPreviewHead = document.getElementById('strateBirPreviewHead');
     const strateBirPreviewBody = document.getElementById('strateBirPreviewBody');
     let allOrderbookRows = [];
+    // Pinned fresh orders (sourceId = stock_holdings_c.id) — float to the top of
+    // the live list. Loaded from orderbook_pins via the send-csv api.
+    let orderbookPins = new Set();
     let allOrderbookRawRows = [];
     let allBirSourceRows = [];
     let strateBirPreviewMode = 'table';
@@ -5163,7 +5178,12 @@
         return;
       }
 
-      orderbookTableBody.innerHTML = rows.map((row) => {
+      // Pinned orders float to the top (stable — preserves order within groups).
+      const orderedRows = rows.slice().sort((a, b) =>
+        (orderbookPins.has(String(b.sourceId)) ? 1 : 0) - (orderbookPins.has(String(a.sourceId)) ? 1 : 0)
+      );
+
+      orderbookTableBody.innerHTML = orderedRows.map((row) => {
         const sideValue = String(row.side || '-').toUpperCase();
         const sideClass = sideValue === 'BUY'
           ? 'side-badge-buy'
@@ -5252,9 +5272,14 @@
           }
         }
 
+        const isPinned = !!row.sourceId && orderbookPins.has(String(row.sourceId));
+        const pinBtn = row.sourceId
+          ? `<button type="button" class="pin-order-btn${isPinned ? ' is-pinned' : ''}" data-pin-investor data-source-id="${escapeHtml(String(row.sourceId))}" data-user-id="${escapeHtml(String(row.userId || ''))}" title="${isPinned ? 'Unpin from top' : 'Pin to top'}" aria-pressed="${isPinned}"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H19v-2l-3-2z"/></svg></button>`
+          : '';
+
         return `
-          <tr class="orderbook-main-row${isPending ? ' orderbook-pending-row' : ''}" data-orderbook-main-row data-line-key="${lineKey}">
-            <td style="white-space:nowrap;">${actionsHtml}</td>
+          <tr class="orderbook-main-row${isPending ? ' orderbook-pending-row' : ''}${isPinned ? ' orderbook-pinned-row' : ''}" data-orderbook-main-row data-line-key="${lineKey}">
+            <td style="white-space:nowrap;"><span class="ob-actions-wrap">${pinBtn}${actionsHtml}</span></td>
             <td>${escapeHtml(String(row.line ?? '-'))}</td>
             <td>${escapeHtml(row.instrumentName || '-')}${strategyTag}${pendingBadge}${rebalancedBadge}</td>
             <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
@@ -5845,6 +5870,21 @@
       return groupByStrategy(aggregated, allDisplayRows);
     };
 
+    const loadOrderbookPins = async () => {
+      try {
+        const { data } = await supabaseClient.auth.getSession();
+        const t = data?.session?.access_token;
+        if (!t) return;
+        const r = await fetch('/api/orderbook/send-csv?action=list-pins', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
+          body: '{}',
+        });
+        const j = await r.json();
+        orderbookPins = new Set((j.pins || []).map((p) => String(p.source_id)));
+      } catch (e) { /* keep existing pins on failure */ }
+    };
+
     const loadOrderbook = async () => {
       if (!orderbookTableBody) return;
 
@@ -5858,6 +5898,7 @@
       setArchiveBooksLoading(true);
 
       try {
+        await loadOrderbookPins();
         allOrderbookRows = await loadOrderbookClientSideFallback();
         applySearchFilter();
         renderStrateBirPreview();
@@ -7047,6 +7088,40 @@
     }
 
     if (orderbookTableBody) {
+      // Pin / unpin a fresh order to the top of the live list (non-destructive,
+      // no password). Persists in orderbook_pins via the send-csv api.
+      orderbookTableBody.addEventListener('click', async (event) => {
+        const pinBtn = event.target.closest('[data-pin-investor]');
+        if (!pinBtn) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const sourceId = pinBtn.dataset.sourceId;
+        const userId = pinBtn.dataset.userId || '';
+        if (!sourceId) return;
+        const currentlyPinned = orderbookPins.has(String(sourceId));
+        pinBtn.disabled = true;
+        try {
+          const { data } = await supabaseClient.auth.getSession();
+          const t = data?.session?.access_token;
+          if (!t) { alert('No active session.'); return; }
+          const action = currentlyPinned ? 'unpin-investor' : 'pin-investor';
+          const r = await fetch('/api/orderbook/send-csv?action=' + action, {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sourceId, userId }),
+          });
+          const j = await r.json();
+          if (!r.ok || !j.ok) throw new Error(j?.error || 'Pin failed');
+          if (currentlyPinned) orderbookPins.delete(String(sourceId));
+          else orderbookPins.add(String(sourceId));
+          applySearchFilter();
+        } catch (err) {
+          alert('Pin error: ' + (err?.message || err));
+        } finally {
+          pinBtn.disabled = false;
+        }
+      });
+
       orderbookTableBody.addEventListener('click', (event) => {
         if (event.target.closest('select, button, input, a, option')) {
           return;

@@ -13,11 +13,35 @@ module.exports = async (req, res) => {
   }
 
   try {
-    await fetchSupabaseJson('/auth/v1/user', token, false);
+    const authUser = await fetchSupabaseJson('/auth/v1/user', token, false);
 
     const action = req.query?.action || new URL(req.url, `http://${req.headers.host}`).searchParams.get('action');
     if (action === 'trade-confirmation') {
       return handleSendTradeConfirmation(req, res, token);
+    }
+
+    // ── Orderbook pins ────────────────────────────────────────────────────────
+    // Pin a fresh order (by sourceId = stock_holdings_c.id) so it floats to the
+    // top of the live list. Non-destructive — no password gate. Stored in the
+    // orderbook_pins table (service-role; the page reads via list-pins).
+    if (action === 'list-pins') {
+      const pins = await fetchSupabaseJson('/rest/v1/orderbook_pins?select=source_id,user_id');
+      return sendJson(res, 200, { pins: Array.isArray(pins) ? pins : [] });
+    }
+    if (action === 'pin-investor' || action === 'unpin-investor') {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const sourceId = String(body.sourceId || '').trim();
+      if (!sourceId) return sendJson(res, 400, { error: 'sourceId required' });
+      if (action === 'unpin-investor') {
+        await requestSupabaseJson(`/rest/v1/orderbook_pins?source_id=eq.${encodeURIComponent(sourceId)}`, { method: 'DELETE' });
+        return sendJson(res, 200, { ok: true, pinned: false });
+      }
+      await requestSupabaseJson('/rest/v1/orderbook_pins?on_conflict=source_id', {
+        method: 'POST',
+        extraHeaders: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: { source_id: sourceId, user_id: String(body.userId || '') || null, pinned_by: authUser?.email || null, pinned_at: new Date().toISOString() }
+      });
+      return sendJson(res, 200, { ok: true, pinned: true });
     }
 
     // Fetch a user's transactions using service-role key (bypasses RLS).
