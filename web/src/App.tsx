@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import CrmLayout from "@/components/CrmLayout";
 import SignIn from "@/pages/SignIn";
 import Team from "@/pages/Team";
+import AppSettings from "@/pages/AppSettings";
 import Placeholder from "@/pages/Placeholder";
 
 const queryClient = new QueryClient();
@@ -25,8 +26,9 @@ function Shell() {
   return (
     <CrmLayout>
       <Routes>
-        {/* Reference page (fully ported). */}
+        {/* Ported pages (real data). */}
         <Route path="/team" element={<Team />} />
+        <Route path="/app-settings" element={<AppSettings />} />
 
         {/* Placeholders — Fable ports these to real data next, one by one. */}
         <Route path="/" element={<Placeholder title="Clients" />} />
@@ -40,7 +42,6 @@ function Shell() {
         <Route path="/mint-mornings" element={<Placeholder title="Mint Mornings" />} />
         <Route path="/emailers" element={<Placeholder title="Emailers & Triggers" />} />
         <Route path="/settings" element={<Placeholder title="Settings" />} />
-        <Route path="/app-settings" element={<Placeholder title="App Settings" />} />
         <Route path="/compliance" element={<Placeholder title="Cyber Compliance" />} />
         <Route path="*" element={<Placeholder title="Not Found" />} />
       </Routes>
