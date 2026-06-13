@@ -7093,9 +7093,11 @@
     }
 
     if (orderbookTableBody) {
-      // Pin / unpin a fresh order to the top of the live list (non-destructive,
-      // no password). Persists in orderbook_pins via the send-csv api.
-      orderbookTableBody.addEventListener('click', async (event) => {
+      // Pin / unpin the whole order book to the top of the Snapshots list
+      // (non-destructive, no password). The pin button lives inside snapshot
+      // investor tables (rendered in filledOrderbooksList, not this live table),
+      // so listen at the document level. Persists in orderbook_pins via the api.
+      document.addEventListener('click', async (event) => {
         const pinBtn = event.target.closest('[data-pin-investor]');
         if (!pinBtn) return;
         event.preventDefault();
