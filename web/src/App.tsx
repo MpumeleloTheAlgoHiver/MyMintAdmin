@@ -8,6 +8,9 @@ import SignIn from "@/pages/SignIn";
 import Team from "@/pages/Team";
 import AppSettings from "@/pages/AppSettings";
 import Clients from "@/pages/Clients";
+import Strategies from "@/pages/Strategies";
+import Eft from "@/pages/Eft";
+import Compliance from "@/pages/Compliance";
 import Placeholder from "@/pages/Placeholder";
 
 const queryClient = new QueryClient();
@@ -31,19 +34,18 @@ function Shell() {
         <Route path="/team" element={<Team />} />
         <Route path="/app-settings" element={<AppSettings />} />
         <Route path="/" element={<Clients />} />
+        <Route path="/strategies" element={<Strategies />} />
+        <Route path="/eft" element={<Eft />} />
+        <Route path="/compliance" element={<Compliance />} />
 
         {/* Placeholders — ported to real data next, one by one. */}
         <Route path="/studio" element={<Placeholder title="Client View Studio" />} />
         <Route path="/dashboard" element={<Placeholder title="Dashboard" />} />
-        <Route path="/strategies" element={<Placeholder title="Strategies" />} />
         <Route path="/factsheets" element={<Placeholder title="Factsheets" />} />
         <Route path="/investors" element={<Placeholder title="Investors" />} />
         <Route path="/orderbook" element={<Placeholder title="Order Book" />} />
-        <Route path="/eft" element={<Placeholder title="EFT Payments" />} />
         <Route path="/mint-mornings" element={<Placeholder title="Mint Mornings" />} />
         <Route path="/emailers" element={<Placeholder title="Emailers & Triggers" />} />
-        <Route path="/settings" element={<Placeholder title="Settings" />} />
-        <Route path="/compliance" element={<Placeholder title="Cyber Compliance" />} />
         <Route path="*" element={<Placeholder title="Not Found" />} />
       </Routes>
     </CrmLayout>
