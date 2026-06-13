@@ -2489,7 +2489,7 @@
 
       const { data, error } = await supabaseClient
         .from('stock_holdings_c')
-        .select('id, quantity, avg_fill, security_id, side')
+        .select('id, quantity, avg_fill, security_id')
         .in('id', ids);
       if (error) throw new Error(error.message || 'Failed to load investor holdings');
 
@@ -2512,7 +2512,7 @@
           avgFill: avgFillRand != null
             ? `R ${avgFillRand.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
             : '-',
-          side: db.side || m.side || '-',
+          side: m.side || '-',
           sourceIds: [String(db.id)],
           sourceId: String(db.id),
         };
