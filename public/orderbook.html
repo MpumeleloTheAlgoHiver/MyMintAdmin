@@ -1631,6 +1631,15 @@
     const ARCHIVE_BACKFILL_KEY = 'orderbook-archive-backfill-v2';
     const MANUALLY_CLOSED_BOOKS_KEY = 'orderbook-manually-closed-v1';
     let filledOrderbooksArchive = [];
+    // The blue pin promotes a captured snapshot into the top "live" table.
+    // If any snapshot is pinned, the most recent pinned book's rows are shown
+    // up top (instead of the live active rows) until it is unpinned.
+    const getPinnedTopBook = () => {
+      if (!orderbookPins || !orderbookPins.size) return null;
+      const pinned = (filledOrderbooksArchive || []).filter((b) => orderbookPins.has(String(b.id)));
+      if (!pinned.length) return null;
+      return pinned.slice().sort((a, b) => (b.sequence || 0) - (a.sequence || 0))[0];
+    };
     let holdingFillDateById = new Map();
     /* Per-holding execution economics for the MINT PnL column, keyed by
        stock_holdings_c id. Built once per load from the authoritative holdings
@@ -3786,6 +3795,7 @@
     const updateOrderbookHeaderSequence = () => {
       activeOrderbookSequence = getTodayOrderbookSequence();
       if (!orderbookTitle) return;
+      if (getPinnedTopBook()) return; // a pinned snapshot owns the top title
       orderbookTitle.textContent = `Orderbook :${String(activeOrderbookSequence).padStart(2, '0')}`;
     };
 
@@ -5318,13 +5328,22 @@
     };
 
     const applySearchFilter = () => {
+      // A pinned snapshot takes over the top table; otherwise show the live rows.
+      const pinnedBook = getPinnedTopBook();
+      const baseRows = pinnedBook ? (pinnedBook.rows || []) : allOrderbookRows;
+      if (orderbookTitle) {
+        orderbookTitle.textContent = pinnedBook
+          ? `Order Book ${pinnedBook.sequence} (pinned)`
+          : `Orderbook :${String(activeOrderbookSequence).padStart(2, '0')}`;
+      }
+
       const query = orderbookSearch?.value?.trim().toLowerCase() || '';
       if (!query) {
-        renderOrderbookRows(allOrderbookRows);
+        renderOrderbookRows(baseRows);
         return;
       }
 
-      const filtered = allOrderbookRows.filter((row) => {
+      const filtered = baseRows.filter((row) => {
         return String(row.instrumentName || '').toLowerCase().includes(query)
           || String(row.ticker || '').toLowerCase().includes(query)
           || String(row.side || '').toLowerCase().includes(query)
