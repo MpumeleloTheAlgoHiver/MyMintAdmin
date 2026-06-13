@@ -14,15 +14,15 @@ type Kind = "money" | "percent";
 interface FieldDef { key: string; group: string; kind: Kind; label: string; hint: string; }
 
 const FIELDS: FieldDef[] = [
-  { key: "isinFeePerAsset",      group: "Purchase fees (app)", kind: "money",   label: "Custody fee per asset",        hint: "Charged per underlying security (ISIN) in a basket" },
+  { key: "isinFeePerAsset",      group: "Purchase fees (app)", kind: "money",   label: "Custody fee per asset",        hint: "Charged per underlying security in a basket" },
   { key: "brokerFeeRate",        group: "Purchase fees (app)", kind: "percent", label: "Broker fee",                   hint: "Percent of the buffered investment" },
-  { key: "executionReserveRate", group: "Purchase fees (app)", kind: "percent", label: "Execution reserve (buffer)",   hint: "The reserve held on every buy" },
   { key: "transactionFeeRate",   group: "Purchase fees (app)", kind: "percent", label: "Transaction fee",              hint: "Percent of the buffered investment" },
+  { key: "executionReserveRate", group: "Cash asset class",    kind: "percent", label: "Execution reserve",            hint: "Held cash set aside on every buy — a cash asset, not a fee" },
   { key: "monthlyStrategyFee",   group: "Strategy",            kind: "money",   label: "Monthly additional-strategy fee", hint: "Charged per extra strategy, per month" },
   { key: "rebBrokerageRate",     group: "CRM rebalance engine", kind: "percent", label: "Rebalance brokerage",         hint: "Brokerage applied during rebalances" },
-  { key: "rebCustodyFee",        group: "CRM rebalance engine", kind: "money",   label: "Rebalance custody fee",       hint: "Custody per ISIN, per affected client" },
+  { key: "rebCustodyFee",        group: "CRM rebalance engine", kind: "money",   label: "Rebalance custody fee",       hint: "Custody per asset, per affected client" },
 ];
-const GROUPS = ["Purchase fees (app)", "Strategy", "CRM rebalance engine"];
+const GROUPS = ["Purchase fees (app)", "Cash asset class", "Strategy", "CRM rebalance engine"];
 
 const toInput = (f: FieldDef, v: number) => (f.kind === "percent" ? +(v * 100).toFixed(6) : v);
 const fromInput = (f: FieldDef, raw: string) => (f.kind === "percent" ? Number(raw) / 100 : Number(raw));
