@@ -131,13 +131,13 @@
 
     // Field config. kind: 'money' (R, raw value) or 'percent' (shown as %, stored as decimal rate).
     const FIELDS = [
-      { key:'isinFeePerAsset',      group:'grp-purchase',  kind:'money',   label:'Custody fee per asset',  hint:'Charged per underlying security (ISIN) in a basket' },
+      { key:'isinFeePerAsset',      group:'grp-purchase',  kind:'money',   label:'Custody fee per asset',  hint:'Charged per underlying security in a basket' },
       { key:'brokerFeeRate',        group:'grp-purchase',  kind:'percent', label:'Broker fee',             hint:'Percent of the buffered investment' },
       { key:'executionReserveRate', group:'grp-purchase',  kind:'percent', label:'Execution reserve (buffer)', hint:'The reserve held on every buy' },
       { key:'transactionFeeRate',   group:'grp-purchase',  kind:'percent', label:'Transaction fee',        hint:'Percent of the buffered investment' },
       { key:'monthlyStrategyFee',   group:'grp-strategy',  kind:'money',   label:'Monthly additional-strategy fee', hint:'Charged per extra strategy, per month' },
       { key:'rebBrokerageRate',     group:'grp-rebalance', kind:'percent', label:'Rebalance brokerage',    hint:'Brokerage applied during rebalances' },
-      { key:'rebCustodyFee',        group:'grp-rebalance', kind:'money',   label:'Rebalance custody fee',  hint:'Custody per ISIN, per affected client' },
+      { key:'rebCustodyFee',        group:'grp-rebalance', kind:'money',   label:'Rebalance custody fee',  hint:'Custody per asset, per affected client' },
     ];
 
     let currentToken = null;

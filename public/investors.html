@@ -1172,14 +1172,14 @@
             <div style="font-size:10px;color:#94a3b8;font-weight:600;margin-bottom:6px;letter-spacing:0.04em;">PURCHASE</div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
               ${kpi('Broker (0.25%)', feeBroker, '#b45309')}
-              ${kpi('Custody / ISIN', feeCustody, '#b45309')}
+              ${kpi('Custody fee', feeCustody, '#b45309')}
               ${kpi('MINT revenue (3.8%)', feeMint, '#059669')}
             </div>
             ${rebFeeTotal > 0 ? `
             <div style="font-size:10px;color:#94a3b8;font-weight:600;margin:12px 0 6px;letter-spacing:0.04em;">REBALANCE${'�'}&middot;${'�'}<span style="color:#0e7490;">admin only</span></div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
               ${kpi('Reb. broker (0.5%)', rebFeeBroker, '#b45309')}
-              ${kpi('Reb. custody (R69/ISIN)', rebFeeCustody, '#b45309')}
+              ${kpi('Rebalance custody', rebFeeCustody, '#b45309')}
               ${kpi('Rebalance total', rebFeeTotal, '#b45309')}
             </div>` : ''}
           </div>
