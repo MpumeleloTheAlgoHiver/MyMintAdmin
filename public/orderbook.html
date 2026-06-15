@@ -4423,13 +4423,40 @@
       return { row: next, changed };
     };
 
-    const reconcileStrategyArchiveRowWithLive = (row, liveById) => {
-      const holdings = Array.isArray(row?.strategyHoldings) ? row.strategyHoldings : [];
+    const reconcileStrategyArchiveRowWithLive = (row, liveById, swapCtx) => {
+      let holdings = Array.isArray(row?.strategyHoldings) ? row.strategyHoldings : [];
       if (!holdings.length) {
         return reconcileLeafArchiveRowWithLive(row, liveById);
       }
 
       let changed = false;
+
+      /* Pre-fill swap support: a holding deactivated by a rebalance swap
+         (closed_reason='REBALANCE_PENDING_SWAP') must DROP out of the snapshot,
+         and the new pending replacement holding for that same investor+strategy
+         must be pulled IN — so the snapshot shows one basket with the swapped
+         asset in place (e.g. CLI → ABG), even before fill & settle. Runs on every
+         reconcile, so it sticks regardless of any cached copy. */
+      const ctx = swapCtx || { swappedOutIds: new Set(), liveByUserStrategy: new Map(), capturedIds: new Set() };
+      const swappedUsers = new Set();
+      const kept = holdings.filter((h) => {
+        const ids = [];
+        if (h?.sourceId) ids.push(String(h.sourceId));
+        if (Array.isArray(h?.sourceIds)) h.sourceIds.forEach((id) => id && ids.push(String(id)));
+        const isSwappedOut = ids.length > 0 && ids.every((id) => ctx.swappedOutIds.has(id));
+        if (isSwappedOut) { if (h?.userId) swappedUsers.add(String(h.userId)); changed = true; return false; }
+        return true;
+      });
+      const strategyId = row.strategyId ? String(row.strategyId) : '';
+      const additions = [];
+      swappedUsers.forEach((uid) => {
+        (ctx.liveByUserStrategy.get(`${uid}|${strategyId}`) || []).forEach((lr) => {
+          const lid = lr?.sourceId ? String(lr.sourceId) : '';
+          if (lid && !ctx.capturedIds.has(lid)) { additions.push({ ...lr }); ctx.capturedIds.add(lid); changed = true; }
+        });
+      });
+      holdings = [...kept, ...additions];
+
       const nextHoldings = holdings.map((holding, index) => {
         const result = reconcileLeafArchiveRowWithLive(holding, liveById);
         if (result.changed) changed = true;
@@ -4579,6 +4606,36 @@
       if (!Array.isArray(allBirSourceRows) || !allBirSourceRows.length) return;
 
       const liveById = buildLiveHoldingMapById();
+
+      /* Build the pre-fill swap context once: which holdings were swapped OUT,
+         the live PENDING holdings to swap IN (by investor+strategy), and every
+         holding id already captured anywhere (so we add a replacement only once). */
+      let swappedOutIds = new Set();
+      try {
+        const { data: swapped } = await supabaseClient
+          .from('stock_holdings_c')
+          .select('id')
+          .eq('closed_reason', 'REBALANCE_PENDING_SWAP');
+        swappedOutIds = new Set((swapped || []).map((r) => String(r.id)));
+      } catch (e) { /* non-fatal: fall back to leave-as-is */ }
+
+      const liveByUserStrategy = new Map();
+      (allBirSourceRows || []).forEach((r) => {
+        if (!r || Number(r.avgFillNumber || 0) > 0) return; // pending (unfilled) only
+        const uid = r.userId ? String(r.userId) : '';
+        const sid = r.strategyId ? String(r.strategyId) : '';
+        if (!uid || !sid) return;
+        const key = `${uid}|${sid}`;
+        if (!liveByUserStrategy.has(key)) liveByUserStrategy.set(key, []);
+        liveByUserStrategy.get(key).push(r);
+      });
+
+      const capturedIds = new Set();
+      filledOrderbooksArchive.forEach((b) => (b?.rows || []).forEach((row) => {
+        getRowHoldingIds(row).forEach((id) => capturedIds.add(String(id)));
+      }));
+
+      const swapCtx = { swappedOutIds, liveByUserStrategy, capturedIds };
       const changedBooks = [];
 
       const nextArchive = filledOrderbooksArchive.map((book) => {
@@ -4587,7 +4644,7 @@
 
         const nextRows = rows.map((row, index) => {
           const result = row?.isStrategy
-            ? reconcileStrategyArchiveRowWithLive(row, liveById)
+            ? reconcileStrategyArchiveRowWithLive(row, liveById, swapCtx)
             : reconcileLeafArchiveRowWithLive(row, liveById);
 
           if (result.changed) bookChanged = true;
