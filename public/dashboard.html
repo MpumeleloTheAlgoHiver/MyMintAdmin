@@ -8749,7 +8749,7 @@
       let rebIsins = [];           // [{code, description, unitsPerLot, currentPrice, weightPercent}]
       let rebRawHoldings = {};     // code &rarr; [{userId, name, quantity}]  (FILLED only — see partition in rebLoadStrategy)
       let rebUnfilledHoldings = {}; // code &rarr; [{holdingId, securityId, userId, familyMemberId, quantity}] — avg_fill=0 orders, handled by the swap step, never the sell/buy engine
-      let rebSwapDryRun = true;    // SAFETY: true = unfilled-order swap step LOGS its plan and writes NOTHING. Flip to false to arm live swaps.
+      let rebSwapDryRun = false;   // ARMED: unfilled-order swaps write for real. Set true to return to log-only dry-run.
       let rebSelectedIsin = null;
       let rebSelectedStep = null;
       let rebSellNetProceeds = 0;
