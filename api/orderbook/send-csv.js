@@ -1,4 +1,5 @@
 const { sendJson, fetchSupabaseJson, requestSupabaseJson, buildInFilter, sendOrderbookCsvEmail, handleSendTradeConfirmation } = require('../_orderbook');
+const handleSendTestEmail = require('../_send-test-email');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
@@ -18,6 +19,9 @@ module.exports = async (req, res) => {
     const action = req.query?.action || new URL(req.url, `http://${req.headers.host}`).searchParams.get('action');
     if (action === 'trade-confirmation') {
       return handleSendTradeConfirmation(req, res, token);
+    }
+    if (action === 'send-test-email') {
+      return handleSendTestEmail(req, res);
     }
 
     // ── Orderbook pins ────────────────────────────────────────────────────────
