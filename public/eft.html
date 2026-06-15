@@ -327,7 +327,7 @@
         <div id="addWalletAlert" class="alert alert-error" style="display:none;"></div>
         <div id="addWalletSuccess" class="alert alert-success" style="display:none;"></div>
 
-        <form id="addWalletForm" style="display:grid;grid-template-columns:1fr 150px 120px;gap:12px;align-items:flex-end;">
+        <form id="addWalletForm" style="display:grid;grid-template-columns:1fr 120px 150px 120px;gap:12px;align-items:flex-end;">
           <div>
             <div class="form-label">Search Client</div>
             <div class="search-box-wrapper">
@@ -336,6 +336,14 @@
             </div>
             <input type="hidden" id="selectedClientId" />
             <input type="hidden" id="selectedClientType" value="parent" />
+          </div>
+
+          <div>
+            <div class="form-label">Wallet Type</div>
+            <select id="walletStatus" class="form-input">
+              <option value="active">Active</option>
+              <option value="test">Test</option>
+            </select>
           </div>
 
           <div>
@@ -357,7 +365,14 @@
 
       <!-- Clients with Wallet Balance Section -->
       <div class="card">
-        <div class="card-title">Client's with Wallet Balance</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div class="card-title" style="margin-bottom:0;">Client's with Wallet Balance</div>
+          <div style="display:flex;gap:8px;background:#f1f5f9;padding:4px;border-radius:8px;">
+            <button id="filterActive" class="filter-btn active" style="padding:6px 12px;font-size:12px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:#fff;color:#0f172a;box-shadow:0 1px 2px rgba(0,0,0,0.05);">Active Wallets</button>
+            <button id="filterTest" class="filter-btn" style="padding:6px 12px;font-size:12px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:transparent;color:#64748b;">Test Wallets</button>
+            <button id="filterPending" class="filter-btn" style="padding:6px 12px;font-size:12px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:transparent;color:#64748b;">Pending Approvals</button>
+          </div>
+        </div>
 
         <div style="overflow-x:auto;border-radius:12px;border:1px solid #f1f5f9;">
           <table>
@@ -566,11 +581,11 @@
       }
 
       try {
-        const { data: { session } } = await supabaseClient.auth.getSession();
+        const walletStatus = document.getElementById('walletStatus').value || 'active';
         const response = await fetch('/api/send-eft-email?action=add-wallet', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-          body: JSON.stringify({ user_id: clientId, amount, account_type: accountType }),
+          body: JSON.stringify({ user_id: clientId, amount, account_type: accountType, wallet_status: walletStatus }),
         });
 
         const result = await response.json();
@@ -594,16 +609,110 @@
       }
     });
 
+    let currentEftFilter = 'active';
+    
+    document.getElementById('filterActive').addEventListener('click', (e) => {
+      document.querySelectorAll('.filter-btn').forEach(b => { b.classList.remove('active'); b.style.background = 'transparent'; b.style.color = '#64748b'; });
+      e.target.classList.add('active'); e.target.style.background = '#fff'; e.target.style.color = '#0f172a';
+      currentEftFilter = 'active';
+      loadPaidEfts();
+    });
+    document.getElementById('filterTest').addEventListener('click', (e) => {
+      document.querySelectorAll('.filter-btn').forEach(b => { b.classList.remove('active'); b.style.background = 'transparent'; b.style.color = '#64748b'; });
+      e.target.classList.add('active'); e.target.style.background = '#fff'; e.target.style.color = '#0f172a';
+      currentEftFilter = 'test';
+      loadPaidEfts();
+    });
+    document.getElementById('filterPending').addEventListener('click', (e) => {
+      document.querySelectorAll('.filter-btn').forEach(b => { b.classList.remove('active'); b.style.background = 'transparent'; b.style.color = '#64748b'; });
+      e.target.classList.add('active'); e.target.style.background = '#fff'; e.target.style.color = '#0f172a';
+      currentEftFilter = 'pending';
+      loadPaidEfts();
+    });
+
+    window.approvePendingDeposit = async (transactionId) => {
+      try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        const response = await fetch('/api/send-eft-email?action=approve-deposit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ transaction_id: transactionId }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Failed to approve');
+        alert('Deposit approved successfully!');
+        loadPaidEfts();
+      } catch (err) {
+        alert(err.message);
+      }
+    };
+
     /* ── Load Users with Wallets ── */
     async function loadPaidEfts() {
       const tableBody = document.getElementById('paidEftTableBody');
       const totalWalletCount = document.getElementById('totalWalletCount');
       const totalWalletAmount = document.getElementById('totalWalletAmount');
+      
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      const currentUserId = session?.user?.id;
 
       try {
+        if (currentEftFilter === 'pending') {
+          const { data: txns, error } = await supabaseClient
+            .from('wallet_transactions')
+            .select('id, user_id, amount, created_at, status')
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false });
+
+          if (error) throw error;
+
+          if (!txns || txns.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="4" class="empty-state">No pending approvals</td></tr>';
+            totalWalletCount.textContent = '0';
+            totalWalletAmount.textContent = formatCurrency(0);
+            return;
+          }
+
+          const userIds = txns.map(t => t.user_id).filter(Boolean);
+          let profilesMap = {};
+          if (userIds.length > 0) {
+            const { data: profiles } = await supabaseClient
+              .from('profiles')
+              .select('id, first_name, last_name, mint_number, email')
+              .in('id', userIds);
+            if (profiles) profiles.forEach(p => { profilesMap[p.id] = p; });
+          }
+
+          const totalAmount = txns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+          totalWalletCount.textContent = txns.length.toString();
+          totalWalletAmount.textContent = formatCurrency(totalAmount);
+
+          tableBody.innerHTML = txns.map(txn => {
+            const p = profilesMap[txn.user_id] || {};
+            const dateStr = new Date(txn.created_at).toLocaleDateString('en-ZA');
+            const parentName = `${p.first_name || ''} ${p.last_name || ''}`;
+            const actionButton = currentUserId === '766494d0-048c-4156-b706-7ad7050508bd'
+              ? `<button class="btn btn-primary" style="padding:6px 12px;font-size:11px;background:#f59e0b;" onclick="approvePendingDeposit('${txn.id}')">Approve</button>`
+              : `<span style="color:#f59e0b;font-weight:600;font-size:12px;">Pending</span>`;
+
+            return `
+              <tr>
+                <td style="color:#94a3b8;">${dateStr}</td>
+                <td style="font-weight:600;color:#1e293b;">${parentName}</td>
+                <td style="font-weight:700;color:#f59e0b;">+${formatCurrency(txn.amount)}</td>
+                <td style="font-family:monospace;color:#7c3aed;font-weight:600;">Pending Deposit</td>
+                <td>${actionButton}</td>
+              </tr>
+            `;
+          }).join('');
+          return;
+        }
+
+        // Fetch regular active or test wallets
         const { data: wallets, error } = await supabaseClient
           .from('wallets')
-          .select('id, user_id, balance, currency, updated_at, created_at, mint_number, mailer')
+          .select('id, user_id, balance, currency, updated_at, created_at, mint_number, mailer, status')
+          .eq('status', currentEftFilter)
           .gt('balance', 0)
           .order('updated_at', { ascending: false });
 
