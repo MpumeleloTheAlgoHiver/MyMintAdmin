@@ -123,7 +123,7 @@ const buildEmailHtml = ({ firstName, mintRef, orderDate, tableRowsHtml, subjectH
 </body>
 </html>`;
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }

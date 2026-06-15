@@ -1679,6 +1679,33 @@
       return true;
     };
 
+    const sendTestEmailBtn = document.getElementById('sendTestEmailBtn');
+    if (sendTestEmailBtn) {
+      sendTestEmailBtn.addEventListener('click', async () => {
+        sendTestEmailBtn.disabled = true;
+        sendTestEmailBtn.textContent = 'Sending...';
+        try {
+          const res = await fetch('/api/orderbook/send-csv?action=send-test-email', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${window.localStorage.getItem('supabase.auth.token')}`
+            }
+          });
+          if (res.ok) {
+            alert('Test emails sent successfully!');
+          } else {
+            alert('Failed to send test emails.');
+          }
+        } catch (err) {
+          console.error(err);
+          alert('Error sending test emails.');
+        } finally {
+          sendTestEmailBtn.disabled = false;
+          sendTestEmailBtn.textContent = 'Send Test Email';
+        }
+      });
+    }
+
     const signOutBtn = document.getElementById('signOutBtn');
     if (signOutBtn) {
       signOutBtn.addEventListener('click', async () => {
