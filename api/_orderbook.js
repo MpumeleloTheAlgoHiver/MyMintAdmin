@@ -343,7 +343,7 @@ const handleSendTradeConfirmation = async (req, res, token) => {
           <!-- Header Image -->
           <tr>
             <td style="padding:0;">
-              <img src="https://cdn.jsdelivr.net/gh/MufaroAlgohive/MyMintAdmin@main/public/images/email-header.jpg" alt="Mint Investment Platform" width="600" style="width:100%;max-width:600px;height:auto;display:block;border-radius:18px 18px 0 0;" />
+              <img src="https://cdn.jsdelivr.net/gh/MufaroAlgohive/MyMintAdmin@3180e25/public/images/email-header.jpg" alt="Mint Investment Platform" width="600" style="width:100%;max-width:600px;height:auto;display:block;border-radius:18px 18px 0 0;" />
             </td>
           </tr>
           <!-- Subject Heading -->
