@@ -340,21 +340,16 @@ const handleSendTradeConfirmation = async (req, res, token) => {
       <td align="center" style="padding:32px 16px;">
         <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 8px 32px rgba(15,23,42,0.07);">
 
-          <!-- Header -->
+          <!-- Header Image -->
           <tr>
-            <td style="background:linear-gradient(135deg,#31005e 0%,#5b21b6 50%,#7c3aed 100%);padding:36px 36px 28px 36px;">
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
-                <tr>
-                  <td style="vertical-align:middle;">
-                    <div style="display:inline-block;width:36px;height:36px;background:#ffffff;border-radius:10px;text-align:center;line-height:36px;font-weight:700;color:#7c3aed;font-size:18px;letter-spacing:-0.5px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">M</div>
-                  </td>
-                  <td style="vertical-align:middle;padding-left:12px;">
-                    <div style="color:#ffffff;font-weight:600;font-size:15px;letter-spacing:-0.2px;">Mint</div>
-                    <div style="color:rgba(255,255,255,0.7);font-size:12px;font-weight:500;">Investment Platform</div>
-                  </td>
-                </tr>
-              </table>
-              <h1 style="margin:24px 0 0 0;color:#ffffff;font-size:26px;line-height:1.2;font-weight:800;letter-spacing:-0.5px;">${subjectHeading}</h1>
+            <td style="padding:0;">
+              <img src="${DASHBOARD_URL}/images/email-header.jpg" alt="Mint Investment Platform" width="600" style="width:100%;max-width:600px;height:auto;display:block;border-radius:18px 18px 0 0;" />
+            </td>
+          </tr>
+          <!-- Subject Heading -->
+          <tr>
+            <td style="padding:32px 36px 0 36px;">
+              <h1 style="margin:0;color:#0f172a;font-size:26px;line-height:1.2;font-weight:800;letter-spacing:-0.5px;">${subjectHeading}</h1>
             </td>
           </tr>
 
@@ -533,8 +528,8 @@ const handleSendTradeConfirmation = async (req, res, token) => {
         mintRef: batchRef,
         orderDate: batchDate,
         tableRowsHtml,
-        subjectHeading: 'Basket Purchased.',
-        subjectIntro: `You have successfully purchased the <strong>${strategyName}</strong> basket. The following trades were executed to build your portfolio:`
+        subjectHeading: 'Portfolio Realigned.',
+        subjectIntro: `Your <strong>${strategyName}</strong> portfolio has been successfully realigned. The following trades were executed to match the target strategy:`
       });
     }
 
