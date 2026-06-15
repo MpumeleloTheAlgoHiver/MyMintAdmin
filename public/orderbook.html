@@ -2900,12 +2900,12 @@
       return csvLines.join('\n');
     };
 
-    const downloadCsv = (rows) => {
+    const downloadCsv = (rows, fileName) => {
       const blob = new Blob([toCsvContent(rows)], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `orderbook-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.download = fileName || `orderbook-${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -7242,19 +7242,37 @@
     if (exportOrderbookBtn) {
       exportOrderbookBtn.addEventListener('click', () => {
         const query = orderbookSearch?.value?.trim().toLowerCase() || '';
-        const rows = query
-          ? allOrderbookRows.filter((row) => {
-            return String(row.instrumentName || '').toLowerCase().includes(query)
-              || String(row.ticker || '').toLowerCase().includes(query)
-              || String(row.side || '').toLowerCase().includes(query)
-              || String(row.marketValue || '').toLowerCase().includes(query)
-              || String(row.orderType || '').toLowerCase().includes(query)
-              || String(row.settlementAccount || '').toLowerCase().includes(query)
-                || String(row.brokerRef || '').toLowerCase().includes(query)
-                || String(row.unrealizedPnl || '').toLowerCase().includes(query);
-          })
-          : allOrderbookRows;
-        downloadCsv(rows);
+        const matches = (row) =>
+          String(row.instrumentName || '').toLowerCase().includes(query)
+          || String(row.ticker || '').toLowerCase().includes(query)
+          || String(row.side || '').toLowerCase().includes(query)
+          || String(row.strategyName || '').toLowerCase().includes(query)
+          || String(row.strategyShortName || '').toLowerCase().includes(query)
+          || String(row.marketValue || '').toLowerCase().includes(query)
+          || String(row.orderType || '').toLowerCase().includes(query)
+          || String(row.settlementAccount || '').toLowerCase().includes(query)
+          || String(row.brokerRef || '').toLowerCase().includes(query)
+          || String(row.unrealizedPnl || '').toLowerCase().includes(query);
+
+        const today = new Date().toISOString().slice(0, 10);
+        const liveRows = query ? allOrderbookRows.filter(matches) : allOrderbookRows;
+
+        // If a snapshot is pinned to the top, export it as its own CSV alongside
+        // the live/active order book (two downloads).
+        const pinnedBook = getPinnedTopBook();
+        const pinnedRows = pinnedBook
+          ? (query ? (pinnedBook.rows || []).filter(matches) : (pinnedBook.rows || []))
+          : [];
+
+        if (pinnedBook && pinnedRows.length) {
+          downloadCsv(pinnedRows, `orderbook-pinned-OrderBook-${pinnedBook.sequence}-${today}.csv`);
+          // Stagger so the browser doesn't drop the second download.
+          if (liveRows.length) {
+            setTimeout(() => downloadCsv(liveRows, `orderbook-active-${today}.csv`), 400);
+          }
+        } else {
+          downloadCsv(liveRows, `orderbook-${today}.csv`);
+        }
       });
     }
 
