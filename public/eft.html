@@ -580,27 +580,6 @@
         addWalletSuccess.textContent = `Successfully added ${formatCurrency(amount)} to wallet`;
         addWalletSuccess.style.display = 'block';
 
-        // Fetch profile so we have email, firstName, mintNumber for the notification email
-        const { data: profileRows } = await supabaseClient
-          .from('profiles')
-          .select('email, first_name, mint_number')
-          .eq('id', clientId)
-          .limit(1);
-        const profile = profileRows && profileRows[0];
-
-        if (profile && profile.email) {
-          await sendWalletEmail(
-            result.walletId || '',
-            profile.email,
-            profile.first_name || '',
-            profile.mint_number || '',
-            result.newBalance,
-            'ZAR',
-            new Date().toISOString(),
-            result.amountAdded
-          );
-        }
-
         walletAmount.value = '';
         selectedClientId.value = '';
         clientSearch.value = '';
@@ -804,6 +783,24 @@
       if (!email) {
         alert('Client email not found');
         return;
+      }
+      
+      // If amountAdded is not provided (i.e. manual Send button click), fetch the latest top-up
+      if (amountAdded == null && walletId) {
+        try {
+          const { data: latestTx } = await supabaseClient
+            .from('wallet_transactions')
+            .select('amount')
+            .eq('wallet_id', walletId)
+            .eq('transaction_type', 'manual')
+            .order('created_at', { ascending: false })
+            .limit(1);
+          if (latestTx && latestTx.length > 0) {
+            amountAdded = latestTx[0].amount;
+          }
+        } catch (e) {
+          console.warn('Could not fetch latest amount added:', e);
+        }
       }
       
       const htmlTemplate = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">

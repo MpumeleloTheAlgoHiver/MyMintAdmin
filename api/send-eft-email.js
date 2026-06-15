@@ -104,7 +104,7 @@ const handleAddWallet = async (req, res, token) => {
       await requestSupabaseJson(`/rest/v1/wallets?id=eq.${encodeURIComponent(wallet.id)}`, {
         method: 'PATCH',
         useServiceRoleAuth: true,
-        body: { balance: newWalletBalance, mailer: 'sent', updated_at: new Date().toISOString() },
+        body: { balance: newWalletBalance, updated_at: new Date().toISOString() },
       });
       walletId = wallet.id;
     } else {
@@ -112,7 +112,7 @@ const handleAddWallet = async (req, res, token) => {
       const created = await requestSupabaseJson('/rest/v1/wallets', {
         method: 'POST',
         useServiceRoleAuth: true,
-        body: { user_id, balance: numericAmount, currency: 'ZAR', mailer: 'sent' },
+        body: { user_id, balance: numericAmount, currency: 'ZAR' },
         extraHeaders: { Prefer: 'return=representation' },
       });
       if (Array.isArray(created) && created[0]) {
