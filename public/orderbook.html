@@ -1483,6 +1483,7 @@
           <p class="orderbook-subtitle">Holdings ledger with export support.</p>
           <div class="orderbook-toolbar">
             <div class="orderbook-count" id="orderbookCount">0 records</div>
+            <button class="orderbook-export-btn" id="orderbookUatToggle" type="button" title="Toggle between live (real) orders and UAT test-account orders">Live orders</button>
             <button class="orderbook-export-btn" id="exportOrderbookBtn" type="button" disabled>Export CSV</button>
           </div>
           <div class="orderbook-table-wrap">
@@ -1593,6 +1594,7 @@
     const orderbookTableBody = document.getElementById('orderbookTableBody');
     const orderbookCount = document.getElementById('orderbookCount');
     const exportOrderbookBtn = document.getElementById('exportOrderbookBtn');
+    const orderbookUatToggle = document.getElementById('orderbookUatToggle');
     const orderbookSearch = document.getElementById('orderbookSearch');
     const orderbookTimer = document.getElementById('orderbookTimer');
     const filledOrderbooksList = document.getElementById('filledOrderbooksList');
@@ -1615,6 +1617,27 @@
     const strateBirPreviewHead = document.getElementById('strateBirPreviewHead');
     const strateBirPreviewBody = document.getElementById('strateBirPreviewBody');
     let allOrderbookRows = [];
+    // ── UAT mode ──────────────────────────────────────────────────────────────
+    // The live orderbook hides orders owned by dedicated TEST accounts
+    // (profiles.is_test = true) so fake/UAT buys never clutter it. The toolbar
+    // toggle flips to "UAT" to show ONLY those test orders. Filtering happens at
+    // the source (holdings + rebalance rows) so the table AND the CSV export follow
+    // automatically. Snapshot capture/reconcile is skipped while in UAT mode so a
+    // filtered live set can never touch the real archived books.
+    let orderbookUatMode = false;
+    let _testUserIdSet = null;
+    const getTestUserIdSet = async () => {
+      if (_testUserIdSet) return _testUserIdSet;
+      try {
+        const { data, error } = await supabaseClient.from('profiles').select('id').eq('is_test', true);
+        if (error) throw error;
+        _testUserIdSet = new Set((data || []).map((r) => r.id));
+      } catch (err) {
+        console.error('[UAT] could not load test accounts:', err?.message || err);
+        _testUserIdSet = new Set(); // fail safe → behaves as live book (treats nobody as test)
+      }
+      return _testUserIdSet;
+    };
     // Pinned fresh orders (sourceId = stock_holdings_c.id) — float to the top of
     // the live list. Loaded from orderbook_pins via the send-csv api.
     let orderbookPins = new Set();
@@ -1641,6 +1664,7 @@
     // If any snapshot is pinned, the most recent pinned book's rows are shown
     // up top (instead of the live active rows) until it is unpinned.
     const getPinnedTopBook = () => {
+      if (orderbookUatMode) return null; // UAT view shows only the filtered live test orders
       if (!orderbookPins || !orderbookPins.size) return null;
       const pinned = (filledOrderbooksArchive || []).filter((b) => orderbookPins.has(String(b.id)));
       if (!pinned.length) return null;
@@ -5481,9 +5505,18 @@
         throw new Error(holdingsResult.error.message || 'Could not load stock_holdings_c');
       }
 
-      const holdings = holdingsResult.data || [];
-      const rebEvents = rebEventsResult.data || [];
+      let holdings = holdingsResult.data || [];
+      let rebEvents = rebEventsResult.data || [];
       const rebBatches = rebBatchesResult.data || [];
+
+      // UAT toggle: the live book hides rows owned by test accounts; UAT shows ONLY
+      // them. Filter at the source so every downstream map, row, and the CSV export
+      // reflect the active mode.
+      const _testIds = await getTestUserIdSet();
+      const _keepRow = (uid) => orderbookUatMode ? _testIds.has(uid) : !_testIds.has(uid);
+      holdings = holdings.filter((h) => _keepRow(h.user_id));
+      rebEvents = rebEvents.filter((e) => _keepRow(e.user_id));
+
       const batchById = rebBatches.reduce((acc, b) => { acc[b.id] = b; return acc; }, {});
       holdingFillDateById.clear();
       mintGainByHolding.clear();
@@ -6028,12 +6061,16 @@
         allOrderbookRows = await loadOrderbookClientSideFallback();
         applySearchFilter();
         renderStrateBirPreview();
-        maybeCaptureFilledOrderbook();
+        // In UAT mode the live set is filtered to test accounts, so DON'T capture
+        // or reconcile snapshots — that would alter the real archived books.
+        if (!orderbookUatMode) {
+          maybeCaptureFilledOrderbook();
 
-        // Run reconciliation tasks after initial render (non-blocking)
-        reconcileArchivedBooksWithLiveHoldings()
-          .then(() => maybeBackfillLegacyArchiveSnapshots())
-          .catch((err) => console.error('Post-render reconciliation error:', err?.message || err));
+          // Run reconciliation tasks after initial render (non-blocking)
+          reconcileArchivedBooksWithLiveHoldings()
+            .then(() => maybeBackfillLegacyArchiveSnapshots())
+            .catch((err) => console.error('Post-render reconciliation error:', err?.message || err));
+        }
       } catch (error) {
         console.error('Orderbook load error:', error);
         orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">Could not load orderbook data.</td></tr>';
@@ -7388,6 +7425,24 @@
         } else {
           downloadCsv(liveRows, `orderbook-${today}.csv`);
         }
+      });
+    }
+
+    if (orderbookUatToggle) {
+      const paintUatToggle = () => {
+        orderbookUatToggle.textContent = orderbookUatMode ? 'UAT: test orders' : 'Live orders';
+        orderbookUatToggle.style.background = orderbookUatMode ? '#f59e0b' : '';
+        orderbookUatToggle.style.color = orderbookUatMode ? '#fff' : '';
+        orderbookUatToggle.style.borderColor = orderbookUatMode ? '#f59e0b' : '';
+        orderbookUatToggle.title = orderbookUatMode
+          ? 'Showing UAT test-account orders only — click to return to the live book'
+          : 'Toggle between live (real) orders and UAT test-account orders';
+      };
+      paintUatToggle();
+      orderbookUatToggle.addEventListener('click', () => {
+        orderbookUatMode = !orderbookUatMode;
+        paintUatToggle();
+        loadOrderbook().catch((err) => console.error('UAT toggle reload failed:', err?.message || err));
       });
     }
 
