@@ -1483,8 +1483,10 @@
           <p class="orderbook-subtitle">Holdings ledger with export support.</p>
           <div class="orderbook-toolbar">
             <div class="orderbook-count" id="orderbookCount">0 records</div>
-            <button class="orderbook-export-btn" id="orderbookUatToggle" type="button" title="Toggle between live (real) orders and UAT test-account orders">Live orders</button>
-            <button class="orderbook-export-btn" id="exportOrderbookBtn" type="button" disabled>Export CSV</button>
+            <div class="orderbook-toolbar-actions">
+              <button class="orderbook-export-btn" id="orderbookUatToggle" type="button" title="Toggle between live (real) orders and UAT test-account orders">Live orders</button>
+              <button class="orderbook-export-btn" id="exportOrderbookBtn" type="button" disabled>Export CSV</button>
+            </div>
           </div>
           <div class="orderbook-table-wrap">
             <table class="orderbook-table">
@@ -4735,7 +4737,15 @@
       const activeBooks = [];
       const closedBooks = [];
 
-      filledOrderbooksArchive.forEach((book) => {
+      // UAT toggle: snapshots only ever capture live orders (capture is skipped in
+      // UAT mode), so classify each book by whether its rows belong to test accounts
+      // and show only the set that matches the current mode — Live hides test books,
+      // UAT shows only test books.
+      const _uatTestIds = _testUserIdSet || new Set();
+      const _bookIsTest = (book) => (Array.isArray(book.rows) ? book.rows : []).some((r) => _uatTestIds.has(r.userId));
+      const _modeBooks = filledOrderbooksArchive.filter((b) => orderbookUatMode ? _bookIsTest(b) : !_bookIsTest(b));
+
+      _modeBooks.forEach((book) => {
         const result = isBookFullyClosed(book);
         const manualClosedAt = getManualCloseDate(book.id);
         if (manualClosedAt) {
@@ -4746,7 +4756,7 @@
       });
 
       if (!activeBooks.length) {
-        filledOrderbooksList.innerHTML = '<div class="filled-orderbook-empty">No active order books yet.</div>';
+        filledOrderbooksList.innerHTML = `<div class="filled-orderbook-empty">${orderbookUatMode ? 'No UAT (test) order books yet.' : 'No active order books yet.'}</div>`;
       } else {
         let sorted;
         if (activeBooksSortOrder === 'oldest') {
