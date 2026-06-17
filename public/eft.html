@@ -715,7 +715,7 @@
           totalWalletCount.textContent = txns.length.toString();
           totalWalletAmount.textContent = formatCurrency(totalAmount);
 
-          const isApprover = (currentUserEmail || '').toLowerCase() === 'lonwabo@mymint.co.za';
+          const isApprover = (session?.user?.email || '').toLowerCase() === 'lonwabo@mymint.co.za';
 
           tableBody.innerHTML = txns.map(txn => {
             const p = profilesMap[txn.user_id] || {};
