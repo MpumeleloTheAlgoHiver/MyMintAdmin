@@ -201,7 +201,6 @@ const sendApprovalNotification = async (userId, amount) => {
   } catch (e) {
     console.error('Approval notification email failed:', e.message);
   }
-  }
 };
 
 const handleApproveDeposit = async (req, res, user) => {
