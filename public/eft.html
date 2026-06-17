@@ -445,9 +445,14 @@
       });
     }
 
+    let currentUserEmail = '';
+    let currentUserSession = null;
+
     (async () => {
       const { data: { session } } = await supabaseClient.auth.getSession();
+      currentUserSession = session;
       const email = session?.user?.email || '';
+      currentUserEmail = email;
       const nameEl = document.getElementById('sidebarUserEmail');
       const avatarEl = document.getElementById('sidebarAvatarInitials');
       if (nameEl && email) nameEl.textContent = email;
@@ -582,17 +587,21 @@
 
       try {
         const walletStatus = document.getElementById('walletStatus').value || 'active';
+        const { data: { session: freshSession } } = await supabaseClient.auth.getSession();
         const response = await fetch('/api/send-eft-email?action=add-wallet', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${freshSession?.access_token}` },
           body: JSON.stringify({ user_id: clientId, amount, account_type: accountType, wallet_status: walletStatus }),
         });
 
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Failed to add to wallet');
 
-        // Refresh table to get updated profile/wallet info for the email
-        addWalletSuccess.textContent = `Successfully added ${formatCurrency(amount)} to wallet`;
+        if (walletStatus === 'active') {
+          addWalletSuccess.textContent = `Wallet request submitted — ${formatCurrency(amount)} pending approval from Lonwabo`;
+        } else {
+          addWalletSuccess.textContent = `Successfully added ${formatCurrency(amount)} to test wallet`;
+        }
         addWalletSuccess.style.display = 'block';
 
         walletAmount.value = '';
@@ -687,11 +696,13 @@
           totalWalletCount.textContent = txns.length.toString();
           totalWalletAmount.textContent = formatCurrency(totalAmount);
 
+          const isApprover = (currentUserEmail || '').toLowerCase() === 'lonwabo@mymint.co.za';
+
           tableBody.innerHTML = txns.map(txn => {
             const p = profilesMap[txn.user_id] || {};
             const dateStr = new Date(txn.created_at).toLocaleDateString('en-ZA');
             const parentName = `${p.first_name || ''} ${p.last_name || ''}`;
-            const actionButton = currentUserId === '766494d0-048c-4156-b706-7ad7050508bd'
+            const actionButton = isApprover
               ? `<button class="btn btn-primary" style="padding:6px 12px;font-size:11px;background:#f59e0b;" onclick="approvePendingDeposit('${txn.id}')">Approve</button>`
               : `<span style="color:#f59e0b;font-weight:600;font-size:12px;">Pending</span>`;
 

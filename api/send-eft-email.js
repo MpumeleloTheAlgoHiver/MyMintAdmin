@@ -146,11 +146,66 @@ const handleAddWallet = async (req, res, token) => {
     }
   }
 
+  if (wallet_status === 'active') {
+    sendApprovalNotification(user_id, numericAmount).catch(e => console.error('Notification email error:', e.message));
+  }
+
   return sendJson(res, 200, { success: true, amountAdded: numericAmount, newBalance: newWalletBalance, walletId, pending: wallet_status === 'active' });
 };
 
+const APPROVER_EMAIL = 'lonwabo@mymint.co.za';
+
+const sendApprovalNotification = async (userId, amount) => {
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const fromAddress = process.env.ORDERBOOK_EMAIL_FROM;
+  if (!resendApiKey || !fromAddress) return;
+
+  let clientName = userId;
+  try {
+    const profiles = await fetchSupabaseJson(
+      `/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=first_name,last_name,email&limit=1`
+    );
+    if (Array.isArray(profiles) && profiles[0]) {
+      const p = profiles[0];
+      clientName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.email || userId;
+    }
+  } catch (_) {}
+
+  const zarAmount = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 2 }).format(Number(amount));
+  const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f6fa;margin:0;padding:32px 16px;">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:520px;margin:0 auto;">
+  <tr><td style="background:#fff;border-radius:16px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,0.07);border:1px solid #ede9fe;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px;">
+      <img src="https://app.mymint.co.za/icon.png" style="width:36px;height:36px;border-radius:9px;" />
+      <span style="font-size:16px;font-weight:700;color:#0f172a;">Mint Admin</span>
+    </div>
+    <h2 style="font-size:18px;font-weight:700;color:#1e293b;margin:0 0 8px 0;">Wallet Deposit Request</h2>
+    <p style="font-size:14px;color:#64748b;margin:0 0 20px 0;">A wallet top-up requires your approval.</p>
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:#f8fafc;border-radius:10px;padding:16px;margin-bottom:24px;">
+      <tr><td style="padding:6px 0;font-size:13px;color:#94a3b8;width:120px;">Client</td><td style="font-size:13px;font-weight:600;color:#1e293b;">${clientName}</td></tr>
+      <tr><td style="padding:6px 0;font-size:13px;color:#94a3b8;">Amount</td><td style="font-size:15px;font-weight:700;color:#f59e0b;">${zarAmount}</td></tr>
+      <tr><td style="padding:6px 0;font-size:13px;color:#94a3b8;">Status</td><td style="font-size:13px;font-weight:600;color:#7c3aed;">Pending Approval</td></tr>
+    </table>
+    <p style="font-size:13px;color:#64748b;margin:0 0 20px 0;">Log in to the Mint Admin Portal and go to <strong>EFT Payments → Pending Approvals</strong> to approve or review this request.</p>
+    <a href="https://mint-crm.vercel.app/eft.html" style="display:inline-block;background:#7c3aed;color:#fff;font-size:13px;font-weight:600;padding:12px 24px;border-radius:8px;text-decoration:none;">Review in Admin Portal</a>
+    <p style="font-size:11px;color:#94a3b8;margin:24px 0 0 0;">&copy; ${new Date().getFullYear()} MINT (Pty) Ltd. This is an automated notification.</p>
+  </td></tr>
+</table>
+</body></html>`;
+
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: fromAddress, to: [APPROVER_EMAIL], subject: `Wallet Request — ${clientName} (${zarAmount})`, html }),
+    });
+  } catch (e) {
+    console.error('Approval notification email failed:', e.message);
+  }
+};
+
 const handleApproveDeposit = async (req, res, user) => {
-  if (user.id !== '766494d0-048c-4156-b706-7ad7050508bd') {
+  if ((user.email || '').toLowerCase() !== APPROVER_EMAIL) {
     return sendJson(res, 403, { error: 'Unauthorized to approve deposits' });
   }
 
