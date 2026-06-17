@@ -48,10 +48,31 @@
     .tab-inactive { color: #94a3b8; font-weight: 500; border-bottom: 2px solid transparent; font-size: 13px; padding: 0 18px; display: flex; align-items: center; background: none; border: none; cursor: pointer; white-space: nowrap; transition: color 0.15s ease; }
     .tab-inactive:hover { color: #475569; }
     .hidden { display: none; }
+    
+    /* Embed mode overrides */
+    body.is-embedded .sidebar { display: none !important; }
+    body.is-embedded .top-nav { display: none !important; }
+    body.is-embedded #kpiBar { display: none !important; }
+    body.is-embedded #listPanel { display: none !important; }
+    body.is-embedded .main-content { margin-left: 0 !important; }
+    body.is-embedded .max-w-7xl { max-width: none !important; padding: 0 !important; margin: 0 !important; }
+    body.is-embedded #mainGrid { grid-template-columns: 1fr !important; min-height: 100vh !important; gap: 0 !important; }
+    body.is-embedded #detailPanel { border-radius: 0 !important; box-shadow: none !important; }
   </style>
 <script src="/js/cc-badge.js" defer></script>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('embed') === '1') {
+    document.documentElement.classList.add('is-embedded');
+  }
+</script>
 </head>
 <body class="gradient-bg min-h-screen">
+  <script>
+    if (new URLSearchParams(window.location.search).get('embed') === '1') {
+      document.body.classList.add('is-embedded');
+    }
+  </script>
   <aside class="sidebar">
     <div class="sidebar-header" style="cursor:pointer;position:relative;user-select:none;" onclick="mintHubDropdownToggle(event)">
       <div class="sidebar-logo">
@@ -251,8 +272,8 @@
     <div style="flex:1;overflow:visible;">
       <div class="max-w-7xl mx-auto px-5 py-5 space-y-4">
         <div id="kpiBar" style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:8px;"></div>
-        <div style="display:grid;grid-template-columns:300px 1fr;gap:12px;min-height:600px;">
-          <div style="background:white;border-radius:12px;padding:16px;box-shadow:0 0 0 1px rgba(0,0,0,0.05),0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;gap:10px;">
+        <div id="mainGrid" style="display:grid;grid-template-columns:300px 1fr;gap:12px;min-height:600px;">
+          <div id="listPanel" style="background:white;border-radius:12px;padding:16px;box-shadow:0 0 0 1px rgba(0,0,0,0.05),0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;gap:10px;">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               <span style="font-size:13px;font-weight:600;color:#0f172a;">Investors</span>
@@ -1279,6 +1300,14 @@
         /* Strategy filter */
         const sf = document.getElementById('strategyFilter');
         sf.innerHTML = `<option value="">All Strategies</option>` + allStrategies.sort((a,b) => (a.short_name||a.name).localeCompare(b.short_name||b.name)).map(s => `<option value="${s.id}">${s.short_name||s.name}</option>`).join('');
+        
+        /* Pre-select user from URL if present */
+        const urlParams = new URLSearchParams(window.location.search);
+        const qUserId = urlParams.get('userId');
+        if (qUserId) {
+          currentInvestor = allInvestors.find(i => i.userId === qUserId) || null;
+        }
+        
         renderList(allInvestors);
         renderDetail();
         document.getElementById('investorSearch').oninput = () => renderList(allInvestors);
