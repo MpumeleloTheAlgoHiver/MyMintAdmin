@@ -686,29 +686,20 @@
 
       try {
         if (currentEftFilter === 'pending') {
-          const { data: txns, error } = await supabaseClient
-            .from('wallet_transactions')
-            .select('id, user_id, amount, created_at, status')
-            .eq('status', 'pending')
-            .order('created_at', { ascending: false });
-
-          if (error) throw error;
+          const resp = await fetch('/api/eft/pending-transactions', {
+            headers: { Authorization: `Bearer ${session?.access_token}` }
+          });
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.error || `Server error ${resp.status}`);
+          }
+          const { transactions: txns } = await resp.json();
 
           if (!txns || txns.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="4" class="empty-state">No pending approvals</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="5" class="empty-state">No pending approvals</td></tr>';
             totalWalletCount.textContent = '0';
             totalWalletAmount.textContent = formatCurrency(0);
             return;
-          }
-
-          const userIds = txns.map(t => t.user_id).filter(Boolean);
-          let profilesMap = {};
-          if (userIds.length > 0) {
-            const { data: profiles } = await supabaseClient
-              .from('profiles')
-              .select('id, first_name, last_name, mint_number, email')
-              .in('id', userIds);
-            if (profiles) profiles.forEach(p => { profilesMap[p.id] = p; });
           }
 
           const totalAmount = txns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
@@ -718,7 +709,7 @@
           const isApprover = (session?.user?.email || '').toLowerCase() === 'lonwabo@mymint.co.za';
 
           tableBody.innerHTML = txns.map(txn => {
-            const p = profilesMap[txn.user_id] || {};
+            const p = txn.profile || {};
             const dateStr = new Date(txn.created_at).toLocaleDateString('en-ZA');
             const parentName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || '—';
             const safeClientName = parentName.replace(/'/g, "\\'");

@@ -1600,6 +1600,38 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── GET /api/eft/pending-transactions ─────────────────────────────────────
+  // Returns all wallet_transactions with status='pending', joined with profile
+  // data. Uses service role so RLS does not filter by the caller's user_id.
+  if (req.url.startsWith('/api/eft/pending-transactions') && req.method === 'GET') {
+    const token = parseBearerToken(req.headers.authorization);
+    if (!token) { sendJson(res, 401, { error: 'Missing Authorization bearer token' }); return; }
+    (async () => {
+      try {
+        await fetchSupabaseJson('/auth/v1/user', token, false);
+        const txns = await fetchSupabaseJson(
+          '/rest/v1/wallet_transactions?status=eq.pending&order=created_at.desc&select=id,user_id,amount,created_at,status',
+          null
+        );
+        const rows = Array.isArray(txns) ? txns : [];
+        const userIds = [...new Set(rows.map(t => t.user_id).filter(Boolean))];
+        let profilesMap = {};
+        if (userIds.length > 0) {
+          const profiles = await fetchSupabaseJson(
+            `/rest/v1/profiles?select=id,first_name,last_name,mint_number,email&id=in.(${buildInFilter(userIds)})`,
+            null
+          );
+          if (Array.isArray(profiles)) profiles.forEach(p => { profilesMap[p.id] = p; });
+        }
+        const enriched = rows.map(t => ({ ...t, profile: profilesMap[t.user_id] || null }));
+        sendJson(res, 200, { transactions: enriched });
+      } catch (err) {
+        sendJson(res, 500, { error: err.message || 'Failed to fetch pending transactions' });
+      }
+    })();
+    return;
+  }
+
   if ((req.url.startsWith('/api/add-wallet') || req.url.startsWith('/api/send-eft-email?action=add-wallet')) && req.method === 'POST') {
     const token = parseBearerToken(req.headers.authorization);
     if (!token) {
