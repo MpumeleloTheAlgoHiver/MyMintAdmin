@@ -10882,7 +10882,11 @@
         body.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">Loading&hellip;</p>';
         modal.classList.remove("hidden");
 
-        const buyUniverse = await rebLoadBuySecurities();
+        const [buyUniverse, testWalletRes] = await Promise.all([
+          rebLoadBuySecurities(),
+          supabaseClient.from('wallets').select('user_id').eq('status', 'test'),
+        ]);
+        const testWalletUserIds = new Set((testWalletRes.data || []).map((r) => r.user_id).filter(Boolean));
         const strategyClients = rebClientsForStrategy();
         let selectedBuyId = null;
         let buyPerLot = 1;
@@ -10890,6 +10894,8 @@
 
         const render = () => {
           const totalWallet = strategyClients.reduce((s, c) => s + Number(rebWalletByClient[String(c.id)] || 0), 0);
+          const testParticipants = strategyClients.filter((c) => testWalletUserIds.has(String(c.id)));
+          const hasTestWallets = testParticipants.length > 0;
           const q = searchTerm.trim().toLowerCase();
           const filtered = q
             ? buyUniverse.filter((i) => `${i.code} ${i.fullSymbol} ${i.description}`.toLowerCase().includes(q))
@@ -10920,6 +10926,14 @@
 
           body.innerHTML = `
             <div class="space-y-4">
+              ${hasTestWallets ? `
+              <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 flex items-start gap-2">
+                <span style="font-size:15px;line-height:1.2;">⚠️</span>
+                <div>
+                  <p class="text-[11px] font-semibold text-amber-700">${testParticipants.length} client${testParticipants.length !== 1 ? 's' : ''} ha${testParticipants.length !== 1 ? 've' : 's'} a test wallet</p>
+                  <p class="text-[10px] text-amber-600 mt-0.5">Orders for these clients will appear in the <strong>Test Wallet Orders</strong> tab of the orderbook, not the live book.</p>
+                </div>
+              </div>` : ''}
               <!-- Pool summary -->
               <div class="rounded-xl border border-violet-100 bg-violet-50 p-3">
                 <div class="flex items-baseline justify-between">
@@ -10943,17 +10957,21 @@
                       </tr>
                     </thead>
                     <tbody>
-                      ${perUserPlan.map((p) => `
+                      ${perUserPlan.map((p) => {
+                        const isTest = testWalletUserIds.has(String(p.client.id));
+                        return `
                         <tr class="${selectedInstrument && !p.afford && p.sharesNeeded > 0 ? 'bg-red-50' : 'hover:bg-slate-50'}">
-                          <td class="px-3 py-2 text-slate-800 truncate max-w-[180px]" title="${p.client.id}">${p.client.name}</td>
+                          <td class="px-3 py-2 text-slate-800 truncate max-w-[180px]" title="${p.client.id}">
+                            ${p.client.name}${isTest ? ' <span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:0.04em;background:#fef3c7;color:#d97706;vertical-align:middle;">TEST</span>' : ''}
+                          </td>
                           <td class="px-3 py-2 text-right font-mono text-slate-500">${p.lots.toLocaleString()}</td>
                           <td class="px-3 py-2 text-right font-mono ${p.walletR > 0 ? 'text-violet-700 font-semibold' : 'text-slate-400'}">${rebFmtZAR(p.walletR)}</td>
                           ${selectedInstrument ? `
                             <td class="px-3 py-2 text-right font-mono text-slate-600">${rebFmtZAR(p.cost)}</td>
                             <td class="px-3 py-2 text-right font-mono font-semibold ${p.afford ? 'text-green-700' : 'text-red-600'}">${rebFmtZAR(p.remaining)}</td>
                           ` : ''}
-                        </tr>
-                      `).join('') || '<tr><td colspan="3" class="text-center text-slate-400 py-4">No clients</td></tr>'}
+                        </tr>`;
+                      }).join('') || '<tr><td colspan="3" class="text-center text-slate-400 py-4">No clients</td></tr>'}
                     </tbody>
                   </table>
                 </div>
