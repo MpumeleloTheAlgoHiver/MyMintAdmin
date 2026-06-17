@@ -196,7 +196,7 @@ const sendApprovalNotification = async (userId, amount) => {
     await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: fromAddress, to: APPROVER_EMAILS, subject: `Wallet Request — ${clientName} (${zarAmount})`, html }),
+      body: JSON.stringify({ from: fromAddress, to: ['lonwabo@mymint.co.za'], subject: `Wallet Request — ${clientName} (${zarAmount})`, html }),
     });
   } catch (e) {
     console.error('Approval notification email failed:', e.message);
