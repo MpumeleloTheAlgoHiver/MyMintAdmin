@@ -147,7 +147,7 @@ const handleAddWallet = async (req, res, token) => {
   }
 
   if (wallet_status === 'active') {
-    sendApprovalNotification(user_id, numericAmount).catch(e => console.error('Notification email error:', e.message));
+    await sendApprovalNotification(user_id, numericAmount).catch(e => console.error('Notification email error:', e.message));
   }
 
   return sendJson(res, 200, { success: true, amountAdded: numericAmount, newBalance: newWalletBalance, walletId, pending: wallet_status === 'active' });
