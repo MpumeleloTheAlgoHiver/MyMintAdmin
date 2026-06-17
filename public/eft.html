@@ -706,7 +706,8 @@
           totalWalletCount.textContent = txns.length.toString();
           totalWalletAmount.textContent = formatCurrency(totalAmount);
 
-          const isApprover = (session?.user?.email || '').toLowerCase() === 'lonwabo@mymint.co.za';
+          const userEmail = (session?.user?.email || '').toLowerCase();
+          const isApprover = userEmail === 'lonwabo@mymint.co.za' || userEmail === 'mufaro.ncube@mymint.co.za';
 
           tableBody.innerHTML = txns.map(txn => {
             const p = txn.profile || {};
