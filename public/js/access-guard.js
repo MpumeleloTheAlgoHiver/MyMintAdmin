@@ -57,7 +57,7 @@
   // Usage: window.mintCan('orderbook', 'edit_fill_price') → false | 'pending' | 'direct' | true
   const buildPermHelper = (permissions, approverTier) => {
     return (section, field) => {
-      if (approverTier === 'def') return true; // Def bypasses everything
+      if (approverTier === 'dev') return true; // Dev bypasses everything
       if (!permissions || typeof permissions !== 'object') return false;
       const sec = permissions[section];
       if (!sec || typeof sec !== 'object') return false;

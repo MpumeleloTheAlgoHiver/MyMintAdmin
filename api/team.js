@@ -16,8 +16,8 @@ const {
   updateAuthUserEmail,
   sendInviteEmail,
   sendResendEmail,
-  isMasterOrDef,
-  isDef
+  isMasterOrDev,
+  isDev
 } = require('./_team');
 
 const normEmail = (e) => String(e || '').trim().toLowerCase();
@@ -685,8 +685,8 @@ module.exports = async (req, res) => {
       const { id, approver_tier, permissions } = req.body || {};
       if (!id) return sendJson(res, 400, { error: 'id is required' });
 
-      const validTiers = [null, '', 'master', 'def'];
-      const safeTier = validTiers.includes(approver_tier) ? (approver_tier || null) : null;
+      const validTiers = [null, '', 'master', 'dev'];
+      const finalTier = validTiers.includes(approver_tier) ? (approver_tier || null) : null;
       const safePerms = permissions && typeof permissions === 'object' && !Array.isArray(permissions) ? permissions : {};
 
       const beforeRows = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}&limit=1`);
@@ -697,7 +697,7 @@ module.exports = async (req, res) => {
         const out = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}`, {
           method: 'PATCH',
           extraHeaders: { 'Prefer': 'return=representation' },
-          body: { approver_tier: safeTier, permissions: safePerms, updated_at: new Date().toISOString() }
+          body: { approver_tier: finalTier, permissions: safePerms, updated_at: new Date().toISOString() }
         });
         updated = Array.isArray(out) ? out[0] : out;
       } catch (err) {
@@ -712,21 +712,22 @@ module.exports = async (req, res) => {
         actor_user_id: result.user.id,
         details: {
           before: before ? { approver_tier: before.approver_tier, permissions: before.permissions } : null,
-          after: { approver_tier: safeTier, permissions: safePerms }
+          after: { approver_tier: finalTier, permissions: safePerms }
         }
       });
 
       return sendJson(res, 200, { ok: true, member: updated });
     }
 
-    // LIST-APPROVALS — master/def only (or any admin if they are the actor).
+    // LIST-APPROVALS — master/dev only (or any admin if they are the actor).
     if (action === 'list-approvals') {
       if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
       const result = await requireAuth(req, res);
       if (!result) return;
       const { member } = result;
-      if (member.role !== 'admin' && !isMasterOrDef(member)) {
-        return sendJson(res, 403, { error: 'Master Approver or Def access required' });
+      // Must be admin, master, or dev
+      if (member.role !== 'admin' && !isMasterOrDev(member)) {
+        return sendJson(res, 403, { error: 'Not authorized to view pending approvals' });
       }
 
       const status = (url.searchParams.get('status') || 'pending').trim();
@@ -782,13 +783,13 @@ module.exports = async (req, res) => {
       return sendJson(res, 200, { ok: true, approval });
     }
 
-    // RESOLVE-APPROVAL — master/def only. Approves or rejects a pending request.
+    // RESOLVE-APPROVAL — master/dev only. Approves or rejects a pending request.
     if (action === 'resolve-approval') {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
       const result = await requireAuth(req, res);
       if (!result) return;
-      if (!isMasterOrDef(result.member) && result.member.role !== 'admin') {
-        return sendJson(res, 403, { error: 'Master Approver or Def access required to resolve approvals' });
+      if (!isMasterOrDev(result.member) && result.member.role !== 'admin') {
+        return sendJson(res, 403, { error: 'Not authorized to resolve approvals' });
       }
 
       const { id, decision, notes } = req.body || {};
