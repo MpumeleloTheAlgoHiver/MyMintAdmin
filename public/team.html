@@ -121,11 +121,6 @@
     .tier-radio-content{flex:1;}
     .tier-radio-desc{font-size:11px;color:#8e8e93;margin-top:3px;line-height:1.4;}
 
-    /* Def banner */
-    .dev-banner{display:flex;align-items:flex-start;gap:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:14px 16px;margin-bottom:16px;}
-    .dev-banner svg{width:20px;height:20px;fill:#d97706;flex-shrink:0;margin-top:1px;}
-    .dev-banner-text strong{font-size:13px;color:#92400e;display:block;margin-bottom:2px;}
-    .dev-banner-text span{font-size:12px;color:#78350f;}
 
     /* Accordion */
     .perm-accordion{display:flex;flex-direction:column;gap:8px;}
@@ -508,18 +503,8 @@
             <input type="radio" name="permTier" value="dev">
             <div class="tier-radio-content">
               <span class="tier-badge tier-dev">Dev ◆</span>
-              <div class="tier-radio-desc">Bypasses all approval workflows and executes every action directly</div>
             </div>
           </label>
-        </div>
-      </div>
-
-      <!-- Def Banner (shown when tier = def) -->
-      <div id="devBanner" class="dev-banner" style="display:none;">
-        <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
-        <div class="dev-banner-text">
-          <strong>Dev user — all approval workflows bypassed.</strong>
-          <span>This user can execute every action directly without creating approval requests.</span>
         </div>
       </div>
 
@@ -821,7 +806,6 @@
       const tierInputs = document.querySelectorAll('input[name="permTier"]');
       tierInputs.forEach(inp => { inp.checked = (inp.value === (tier || '')); });
       const isDevTier = tier === 'dev';
-      document.getElementById('defBanner').style.display = isDevTier ? 'flex' : 'none';
       buildAccordion(permissions || {}, tier || '');
       document.getElementById('permOverlay').classList.add('open');
     };
@@ -830,7 +814,6 @@
     document.addEventListener('change', (e) => {
       if (e.target.name === 'permTier') {
         const tier = e.target.value;
-        document.getElementById('defBanner').style.display = tier === 'dev' ? 'flex' : 'none';
         const currentPerms = readPermissions();
         buildAccordion(currentPerms, tier);
       }
