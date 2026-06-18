@@ -132,7 +132,24 @@ module.exports = async (req, res) => {
   }
 
   try {
-    await fetchSupabaseJson('/auth/v1/user', token, false);
+    const authUser = await fetchSupabaseJson('/auth/v1/user', token, false);
+
+    // ── Role check: only admins may commit fill prices directly ──────────────
+    // Staff must go through the approval queue (submit-approval). This check
+    // runs server-side so the restriction cannot be bypassed via curl/Postman.
+    const email = (authUser?.email || '').toLowerCase();
+    if (!email) {
+      return sendJson(res, 401, { error: 'Could not resolve user email from token' });
+    }
+    const memberRows = await fetchSupabaseJson(
+      `/rest/v1/admin_team?email=eq.${encodeURIComponent(email)}&select=role&limit=1`
+    );
+    const memberRole = memberRows && memberRows[0] ? memberRows[0].role : null;
+    if (memberRole !== 'admin') {
+      return sendJson(res, 403, {
+        error: 'Admin access required to commit fill prices directly. Staff must submit for approval.'
+      });
+    }
 
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const ids = Array.isArray(body.ids) ? body.ids.map((value) => String(value || '').trim()).filter(Boolean) : [];

@@ -68,7 +68,7 @@ module.exports = async (req, res) => {
       const result = await requireAdmin(req, res);
       if (!result) return;
       const data = await supabaseRequest(
-        '/rest/v1/admin_team?select=id,user_id,email,full_name,role,page_access,status,invited_by,created_at,updated_at&order=created_at.asc'
+        '/rest/v1/admin_team?select=id,user_id,email,full_name,role,page_access,status,invited_by,approver_tier,permissions,created_at,updated_at&order=created_at.asc'
       );
       // Enrich with last_sign_in_at from Supabase Auth (best-effort).
       let signInByEmail = {};
