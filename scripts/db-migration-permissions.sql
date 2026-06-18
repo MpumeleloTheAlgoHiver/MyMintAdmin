@@ -5,7 +5,7 @@
 -- ============================================================
 
 -- 1. Add approver_tier column to admin_team
---    'def'    = Def/God user — bypasses all approval workflows
+--    'dev'    = Dev user — bypasses all approval workflows
 --    'master' = Master Approver — can review and authorize requests
 --    null     = Lower-level staff — approval workflows enforced
 ALTER TABLE public.admin_team
@@ -49,7 +49,7 @@ BEGIN
       p.full_name,
       'admin',
       'active',
-      COALESCE(p.page_access, '{}'),
+      COALESCE(p.page_permissions, '{}'),
       NOW(),
       NOW()
     FROM public.admin_profiles p

@@ -438,11 +438,11 @@ const sendResetEmail = async ({ toEmail, resetLink }) => {
 };
 
 // Returns true if the member is a Def or Master Approver (can review approvals).
-const isMasterOrDef = (member) =>
-  member && (member.approver_tier === 'def' || member.approver_tier === 'master');
+const isMasterOrDev = (member) =>
+  member && (member.approver_tier === 'dev' || member.approver_tier === 'master');
 
-// Returns true if the member is a Def user (bypasses all workflows).
-const isDef = (member) => member && member.approver_tier === 'def';
+// Returns true if the member is a Dev user (bypasses all workflows).
+const isDev = (member) => member && member.approver_tier === 'dev';
 
 module.exports = {
   ALLOWED_DOMAIN,
@@ -464,6 +464,6 @@ module.exports = {
   sendInviteEmail,
   sendWelcomeEmail,
   sendResetEmail,
-  isMasterOrDef,
-  isDef
+  isMasterOrDev,
+  isDev
 };

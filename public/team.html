@@ -106,7 +106,7 @@
 
     /* ── Tier badges ── */
     .tier-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.02em;}
-    .tier-def{background:#fef3c7;color:#92400e;}
+    .tier-dev{background:#fef3c7;color:#92400e;}
     .tier-master{background:#ede9fe;color:#5b21b6;}
     .tier-lower{background:#f3f4f6;color:#6b7280;}
 
@@ -121,11 +121,6 @@
     .tier-radio-content{flex:1;}
     .tier-radio-desc{font-size:11px;color:#8e8e93;margin-top:3px;line-height:1.4;}
 
-    /* Def banner */
-    .def-banner{display:flex;align-items:flex-start;gap:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:14px 16px;margin-bottom:16px;}
-    .def-banner svg{width:20px;height:20px;fill:#d97706;flex-shrink:0;margin-top:1px;}
-    .def-banner-text strong{font-size:13px;color:#92400e;display:block;margin-bottom:2px;}
-    .def-banner-text span{font-size:12px;color:#78350f;}
 
     /* Accordion */
     .perm-accordion{display:flex;flex-direction:column;gap:8px;}
@@ -236,7 +231,7 @@
     <div class="page">
       <div class="stats-row">
         <div class="stat-card"><div class="stat-label">Total Members</div><div class="stat-value" id="statTotal">—</div></div>
-        <div class="stat-card"><div class="stat-label"><span class="tier-badge tier-def" style="font-size:10px;">Def ◆</span> Users</div><div class="stat-value" id="statDef">—</div></div>
+        <div class="stat-card"><div class="stat-label"><span class="tier-badge tier-dev" style="font-size:10px;">Dev ◆</span> Users</div><div class="stat-value" id="statDev">—</div></div>
         <div class="stat-card"><div class="stat-label"><span class="tier-badge tier-master" style="font-size:10px;">Master ★</span> Approvers</div><div class="stat-value" id="statMaster">—</div></div>
         <div class="stat-card"><div class="stat-label">Pending Invites</div><div class="stat-value" id="statPending">—</div></div>
       </div>
@@ -505,21 +500,11 @@
             </div>
           </label>
           <label class="tier-radio-opt">
-            <input type="radio" name="permTier" value="def">
+            <input type="radio" name="permTier" value="dev">
             <div class="tier-radio-content">
-              <span class="tier-badge tier-def">Def ◆</span>
-              <div class="tier-radio-desc">God mode — bypasses all approval workflows and executes every action directly</div>
+              <span class="tier-badge tier-dev">Dev ◆</span>
             </div>
           </label>
-        </div>
-      </div>
-
-      <!-- Def Banner (shown when tier = def) -->
-      <div id="defBanner" class="def-banner" style="display:none;">
-        <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
-        <div class="def-banner-text">
-          <strong>Def user — all approval workflows bypassed.</strong>
-          <span>This user can execute every action directly without creating approval requests.</span>
         </div>
       </div>
 
@@ -643,7 +628,7 @@
 
     // ── Tier badge HTML ───────────────────────────────────────────────────────
     const tierBadge = (tier) => {
-      if (tier === 'def')    return '<span class="tier-badge tier-def">Def ◆</span>';
+      if (tier === 'dev')    return '<span class="tier-badge tier-dev">Dev ◆</span>';
       if (tier === 'master') return '<span class="tier-badge tier-master">Master ★</span>';
       return '<span class="tier-badge tier-lower">Staff</span>';
     };
@@ -709,20 +694,20 @@
 
     const updateStats = (members) => {
       document.getElementById('statTotal').textContent   = members.length;
-      document.getElementById('statDef').textContent     = members.filter(m => m.approver_tier === 'def').length;
+      document.getElementById('statDev').textContent     = members.filter(m => m.approver_tier === 'dev').length;
       document.getElementById('statMaster').textContent  = members.filter(m => m.approver_tier === 'master').length;
       document.getElementById('statPending').textContent = members.filter(m => m.status === 'pending').length;
     };
 
     // ── Permissions Modal ─────────────────────────────────────────────────────
     const buildAccordion = (permissions, tier) => {
-      const isDefTier = tier === 'def';
+      const isDevTier = tier === 'dev';
       const acc = document.getElementById('permAccordion');
       acc.innerHTML = PERMISSION_MATRIX.map(section => {
         const fields = section.fields.map(field => {
           const curVal = (permissions[section.key] || {})[field.key];
           if (field.type === 'toggle') {
-            const checked = isDefTier ? true : !!curVal;
+            const checked = isDevTier ? true : !!curVal;
             return `
               <div class="perm-field">
                 <div class="perm-field-meta">
@@ -730,21 +715,21 @@
                   <div class="perm-field-desc">${esc(field.desc)}</div>
                 </div>
                 <div class="perm-field-ctrl">
-                  <label class="perm-toggle" title="${isDefTier ? 'Bypassed by Def tier' : ''}">
-                    <input type="checkbox" class="perm-toggle-input" data-section="${section.key}" data-field="${field.key}" ${checked ? 'checked' : ''} ${isDefTier ? 'disabled' : ''}>
+                  <label class="perm-toggle" title="${isDevTier ? 'Bypassed by Dev tier' : ''}">
+                    <input type="checkbox" class="perm-toggle-input" data-section="${section.key}" data-field="${field.key}" ${checked ? 'checked' : ''} ${isDevTier ? 'disabled' : ''}>
                     <span class="perm-toggle-track"></span>
                   </label>
                 </div>
               </div>`;
           } else {
-            const activeVal = isDefTier ? (field.options[field.options.length - 1].value) : (curVal !== undefined ? curVal : false);
+            const activeVal = isDevTier ? (field.options[field.options.length - 1].value) : (curVal !== undefined ? curVal : false);
             const btns = field.options.map(opt => {
               const isActive = String(activeVal) === String(opt.value);
               const isBlocked = opt.value === false;
               let cls = 'ts-btn';
               if (isActive && isBlocked) cls += ' ts-blocked';
               else if (isActive) cls += ' ts-active';
-              return `<button type="button" class="${cls}" data-section="${section.key}" data-field="${field.key}" data-value="${String(opt.value)}" ${isDefTier ? 'disabled' : ''}>${esc(opt.label)}</button>`;
+              return `<button type="button" class="${cls}" data-section="${section.key}" data-field="${field.key}" data-value="${String(opt.value)}" ${isDevTier ? 'disabled' : ''}>${esc(opt.label)}</button>`;
             }).join('');
             return `
               <div class="perm-field">
@@ -820,8 +805,7 @@
       document.getElementById('permMemberEmail').textContent = email;
       const tierInputs = document.querySelectorAll('input[name="permTier"]');
       tierInputs.forEach(inp => { inp.checked = (inp.value === (tier || '')); });
-      const isDefTier = tier === 'def';
-      document.getElementById('defBanner').style.display = isDefTier ? 'flex' : 'none';
+      const isDevTier = tier === 'dev';
       buildAccordion(permissions || {}, tier || '');
       document.getElementById('permOverlay').classList.add('open');
     };
@@ -830,7 +814,6 @@
     document.addEventListener('change', (e) => {
       if (e.target.name === 'permTier') {
         const tier = e.target.value;
-        document.getElementById('defBanner').style.display = tier === 'def' ? 'flex' : 'none';
         const currentPerms = readPermissions();
         buildAccordion(currentPerms, tier);
       }
@@ -959,7 +942,7 @@
         list.innerHTML = `<div class="inbox-empty">${esc(data.error || 'Could not load approvals')}</div>`;
         return;
       }
-      const canResolve = myApproverTier === 'def' || myApproverTier === 'master';
+      const canResolve = myApproverTier === 'dev' || myApproverTier === 'master';
       renderApprovals(data.approvals || [], canResolve, data.notice || null);
       const pendingCount = (data.approvals || []).filter(a => a.status === 'pending').length;
       const badge = document.getElementById('approvalsBadge');
