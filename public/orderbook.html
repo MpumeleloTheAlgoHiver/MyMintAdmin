@@ -8117,12 +8117,22 @@
         
         try {
           await verifyModalPassword(pricePasswordInput.value);
+          priceModalConfirm.textContent = 'Checking permissions...';
+
+          // ── Permission check ──────────────────────────────────────────────
+          const fillPricePerm = (typeof window.mintCan === 'function')
+            ? window.mintCan('orderbook', 'edit_fill_price')
+            : true;
+
+          if (fillPricePerm === false) {
+            throw new Error('You do not have permission to edit fill prices. Contact your admin.');
+          }
+
           priceModalConfirm.textContent = 'Updating...';
 
           // Identify IDs to update
           let idsToUpdate = [];
           if (batchToggle.checked && currentEditRow.rebalanceBatchId) {
-            // Find all matching rows in our current data
             idsToUpdate = (allOrderbookRawRows || [])
               .filter(r => r.rebalanceBatchId === currentEditRow.rebalanceBatchId)
               .flatMap(r => getEditableSourceIds(r));
@@ -8136,28 +8146,54 @@
           const nowIso = new Date().toISOString();
           const fillDateStr = nowIso.split('T')[0];
           const side = String(currentEditRow.tradeSide || currentEditRow.side || '').toUpperCase();
-          const payload = {
+          const dbPayload = {
             avg_fill: newPriceCents,
             "Fill_date": fillDateStr,
             updated_at: nowIso,
             as_of_date: fillDateStr
           };
           if (side === 'SELL') {
-            payload.avg_exit = newPriceCents;
-            payload["Exit_date"] = fillDateStr;
+            dbPayload.avg_exit = newPriceCents;
+            dbPayload["Exit_date"] = fillDateStr;
           }
 
           const { data: sessionData } = await supabaseClient.auth.getSession();
           const accessToken = sessionData?.session?.access_token;
           if (!accessToken) throw new Error('Your session has expired. Please sign in again.');
 
+          // ── Approval routing (permission = 'pending') ─────────────────────
+          if (fillPricePerm === 'pending') {
+            priceModalConfirm.textContent = 'Submitting for approval...';
+            const approvalRes = await fetch('/api/team?action=submit-approval', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+              body: JSON.stringify({
+                type: 'fill_price',
+                payload: {
+                  ids: idsToUpdate,
+                  dbPayload,
+                  instrument: currentEditRow.instrumentName || '',
+                  ticker: currentEditRow.ticker || '',
+                  newPriceRand,
+                  side
+                },
+                notes: `Fill price R${newPriceRand.toFixed(2)} for ${currentEditRow.instrumentName || currentEditRow.ticker || 'holding'} (${side}) — ${idsToUpdate.length} record${idsToUpdate.length !== 1 ? 's' : ''}`
+              })
+            });
+            const approvalData = await approvalRes.json().catch(() => ({}));
+            if (!approvalRes.ok || !approvalData.ok) {
+              throw new Error(approvalData.error || 'Could not submit fill price for approval. Run scripts/db-migration-permissions.sql if this is the first time.');
+            }
+            closePriceModal();
+            alert(`Fill price R${newPriceRand.toFixed(2)} submitted for approval.\nA Master Approver will verify it against the broker statement before it commits to the ledger.`);
+            return;
+          }
+
+          // ── Direct commit (full / true / Def bypass) ──────────────────────
           const response = await fetch('/api/orderbook/update-price', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${accessToken}`
-            },
-            body: JSON.stringify({ ids: idsToUpdate, payload })
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+            body: JSON.stringify({ ids: idsToUpdate, payload: dbPayload })
           });
 
           const result = await response.json().catch(() => ({}));
@@ -8168,7 +8204,7 @@
             throw new Error('No database rows were updated.');
           }
 
-          // Success - refresh orderbook
+          // Success — refresh orderbook
           closePriceModal();
           await loadOrderbook();
         } catch (err) {

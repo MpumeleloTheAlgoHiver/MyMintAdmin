@@ -875,6 +875,11 @@
       const safe = (k, v) => `${k}: ${String(v == null ? '—' : v)}`;
       if (payload.instrument) lines.push(safe('Instrument', payload.instrument));
       if (payload.ticker) lines.push(safe('Ticker', payload.ticker));
+      // fill_price approval fields
+      if (payload.newPriceRand != null) lines.push(safe('Fill Price', `R ${Number(payload.newPriceRand).toFixed(2)}`));
+      if (payload.side) lines.push(safe('Side', payload.side));
+      if (Array.isArray(payload.ids)) lines.push(safe('Records', payload.ids.length));
+      // legacy / other types
       if (payload.fill_price != null) lines.push(safe('Fill Price', payload.fill_price));
       if (payload.quantity != null) lines.push(safe('Quantity', payload.quantity));
       if (payload.strategy) lines.push(safe('Strategy', payload.strategy));
@@ -882,7 +887,7 @@
       if (payload.subject) lines.push(safe('Subject', payload.subject));
       if (payload.description) lines.push(safe('Description', payload.description));
       if (!lines.length) {
-        const keys = Object.keys(payload).filter(k => k !== 'html' && k !== 'text');
+        const keys = Object.keys(payload).filter(k => !['html','text','dbPayload','ids'].includes(k));
         keys.slice(0, 5).forEach(k => lines.push(safe(k, payload[k])));
       }
       return lines.join('\n') || JSON.stringify(payload, null, 2);
@@ -975,9 +980,11 @@
         return;
       }
 
-      // For trade_confirmation approvals: auto-send the email after approval
+      // Auto-execute the underlying action after approval
       if (decision === 'approved' && data.approval) {
         const approval = data.approval;
+
+        // Trade confirmation: send the email
         if (approval.type === 'trade_confirmation' && approval.payload?.holdingId) {
           if (triggerBtn) triggerBtn.textContent = 'Sending email…';
           try {
@@ -990,6 +997,22 @@
             if (sendData.error) console.warn('[Approvals] Trade confirm send after approval:', sendData.error);
           } catch (err) {
             console.warn('[Approvals] Trade confirm send failed:', err.message);
+          }
+        }
+
+        // Fill price: commit the price update to the ledger
+        if (approval.type === 'fill_price' && approval.payload?.ids && approval.payload?.dbPayload) {
+          if (triggerBtn) triggerBtn.textContent = 'Committing fill price…';
+          try {
+            const updateRes = await fetch('/api/orderbook/update-price', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentToken}` },
+              body: JSON.stringify({ ids: approval.payload.ids, payload: approval.payload.dbPayload })
+            });
+            const updateData = await updateRes.json().catch(() => ({}));
+            if (updateData.error) console.warn('[Approvals] Fill price commit after approval:', updateData.error);
+          } catch (err) {
+            console.warn('[Approvals] Fill price commit failed:', err.message);
           }
         }
       }
