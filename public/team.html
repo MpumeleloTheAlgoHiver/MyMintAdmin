@@ -33,7 +33,7 @@
     .top-bar{display:flex;align-items:center;gap:12px;padding:18px 28px;background:#fff;border-bottom:1px solid #e5e5ea;position:sticky;top:0;z-index:100;}
     .top-bar svg{width:20px;height:20px;fill:#7c3aed;flex-shrink:0;}
     .top-bar h1{font-size:17px;font-weight:700;color:#1c1c1e;}
-    .page{padding:28px;max-width:1100px;}
+    .page{padding:28px;max-width:1200px;}
     .stats-row{display:flex;gap:16px;margin-bottom:28px;flex-wrap:wrap;}
     .stat-card{background:#fff;border-radius:14px;padding:16px 20px;flex:1;min-width:130px;border:1px solid #e5e5ea;}
     .stat-label{font-size:11px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
@@ -41,12 +41,16 @@
     .card{background:#fff;border-radius:14px;border:1px solid #e5e5ea;overflow:hidden;}
     .card-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #f2f2f7;}
     .card-title{font-size:14px;font-weight:700;color:#1c1c1e;}
-    .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:opacity .15s;}
+    .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:opacity .15s;font-family:inherit;}
     .btn:hover{opacity:.85;}
     .btn-primary{background:#7c3aed;color:#fff;}
     .btn-sm{padding:5px 12px;font-size:12px;border-radius:8px;}
     .btn-ghost{background:#f2f2f7;color:#3c3c43;}
     .btn-danger{background:#fff0ef;color:#ff3b30;}
+    .btn-approve{background:#dcfce7;color:#166534;border:1px solid #86efac;}
+    .btn-approve:hover{background:#bbf7d0;opacity:1;}
+    .btn-reject{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;}
+    .btn-reject:hover{background:#fecaca;opacity:1;}
     table{width:100%;border-collapse:collapse;}
     th{font-size:11px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.06em;padding:10px 16px;text-align:left;border-bottom:1px solid #f2f2f7;}
     td{font-size:13px;padding:13px 16px;border-bottom:1px solid #f7f7f8;color:#1c1c1e;vertical-align:middle;}
@@ -84,24 +88,112 @@
     .filter-actions{display:flex;gap:8px;}
     .page-chips{display:flex;flex-wrap:wrap;gap:4px;}
     .page-chip{background:#f2f2f7;color:#3c3c43;font-size:11px;padding:2px 8px;border-radius:6px;font-weight:500;}
-    .td-actions{display:flex;gap:6px;align-items:center;}
-    /* Modal */
+    .td-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
     .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:2000;align-items:center;justify-content:center;}
     .overlay.open{display:flex;}
     .modal{background:#fff;border-radius:18px;padding:28px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.18);}
     .modal-title{font-size:17px;font-weight:700;margin-bottom:20px;}
     .form-group{margin-bottom:16px;}
     label{display:block;font-size:12px;font-weight:600;color:#3c3c43;margin-bottom:6px;}
-    input[type=text],input[type=email],select{width:100%;padding:10px 12px;border:1px solid #d1d1d6;border-radius:10px;font-size:14px;color:#1c1c1e;outline:none;transition:border-color .15s;}
-    input:focus,select:focus{border-color:#7c3aed;}
+    input[type=text],input[type=email],select,textarea{width:100%;padding:10px 12px;border:1px solid #d1d1d6;border-radius:10px;font-size:14px;color:#1c1c1e;outline:none;transition:border-color .15s;font-family:inherit;}
+    input:focus,select:focus,textarea:focus{border-color:#7c3aed;}
     .page-access-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;}
     .page-check{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #e5e5ea;border-radius:8px;cursor:pointer;font-size:13px;user-select:none;}
     .page-check input{accent-color:#7c3aed;width:15px;height:15px;cursor:pointer;}
     .page-access-section{display:none;}
     .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:24px;}
     .empty-state{padding:48px;text-align:center;color:#8e8e93;font-size:14px;}
+
+    /* ── Tier badges ── */
+    .tier-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.02em;}
+    .tier-def{background:#fef3c7;color:#92400e;}
+    .tier-master{background:#ede9fe;color:#5b21b6;}
+    .tier-lower{background:#f3f4f6;color:#6b7280;}
+
+    /* ── Permissions modal ── */
+    .perm-modal{max-width:660px;}
+
+    /* Tier radio selector */
+    .tier-radio-group{display:flex;flex-direction:column;gap:8px;}
+    .tier-radio-opt{display:flex;align-items:flex-start;gap:12px;padding:11px 14px;border:2px solid #e5e5ea;border-radius:12px;cursor:pointer;transition:border-color .15s;}
+    .tier-radio-opt:has(input:checked){border-color:#7c3aed;background:#faf7ff;}
+    .tier-radio-opt input{margin-top:3px;accent-color:#7c3aed;flex-shrink:0;cursor:pointer;}
+    .tier-radio-content{flex:1;}
+    .tier-radio-desc{font-size:11px;color:#8e8e93;margin-top:3px;line-height:1.4;}
+
+    /* Def banner */
+    .def-banner{display:flex;align-items:flex-start;gap:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:14px 16px;margin-bottom:16px;}
+    .def-banner svg{width:20px;height:20px;fill:#d97706;flex-shrink:0;margin-top:1px;}
+    .def-banner-text strong{font-size:13px;color:#92400e;display:block;margin-bottom:2px;}
+    .def-banner-text span{font-size:12px;color:#78350f;}
+
+    /* Accordion */
+    .perm-accordion{display:flex;flex-direction:column;gap:8px;}
+    .acc-item{border:1px solid #e5e5ea;border-radius:12px;overflow:hidden;}
+    .acc-header{width:100%;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:transparent;border:none;cursor:pointer;font-size:13px;font-weight:600;color:#1c1c1e;font-family:inherit;text-align:left;}
+    .acc-header:hover{background:#f9f9fb;}
+    .acc-header-left{display:flex;align-items:center;gap:10px;}
+    .acc-header-icon{font-size:16px;width:24px;text-align:center;}
+    .acc-chevron{width:16px;height:16px;fill:#8e8e93;transition:transform .2s;flex-shrink:0;}
+    .acc-item.open .acc-chevron{transform:rotate(180deg);}
+    .acc-body{display:none;border-top:1px solid #f2f2f7;padding:0 16px;}
+    .acc-item.open .acc-body{display:block;}
+
+    /* Permission field row */
+    .perm-field{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid #f7f7f8;}
+    .perm-field:last-child{border-bottom:none;padding-bottom:0;}
+    .perm-field-meta{flex:1;min-width:0;}
+    .perm-field-label{font-size:13px;font-weight:600;color:#1c1c1e;}
+    .perm-field-desc{font-size:11px;color:#8e8e93;margin-top:2px;line-height:1.4;}
+    .perm-field-ctrl{flex-shrink:0;}
+
+    /* Toggle switch */
+    .perm-toggle{position:relative;display:inline-block;cursor:pointer;width:36px;height:20px;}
+    .perm-toggle-input{opacity:0;width:0;height:0;position:absolute;}
+    .perm-toggle-track{display:block;width:36px;height:20px;background:#d1d1d6;border-radius:10px;transition:background .2s;position:relative;}
+    .perm-toggle-input:checked + .perm-toggle-track{background:#7c3aed;}
+    .perm-toggle-track::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+    .perm-toggle-input:checked + .perm-toggle-track::after{transform:translateX(16px);}
+    .perm-toggle-input:disabled + .perm-toggle-track{opacity:.5;cursor:not-allowed;}
+
+    /* Tristate button group */
+    .tristate-group{display:flex;gap:3px;}
+    .ts-btn{padding:5px 10px;border:1px solid #d1d1d6;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;background:#fff;color:#6b7280;transition:all .15s;font-family:inherit;white-space:nowrap;}
+    .ts-btn:hover:not(:disabled){border-color:#7c3aed;color:#7c3aed;}
+    .ts-btn.ts-active{background:#7c3aed;border-color:#7c3aed;color:#fff;}
+    .ts-btn.ts-blocked{background:#fee2e2;border-color:#fca5a5;color:#991b1b;}
+    .ts-btn:disabled{opacity:.45;cursor:not-allowed;}
+
+    /* Approval cards */
+    .approvals-filter-row{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+    .approvals-filter-row select{width:auto;padding:7px 10px;font-size:13px;}
+    .approval-card{background:#fff;border:1px solid #e5e5ea;border-radius:14px;padding:16px 18px;margin-bottom:10px;}
+    .approval-card:last-child{margin-bottom:0;}
+    .approval-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;flex-wrap:wrap;}
+    .approval-type-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+    .atype-trade_confirmation{background:#dbeafe;color:#1d4ed8;}
+    .atype-fill_price{background:#d1fae5;color:#065f46;}
+    .atype-rebalance{background:#ede9fe;color:#5b21b6;}
+    .atype-strategy_visibility{background:#fce7f3;color:#9d174d;}
+    .atype-other{background:#f3f4f6;color:#374151;}
+    .approval-meta{font-size:11px;color:#8e8e93;}
+    .approval-summary{font-size:13px;color:#1c1c1e;margin-bottom:12px;line-height:1.5;}
+    .approval-payload-pre{background:#f8f9fa;border:1px solid #e5e5ea;border-radius:8px;padding:10px 12px;font-size:11px;font-family:monospace;color:#374151;white-space:pre-wrap;word-break:break-all;margin-bottom:12px;max-height:120px;overflow-y:auto;}
+    .approval-notes-wrap{margin-bottom:10px;}
+    .approval-notes-input{width:100%;padding:8px 10px;border:1px solid #d1d1d6;border-radius:8px;font-size:12px;color:#1c1c1e;font-family:inherit;resize:vertical;min-height:44px;outline:none;}
+    .approval-notes-input:focus{border-color:#7c3aed;}
+    .approval-actions-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+    .approval-resolved-badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:8px;}
+    .aresolved-approved{background:#dcfce7;color:#166534;}
+    .aresolved-rejected{background:#fee2e2;color:#991b1b;}
+    .inbox-empty{padding:48px;text-align:center;color:#8e8e93;font-size:14px;}
+    .inbox-notice{background:#fff8e1;color:#7a4d00;border:1px solid #ffe0a3;padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:12px;}
+    .inbox-loading{padding:32px;text-align:center;color:#8e8e93;font-size:13px;}
+
+    /* Pending badge for Approvals tab */
+    .tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;background:#ef4444;color:#fff;border-radius:8px;font-size:10px;font-weight:700;padding:0 4px;margin-left:5px;vertical-align:middle;}
   </style>
-<script src="/js/cc-badge.js" defer></script>
+  <script src="/js/cc-badge.js" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -112,8 +204,8 @@
     <nav class="sidebar-nav">
       <span class="sidebar-section-label">Main</span>
       <a class="nav-icon" href="/index.html"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>Clients</a>
-              <a class="nav-icon" href="/studio.html"><svg viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>Client View Studio</a>
-        <span class="sidebar-section-label">Investments</span>
+      <a class="nav-icon" href="/studio.html"><svg viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>Client View Studio</a>
+      <span class="sidebar-section-label">Investments</span>
       <a class="nav-icon" href="/dashboard.html"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>Dashboard</a>
       <a class="nav-icon" href="/strategies.html"><svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zm0 11h7v7H3zm11-11h7v7h-7zm0 11h7v7h-7z"/></svg>Strategies</a>
       <a class="nav-icon" href="/factsheets.html"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>Factsheets</a>
@@ -123,8 +215,8 @@
       <a class="nav-icon" href="/eft.html"><svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>EFT Payments</a>
       <span class="sidebar-section-label">System</span>
       <a class="nav-icon" href="/settings.html"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58z"/></svg>Settings</a>
-      <a class="nav-icon active" href="/team.html"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>Team</a>
-      <a class="nav-icon" href="/cyber-compliance.html" id="ccNavLink" style="position:relative;"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 4l5 2.18V11c0 3.5-2.33 6.79-5 7.93-2.67-1.14-5-4.43-5-7.93V7.18L12 5z"/></svg>Cyber Compliance<span id="ccBadge" style="display:none;position:absolute;top:5px;right:6px;width:8px;height:8px;background:#ff3b30;border-radius:50%;border:2px solid #fff;"></span></a>
+      <a class="nav-icon active" href="/team.html"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>Security &amp; Team</a>
+      <a class="nav-icon" href="/cyber-compliance.html" id="ccNavLink" style="position:relative;"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>Cyber Compliance<span id="ccBadge" style="display:none;position:absolute;top:5px;right:6px;width:8px;height:8px;background:#ff3b30;border-radius:50%;border:2px solid #fff;"></span></a>
     </nav>
     <div class="sidebar-footer">
       <div class="sidebar-user">
@@ -137,50 +229,112 @@
 
   <main class="main">
     <div class="top-bar">
-      <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-      <h1>Team Management</h1>
+      <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+      <h1>Security Control Center</h1>
     </div>
 
     <div class="page">
       <div class="stats-row">
         <div class="stat-card"><div class="stat-label">Total Members</div><div class="stat-value" id="statTotal">—</div></div>
-        <div class="stat-card"><div class="stat-label">Admins</div><div class="stat-value" id="statAdmins">—</div></div>
-        <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value" id="statActive">—</div></div>
-        <div class="stat-card"><div class="stat-label">Pending</div><div class="stat-value" id="statPending">—</div></div>
+        <div class="stat-card"><div class="stat-label"><span class="tier-badge tier-def" style="font-size:10px;">Def ◆</span> Users</div><div class="stat-value" id="statDef">—</div></div>
+        <div class="stat-card"><div class="stat-label"><span class="tier-badge tier-master" style="font-size:10px;">Master ★</span> Approvers</div><div class="stat-value" id="statMaster">—</div></div>
+        <div class="stat-card"><div class="stat-label">Pending Invites</div><div class="stat-value" id="statPending">—</div></div>
       </div>
 
       <div class="tabs">
         <button class="tab-btn active" data-tab="members">Members</button>
+        <button class="tab-btn" data-tab="approvals">Approvals Inbox<span class="tab-badge" id="approvalsBadge" style="display:none;">0</span></button>
         <button class="tab-btn" data-tab="audit">Audit Log</button>
         <button class="tab-btn" data-tab="impersonation">Impersonation Log</button>
       </div>
 
+      <!-- Members Tab -->
       <div class="tab-pane active" id="tab-members">
         <div class="card">
           <div class="card-header">
-            <span class="card-title">Team Members</span>
+            <span class="card-title">Staff Roster</span>
             <button class="btn btn-primary" id="inviteBtn">
               <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#fff"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
               Invite Member
             </button>
           </div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Member</th>
+                  <th>Tier</th>
+                  <th>Role</th>
+                  <th>Page Access</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="teamTableBody">
+                <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Approvals Inbox Tab -->
+      <div class="tab-pane" id="tab-approvals">
+        <div class="card" style="padding:20px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#1c1c1e;">Approvals Inbox</div>
+              <div style="font-size:12px;color:#8e8e93;margin-top:2px;">Review and authorize pending requests from lower-level staff</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="approvalsRefreshBtn">Refresh</button>
+          </div>
+          <div class="approvals-filter-row">
+            <select id="approvalsStatusFilter" style="width:auto;padding:7px 10px;font-size:13px;border:1px solid #d1d1d6;border-radius:8px;color:#1c1c1e;outline:none;">
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="all">All</option>
+            </select>
+            <select id="approvalsTypeFilter" style="width:auto;padding:7px 10px;font-size:13px;border:1px solid #d1d1d6;border-radius:8px;color:#1c1c1e;outline:none;">
+              <option value="">All Types</option>
+              <option value="trade_confirmation">Trade Confirmation</option>
+              <option value="fill_price">Fill Price</option>
+              <option value="rebalance">Rebalance</option>
+              <option value="strategy_visibility">Strategy Visibility</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div id="approvalsNotice" class="inbox-notice" style="display:none;"></div>
+          <div id="approvalsList"><div class="inbox-loading">Loading approvals…</div></div>
+        </div>
+      </div>
+
+      <!-- Audit Tab -->
+      <div class="tab-pane" id="tab-audit">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Audit Log</span>
+            <button class="btn btn-ghost" id="auditRefreshBtn">Refresh</button>
+          </div>
+          <div class="audit-notice" id="auditNotice"></div>
           <table>
             <thead>
               <tr>
-                <th>Member</th>
-                <th>Role</th>
-                <th>Page Access</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th>When</th>
+                <th>Action</th>
+                <th>Target</th>
+                <th>Performed by</th>
+                <th>Details</th>
               </tr>
             </thead>
-            <tbody id="teamTableBody">
+            <tbody id="auditTableBody">
               <tr><td colspan="5" class="empty-state">Loading...</td></tr>
             </tbody>
           </table>
         </div>
       </div>
 
+      <!-- Impersonation Tab -->
       <div class="tab-pane" id="tab-impersonation">
         <div class="card">
           <div class="card-header">
@@ -226,30 +380,6 @@
           </table>
         </div>
       </div>
-
-      <div class="tab-pane" id="tab-audit">
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title">Audit Log</span>
-            <button class="btn btn-ghost" id="auditRefreshBtn">Refresh</button>
-          </div>
-          <div class="audit-notice" id="auditNotice"></div>
-          <table>
-            <thead>
-              <tr>
-                <th>When</th>
-                <th>Action</th>
-                <th>Target</th>
-                <th>Performed by</th>
-                <th>Details</th>
-              </tr>
-            </thead>
-            <tbody id="auditTableBody">
-              <tr><td colspan="5" class="empty-state">Loading...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   </main>
 
@@ -284,7 +414,7 @@
     </div>
   </div>
 
-  <!-- Invite Link Modal (shown when email delivery wasn't possible) -->
+  <!-- Invite Link Modal -->
   <div class="overlay" id="linkOverlay">
     <div class="modal">
       <div class="modal-title">Invitation created</div>
@@ -300,10 +430,10 @@
     </div>
   </div>
 
-  <!-- Edit Modal -->
+  <!-- Edit Role Modal -->
   <div class="overlay" id="editOverlay">
     <div class="modal">
-      <div class="modal-title">Edit Member</div>
+      <div class="modal-title">Edit Member Role</div>
       <input type="hidden" id="editMemberId">
       <div class="form-group">
         <label>Role</label>
@@ -323,11 +453,11 @@
     </div>
   </div>
 
-  <!-- Update Email Modal (migration: move a member to their @mymint address) -->
+  <!-- Update Email Modal -->
   <div class="overlay" id="emailOverlay">
     <div class="modal">
       <div class="modal-title">Update Email Address</div>
-      <p style="font-size:13px;color:#3c3c43;margin-bottom:16px;">Change this member's email to their <strong>@mymint.co.za</strong> address. This updates both the team record and their sign-in credentials.</p>
+      <p style="font-size:13px;color:#3c3c43;margin-bottom:16px;">Change this member's email to their <strong>@mymint.co.za</strong> address.</p>
       <input type="hidden" id="emailMemberId">
       <div class="form-group">
         <label>Current Email</label>
@@ -345,26 +475,152 @@
     </div>
   </div>
 
+  <!-- Permissions Modal (Security Matrix Editor) -->
+  <div class="overlay" id="permOverlay">
+    <div class="modal perm-modal">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:12px;">
+        <div>
+          <div class="modal-title" style="margin-bottom:4px;">Security Permissions</div>
+          <div style="font-size:12px;color:#8e8e93;" id="permMemberEmail"></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="permCancelTopBtn" style="flex-shrink:0;">✕</button>
+      </div>
+
+      <!-- Tier Selector -->
+      <div class="form-group">
+        <label style="margin-bottom:10px;">Approver Tier</label>
+        <div class="tier-radio-group" id="tierRadioGroup">
+          <label class="tier-radio-opt">
+            <input type="radio" name="permTier" value="">
+            <div class="tier-radio-content">
+              <span class="tier-badge tier-lower">Staff</span>
+              <div class="tier-radio-desc">Lower-level — approval workflows enforced for sensitive actions</div>
+            </div>
+          </label>
+          <label class="tier-radio-opt">
+            <input type="radio" name="permTier" value="master">
+            <div class="tier-radio-content">
+              <span class="tier-badge tier-master">Master Approver ★</span>
+              <div class="tier-radio-desc">Can review and authorize all pending requests from lower-level staff</div>
+            </div>
+          </label>
+          <label class="tier-radio-opt">
+            <input type="radio" name="permTier" value="def">
+            <div class="tier-radio-content">
+              <span class="tier-badge tier-def">Def ◆</span>
+              <div class="tier-radio-desc">God mode — bypasses all approval workflows and executes every action directly</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Def Banner (shown when tier = def) -->
+      <div id="defBanner" class="def-banner" style="display:none;">
+        <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+        <div class="def-banner-text">
+          <strong>Def user — all approval workflows bypassed.</strong>
+          <span>This user can execute every action directly without creating approval requests.</span>
+        </div>
+      </div>
+
+      <!-- Accordion Permission Matrix -->
+      <div class="perm-accordion" id="permAccordion"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="permCancelBtn">Cancel</button>
+        <button class="btn btn-primary" id="permSaveBtn">Save Permissions</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const ALL_PAGES = [
-      { key: 'clients',    label: 'Clients',     href: '/index.html' },
-      { key: 'dashboard',  label: 'Dashboard',   href: '/dashboard.html' },
-      { key: 'strategies', label: 'Strategies',  href: '/strategies.html' },
-      { key: 'factsheets', label: 'Factsheets',  href: '/factsheets.html' },
-      { key: 'investors',  label: 'Investors',   href: '/investors.html' },
-      { key: 'eft',        label: 'EFT Payments',href: '/eft.html' },
-      { key: 'orderbook',  label: 'Order Book',  href: '/orderbook.html' },
-      { key: 'settings',   label: 'Settings',    href: '/settings.html' },
+      { key: 'clients',    label: 'Clients',      href: '/index.html' },
+      { key: 'dashboard',  label: 'Dashboard',    href: '/dashboard.html' },
+      { key: 'strategies', label: 'Strategies',   href: '/strategies.html' },
+      { key: 'factsheets', label: 'Factsheets',   href: '/factsheets.html' },
+      { key: 'investors',  label: 'Investors',    href: '/investors.html' },
+      { key: 'eft',        label: 'EFT Payments', href: '/eft.html' },
+      { key: 'orderbook',  label: 'Order Book',   href: '/orderbook.html' },
+      { key: 'settings',   label: 'Settings',     href: '/settings.html' },
+    ];
+
+    // ── Permission Matrix Definition ──────────────────────────────────────────
+    const PERMISSION_MATRIX = [
+      {
+        key: 'orderbook', label: 'Order Book', icon: '📋',
+        fields: [
+          { key: 'send_confirmation', label: 'Send Trade Confirmations', desc: 'How trade confirmation emails can be dispatched to clients', type: 'tristate', options: [
+            { value: false, label: 'Blocked' },
+            { value: 'test_only', label: 'Test → Approver' },
+            { value: 'full', label: 'Full Send' }
+          ]},
+          { key: 'edit_fill_price', label: 'Edit Fill Price', desc: 'Enter and commit fill prices for trades', type: 'tristate', options: [
+            { value: false, label: 'Blocked' },
+            { value: 'pending', label: 'Pending Approval' },
+            { value: 'direct', label: 'Direct' }
+          ]},
+          { key: 'refund_investor', label: 'Refund / Reverse Investor', desc: 'Eject an investor and return funds to their wallet', type: 'toggle' },
+          { key: 'export', label: 'Export Order Book CSV', desc: 'Download order book data as a CSV file', type: 'toggle' },
+        ]
+      },
+      {
+        key: 'dashboard', label: 'Dashboard', icon: '📊',
+        fields: [
+          { key: 'view_financials', label: 'View Financials', desc: 'Total AUM, investor count, and wallet balances', type: 'toggle' },
+          { key: 'commit_rebalance', label: 'Commit Rebalance', desc: 'Execute a strategy rebalance', type: 'tristate', options: [
+            { value: false, label: 'Blocked' },
+            { value: 'pending', label: 'Proposal Only' },
+            { value: 'direct', label: 'Direct Commit' }
+          ]},
+          { key: 'sync_fundamentals', label: 'Sync Market Data', desc: 'Trigger external market data synchronisation', type: 'toggle' },
+        ]
+      },
+      {
+        key: 'eft', label: 'EFT & Wallet', icon: '💳',
+        fields: [
+          { key: 'approve_deposits', label: 'Approve / Reject Deposits', desc: 'Authorise incoming client EFT payments', type: 'toggle' },
+          { key: 'manual_funds', label: 'Add Manual Funds', desc: 'Credit a client\'s wallet balance manually', type: 'toggle' },
+        ]
+      },
+      {
+        key: 'clients', label: 'Clients', icon: '👥',
+        fields: [
+          { key: 'manage_kyc', label: 'Manage KYC', desc: 'Review and update client KYC status', type: 'toggle' },
+          { key: 'edit_profiles', label: 'Edit Profiles', desc: 'Modify client profile information', type: 'toggle' },
+        ]
+      },
+      {
+        key: 'strategies', label: 'Strategies', icon: '🎯',
+        fields: [
+          { key: 'manage_strategies', label: 'Manage Strategies', desc: 'Create, edit, and delete investment strategies', type: 'toggle' },
+          { key: 'change_visibility', label: 'Change Strategy Visibility', desc: 'Switch a strategy from private to public', type: 'tristate', options: [
+            { value: false, label: 'Blocked' },
+            { value: 'pending', label: 'Pending Approval' },
+            { value: 'direct', label: 'Direct' }
+          ]},
+        ]
+      },
+      {
+        key: 'factsheets', label: 'Factsheets', icon: '📄',
+        fields: [
+          { key: 'upload_factsheets', label: 'Upload Factsheets', desc: 'Upload strategy factsheet PDFs', type: 'toggle' },
+        ]
+      },
     ];
 
     let currentToken = null;
     let myMemberId = null;
+    let myApproverTier = null;
+    let currentPermMemberId = null;
 
     const authHeaders = () => ({ 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' });
+
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
     const requireSession = async () => {
       const { data } = await supabaseClient.auth.getSession();
@@ -385,6 +641,13 @@
       return res.json();
     };
 
+    // ── Tier badge HTML ───────────────────────────────────────────────────────
+    const tierBadge = (tier) => {
+      if (tier === 'def')    return '<span class="tier-badge tier-def">Def ◆</span>';
+      if (tier === 'master') return '<span class="tier-badge tier-master">Master ★</span>';
+      return '<span class="tier-badge tier-lower">Staff</span>';
+    };
+
     const buildPageGrid = (containerId, selectedKeys = []) => {
       const grid = document.getElementById(containerId);
       grid.innerHTML = ALL_PAGES.map(p => `
@@ -395,11 +658,10 @@
       `).join('');
     };
 
-    const getCheckedPages = (containerId) => {
-      return Array.from(document.querySelectorAll(`#${containerId} input[type=checkbox]:checked`))
-        .map(cb => cb.value);
-    };
+    const getCheckedPages = (containerId) =>
+      Array.from(document.querySelectorAll(`#${containerId} input[type=checkbox]:checked`)).map(cb => cb.value);
 
+    // ── Member Table ──────────────────────────────────────────────────────────
     const renderTable = (members) => {
       const body = document.getElementById('teamTableBody');
       if (!members.length) {
@@ -423,16 +685,19 @@
         return `
           <tr>
             <td>
-              <div style="font-weight:600">${m.full_name || '—'}</div>
-              <div style="font-size:11px;color:#8e8e93;margin-top:2px">${m.email}</div>
+              <div style="font-weight:600">${esc(m.full_name || '—')}</div>
+              <div style="font-size:11px;color:#8e8e93;margin-top:2px">${esc(m.email)}</div>
+              ${m.last_sign_in_at ? `<div style="font-size:10px;color:#8e8e93;margin-top:1px">Last login: ${new Date(m.last_sign_in_at).toLocaleDateString('en-ZA')}</div>` : ''}
             </td>
+            <td>${tierBadge(m.approver_tier)}</td>
             <td><span class="badge badge-${m.role}">${m.role === 'admin' ? 'Admin' : 'Staff'}</span></td>
             <td>${pages}</td>
             <td>${status}</td>
             <td>
               <div class="td-actions">
                 ${resendBtn}
-                <button class="btn btn-sm btn-ghost" onclick='openEdit(${JSON.stringify(m.id)},${JSON.stringify(m.role)},${JSON.stringify(perms)})'>Edit</button>
+                <button class="btn btn-sm btn-ghost" onclick='openEdit(${JSON.stringify(m.id)},${JSON.stringify(m.role)},${JSON.stringify(perms)})'>Role</button>
+                <button class="btn btn-sm" style="background:#ede9fe;color:#5b21b6;" onclick='openPerms(${JSON.stringify(m.id)},${JSON.stringify(m.email)},${JSON.stringify(m.approver_tier||null)},${JSON.stringify(m.permissions||{})})'>Permissions</button>
                 ${!m.email.endsWith('@mymint.co.za') ? `<button class="btn btn-sm" style="background:#fff8e1;color:#b45309;" onclick='openUpdateEmail(${JSON.stringify(m.id)},${JSON.stringify(m.email)})'>Update Email</button>` : ''}
                 ${isSelf ? '' : `<button class="btn btn-sm btn-danger" onclick='removeMember(${JSON.stringify(m.id)},${JSON.stringify(m.full_name || m.email)})'>Remove</button>`}
               </div>
@@ -443,13 +708,276 @@
     };
 
     const updateStats = (members) => {
-      document.getElementById('statTotal').textContent = members.length;
-      document.getElementById('statAdmins').textContent = members.filter(m => m.role === 'admin').length;
-      document.getElementById('statActive').textContent = members.filter(m => m.status !== 'pending').length;
+      document.getElementById('statTotal').textContent   = members.length;
+      document.getElementById('statDef').textContent     = members.filter(m => m.approver_tier === 'def').length;
+      document.getElementById('statMaster').textContent  = members.filter(m => m.approver_tier === 'master').length;
       document.getElementById('statPending').textContent = members.filter(m => m.status === 'pending').length;
     };
 
-    // ── Tabs ────────────────────────────────────────────────────────────────
+    // ── Permissions Modal ─────────────────────────────────────────────────────
+    const buildAccordion = (permissions, tier) => {
+      const isDefTier = tier === 'def';
+      const acc = document.getElementById('permAccordion');
+      acc.innerHTML = PERMISSION_MATRIX.map(section => {
+        const fields = section.fields.map(field => {
+          const curVal = (permissions[section.key] || {})[field.key];
+          if (field.type === 'toggle') {
+            const checked = isDefTier ? true : !!curVal;
+            return `
+              <div class="perm-field">
+                <div class="perm-field-meta">
+                  <div class="perm-field-label">${esc(field.label)}</div>
+                  <div class="perm-field-desc">${esc(field.desc)}</div>
+                </div>
+                <div class="perm-field-ctrl">
+                  <label class="perm-toggle" title="${isDefTier ? 'Bypassed by Def tier' : ''}">
+                    <input type="checkbox" class="perm-toggle-input" data-section="${section.key}" data-field="${field.key}" ${checked ? 'checked' : ''} ${isDefTier ? 'disabled' : ''}>
+                    <span class="perm-toggle-track"></span>
+                  </label>
+                </div>
+              </div>`;
+          } else {
+            const activeVal = isDefTier ? (field.options[field.options.length - 1].value) : (curVal !== undefined ? curVal : false);
+            const btns = field.options.map(opt => {
+              const isActive = String(activeVal) === String(opt.value);
+              const isBlocked = opt.value === false;
+              let cls = 'ts-btn';
+              if (isActive && isBlocked) cls += ' ts-blocked';
+              else if (isActive) cls += ' ts-active';
+              return `<button type="button" class="${cls}" data-section="${section.key}" data-field="${field.key}" data-value="${String(opt.value)}" ${isDefTier ? 'disabled' : ''}>${esc(opt.label)}</button>`;
+            }).join('');
+            return `
+              <div class="perm-field">
+                <div class="perm-field-meta">
+                  <div class="perm-field-label">${esc(field.label)}</div>
+                  <div class="perm-field-desc">${esc(field.desc)}</div>
+                </div>
+                <div class="perm-field-ctrl"><div class="tristate-group" data-section="${section.key}" data-field="${field.key}">${btns}</div></div>
+              </div>`;
+          }
+        }).join('');
+
+        return `
+          <div class="acc-item">
+            <button type="button" class="acc-header" data-acc-section="${section.key}">
+              <div class="acc-header-left">
+                <span class="acc-header-icon">${section.icon}</span>
+                <span>${esc(section.label)}</span>
+              </div>
+              <svg class="acc-chevron" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+            </button>
+            <div class="acc-body">${fields}</div>
+          </div>`;
+      }).join('');
+
+      // Accordion toggle
+      acc.querySelectorAll('.acc-header').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const item = btn.closest('.acc-item');
+          item.classList.toggle('open');
+        });
+      });
+
+      // Tristate button group handler
+      acc.querySelectorAll('.tristate-group').forEach(group => {
+        group.addEventListener('click', (e) => {
+          const btn = e.target.closest('.ts-btn');
+          if (!btn || btn.disabled) return;
+          group.querySelectorAll('.ts-btn').forEach(b => {
+            b.classList.remove('ts-active', 'ts-blocked');
+          });
+          const val = btn.dataset.value;
+          if (val === 'false') btn.classList.add('ts-blocked');
+          else btn.classList.add('ts-active');
+        });
+      });
+    };
+
+    const readPermissions = () => {
+      const perms = {};
+      PERMISSION_MATRIX.forEach(section => {
+        perms[section.key] = {};
+        section.fields.forEach(field => {
+          if (field.type === 'toggle') {
+            const el = document.querySelector(`.perm-toggle-input[data-section="${section.key}"][data-field="${field.key}"]`);
+            perms[section.key][field.key] = el ? el.checked : false;
+          } else {
+            const activeBtn = document.querySelector(`.ts-btn.ts-active[data-section="${section.key}"][data-field="${field.key}"], .ts-btn.ts-blocked[data-section="${section.key}"][data-field="${field.key}"]`);
+            if (activeBtn) {
+              const v = activeBtn.dataset.value;
+              perms[section.key][field.key] = v === 'false' ? false : v;
+            } else {
+              perms[section.key][field.key] = false;
+            }
+          }
+        });
+      });
+      return perms;
+    };
+
+    window.openPerms = (id, email, tier, permissions) => {
+      currentPermMemberId = id;
+      document.getElementById('permMemberEmail').textContent = email;
+      const tierInputs = document.querySelectorAll('input[name="permTier"]');
+      tierInputs.forEach(inp => { inp.checked = (inp.value === (tier || '')); });
+      const isDefTier = tier === 'def';
+      document.getElementById('defBanner').style.display = isDefTier ? 'flex' : 'none';
+      buildAccordion(permissions || {}, tier || '');
+      document.getElementById('permOverlay').classList.add('open');
+    };
+
+    // Re-build accordion when tier changes
+    document.addEventListener('change', (e) => {
+      if (e.target.name === 'permTier') {
+        const tier = e.target.value;
+        document.getElementById('defBanner').style.display = tier === 'def' ? 'flex' : 'none';
+        const currentPerms = readPermissions();
+        buildAccordion(currentPerms, tier);
+      }
+    });
+
+    document.getElementById('permSaveBtn').addEventListener('click', async () => {
+      const tier = document.querySelector('input[name="permTier"]:checked')?.value || '';
+      const permissions = readPermissions();
+      const btn = document.getElementById('permSaveBtn');
+      btn.textContent = 'Saving…'; btn.disabled = true;
+      const data = await api('POST', '/api/team?action=update-permissions', {
+        id: currentPermMemberId, approver_tier: tier || null, permissions
+      });
+      btn.textContent = 'Save Permissions'; btn.disabled = false;
+      if (data.ok) {
+        document.getElementById('permOverlay').classList.remove('open');
+        await loadTeam();
+      } else {
+        alert(data.error || 'Failed to save permissions.\n\nNote: Run scripts/db-migration-permissions.sql in your Supabase SQL editor first.');
+      }
+    });
+
+    ['permCancelBtn','permCancelTopBtn'].forEach(id => {
+      document.getElementById(id).addEventListener('click', () => document.getElementById('permOverlay').classList.remove('open'));
+    });
+    document.getElementById('permOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'permOverlay') document.getElementById('permOverlay').classList.remove('open');
+    });
+
+    // ── Approvals Inbox ───────────────────────────────────────────────────────
+    const APPROVAL_TYPE_LABELS = {
+      trade_confirmation: 'Trade Confirmation',
+      fill_price: 'Fill Price',
+      rebalance: 'Rebalance',
+      strategy_visibility: 'Strategy Visibility',
+      other: 'Other'
+    };
+
+    const fmtApprovalPayload = (payload) => {
+      if (!payload || typeof payload !== 'object') return '—';
+      const lines = [];
+      const safe = (k, v) => `${k}: ${String(v == null ? '—' : v)}`;
+      if (payload.instrument) lines.push(safe('Instrument', payload.instrument));
+      if (payload.ticker) lines.push(safe('Ticker', payload.ticker));
+      if (payload.fill_price != null) lines.push(safe('Fill Price', payload.fill_price));
+      if (payload.quantity != null) lines.push(safe('Quantity', payload.quantity));
+      if (payload.strategy) lines.push(safe('Strategy', payload.strategy));
+      if (payload.to) lines.push(safe('To', payload.to));
+      if (payload.subject) lines.push(safe('Subject', payload.subject));
+      if (payload.description) lines.push(safe('Description', payload.description));
+      if (!lines.length) {
+        const keys = Object.keys(payload).filter(k => k !== 'html' && k !== 'text');
+        keys.slice(0, 5).forEach(k => lines.push(safe(k, payload[k])));
+      }
+      return lines.join('\n') || JSON.stringify(payload, null, 2);
+    };
+
+    const renderApprovals = (approvals, canResolve, notice) => {
+      const list = document.getElementById('approvalsList');
+      const noticeEl = document.getElementById('approvalsNotice');
+      if (notice) {
+        noticeEl.textContent = notice;
+        noticeEl.style.display = 'block';
+      } else {
+        noticeEl.style.display = 'none';
+      }
+
+      if (!approvals.length) {
+        list.innerHTML = '<div class="inbox-empty">No approvals found for the selected filters.</div>';
+        return;
+      }
+
+      list.innerHTML = approvals.map(a => {
+        const typeCls = 'atype-' + (a.type || 'other').replace(/[^a-z_]/g,'');
+        const typeLabel = APPROVAL_TYPE_LABELS[a.type] || a.type;
+        const when = a.created_at ? fmtAuditWhen(a.created_at) : '—';
+        const payloadText = fmtApprovalPayload(a.payload);
+        const isPending = a.status === 'pending';
+
+        let resolvedHtml = '';
+        if (!isPending) {
+          const cls = a.status === 'approved' ? 'aresolved-approved' : 'aresolved-rejected';
+          const icon = a.status === 'approved' ? '✓' : '✗';
+          resolvedHtml = `<span class="approval-resolved-badge ${cls}">${icon} ${a.status.charAt(0).toUpperCase()+a.status.slice(1)}</span>`;
+          if (a.reviewed_by_email) resolvedHtml += `<span style="font-size:11px;color:#8e8e93;"> by ${esc(a.reviewed_by_email)}</span>`;
+          if (a.reviewed_at) resolvedHtml += `<span style="font-size:11px;color:#8e8e93;"> · ${fmtAuditWhen(a.reviewed_at)}</span>`;
+        }
+
+        return `
+          <div class="approval-card" data-approval-id="${esc(a.id)}">
+            <div class="approval-card-head">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <span class="approval-type-badge ${typeCls}">${esc(typeLabel)}</span>
+                <span class="approval-meta">Requested by <strong>${esc(a.requested_by_email)}</strong> · ${esc(when)}</span>
+              </div>
+              ${resolvedHtml ? `<div>${resolvedHtml}</div>` : ''}
+            </div>
+            <div class="approval-payload-pre">${esc(payloadText)}</div>
+            ${a.notes ? `<div style="font-size:12px;color:#6b7280;margin-bottom:10px;font-style:italic;">"${esc(a.notes)}"</div>` : ''}
+            ${isPending && canResolve ? `
+              <div class="approval-notes-wrap">
+                <textarea class="approval-notes-input" placeholder="Add a note (optional)…" rows="2"></textarea>
+              </div>
+              <div class="approval-actions-row">
+                <button class="btn btn-sm btn-approve" onclick="resolveApproval('${esc(a.id)}','approved',this)">✓ Approve</button>
+                <button class="btn btn-sm btn-reject" onclick="resolveApproval('${esc(a.id)}','rejected',this)">✗ Reject</button>
+              </div>` : ''}
+          </div>`;
+      }).join('');
+    };
+
+    const loadApprovals = async () => {
+      const list = document.getElementById('approvalsList');
+      list.innerHTML = '<div class="inbox-loading">Loading approvals…</div>';
+      const status = document.getElementById('approvalsStatusFilter').value;
+      const type = document.getElementById('approvalsTypeFilter').value;
+      const params = new URLSearchParams({ action: 'list-approvals', status, limit: '200' });
+      if (type) params.set('type', type);
+      const data = await api('GET', '/api/team?' + params.toString());
+      if (!data.ok) {
+        list.innerHTML = `<div class="inbox-empty">${esc(data.error || 'Could not load approvals')}</div>`;
+        return;
+      }
+      const canResolve = myApproverTier === 'def' || myApproverTier === 'master';
+      renderApprovals(data.approvals || [], canResolve, data.notice || null);
+      const pendingCount = (data.approvals || []).filter(a => a.status === 'pending').length;
+      const badge = document.getElementById('approvalsBadge');
+      if (pendingCount > 0) { badge.textContent = pendingCount; badge.style.display = ''; }
+      else badge.style.display = 'none';
+    };
+
+    window.resolveApproval = async (id, decision, triggerBtn) => {
+      const card = document.querySelector(`[data-approval-id="${id}"]`);
+      const notesEl = card ? card.querySelector('.approval-notes-input') : null;
+      const notes = notesEl ? notesEl.value.trim() : '';
+      const label = decision === 'approved' ? 'Approving…' : 'Rejecting…';
+      if (triggerBtn) { triggerBtn.disabled = true; triggerBtn.textContent = label; }
+      const data = await api('POST', '/api/team?action=resolve-approval', { id, decision, notes: notes || null });
+      if (!data.ok) {
+        if (triggerBtn) { triggerBtn.disabled = false; triggerBtn.textContent = decision === 'approved' ? '✓ Approve' : '✗ Reject'; }
+        alert(data.error || 'Could not resolve approval');
+        return;
+      }
+      await loadApprovals();
+    };
+
+    // ── Tabs ──────────────────────────────────────────────────────────────────
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const tab = btn.getAttribute('data-tab');
@@ -457,9 +985,13 @@
         document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
         if (tab === 'audit') loadAudit();
         if (tab === 'impersonation') loadImpersonation();
+        if (tab === 'approvals') loadApprovals();
       });
     });
 
+    document.getElementById('approvalsRefreshBtn').addEventListener('click', loadApprovals);
+    document.getElementById('approvalsStatusFilter').addEventListener('change', loadApprovals);
+    document.getElementById('approvalsTypeFilter').addEventListener('change', loadApprovals);
     document.getElementById('auditRefreshBtn').addEventListener('click', loadAudit);
     document.getElementById('impRefreshBtn').addEventListener('click', loadImpersonation);
     document.getElementById('impApplyBtn').addEventListener('click', loadImpersonation);
@@ -476,6 +1008,7 @@
       });
     });
 
+    // ── Audit helpers ─────────────────────────────────────────────────────────
     const fmtAuditWhen = (iso) => {
       if (!iso) return '';
       const d = new Date(iso);
@@ -489,12 +1022,11 @@
 
     const describeAudit = (entry) => {
       const d = entry.details || {};
-      const escape = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       switch (entry.action) {
         case 'invite': {
           const reissue = d.reissue ? ' (re-issued)' : '';
-          const role = d.role ? ` as <strong>${escape(d.role)}</strong>` : '';
-          const pages = (d.page_access && d.page_access.length) ? ` — pages: ${d.page_access.map(escape).join(', ')}` : '';
+          const role = d.role ? ` as <strong>${esc(d.role)}</strong>` : '';
+          const pages = (d.page_access && d.page_access.length) ? ` — pages: ${d.page_access.map(esc).join(', ')}` : '';
           const sent = d.email_sent === false ? ' · email not sent' : '';
           return `Invited${role}${reissue}${pages}${sent}`;
         }
@@ -502,23 +1034,26 @@
           const before = d.before || {};
           const after = d.after || {};
           const parts = [];
-          if (before.role !== after.role) parts.push(`role: ${escape(before.role || '—')} → <strong>${escape(after.role)}</strong>`);
-          const beforePages = (before.page_access || []).slice().sort().join(',');
-          const afterPages  = (after.page_access  || []).slice().sort().join(',');
-          if (beforePages !== afterPages) parts.push(`pages: ${escape(beforePages || '—')} → <strong>${escape(afterPages || '—')}</strong>`);
+          if (before.role !== after.role) parts.push(`role: ${esc(before.role || '—')} → <strong>${esc(after.role)}</strong>`);
+          const bTier = before.approver_tier, aTier = after.approver_tier;
+          if (bTier !== aTier) parts.push(`tier: ${esc(bTier || 'staff')} → <strong>${esc(aTier || 'staff')}</strong>`);
+          const bp = (before.page_access || []).slice().sort().join(',');
+          const ap = (after.page_access  || []).slice().sort().join(',');
+          if (bp !== ap) parts.push(`pages: ${esc(bp || '—')} → <strong>${esc(ap || '—')}</strong>`);
+          if (before.permissions !== undefined || after.permissions !== undefined) parts.push('permissions updated');
           return parts.length ? parts.join(' · ') : 'No changes';
         }
         case 'remove':
-          return `Removed${d.role ? ' (was ' + escape(d.role) + ')' : ''}`;
+          return `Removed${d.role ? ' (was ' + esc(d.role) + ')' : ''}`;
         case 'signup':
-          return `Completed signup${d.full_name ? ' as ' + escape(d.full_name) : ''}`;
+          return `Completed signup${d.full_name ? ' as ' + esc(d.full_name) : ''}`;
         case 'impersonate': {
-          const env = d.mint_environment ? ` <strong>${escape(d.mint_environment)}</strong>` : '';
-          const name = d.target_name ? ` (${escape(d.target_name)})` : '';
+          const env = d.mint_environment ? ` <strong>${esc(d.mint_environment)}</strong>` : '';
+          const name = d.target_name ? ` (${esc(d.target_name)})` : '';
           return `Viewed Mint as client${name} on${env}`;
         }
         default:
-          return escape(JSON.stringify(d));
+          return esc(JSON.stringify(d));
       }
     };
 
@@ -528,13 +1063,12 @@
         body.innerHTML = '<tr><td colspan="5" class="empty-state">No activity yet.</td></tr>';
         return;
       }
-      const escape = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       body.innerHTML = entries.map(e => `
         <tr>
           <td><span class="audit-when">${fmtAuditWhen(e.created_at)}</span></td>
-          <td><span class="audit-action audit-${e.action}">${escape(e.action)}</span></td>
-          <td>${escape(e.target_email || '—')}</td>
-          <td>${escape(e.actor_email || (e.action === 'signup' ? 'self' : '—'))}</td>
+          <td><span class="audit-action audit-${e.action}">${esc(e.action)}</span></td>
+          <td>${esc(e.target_email || '—')}</td>
+          <td>${esc(e.actor_email || (e.action === 'signup' ? 'self' : '—'))}</td>
           <td><span class="audit-detail">${describeAudit(e)}</span></td>
         </tr>
       `).join('');
@@ -546,24 +1080,20 @@
         body.innerHTML = '<tr><td colspan="5" class="empty-state">No impersonation events match these filters.</td></tr>';
         return;
       }
-      const escape = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       body.innerHTML = entries.map(e => {
         const d = e.details || {};
         const env = (d.mint_environment || '').toLowerCase();
         const envBadge = env
-          ? `<span class="env-badge env-${env === 'live' ? 'live' : 'dev'}">${escape(env)}</span>`
+          ? `<span class="env-badge env-${env === 'live' ? 'live' : 'dev'}">${esc(env)}</span>`
           : '<span style="color:#8e8e93;font-size:12px;">—</span>';
-        const targetName = d.target_name ? `<div style="font-size:11px;color:#8e8e93;margin-top:2px">${escape(d.target_name)}</div>` : '';
+        const targetName = d.target_name ? `<div style="font-size:11px;color:#8e8e93;margin-top:2px">${esc(d.target_name)}</div>` : '';
         return `
           <tr>
             <td><span class="audit-when">${fmtAuditWhen(e.created_at)}</span></td>
-            <td>${escape(e.actor_email || '—')}</td>
-            <td>
-              <div>${escape(e.target_email || '—')}</div>
-              ${targetName}
-            </td>
+            <td>${esc(e.actor_email || '—')}</td>
+            <td><div>${esc(e.target_email || '—')}</div>${targetName}</td>
             <td>${envBadge}</td>
-            <td><span class="audit-detail">${escape(d.mint_base || '')}</span></td>
+            <td><span class="audit-detail">${esc(d.mint_base || '')}</span></td>
           </tr>
         `;
       }).join('');
@@ -578,19 +1108,16 @@
       const client = document.getElementById('impClient').value.trim();
       const from = document.getElementById('impFrom').value.trim();
       const to = document.getElementById('impTo').value.trim();
-      if (admin) params.set('actor_email', admin);
+      if (admin)  params.set('actor_email', admin);
       if (client) params.set('target_email', client);
-      if (from) params.set('from', from + 'T00:00:00Z');
-      if (to) params.set('to', to + 'T23:59:59Z');
+      if (from)   params.set('from', from + 'T00:00:00Z');
+      if (to)     params.set('to', to + 'T23:59:59Z');
       const data = await api('GET', '/api/team?' + params.toString());
       if (!data.ok) {
-        document.getElementById('impTableBody').innerHTML = `<tr><td colspan="5" class="empty-state">${data.error || 'Could not load impersonation log'}</td></tr>`;
+        document.getElementById('impTableBody').innerHTML = `<tr><td colspan="5" class="empty-state">${esc(data.error || 'Could not load impersonation log')}</td></tr>`;
         return;
       }
-      if (data.notice) {
-        notice.textContent = data.notice;
-        notice.style.display = 'block';
-      }
+      if (data.notice) { notice.textContent = data.notice; notice.style.display = 'block'; }
       renderImpersonation(data.entries || []);
     }
 
@@ -600,13 +1127,10 @@
       document.getElementById('auditTableBody').innerHTML = '<tr><td colspan="5" class="empty-state">Loading...</td></tr>';
       const data = await api('GET', '/api/team?action=audit-list&limit=200');
       if (!data.ok) {
-        document.getElementById('auditTableBody').innerHTML = `<tr><td colspan="5" class="empty-state">${data.error || 'Could not load audit log'}</td></tr>`;
+        document.getElementById('auditTableBody').innerHTML = `<tr><td colspan="5" class="empty-state">${esc(data.error || 'Could not load audit log')}</td></tr>`;
         return;
       }
-      if (data.notice) {
-        notice.textContent = data.notice;
-        notice.style.display = 'block';
-      }
+      if (data.notice) { notice.textContent = data.notice; notice.style.display = 'block'; }
       renderAudit(data.entries || []);
     }
 
@@ -616,12 +1140,12 @@
         updateStats(data.members);
         renderTable(data.members);
       } else {
-        document.getElementById('teamTableBody').innerHTML = '<tr><td colspan="6" class="empty-state">Could not load team from database (Access Denied or Not Configured locally)</td></tr>';
+        document.getElementById('teamTableBody').innerHTML = '<tr><td colspan="6" class="empty-state">Could not load team (Access Denied or not configured)</td></tr>';
         updateStats([]);
       }
     };
 
-    // Invite modal
+    // ── Invite Modal ──────────────────────────────────────────────────────────
     document.getElementById('inviteBtn').addEventListener('click', () => {
       document.getElementById('inviteName').value = '';
       document.getElementById('inviteEmail').value = '';
@@ -632,8 +1156,7 @@
     });
 
     document.getElementById('inviteRole').addEventListener('change', (e) => {
-      document.getElementById('invitePageAccessSection').style.display =
-        e.target.value === 'staff' ? 'block' : 'none';
+      document.getElementById('invitePageAccessSection').style.display = e.target.value === 'staff' ? 'block' : 'none';
     });
 
     document.getElementById('inviteCancelBtn').addEventListener('click', () => {
@@ -645,30 +1168,21 @@
       const full_name = document.getElementById('inviteName').value.trim();
       const role = document.getElementById('inviteRole').value;
       const page_access = role === 'staff' ? getCheckedPages('invitePageGrid') : [];
-
       if (!email) { alert('Email is required'); return; }
       if (!email.endsWith('@mymint.co.za')) { alert('Only @mymint.co.za email addresses can be invited.'); return; }
-
       const btn = document.getElementById('inviteSubmitBtn');
-      btn.textContent = 'Sending…';
-      btn.disabled = true;
-
+      btn.textContent = 'Sending…'; btn.disabled = true;
       const data = await api('POST', '/api/team?action=invite', { email, full_name, role, page_access });
-      btn.textContent = 'Send Invite';
-      btn.disabled = false;
-
+      btn.textContent = 'Send Invite'; btn.disabled = false;
       if (data.ok) {
         document.getElementById('inviteOverlay').classList.remove('open');
         await loadTeam();
-        if (!data.emailSent && data.signupLink) {
-          showInviteLink(email, data.signupLink, data.emailReason);
-        }
+        if (!data.emailSent && data.signupLink) showInviteLink(email, data.signupLink, data.emailReason);
       } else {
         alert(data.error || 'Failed to invite member');
       }
     });
 
-    // Resend invitation — re-issues the token and re-sends the email (or shows the new link).
     window.resendInvite = async (id, email) => {
       if (!confirm(`Resend invitation to ${email}? The previous link will stop working.`)) return;
       const data = await api('POST', '/api/team?action=resend', { id });
@@ -679,11 +1193,10 @@
       } else if (data.signupLink) {
         showInviteLink(email, data.signupLink, data.emailReason);
       } else {
-        alert(`Could not send invitation email to ${email}.\n\nReason: ${data.emailReason || 'Unknown error'}\n\nCheck that RESEND_API_KEY is set in your environment.`);
+        alert(`Could not send invitation email to ${email}.\n\nReason: ${data.emailReason || 'Unknown error'}`);
       }
     };
 
-    // Modal that shows the signup link to copy when email delivery wasn't possible.
     function showInviteLink(email, link, reason) {
       const overlay = document.getElementById('linkOverlay');
       document.getElementById('linkEmail').textContent = email;
@@ -698,7 +1211,7 @@
       overlay.classList.add('open');
     }
 
-    // Edit modal
+    // ── Edit Role Modal ───────────────────────────────────────────────────────
     window.openEdit = (id, role, page_access) => {
       document.getElementById('editMemberId').value = id;
       document.getElementById('editRole').value = role;
@@ -708,8 +1221,7 @@
     };
 
     document.getElementById('editRole').addEventListener('change', (e) => {
-      document.getElementById('editPageAccessSection').style.display =
-        e.target.value === 'staff' ? 'block' : 'none';
+      document.getElementById('editPageAccessSection').style.display = e.target.value === 'staff' ? 'block' : 'none';
     });
 
     document.getElementById('editCancelBtn').addEventListener('click', () => {
@@ -720,15 +1232,10 @@
       const id = document.getElementById('editMemberId').value;
       const role = document.getElementById('editRole').value;
       const page_access = role === 'staff' ? getCheckedPages('editPageGrid') : [];
-
       const btn = document.getElementById('editSubmitBtn');
-      btn.textContent = 'Saving…';
-      btn.disabled = true;
-
+      btn.textContent = 'Saving…'; btn.disabled = true;
       const data = await api('PATCH', '/api/team?action=update', { id, role, page_access });
-      btn.textContent = 'Save Changes';
-      btn.disabled = false;
-
+      btn.textContent = 'Save Changes'; btn.disabled = false;
       if (data.ok) {
         document.getElementById('editOverlay').classList.remove('open');
         await loadTeam();
@@ -737,7 +1244,7 @@
       }
     });
 
-    // Update Email modal
+    // ── Update Email Modal ────────────────────────────────────────────────────
     window.openUpdateEmail = (id, currentEmail) => {
       document.getElementById('emailMemberId').value = id;
       document.getElementById('emailCurrent').value = currentEmail;
@@ -749,7 +1256,6 @@
     document.getElementById('emailCancelBtn').addEventListener('click', () => {
       document.getElementById('emailOverlay').classList.remove('open');
     });
-
     document.getElementById('emailOverlay').addEventListener('click', (e) => {
       if (e.target.id === 'emailOverlay') document.getElementById('emailOverlay').classList.remove('open');
     });
@@ -759,41 +1265,33 @@
       const new_email = document.getElementById('emailNew').value.trim().toLowerCase();
       const errBox = document.getElementById('emailError');
       errBox.style.display = 'none';
-
       if (!new_email) { errBox.textContent = 'Enter the new email address.'; errBox.style.display = 'block'; return; }
       if (!new_email.endsWith('@mymint.co.za')) { errBox.textContent = 'Must be a @mymint.co.za address.'; errBox.style.display = 'block'; return; }
-
       const btn = document.getElementById('emailSubmitBtn');
       btn.disabled = true; btn.textContent = 'Updating…';
-
       const data = await api('POST', '/api/team?action=update-email', { id, new_email });
       btn.disabled = false; btn.textContent = 'Update Email';
-
       if (data.ok) {
         document.getElementById('emailOverlay').classList.remove('open');
         await loadTeam();
-        const note = data.authUpdated
+        alert(data.authUpdated
           ? 'Email updated. The member can now sign in with their new address.'
-          : 'Team record updated. Note: no Supabase Auth account was found for this member — they may need to accept a fresh invitation.';
-        alert(note);
+          : 'Team record updated. Note: no Supabase Auth account found — they may need a fresh invite.');
       } else {
         errBox.textContent = data.error || 'Failed to update email.';
         errBox.style.display = 'block';
       }
     });
 
-    // Remove
+    // ── Remove ────────────────────────────────────────────────────────────────
     window.removeMember = async (id, name) => {
       if (!confirm(`Remove ${name} from the team?`)) return;
       const data = await api('DELETE', '/api/team?action=remove', { id });
-      if (data.ok) {
-        await loadTeam();
-      } else {
-        alert(data.error || 'Failed to remove member');
-      }
+      if (data.ok) { await loadTeam(); }
+      else { alert(data.error || 'Failed to remove member'); }
     };
 
-    // Close overlays on backdrop click
+    // ── Backdrop close ────────────────────────────────────────────────────────
     ['inviteOverlay', 'editOverlay'].forEach(id => {
       document.getElementById(id).addEventListener('click', (e) => {
         if (e.target.id === id) document.getElementById(id).classList.remove('open');
@@ -805,19 +1303,17 @@
       window.location.href = '/signin.html';
     });
 
+    // ── Boot ──────────────────────────────────────────────────────────────────
     (async () => {
       const ok = await requireSession();
       if (!ok) return;
-
-      // Verify this user is an admin
       const me = await api('GET', '/api/team?action=me');
-      if (!me.ok || me.role !== 'admin') {
-        window.location.href = '/index.html';
-        return;
-      }
+      if (!me.ok || me.role !== 'admin') { window.location.href = '/index.html'; return; }
       myMemberId = me.id || null;
-
+      myApproverTier = me.approver_tier || null;
       await loadTeam();
+      // Silently pre-fetch approval count for the badge
+      loadApprovals().catch(() => {});
     })();
   </script>
 </body>

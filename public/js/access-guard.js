@@ -53,6 +53,18 @@
     });
   };
 
+  // Helper available to page JS: check a granular permission.
+  // Usage: window.mintCan('orderbook', 'edit_fill_price') → false | 'pending' | 'direct' | true
+  const buildPermHelper = (permissions, approverTier) => {
+    return (section, field) => {
+      if (approverTier === 'def') return true; // Def bypasses everything
+      if (!permissions || typeof permissions !== 'object') return false;
+      const sec = permissions[section];
+      if (!sec || typeof sec !== 'object') return false;
+      return sec[field] !== undefined ? sec[field] : false;
+    };
+  };
+
   const run = async () => {
     const token = getStoredToken();
     if (!token) { redirectToSignIn('signin-required'); return; }
@@ -67,7 +79,6 @@
     }
 
     if (!me || !me.ok) {
-      // Token invalid or not a team member
       try {
         const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
         if (key) localStorage.removeItem(key);
@@ -78,13 +89,18 @@
 
     const role = me.role;
     const pageAccess = Array.isArray(me.page_access) ? me.page_access : [];
+    const approverTier = me.approver_tier || null;
+    const permissions = me.permissions || {};
 
     applyNavVisibility(role, pageAccess);
+
+    // Expose permission helper to page scripts
+    window.mintCan = buildPermHelper(permissions, approverTier);
+    window.mintMe = { role, pageAccess, approverTier, permissions, email: me.email };
 
     if (PAGE_KEY) {
       const allowed = role === 'admin' || pageAccess.includes(PAGE_KEY);
       if (!allowed) {
-        // Send the user somewhere they CAN go, or sign-in if nothing.
         const fallback = role === 'admin'
           ? '/index.html'
           : (pageAccess[0]
@@ -95,9 +111,10 @@
       }
     }
 
-    // Reveal page (some pages set <style>html{opacity:0}</style> to avoid flash)
     try { document.documentElement.style.opacity = '1'; } catch {}
-    window.dispatchEvent(new CustomEvent('access-guard:ready', { detail: { role, page_access: pageAccess, email: me.email } }));
+    window.dispatchEvent(new CustomEvent('access-guard:ready', {
+      detail: { role, page_access: pageAccess, approver_tier: approverTier, permissions, email: me.email }
+    }));
   };
 
   if (document.readyState === 'loading') {

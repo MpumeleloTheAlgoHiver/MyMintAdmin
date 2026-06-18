@@ -14,7 +14,10 @@ const {
   inviteUserViaSupabase,
   recoverPasswordViaSupabase,
   updateAuthUserEmail,
-  sendInviteEmail
+  sendInviteEmail,
+  sendResendEmail,
+  isMasterOrDef,
+  isDef
 } = require('./_team');
 
 const normEmail = (e) => String(e || '').trim().toLowerCase();
@@ -53,6 +56,8 @@ module.exports = async (req, res) => {
         full_name: member.full_name || null,
         role: member.role || 'staff',
         page_access: member.page_access || [],
+        approver_tier: member.approver_tier || null,
+        permissions: member.permissions || {},
         id: member.id
       });
     }
@@ -670,6 +675,163 @@ module.exports = async (req, res) => {
       });
 
       return sendJson(res, 200, { ok: true, value: saved?.value || value });
+    }
+
+    // UPDATE-PERMISSIONS — admin only. Sets a member's approver_tier + permissions JSONB.
+    if (action === 'update-permissions') {
+      if (req.method !== 'POST' && req.method !== 'PATCH') return sendJson(res, 405, { error: 'Method not allowed' });
+      const result = await requireAdmin(req, res);
+      if (!result) return;
+      const { id, approver_tier, permissions } = req.body || {};
+      if (!id) return sendJson(res, 400, { error: 'id is required' });
+
+      const validTiers = [null, '', 'master', 'def'];
+      const safeTier = validTiers.includes(approver_tier) ? (approver_tier || null) : null;
+      const safePerms = permissions && typeof permissions === 'object' && !Array.isArray(permissions) ? permissions : {};
+
+      const beforeRows = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}&limit=1`);
+      const before = beforeRows && beforeRows[0];
+
+      let updated;
+      try {
+        const out = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}`, {
+          method: 'PATCH',
+          extraHeaders: { 'Prefer': 'return=representation' },
+          body: { approver_tier: safeTier, permissions: safePerms, updated_at: new Date().toISOString() }
+        });
+        updated = Array.isArray(out) ? out[0] : out;
+      } catch (err) {
+        return sendJson(res, 500, { error: `Could not update permissions: ${err.message}. Have you run the permissions migration SQL?` });
+      }
+
+      await writeAudit({
+        action: 'update',
+        target_email: updated?.email || before?.email || '',
+        target_member_id: id,
+        actor_email: result.user.email,
+        actor_user_id: result.user.id,
+        details: {
+          before: before ? { approver_tier: before.approver_tier, permissions: before.permissions } : null,
+          after: { approver_tier: safeTier, permissions: safePerms }
+        }
+      });
+
+      return sendJson(res, 200, { ok: true, member: updated });
+    }
+
+    // LIST-APPROVALS — master/def only (or any admin if they are the actor).
+    if (action === 'list-approvals') {
+      if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
+      const result = await requireAuth(req, res);
+      if (!result) return;
+      const { member } = result;
+      if (member.role !== 'admin' && !isMasterOrDef(member)) {
+        return sendJson(res, 403, { error: 'Master Approver or Def access required' });
+      }
+
+      const status = (url.searchParams.get('status') || 'pending').trim();
+      const type = (url.searchParams.get('type') || '').trim();
+      const limit = Math.min(parseInt(url.searchParams.get('limit') || '100', 10) || 100, 500);
+
+      const filters = [];
+      if (status && status !== 'all') filters.push(`status=eq.${encodeURIComponent(status)}`);
+      if (type) filters.push(`type=eq.${encodeURIComponent(type)}`);
+      const qs = [
+        'select=*',
+        'order=created_at.desc',
+        `limit=${limit}`,
+        ...filters
+      ].join('&');
+
+      try {
+        const rows = await supabaseRequest(`/rest/v1/admin_approvals?${qs}`);
+        return sendJson(res, 200, { ok: true, approvals: rows || [] });
+      } catch (err) {
+        return sendJson(res, 200, { ok: true, approvals: [], notice: 'Approvals table not found — run scripts/db-migration-permissions.sql in your Supabase SQL editor.' });
+      }
+    }
+
+    // SUBMIT-APPROVAL — any authenticated member. Creates a pending approval request.
+    if (action === 'submit-approval') {
+      if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+      const result = await requireAuth(req, res);
+      if (!result) return;
+      const { type, payload, notes } = req.body || {};
+      if (!type) return sendJson(res, 400, { error: 'type is required' });
+
+      const row = {
+        type: String(type).trim(),
+        status: 'pending',
+        requested_by_id: result.member.id || null,
+        requested_by_email: result.user.email,
+        payload: payload && typeof payload === 'object' ? payload : {},
+        notes: notes ? String(notes).trim() : null
+      };
+
+      let approval;
+      try {
+        const out = await supabaseRequest('/rest/v1/admin_approvals', {
+          method: 'POST',
+          body: row
+        });
+        approval = Array.isArray(out) ? out[0] : out;
+      } catch (err) {
+        return sendJson(res, 500, { error: `Could not submit approval: ${err.message}. Have you run the permissions migration SQL?` });
+      }
+
+      return sendJson(res, 200, { ok: true, approval });
+    }
+
+    // RESOLVE-APPROVAL — master/def only. Approves or rejects a pending request.
+    if (action === 'resolve-approval') {
+      if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+      const result = await requireAuth(req, res);
+      if (!result) return;
+      if (!isMasterOrDef(result.member) && result.member.role !== 'admin') {
+        return sendJson(res, 403, { error: 'Master Approver or Def access required to resolve approvals' });
+      }
+
+      const { id, decision, notes } = req.body || {};
+      if (!id) return sendJson(res, 400, { error: 'id is required' });
+      if (decision !== 'approved' && decision !== 'rejected') return sendJson(res, 400, { error: 'decision must be "approved" or "rejected"' });
+
+      const rows = await supabaseRequest(`/rest/v1/admin_approvals?id=eq.${id}&limit=1`).catch(() => null);
+      const approval = rows && rows[0];
+      if (!approval) return sendJson(res, 404, { error: 'Approval not found' });
+      if (approval.status !== 'pending') return sendJson(res, 400, { error: `Approval is already ${approval.status}` });
+
+      let updated;
+      try {
+        const out = await supabaseRequest(`/rest/v1/admin_approvals?id=eq.${id}`, {
+          method: 'PATCH',
+          extraHeaders: { 'Prefer': 'return=representation' },
+          body: {
+            status: decision,
+            reviewed_by_id: result.member.id || null,
+            reviewed_by_email: result.user.email,
+            notes: notes ? String(notes).trim() : approval.notes,
+            reviewed_at: new Date().toISOString()
+          }
+        });
+        updated = Array.isArray(out) ? out[0] : out;
+      } catch (err) {
+        return sendJson(res, 500, { error: `Could not resolve approval: ${err.message}` });
+      }
+
+      // For trade_confirmation approvals — if approved and email payload is present, send it.
+      let emailResult = null;
+      if (decision === 'approved' && approval.type === 'trade_confirmation') {
+        const ep = approval.payload || {};
+        if (ep.to && ep.subject && ep.html) {
+          try {
+            emailResult = await sendResendEmail({ to: ep.to, subject: ep.subject, html: ep.html, text: ep.text || '' });
+          } catch (err) {
+            emailResult = { skipped: true, reason: err.message };
+          }
+        }
+      }
+
+      return sendJson(res, 200, { ok: true, approval: updated, emailResult });
     }
 
     sendJson(res, 404, { error: 'Not found' });

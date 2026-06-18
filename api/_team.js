@@ -437,6 +437,13 @@ const sendResetEmail = async ({ toEmail, resetLink }) => {
   });
 };
 
+// Returns true if the member is a Def or Master Approver (can review approvals).
+const isMasterOrDef = (member) =>
+  member && (member.approver_tier === 'def' || member.approver_tier === 'master');
+
+// Returns true if the member is a Def user (bypasses all workflows).
+const isDef = (member) => member && member.approver_tier === 'def';
+
 module.exports = {
   ALLOWED_DOMAIN,
   INVITE_TTL_MS,
@@ -453,7 +460,10 @@ module.exports = {
   inviteUserViaSupabase,
   recoverPasswordViaSupabase,
   updateAuthUserEmail,
+  sendResendEmail,
   sendInviteEmail,
   sendWelcomeEmail,
-  sendResetEmail
+  sendResetEmail,
+  isMasterOrDef,
+  isDef
 };
