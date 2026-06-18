@@ -29,10 +29,19 @@ module.exports = async (req, res) => {
     const sbGet = (path) =>
       fetch(`${supabaseUrl}/rest/v1/${path}`, { headers: sbH }).then((r) => r.json());
 
-    const [holdings, strategies] = await Promise.all([
+    let [holdings, strategies] = await Promise.all([
       sbGet('stock_holdings_c?select=user_id,family_member_id,security_id,strategy_id,quantity,avg_fill,expected_fill:%22Expected_fill%22,market_value,transaction_id,created_at&is_active=eq.true&trade_side=eq.BUY'),
       sbGet('strategies_c?select=id,name,short_name,description,risk_level,sector'),
     ]);
+
+    /* Exclude UAT/test accounts (profiles.is_test = true) from the investor list
+       entirely — they must never show on investors.html. Filtering holdings here
+       scopes userIds/secIds/famIds and everything fetched from them downstream. */
+    try {
+      const testRows = await sbGet('profiles?select=id&is_test=eq.true');
+      const testIds = new Set((testRows || []).map((r) => r.id));
+      if (testIds.size) holdings = (holdings || []).filter((h) => !testIds.has(h.user_id));
+    } catch (e) { /* is_test column absent -> no filtering */ }
 
     /* Client cost basis per share, in CENTS, preferring Expected_fill (the price
        the client saw at buy time, in rands) over avg_fill (broker fill in cents,

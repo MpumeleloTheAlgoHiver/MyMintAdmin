@@ -6521,11 +6521,22 @@
       };
     };
 
-    const downloadPackPdf = async (pack, sections = []) => {
+    const downloadPackPdf = async (pack, sections = [], extras = {}) => {
       const JsPdfCtor = await ensureJsPdfLoaded();
       if (!JsPdfCtor) throw new Error('PDF library unavailable. Please refresh and try again.');
       const report = buildPackPdfReport(pack, sections, JsPdfCtor);
       if (!report) throw new Error('Could not build account details PDF for this user.');
+      // Bundle the ComputerShare account-creation doc into the SAME pack PDF so it's
+      // part of the pack download (appended as its own page).
+      if (extras && extras.profile) {
+        try {
+          let logoDataUrl = '';
+          try { logoDataUrl = await loadImageAsDataUrl(COMPUTERSHARE_LOGO_URL); } catch (e) { /* logo optional */ }
+          buildComputerSharePdfReport(extras.profile, extras.onboardingRow || {}, extras.packDetails || {}, { JsPdfCtor, logoDataUrl, doc: report.doc });
+        } catch (csErr) {
+          console.warn('Could not append ComputerShare doc to pack PDF:', csErr);
+        }
+      }
       report.doc.save(report.filename);
     };
 
@@ -9830,7 +9841,10 @@
     const buildComputerSharePdfReport = (profile = {}, onboardingRow = {}, packDetails = {}, options = {}) => {
       const JsPdfCtor = options?.JsPdfCtor || getJsPdfConstructor();
       if (!JsPdfCtor) return null;
-      const doc = new JsPdfCtor({ unit: 'pt', format: 'a4' });
+      // When options.doc is supplied, append the ComputerShare page(s) onto that
+      // existing document (used to bundle it into the pack PDF) instead of a new file.
+      const doc = options?.doc || new JsPdfCtor({ unit: 'pt', format: 'a4' });
+      if (options?.doc) doc.addPage();
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 38;
@@ -10217,10 +10231,20 @@
         const sections = container?.__packSections || [];
         if (!pack) return;
 
+        // Bundle the ComputerShare account-creation doc into the pack PDF (same data
+        // sources as the standalone ComputerShare download).
+        const packProfileId = packDownloadBtn.closest('.simple-item')?.dataset?.profileId;
+        const packProfile = packProfileId ? allProfiles.find((row) => String(row.id) === String(packProfileId)) : null;
+        const extras = packProfile ? {
+          profile: packProfile,
+          onboardingRow: onboardingMap[packProfileId] || {},
+          packDetails: packJsonMap[packProfileId] || packDetailsRowMap[packProfileId]?.pack_details || {},
+        } : {};
+
         const originalLabel = packDownloadBtn.textContent;
         packDownloadBtn.disabled = true;
         packDownloadBtn.textContent = 'Preparing PDF...';
-        downloadPackPdf(pack, sections)
+        downloadPackPdf(pack, sections, extras)
           .catch((error) => {
             console.error('Pack PDF generation failed:', error);
             alert(error?.message || 'Unable to generate account details PDF right now. Please try again.');
