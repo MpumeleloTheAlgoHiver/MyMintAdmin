@@ -2412,6 +2412,7 @@
           }).length;
           _updateAlertBadges(alertCount);
           _renderReturnInsights(_activeReturnTab);
+          renderTopAssetsRow(); /* re-render strategy cards now that intraday data is available */
         } catch(e) {
           const listEl = document.getElementById('returnInsightsList');
           if (listEl) listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">Data unavailable</div>';
@@ -7738,9 +7739,27 @@
           const ytdDisplay = fmtYtd(ytd);
           const ytdClr = ytdColor(ytd);
 
-          /* Daily return &mdash; strictly from strategies_returns_c.1d_pct (no fallback) */
+          /* Daily return — try strategies_returns_c.1d_pct first, then weighted intraday fallback */
           const stratRet = strategyReturnsMap.get(String(strategy.id));
-          const dailyReturn = stratRet?.['1d_pct'] != null ? Number(stratRet['1d_pct']) : null;
+          let dailyReturn = stratRet?.['1d_pct'] != null ? Number(stratRet['1d_pct']) : null;
+          if (dailyReturn == null && holdings.length > 0 && Object.keys(_riIntradayMap).length > 0) {
+            let _wSum = 0, _wTotal = 0;
+            holdings.forEach(h => {
+              const _sym = h.ticker || h.symbol || (typeof h === 'string' ? h : '');
+              const _sec = globalSecuritiesMap.get(_sym) || globalSecuritiesMap.get(_sym + '.JO') || globalSecuritiesMap.get((_sym || '').replace('.JO', ''));
+              const _iv = _sec?.id ? _riIntradayMap[_sec.id] : null;
+              if (!_iv) return;
+              const _cp = _iv.current_price != null ? Number(_iv.current_price) : null;
+              const _iv1d = _iv['1d_pct'] != null ? Number(_iv['1d_pct']) : null;
+              const _shares = Number(h.shares || h.quantity) || 0;
+              if (_cp != null && _iv1d != null && _shares > 0) {
+                const _w = _cp * _shares;
+                _wSum += _w * _iv1d;
+                _wTotal += _w;
+              }
+            });
+            if (_wTotal > 0) dailyReturn = _wSum / _wTotal;
+          }
           const dailyDisplay = fmtYtd(dailyReturn);
           const dailyClr = ytdColor(dailyReturn);
 
