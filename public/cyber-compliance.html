@@ -1747,8 +1747,7 @@ const pollBadge = async () => {
 // ── Auth / sidebar init ──────────────────────────────────────────────────────
 window.addEventListener('access-guard:ready', (e) => {
   const { email, role } = e.detail;
-  document.getElementById('sidebarUserEmail').textContent = email || 'Admin';
-  document.getElementById('sidebarAvatarInitials').textContent = (email || 'A')[0].toUpperCase();
+  /* sidebar.js handles user display via access-guard:ready */
   document.getElementById('sidebarUserRole').textContent = role === 'admin' ? 'Administrator' : 'Staff';
 });
 document.getElementById('signOutBtn')?.addEventListener('click', async () => {

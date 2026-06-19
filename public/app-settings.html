@@ -220,8 +220,7 @@
       if (!data.session) { window.location.href = '/signin.html'; return; }
       currentToken = data.session.access_token;
       const email = data.session.user.email || '';
-      document.getElementById('sidebarUserEmail').textContent = email || 'Admin';
-      document.getElementById('sidebarAvatarInitials').textContent = email ? email[0].toUpperCase() : 'A';
+      /* sidebar.js handles user display via access-guard:ready */
 
       const me = await api('GET', '/api/team?action=me');
       if (!me.ok || me.role !== 'admin') {

@@ -584,8 +584,7 @@
       if (!data.session) { window.location.href = '/signin.html'; return false; }
       currentToken = data.session.access_token;
       const email = data.session.user.email || '';
-      document.getElementById('sidebarUserEmail').textContent = email || 'Admin';
-      document.getElementById('sidebarAvatarInitials').textContent = email ? email[0].toUpperCase() : 'A';
+      /* sidebar.js handles user display via access-guard:ready */
       return true;
     };
 
