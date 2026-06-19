@@ -1698,6 +1698,7 @@
     const FILLED_ARCHIVE_KEY = 'filled-orderbooks-archive-v1';
     const ARCHIVE_BACKFILL_KEY = 'orderbook-archive-backfill-v2';
     const MANUALLY_CLOSED_BOOKS_KEY = 'orderbook-manually-closed-v1';
+    const CLOSED_BOOKS_MIGRATED_KEY = 'orderbook-closed-migrated-v1';
     let filledOrderbooksArchive = [];
     // The blue pin promotes a captured snapshot into the top "live" table.
     // If any snapshot is pinned, the most recent pinned book's rows are shown
@@ -3904,37 +3905,117 @@
       }
     };
 
-    /* Books are only marked "closed" when the user explicitly clicks "Move to
-       Closed Book" on a fully-filled book. We track that locally rather than
-       persisting to the DB so this works without a schema migration. */
-    const readManuallyClosedMap = () => {
+    /* Books are marked "closed" when an admin clicks "Move to Closed Book" on a
+       fully-filled book. The closed set is SHARED across all admins: it lives in
+       the DB (orderbook_email_runs.closed_at, one row per book) and is read/written
+       through service-role API actions on send-csv.js. localStorage is kept only as
+       an offline cache so the last-known closed set paints instantly before the DB
+       responds. manuallyClosedMap is the in-memory source of truth at render time. */
+    let manuallyClosedMap = {};
+
+    const hydrateManuallyClosedFromCache = () => {
       try {
         const raw = localStorage.getItem(MANUALLY_CLOSED_BOOKS_KEY);
         const parsed = raw ? JSON.parse(raw) : {};
-        return (parsed && typeof parsed === 'object') ? parsed : {};
+        manuallyClosedMap = (parsed && typeof parsed === 'object') ? parsed : {};
       } catch {
-        return {};
+        manuallyClosedMap = {};
       }
     };
 
+    const readManuallyClosedMap = () => manuallyClosedMap;
+
     const writeManuallyClosedMap = (map) => {
+      manuallyClosedMap = (map && typeof map === 'object') ? map : {};
       try {
-        localStorage.setItem(MANUALLY_CLOSED_BOOKS_KEY, JSON.stringify(map || {}));
+        localStorage.setItem(MANUALLY_CLOSED_BOOKS_KEY, JSON.stringify(manuallyClosedMap));
       } catch {
+      }
+    };
+
+    const closedMapsEqual = (a, b) => {
+      const ak = Object.keys(a || {});
+      const bk = Object.keys(b || {});
+      if (ak.length !== bk.length) return false;
+      return ak.every((k) => a[k] === b[k]);
+    };
+
+    // GET the shared closed set from the DB. Returns a { bookId: closedAtIso } map.
+    const loadClosedBooksFromDb = async () => {
+      const { data } = await supabaseClient.auth.getSession();
+      const token = data?.session?.access_token;
+      if (!token) return null;
+
+      const response = await fetch('/api/orderbook/send-csv?action=closed-books-list', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: '{}'
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.details || payload?.error || `Closed books HTTP ${response.status}`);
+      }
+      const payload = await response.json().catch(() => ({}));
+      const items = Array.isArray(payload?.items) ? payload.items : [];
+      const map = {};
+      items.forEach((it) => {
+        if (it && it.book_id) map[String(it.book_id)] = it.closed_at || new Date().toISOString();
+      });
+      return map;
+    };
+
+    // Persist a close/reopen to the DB so every admin sees it.
+    const setClosedBookInDb = async (bookId, closedAtIso, closed = true) => {
+      try {
+        const { data } = await supabaseClient.auth.getSession();
+        const token = data?.session?.access_token;
+        if (!token || !bookId) return false;
+        const response = await fetch('/api/orderbook/send-csv?action=closed-books-set', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ bookId: String(bookId), closedAt: closedAtIso, closed })
+        });
+        return response.ok;
+      } catch {
+        return false;
+      }
+    };
+
+    // Re-sync the shared closed set from the DB and re-render only if it changed
+    // (so another admin's close shows up without a hard reload, and we never
+    // re-render needlessly). Called on the orderbook's periodic/realtime refresh.
+    const refreshClosedBooksFromDb = async () => {
+      try {
+        const dbMap = await loadClosedBooksFromDb();
+        if (!dbMap || typeof dbMap !== 'object') return;
+        if (closedMapsEqual(dbMap, manuallyClosedMap)) return;
+        writeManuallyClosedMap(dbMap);
+        renderFilledOrderbooks();
+      } catch {
+        // keep last-known map on transient failure
       }
     };
 
     const markBookManuallyClosed = (bookId, closedAtIso) => {
       if (!bookId) return;
-      const map = readManuallyClosedMap();
-      map[String(bookId)] = closedAtIso || new Date().toISOString();
-      writeManuallyClosedMap(map);
+      const at = closedAtIso || new Date().toISOString();
+      // Optimistic local update + cache, then persist to the shared DB.
+      manuallyClosedMap[String(bookId)] = at;
+      writeManuallyClosedMap(manuallyClosedMap);
+      setClosedBookInDb(String(bookId), at, true).then((ok) => {
+        if (!ok) console.error('[orderbook] failed to sync closed book to DB:', bookId);
+      });
     };
 
     const getManualCloseDate = (bookId) => {
       if (!bookId) return null;
-      const map = readManuallyClosedMap();
-      return map[String(bookId)] || null;
+      return manuallyClosedMap[String(bookId)] || null;
     };
 
     const hasCompletedArchiveBackfill = () => {
@@ -8217,6 +8298,7 @@
     });
 
     filledOrderbooksArchive = readFilledArchive();
+    hydrateManuallyClosedFromCache();
     setActiveTab('active');
     updateOrderbookHeaderSequence();
     renderFilledOrderbooks();
@@ -8239,6 +8321,36 @@
         }
       } catch (error) {
         console.error('Could not load DB archive:', error?.message || error);
+      }
+
+      // Load the SHARED closed-books set so every admin sees the same Closed Books.
+      // One-time migration: before this was DB-backed, each admin's closes lived
+      // only in their own localStorage. On first load we push any locally-closed
+      // books that the DB doesn't know about up to the shared set, so nobody's
+      // previously-closed books suddenly reappear in Active. After that the DB is
+      // the single source of truth.
+      try {
+        const localBefore = { ...manuallyClosedMap };
+        const dbClosed = await loadClosedBooksFromDb();
+        if (dbClosed && typeof dbClosed === 'object') {
+          let migrated = false;
+          try { migrated = localStorage.getItem(CLOSED_BOOKS_MIGRATED_KEY) === 'done'; } catch {}
+          if (!migrated) {
+            Object.keys(localBefore).forEach((id) => {
+              if (!(id in dbClosed)) {
+                dbClosed[id] = localBefore[id];
+                setClosedBookInDb(id, localBefore[id], true);
+              }
+            });
+            try { localStorage.setItem(CLOSED_BOOKS_MIGRATED_KEY, 'done'); } catch {}
+          }
+          if (!closedMapsEqual(dbClosed, manuallyClosedMap)) {
+            writeManuallyClosedMap(dbClosed);
+            renderFilledOrderbooks();
+          }
+        }
+      } catch (error) {
+        console.error('Could not load closed books:', error?.message || error);
       }
 
       await loadOrderbook();
@@ -8268,6 +8380,9 @@
           try { await loadOrderbook(); }
           catch (e) { console.error('[orderbook] realtime refresh failed:', e?.message || e); }
           finally { rtInFlight = false; if (rtQueued) { rtQueued = false; scheduleRt(); } }
+          // Re-sync the shared closed-books set so another admin's close shows up
+          // here too (re-renders only when it actually changed).
+          refreshClosedBooksFromDb();
         };
         const scheduleRt = () => {
           if (rtTimer) clearTimeout(rtTimer);

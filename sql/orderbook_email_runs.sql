@@ -57,6 +57,19 @@ before update on public.orderbook_email_runs
 for each row
 execute function public.set_orderbook_email_runs_updated_at();
 
+-- Shared "Closed Books" state. Previously each admin tracked which fully-filled
+-- books they had moved to Closed Books in their own browser localStorage, so the
+-- Closed Books list differed per admin. These columns make the closed set shared:
+-- a book closed by one admin is closed for everyone. A book maps 1:1 to a row
+-- here (book id = `<run_date>-<sequence_number>`), so no separate table is needed.
+alter table public.orderbook_email_runs
+  add column if not exists closed_at timestamp with time zone null,
+  add column if not exists closed_by uuid null;
+
+create index if not exists idx_orderbook_email_runs_closed_at
+  on public.orderbook_email_runs (closed_at)
+  where closed_at is not null;
+
 alter table public.orderbook_email_runs enable row level security;
 
 drop policy if exists orderbook_email_runs_service_role_access on public.orderbook_email_runs;

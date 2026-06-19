@@ -387,6 +387,55 @@ module.exports = async (req, res) => {
       return sendJson(res, 200, { statuses });
     }
 
+    // List every book that has been moved to "Closed Books" (shared across all
+    // admins). Read with the service-role key so each admin sees the same closed
+    // set regardless of who clicked "Move to Closed Book". A book maps 1:1 to an
+    // orderbook_email_runs row; book id = `<run_date>-<sequence_number>`.
+    if (action === 'closed-books-list') {
+      const rows = await fetchSupabaseJson(
+        '/rest/v1/orderbook_email_runs?select=run_date,sequence_number,closed_at&closed_at=not.is.null&order=closed_at.desc'
+      );
+      const items = (Array.isArray(rows) ? rows : [])
+        .filter((r) => r && r.run_date != null && r.closed_at)
+        .map((r) => ({
+          book_id: `${r.run_date}-${Number(r.sequence_number) || 1}`,
+          closed_at: r.closed_at
+        }));
+      return sendJson(res, 200, { items });
+    }
+
+    // Mark / unmark a book as closed for everyone. closed=true stamps closed_at,
+    // closed=false clears it (reopen). Writes go through the service-role key so
+    // any admin's action is visible to all (the table is RLS write-protected).
+    if (action === 'closed-books-set') {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const bookId = String(body.bookId || '').trim();
+      if (!bookId) return sendJson(res, 400, { error: 'bookId required' });
+
+      // book id = `<run_date>-<sequence_number>`; run_date itself contains dashes
+      // (YYYY-MM-DD) so split on the trailing integer sequence.
+      const match = bookId.match(/^(.*)-(\d+)$/);
+      if (!match) return sendJson(res, 400, { error: 'Invalid bookId' });
+      const runDate = match[1];
+      const sequence = Number(match[2]) || 1;
+      const scope = `run_date=eq.${encodeURIComponent(runDate)}&sequence_number=eq.${encodeURIComponent(sequence)}`;
+
+      const closed = body.closed !== false; // default true
+      let closedAt = null;
+      if (closed) {
+        const t = String(body.closedAt || '').trim();
+        const d = t ? new Date(t) : new Date();
+        closedAt = Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+      }
+
+      const updated = await requestSupabaseJson(
+        `/rest/v1/orderbook_email_runs?${scope}&select=run_date,sequence_number`,
+        { method: 'PATCH', body: { closed_at: closedAt }, extraHeaders: { Prefer: 'return=representation' } }
+      );
+      const affected = Array.isArray(updated) ? updated.length : 0;
+      return sendJson(res, 200, { ok: true, closed, bookId, closedAt, affected });
+    }
+
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     await sendOrderbookCsvEmail({
       subject: body.subject,
