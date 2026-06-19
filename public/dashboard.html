@@ -6903,7 +6903,10 @@
           background:rgba(15,23,42,0.45);backdrop-filter:blur(3px);
           display:flex;align-items:center;justify-content:center;padding:20px;`;
 
-        /* Build sector options */
+        /* Build sector options — ensure the strategy's existing sector is always in the list */
+        if (strategy.sector && !knownSectors.includes(strategy.sector)) {
+          knownSectors = [...knownSectors, strategy.sector].sort();
+        }
         const sectorOpts = knownSectors.map(
           (s) => `<option value="${s}" ${strategy.sector === s ? "selected" : ""}>${s}</option>`
         ).join("");
