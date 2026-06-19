@@ -1660,22 +1660,44 @@
           supabaseClient.from('profiles').select('id').eq('is_test', true),
           supabaseClient.from('wallets').select('user_id').eq('status', 'test'),
         ]);
-        if (profilesRes.error) throw profilesRes.error;
-        const profileIds = (profilesRes.data || []).map((r) => r.id);
+        const profileIds = (profilesRes.data || []).map((r) => r.id).filter(Boolean);
         const walletUserIds = (walletsRes.data || []).map((r) => r.user_id).filter(Boolean);
+        // If BOTH reads failed, do NOT cache an empty set. Caching empty would
+        // silently leak every test order into the live book (and let capture bake
+        // test orders into archived books). Return empty for this call, but leave
+        // the cache null so the next call retries.
+        if (profilesRes.error && walletsRes.error) {
+          console.error('[UAT] could not load test accounts:', profilesRes.error?.message || walletsRes.error?.message);
+          return new Set();
+        }
         _testUserIdSet = new Set([...profileIds, ...walletUserIds]);
       } catch (err) {
         console.error('[UAT] could not load test accounts:', err?.message || err);
-        _testUserIdSet = new Set();
+        return new Set(); // transient — do NOT cache, so the next call retries
       }
       return _testUserIdSet;
     };
-    // True if a captured/archived order book belongs to test accounts (any of its
-    // rows is owned by a test user). Keeps UAT and live books — and their numbering
+    // Every user id that owns any part of an aggregated/archived book row. The row
+    // is aggregated by security, so owners live in the nested strategyUsers /
+    // strategyHoldings / bndRows — the top-level userId is usually null (which is
+    // why archived test books used to leak into the live book).
+    const rowOwnerIds = (r) => {
+      const ids = [];
+      if (r && r.userId) ids.push(r.userId);
+      (Array.isArray(r?.strategyUsers) ? r.strategyUsers : []).forEach((u) => { const id = u?.userId || u?.user_id || u?.id; if (id) ids.push(id); });
+      (Array.isArray(r?.strategyHoldings) ? r.strategyHoldings : []).forEach((h) => { const id = h?.userId || h?.user_id; if (id) ids.push(id); });
+      (Array.isArray(r?.bndRows) ? r.bndRows : []).forEach((b) => { const id = b?.userId || b?.user_id; if (id) ids.push(id); });
+      return ids;
+    };
+    // A book is a TEST book only if EVERY owner across all its rows is a test
+    // account. "every" (not "some") so a book that contains even one real client
+    // still shows in the live book. Keeps UAT and live books — and their numbering
     // — completely separate.
     const bookIsTestBook = (book) => {
       const ids = _testUserIdSet || new Set();
-      return (Array.isArray(book?.rows) ? book.rows : []).some((r) => ids.has(r.userId));
+      if (!ids.size) return false;
+      const owners = (Array.isArray(book?.rows) ? book.rows : []).flatMap(rowOwnerIds);
+      return owners.length > 0 && owners.every((id) => ids.has(id));
     };
     // Pinned fresh orders (sourceId = stock_holdings_c.id) — float to the top of
     // the live list. Loaded from orderbook_pins via the send-csv api.
@@ -6396,7 +6418,10 @@
         renderStrateBirPreview();
         // In UAT mode the live set is filtered to test accounts, so DON'T capture
         // or reconcile snapshots — that would alter the real archived books.
-        if (!orderbookUatMode) {
+        // Also require the test-account set to have RESOLVED (_testUserIdSet !== null):
+        // if it couldn't load, the live set is unfiltered, and capturing/reconciling
+        // would bake test orders into a real archived book (and into broker CSVs).
+        if (!orderbookUatMode && _testUserIdSet !== null) {
           maybeCaptureFilledOrderbook();
 
           // Run reconciliation tasks after initial render (non-blocking)
