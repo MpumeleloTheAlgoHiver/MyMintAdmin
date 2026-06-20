@@ -163,6 +163,14 @@ module.exports = async (req, res) => {
       return sendJson(res, 400, { error: 'No payload provided' });
     }
 
+    // Stamp WHO authorized this fill (and when), server-side from the verified
+    // token — so it can never be spoofed by the client. Applies to both the
+    // broker-fills upload and the manual pencil (both POST here).
+    if (Object.prototype.hasOwnProperty.call(payload, 'avg_fill')) {
+      payload.fill_set_by = email;
+      payload.fill_set_at = new Date().toISOString();
+    }
+
     const updatedRows = await requestSupabaseJson(
       `/rest/v1/stock_holdings_c?id=in.(${buildInFilter(ids)})&select=id`,
       {

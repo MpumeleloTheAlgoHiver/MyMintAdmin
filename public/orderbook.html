@@ -1198,6 +1198,8 @@
     }
     .upload-fills-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .upload-fills-btn svg { width: 15px; height: 15px; }
+    /* "by {admin}" byline under an avg fill — who authorized it */
+    .ob-fill-by { font-size: 9.5px; color: #94a3b8; font-weight: 500; margin-top: 1px; white-space: nowrap; }
     /* Broker-fills preview modal table */
     .broker-fills-preview-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
     .broker-fills-preview-table th, .broker-fills-preview-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
@@ -1928,6 +1930,39 @@
       </span>
     `;
 
+    /* Who authorized this holding's avg_fill — resolved from the live raw rows
+       by sourceId, so it works for both aggregated (across investors) and
+       per-investor holdings without threading the field through aggregation.
+       One setter → that admin; several → "multiple". */
+    const fillAuthorizerFor = (holding) => {
+      const ids = new Set(
+        ((holding?.sourceIds && holding.sourceIds.length)
+          ? holding.sourceIds
+          : (holding?.sourceId ? [holding.sourceId] : [])
+        ).map(String).filter(Boolean)
+      );
+      if (!ids.size) return null;
+      const setters = new Set();
+      let latest = null;
+      (allOrderbookRawRows || []).forEach((r) => {
+        if (!ids.has(String(r.sourceId))) return;
+        if (r.fillSetBy) setters.add(r.fillSetBy);
+        if (r.fillSetAt && (!latest || r.fillSetAt > latest)) latest = r.fillSetAt;
+      });
+      if (!setters.size) return null;
+      const arr = [...setters];
+      return { by: arr.length === 1 ? arr[0] : 'multiple', at: latest, multiple: arr.length > 1 };
+    };
+
+    const renderFillByline = (holding) => {
+      const a = fillAuthorizerFor(holding);
+      if (!a) return '';
+      const label = a.multiple ? 'multiple' : String(a.by).split('@')[0];
+      const when = a.at ? new Date(a.at).toLocaleString() : '';
+      const title = a.multiple ? 'Avg fill set by multiple admins' : `Avg fill set by ${a.by}${when ? ' on ' + when : ''}`;
+      return `<div class="ob-fill-by" title="${escapeHtml(title)}">by ${escapeHtml(label)}</div>`;
+    };
+
     const renderBndDetailsTable = (row) => {
       const bndRows = buildBndRowsForOrder(row);
       if (!bndRows.length) {
@@ -2393,7 +2428,7 @@
             <td class="orderbook-cell-muted">${escapeHtml(h.ticker || '-')}</td>
             <td>${escapeHtml(h.side || '-')}</td>
             <td class="r">${escapeHtml(String(h.totalQuantity ?? '-'))}</td>
-            <td class="r">${escapeHtml(asRandValue(h.avgFill))}</td>
+            <td class="r">${escapeHtml(asRandValue(h.avgFill))}${renderFillByline(h)}</td>
             <td class="r">${escapeHtml(asRandValue(h.marketValue))}</td>
             <td class="r ${pnlCls}">${pnl >= 0 ? '+' : ''}${escapeHtml(formatMoney(pnl))}</td>
           </tr>`;
@@ -2554,7 +2589,7 @@
           <td class="orderbook-cell-muted">${escapeHtml(h.ticker || '-')}</td>
           <td><span class="side-badge ${hSideClass}">${escapeHtml(hSide)}</span></td>
           <td>${escapeHtml(String(h.totalQuantity ?? '-'))}</td>
-          <td>${editable ? renderEditableAvgFill(h) : escapeHtml(asRandValue(h.avgFill))}</td>
+          <td>${escapeHtml(asRandValue(h.avgFill))}${renderFillByline(h)}</td>
           <td>${escapeHtml(asRandValue(h.actualFill))}</td>
           <td>${escapeHtml(asRandValue(h.marketValue))}</td>
           ${renderInitialPnlCell(h.unrealizedPnlNumber, h.unrealizedPnl)}${renderMintPnlCell(h)}
@@ -5532,6 +5567,10 @@
         let priceActionHtml = '';
         if (isPending) {
           priceActionHtml = escapeHtml(asRandValue(row.avgFill));
+        } else if (row.isStrategy) {
+          // Strategies are filled via the broker-fills Excel upload (per investor),
+          // not the pencil — show the value only, no edit affordance.
+          priceActionHtml = escapeHtml(asRandValue(row.avgFill));
         } else {
           priceActionHtml = renderEditableAvgFill(row);
         }
@@ -5713,7 +5752,7 @@
       const [holdingsResult, rebEventsResult, rebBatchesResult] = await Promise.all([
         supabaseClient
           .from('stock_holdings_c')
-          .select('id, user_id, family_member_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, as_of_date, created_at, updated_at, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", avg_exit, strategy_id, trade_side, is_active, closed_reason, closed_at, rebalance_batch_id, strategy_name_snapshot, transaction_id, expected_fill:"Expected_fill"')
+          .select('id, user_id, family_member_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, as_of_date, created_at, updated_at, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", avg_exit, strategy_id, trade_side, is_active, closed_reason, closed_at, rebalance_batch_id, strategy_name_snapshot, transaction_id, expected_fill:"Expected_fill", fill_set_by, fill_set_at')
           .order('updated_at', { ascending: false }),
         supabaseClient
           .from('rebalance_event')
@@ -6090,6 +6129,8 @@
           rebalanceBatchStatus: null,
           notificationStatus: orderEmailsMap[row.rebalance_batch_id] || orderEmailsMap[row.id] || 'pending',
           createdAt: row.created_at || null,
+          fillSetBy: row.fill_set_by || null,
+          fillSetAt: row.fill_set_at || null,
         };
       });
 
