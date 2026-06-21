@@ -19,6 +19,7 @@
     '/investors.html':  'investors',
     '/eft.html':        'eft',
     '/orderbook.html':  'orderbook',
+    '/gifting.html':    'gifting',
     '/settings.html':    'settings',
     '/cyber-compliance.html': 'cyber-compliance',
     '/team.html':             '__admin_only__'

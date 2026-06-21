@@ -16,8 +16,14 @@
     '.sidebar-brand-name{font-size:14px;font-weight:700;color:#0f172a;letter-spacing:-0.01em;line-height:1.2;}',
     '.sidebar-brand-sub{font-size:10px;color:#94a3b8;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;}',
     '.sidebar-nav{flex:1;display:flex;flex-direction:column;gap:2px;width:100%;padding:16px 12px;overflow-y:auto;}',
-    '.sidebar-section-label{font-size:10px;font-weight:600;color:#94a3b8;letter-spacing:0.08em;text-transform:uppercase;padding:8px 8px 4px;margin-top:8px;}',
+    '.sidebar-section-label{font-size:10px;font-weight:600;color:#94a3b8;letter-spacing:0.08em;text-transform:uppercase;padding:8px 8px 4px;margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer;user-select:none;background:none;border:none;width:100%;text-align:left;font-family:inherit;}',
     '.sidebar-section-label:first-child{margin-top:0;}',
+    '.sidebar-section-label:hover{color:#7c3aed;}',
+    '.sidebar-section-label .sec-chevron{width:11px;height:11px;flex-shrink:0;transition:transform 0.2s ease;opacity:.7;}',
+    '.sidebar-section-label.collapsed .sec-chevron{transform:rotate(-90deg);}',
+    '.sidebar-section{display:grid;grid-template-rows:1fr;transition:grid-template-rows 0.2s ease;}',
+    '.sidebar-section.collapsed{grid-template-rows:0fr;}',
+    '.sidebar-section>div{overflow:hidden;min-height:0;display:flex;flex-direction:column;gap:2px;}',
     '.nav-icon{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;cursor:pointer;transition:all 0.15s ease;text-decoration:none;color:#64748b;font-size:13px;font-weight:500;white-space:nowrap;}',
     '.nav-icon svg{width:18px;height:18px;fill:#94a3b8;transition:fill 0.15s ease;flex-shrink:0;}',
     '.nav-icon:hover{background:#f5f3ff;color:#5b21b6;}',
@@ -41,6 +47,9 @@
     '#viewSwitcherDropdown.vs-open{grid-template-rows:1fr;}',
     '#viewSwitcherDropdown>div{overflow:hidden;}',
   ].join('');
+
+  /* Chevron shown on each collapsible section label. */
+  var SEC_CHEV = '<svg class="sec-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>';
 
   /* ── HTML ────────────────────────────────────────────────────────────── */
   var HTML = ''
@@ -82,22 +91,31 @@
     +     '</div>'
     +   '</div></div></div>'
     + '</div>'
-    /* Nav */
+    /* Nav — each section label is a toggle that collapses its items */
     + '<nav class="sidebar-nav">'
-    +   '<span class="sidebar-section-label">Main</span>'
-    +   '<a class="nav-icon" href="/index.html"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>Clients</a>'
-    +   '<a class="nav-icon" href="/studio.html"><svg viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>Client View Studio</a>'
-    +   '<span class="sidebar-section-label">Investments</span>'
-    +   '<a class="nav-icon" href="/dashboard.html"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>Dashboard</a>'
-    +   '<a class="nav-icon" href="/factsheets.html"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>Factsheets</a>'
-    +   '<a class="nav-icon" href="/investors.html"><svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>Investors</a>'
-    +   '<a class="nav-icon" href="/orderbook.html"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>Order Book<span class="nav-notification-dot" data-orderbook-notification-dot aria-hidden="true"></span></a>'
-    +   '<span class="sidebar-section-label">Banking</span>'
-    +   '<a class="nav-icon" href="/eft.html"><svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>EFT Payments<span class="nav-pending-count" aria-hidden="true"></span></a>'
-    +   '<span class="sidebar-section-label">System</span>'
-    +   '<a class="nav-icon" href="/settings.html"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>Settings</a>'
-    +   '<a class="nav-icon" id="teamNavLink" href="/team.html" style="display:none"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>Team</a>'
-    +   '<a class="nav-icon" href="/cyber-compliance.html" id="ccNavLink" style="position:relative;"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 4l5 2.18V11c0 3.5-2.33 6.79-5 7.93-2.67-1.14-5-4.43-5-7.93V7.18L12 5z"/></svg>Cyber Compliance<span id="ccBadge" style="display:none;position:absolute;top:5px;right:6px;width:8px;height:8px;background:#ff3b30;border-radius:50%;border:2px solid #fff;"></span></a>'
+    +   '<button type="button" class="sidebar-section-label" data-section="main" onclick="mintSidebarToggleSection(\'main\')">Main' + SEC_CHEV + '</button>'
+    +   '<div class="sidebar-section" data-section="main"><div>'
+    +     '<a class="nav-icon" href="/index.html"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>Clients</a>'
+    +     '<a class="nav-icon" href="/studio.html"><svg viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>Client View Studio</a>'
+    +   '</div></div>'
+    +   '<button type="button" class="sidebar-section-label" data-section="investments" onclick="mintSidebarToggleSection(\'investments\')">Investments' + SEC_CHEV + '</button>'
+    +   '<div class="sidebar-section" data-section="investments"><div>'
+    +     '<a class="nav-icon" href="/dashboard.html"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>Dashboard</a>'
+    +     '<a class="nav-icon" href="/factsheets.html"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>Factsheets</a>'
+    +     '<a class="nav-icon" href="/investors.html"><svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>Investors</a>'
+    +     '<a class="nav-icon" href="/orderbook.html"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>Order Book<span class="nav-notification-dot" data-orderbook-notification-dot aria-hidden="true"></span></a>'
+    +     '<a class="nav-icon" href="/gifting.html"><svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.11-.31.18-.65.18-1a2.996 2.996 0 0 0-5.5-1.65l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7 10.83 8.62 12 11 8.76l1-1.36 1 1.36L15.38 12 17 10.83 14.92 8H20v6z"/></svg>Gifting</a>'
+    +   '</div></div>'
+    +   '<button type="button" class="sidebar-section-label" data-section="banking" onclick="mintSidebarToggleSection(\'banking\')">Banking' + SEC_CHEV + '</button>'
+    +   '<div class="sidebar-section" data-section="banking"><div>'
+    +     '<a class="nav-icon" href="/eft.html"><svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>EFT Payments<span class="nav-pending-count" aria-hidden="true"></span></a>'
+    +   '</div></div>'
+    +   '<button type="button" class="sidebar-section-label" data-section="system" onclick="mintSidebarToggleSection(\'system\')">System' + SEC_CHEV + '</button>'
+    +   '<div class="sidebar-section" data-section="system"><div>'
+    +     '<a class="nav-icon" href="/settings.html"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.62l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.62l2.03 1.58c-.05.32-.07.64-.07.94s.02.62.07.94l-2.03 1.58c-.18.14-.23.41-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.62l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>Settings</a>'
+    +     '<a class="nav-icon" id="teamNavLink" href="/team.html" style="display:none"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>Team</a>'
+    +     '<a class="nav-icon" href="/cyber-compliance.html" id="ccNavLink" style="position:relative;"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 4l5 2.18V11c0 3.5-2.33 6.79-5 7.93-2.67-1.14-5-4.43-5-7.93V7.18L12 5z"/></svg>Cyber Compliance<span id="ccBadge" style="display:none;position:absolute;top:5px;right:6px;width:8px;height:8px;background:#ff3b30;border-radius:50%;border:2px solid #fff;"></span></a>'
+    +   '</div></div>'
     + '</nav>'
     /* Footer */
     + '<div class="sidebar-footer">'
@@ -180,6 +198,46 @@
     }
   };
 
+  /* ── Collapsible sections ────────────────────────────────────────────── */
+  var SECTIONS_KEY = 'mint-sidebar-sections';
+
+  function readSectionState() {
+    try { return JSON.parse(localStorage.getItem(SECTIONS_KEY) || '{}') || {}; }
+    catch (_) { return {}; }
+  }
+
+  window.mintSidebarToggleSection = function (key) {
+    var sec = document.querySelector('.sidebar-section[data-section="' + key + '"]');
+    var lbl = document.querySelector('.sidebar-section-label[data-section="' + key + '"]');
+    if (!sec || !lbl) return;
+    var collapsed = !sec.classList.contains('collapsed');
+    sec.classList.toggle('collapsed', collapsed);
+    lbl.classList.toggle('collapsed', collapsed);
+    var st = readSectionState();
+    st[key] = collapsed;
+    try { localStorage.setItem(SECTIONS_KEY, JSON.stringify(st)); } catch (_) {}
+  };
+
+  /* Apply saved collapse state. Default: collapsed, EXCEPT the section holding
+     the current page (so you always see where you are). User toggles persist
+     and override the default. Run synchronously before paint to avoid a flash. */
+  function applySectionState() {
+    var saved = readSectionState();
+    var activeKey = null;
+    var activeIcon = document.querySelector('aside.sidebar .nav-icon.active');
+    if (activeIcon) {
+      var wrap = activeIcon.closest('.sidebar-section');
+      if (wrap) activeKey = wrap.getAttribute('data-section');
+    }
+    document.querySelectorAll('aside.sidebar .sidebar-section').forEach(function (sec) {
+      var key = sec.getAttribute('data-section');
+      var lbl = document.querySelector('.sidebar-section-label[data-section="' + key + '"]');
+      var collapsed = (key in saved) ? !!saved[key] : (key !== activeKey);
+      sec.classList.toggle('collapsed', collapsed);
+      if (lbl) lbl.classList.toggle('collapsed', collapsed);
+    });
+  }
+
   /* ── Helpers ─────────────────────────────────────────────────────────── */
   function injectCSS() {
     if (document.getElementById('mint-sidebar-css')) return;
@@ -240,7 +298,11 @@
   injectCSS();
   (function injectNow() {
     var aside = document.querySelector('aside.sidebar');
-    if (aside) aside.innerHTML = HTML;
+    if (aside) {
+      aside.innerHTML = HTML;
+      markActive();          // know the current page before deciding which section opens
+      applySectionState();   // apply collapse state synchronously → no flash
+    }
   })();
 
   /* Wire up behaviour once the whole DOM is ready */

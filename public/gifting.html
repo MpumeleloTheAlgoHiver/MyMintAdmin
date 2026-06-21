@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gifting · Mint admin</title>
+  <style>
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; background:#f5f6fa; color:#0f172a; }
+    .main-content { margin-left:220px; min-height:100vh; padding:28px 32px; box-sizing:border-box; }
+    .page-head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap; }
+    .page-title { font-size:22px; font-weight:800; letter-spacing:-0.02em; margin:0; }
+    .page-sub { font-size:13px; color:#64748b; margin:4px 0 0; }
+    .stats { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
+    .stat-card { background:#fff; border:1px solid #ede9fe; border-radius:14px; padding:14px 18px; min-width:130px; }
+    .stat-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#94a3b8; }
+    .stat-value { font-size:20px; font-weight:800; margin-top:4px; }
+    .card { background:#fff; border:1px solid #ede9fe; border-radius:16px; overflow:hidden; box-shadow:0 8px 32px rgba(15,23,42,.05); }
+    .card-head { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #f1f5f9; gap:12px; flex-wrap:wrap; }
+    .card-title { font-size:14px; font-weight:700; }
+    .search { border:1px solid #e2e8f0; border-radius:10px; padding:8px 12px; font-size:13px; min-width:240px; outline:none; }
+    .search:focus { border-color:#a855f7; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th { text-align:left; padding:10px 16px; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.03em; background:#f8fafc; white-space:nowrap; position:sticky; top:0; }
+    td { padding:11px 16px; border-bottom:1px solid #f1f5f9; vertical-align:middle; white-space:nowrap; }
+    tr:hover td { background:#faf7ff; }
+    .r { text-align:right; }
+    .muted { color:#94a3b8; }
+    .amount { font-weight:700; }
+    .badge { font-size:10px; font-weight:700; padding:3px 9px; border-radius:6px; letter-spacing:.02em; display:inline-block; }
+    .b-pending { background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; }
+    .b-claimed { background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; }
+    .b-expired { background:#fffbeb; color:#b45309; border:1px solid #fde68a; }
+    .b-refunded { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
+    .b-cancelled { background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; }
+    .empty-state { padding:48px 0; text-align:center; color:#94a3b8; }
+    .tag { font-size:10px; font-weight:700; color:#7c3aed; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:5px; padding:1px 6px; margin-left:6px; }
+  </style>
+  <script src="/js/cc-badge.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar"></aside>
+<script src="/js/sidebar.js"></script>
+
+  <main class="main-content">
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Gifting</h1>
+        <p class="page-sub">Every investment gift sent through the app — who sent it, to whom, and where it stands.</p>
+      </div>
+      <input id="giftSearch" class="search" type="search" placeholder="Search sender, recipient, asset…" />
+    </div>
+
+    <div class="stats" id="giftStats"></div>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">All gifts <span class="muted" id="giftCount"></span></div>
+      </div>
+      <div style="max-height:64vh;overflow:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Sent</th>
+              <th>Sender</th>
+              <th>Recipient</th>
+              <th>Gift</th>
+              <th class="r">Amount</th>
+              <th>Status</th>
+              <th>Last update</th>
+            </tr>
+          </thead>
+          <tbody id="giftRows">
+            <tr><td colspan="7" class="empty-state">Loading gifts…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <div id="mintAppOverlay" style="display:none;position:fixed;inset:0;z-index:99998;background:#0f172a;">
+    <div style="position:absolute;top:0;left:0;right:0;height:44px;background:#0f172a;display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:1;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <img src="/icon.png" style="width:22px;height:22px;border-radius:6px;" />
+        <span style="color:white;font-size:13px;font-weight:600;">Mint App</span>
+      </div>
+      <button onclick="mintAppClose()" style="background:#1e293b;color:#94a3b8;border:none;border-radius:8px;padding:5px 14px;cursor:pointer;font-size:12px;font-weight:500;">&#8592; Back to Admin</button>
+    </div>
+    <iframe id="mintAppFrame" src="" style="position:absolute;top:44px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 44px);border:none;background:white;" allowfullscreen></iframe>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    const rand = (cents) => 'R ' + (Number(cents || 0) / 100).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const dt = (iso) => {
+      if (!iso) return '<span class="muted">—</span>';
+      try { return new Date(iso).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', dateStyle: 'medium', timeStyle: 'short' }); }
+      catch { return esc(iso); }
+    };
+
+    // Derive a display status from the row's flags (refunded/cancelled override).
+    const statusOf = (g) => {
+      if (g.cancelled_at || g.status === 'cancelled') return { key: 'cancelled', label: 'Cancelled', cls: 'b-cancelled', at: g.cancelled_at };
+      if (g.status === 'claimed' || g.claimed_at)     return { key: 'claimed',   label: 'Claimed',   cls: 'b-claimed',   at: g.claimed_at };
+      if (g.refunded_at)                              return { key: 'refunded',  label: 'Refunded',  cls: 'b-refunded',  at: g.refunded_at };
+      const expired = g.status === 'expired' || (g.expires_at && new Date(g.expires_at).getTime() < Date.now());
+      if (expired)                                    return { key: 'expired',   label: 'Expired',   cls: 'b-expired',   at: g.expires_at };
+      return { key: 'pending', label: 'Pending', cls: 'b-pending', at: g.expires_at };
+    };
+
+    let allGifts = [];
+
+    const nameFor = (profile, fallback) => {
+      if (profile) {
+        const n = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+        if (n) return n;
+        if (profile.email) return profile.email;
+      }
+      return fallback || '<span class="muted">—</span>';
+    };
+
+    const renderStats = (gifts) => {
+      const total = gifts.length;
+      let claimed = 0, pending = 0, expired = 0, value = 0;
+      gifts.forEach((g) => {
+        value += Number(g.amount || 0);
+        const s = statusOf(g).key;
+        if (s === 'claimed') claimed++;
+        else if (s === 'pending') pending++;
+        else if (s === 'expired' || s === 'refunded') expired++;
+      });
+      const cards = [
+        ['Total gifts', total],
+        ['Total value', rand(value)],
+        ['Claimed', claimed],
+        ['Pending', pending],
+        ['Expired / refunded', expired],
+      ];
+      document.getElementById('giftStats').innerHTML = cards.map(([l, v]) =>
+        `<div class="stat-card"><div class="stat-label">${esc(l)}</div><div class="stat-value">${esc(v)}</div></div>`).join('');
+    };
+
+    const renderRows = (gifts) => {
+      const tbody = document.getElementById('giftRows');
+      document.getElementById('giftCount').textContent = gifts.length ? `(${gifts.length})` : '';
+      if (!gifts.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No gifts found.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = gifts.map((g) => {
+        const s = statusOf(g);
+        const assetTag = g.asset_type ? `<span class="tag">${esc(String(g.asset_type).toUpperCase())}</span>` : '';
+        return `<tr>
+          <td>${dt(g.created_at)}</td>
+          <td>${g._senderName}</td>
+          <td>${g._recipientName}</td>
+          <td>${esc(g.asset_name || '—')}${assetTag}</td>
+          <td class="r amount">${rand(g.amount)}</td>
+          <td><span class="badge ${s.cls}">${esc(s.label)}</span></td>
+          <td>${dt(s.at)}</td>
+        </tr>`;
+      }).join('');
+    };
+
+    const applyFilter = () => {
+      const q = (document.getElementById('giftSearch').value || '').trim().toLowerCase();
+      if (!q) { renderRows(allGifts); return; }
+      const filtered = allGifts.filter((g) =>
+        [g._senderText, g._recipientText, g.asset_name, statusOf(g).label]
+          .some((v) => String(v || '').toLowerCase().includes(q)));
+      renderRows(filtered);
+    };
+
+    const load = async () => {
+      try {
+        const { data: gifts, error } = await supabaseClient
+          .from('gift_claims')
+          .select('id, sender_user_id, recipient_user_id, recipient_identifier, amount, asset_type, asset_name, status, expires_at, reserved_at, refunded_at, created_at, claimed_at, cancelled_at')
+          .order('created_at', { ascending: false })
+          .limit(2000);
+        if (error) throw error;
+
+        // Resolve sender + recipient names from profiles in one lookup.
+        const ids = [...new Set((gifts || []).flatMap((g) => [g.sender_user_id, g.recipient_user_id]).filter(Boolean))];
+        const profMap = {};
+        if (ids.length) {
+          const { data: profs } = await supabaseClient
+            .from('profiles').select('id, first_name, last_name, email').in('id', ids);
+          (profs || []).forEach((p) => { profMap[String(p.id)] = p; });
+        }
+
+        allGifts = (gifts || []).map((g) => {
+          const sender = profMap[String(g.sender_user_id)];
+          const recipient = profMap[String(g.recipient_user_id)];
+          const senderName = nameFor(sender, '<span class="muted">Unknown</span>');
+          const recipientName = recipient
+            ? nameFor(recipient, '')
+            : (g.recipient_identifier ? esc(g.recipient_identifier) : '<span class="muted">Unclaimed</span>');
+          return {
+            ...g,
+            _senderName: senderName,
+            _recipientName: recipientName,
+            _senderText: sender ? [sender.first_name, sender.last_name, sender.email].filter(Boolean).join(' ') : '',
+            _recipientText: recipient ? [recipient.first_name, recipient.last_name, recipient.email].filter(Boolean).join(' ') : (g.recipient_identifier || ''),
+          };
+        });
+
+        renderStats(allGifts);
+        renderRows(allGifts);
+      } catch (err) {
+        console.error('Gifting load error:', err);
+        document.getElementById('giftRows').innerHTML =
+          '<tr><td colspan="7" class="empty-state">Could not load gifts: ' + esc(err.message || 'unknown error') + '</td></tr>';
+      }
+    };
+
+    document.getElementById('giftSearch').addEventListener('input', applyFilter);
+
+    (async () => {
+      const { data } = await supabaseClient.auth.getSession();
+      if (!data.session) { window.location.href = '/signin.html'; return; }
+      load();
+    })();
+  </script>
+
+  <script>
+  (function(){
+    var link=document.getElementById("teamNavLink");
+    if(!link)return;
+    var key=Object.keys(localStorage).find(function(k){return k.startsWith("sb-")&&k.endsWith("-auth-token");});
+    if(!key)return;
+    try{
+      var token=JSON.parse(localStorage.getItem(key))&&JSON.parse(localStorage.getItem(key)).access_token;
+      if(!token)return;
+      fetch("/api/team?action=me",{headers:{Authorization:"Bearer "+token}})
+        .then(function(r){return r.json();})
+        .then(function(d){if(d.role==="admin")link.style.display="";})
+        .catch(function(){});
+    }catch(e){}
+  })();
+  </script>
+  <script>window.PAGE_ACCESS_KEY = "gifting";</script>
+  <script src="/js/access-guard.js"></script>
+</body>
+</html>
