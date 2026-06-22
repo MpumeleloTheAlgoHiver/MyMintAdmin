@@ -20,6 +20,7 @@
     '/eft.html':        'eft',
     '/orderbook.html':  'orderbook',
     '/gifting.html':    'gifting',
+    '/finances.html':   'finances',
     '/settings.html':    'settings',
     '/cyber-compliance.html': 'cyber-compliance',
     '/team.html':             '__admin_only__'

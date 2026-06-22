@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finances · Mint admin</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; background:#f6f5fb; color:#0f172a; }
+    .main-content { margin-left:220px; min-height:100vh; padding:32px 36px 48px; }
+
+    /* Hero */
+    .fin-hero { position:relative; overflow:hidden; border-radius:22px; padding:26px 30px; background:linear-gradient(135deg,#3b0764 0%,#6d28d9 48%,#9333ea 100%); color:#fff; margin-bottom:24px; box-shadow:0 18px 40px rgba(109,40,217,.28); display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+    .fin-hero::after { content:""; position:absolute; right:-40px; top:-50px; width:240px; height:240px; background:radial-gradient(circle,rgba(255,255,255,.16),transparent 70%); pointer-events:none; }
+    .fin-hero h1 { margin:0; font-size:26px; font-weight:800; letter-spacing:-.02em; display:flex; align-items:center; gap:10px; }
+    .fin-hero p { margin:8px 0 0; font-size:13.5px; color:#e9d5ff; max-width:560px; line-height:1.5; }
+    .live-pill { display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:#fff; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.25); border-radius:999px; padding:6px 13px; position:relative; z-index:2; }
+    .live-dot { width:7px; height:7px; border-radius:50%; background:#34d399; box-shadow:0 0 0 3px rgba(52,211,153,.3); animation:pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.35;} }
+
+    /* Stat cards */
+    .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:-44px 4px 22px; position:relative; z-index:2; }
+    .stat-card { background:#fff; border:1px solid #efe9fb; border-radius:16px; padding:18px; box-shadow:0 8px 24px rgba(15,23,42,.05); position:relative; overflow:hidden; transition:transform .15s ease, box-shadow .15s ease; }
+    .stat-card:hover { transform:translateY(-2px); box-shadow:0 14px 30px rgba(15,23,42,.09); }
+    .stat-card::after { content:""; position:absolute; top:0; left:0; right:0; height:3px; }
+    .stat-card.c-purple::after { background:#7c3aed; } .stat-card.c-green::after { background:#059669; }
+    .stat-card.c-violet::after { background:#8b5cf6; } .stat-card.c-amber::after { background:#d97706; }
+    .stat-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:17px; margin-bottom:13px; }
+    .stat-label { font-size:10.5px; color:#94a3b8; text-transform:uppercase; letter-spacing:.06em; font-weight:700; margin-bottom:6px; }
+    .stat-value { font-size:25px; font-weight:800; letter-spacing:-.02em; line-height:1; }
+    .stat-value .cur { font-size:15px; font-weight:600; color:#94a3b8; }
+    .stat-sub { font-size:11px; color:#94a3b8; margin-top:8px; }
+
+    /* Cards */
+    .card { background:#fff; border:1px solid #efe9fb; border-radius:18px; padding:20px 22px; box-shadow:0 10px 30px rgba(15,23,42,.05); margin-bottom:16px; }
+    .card:last-child { margin-bottom:0; }
+    .card-head { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px; gap:10px; }
+    .card-title { font-size:14.5px; font-weight:700; }
+    .card-sub { font-size:11.5px; color:#94a3b8; margin-top:2px; }
+
+    /* Fees */
+    .fees-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; }
+    .fee-card { border:1px solid #f1ecfb; border-radius:14px; padding:14px 16px; background:#faf9fe; }
+    .fee-top { display:flex; align-items:center; gap:9px; margin-bottom:8px; }
+    .fee-ic { width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; background:#f5f3ff; color:#7c3aed; }
+    .fee-name { font-size:12px; font-weight:700; color:#475569; }
+    .fee-val { font-size:19px; font-weight:800; letter-spacing:-.01em; }
+    .fee-bar { height:5px; border-radius:4px; background:#ece7f9; margin-top:9px; overflow:hidden; }
+    .fee-bar > div { height:5px; border-radius:4px; background:linear-gradient(90deg,#7c3aed,#a855f7); }
+    .fee-share { font-size:10.5px; color:#94a3b8; margin-top:5px; }
+
+    .grid-2 { display:grid; grid-template-columns:1fr 320px; gap:16px; }
+    @media (max-width:1150px){ .stats{grid-template-columns:repeat(2,1fr);} .grid-2{grid-template-columns:1fr;} }
+
+    .chart-wrap { position:relative; width:100%; height:240px; }
+    .legend { display:flex; gap:18px; margin-top:14px; font-size:12px; color:#64748b; }
+    .legend-item { display:flex; align-items:center; gap:6px; }
+    .legend-sw { width:11px; height:11px; border-radius:3px; }
+
+    /* Strategy list */
+    .strat-row { display:grid; grid-template-columns:18px 8px 1fr 110px 52px 64px; align-items:center; gap:11px; padding:9px 0; border-top:1px solid #f4f1fb; }
+    .strat-row:first-child { border-top:none; }
+    .strat-rank { font-size:11px; color:#cbd5e1; text-align:center; font-weight:700; }
+    .strat-dot { width:8px; height:8px; border-radius:50%; }
+    .strat-name { font-size:13px; font-weight:600; }
+    .strat-meta { font-size:11px; color:#94a3b8; }
+    .bar-bg { height:5px; border-radius:4px; background:#ece7f9; overflow:hidden; }
+    .bar-fill { height:5px; border-radius:4px; }
+    .bar-label { font-size:10px; color:#94a3b8; margin-top:3px; text-align:right; }
+    .strat-pct { font-size:12.5px; font-weight:600; text-align:right; }
+    .strat-roi { font-size:12px; font-weight:700; text-align:right; }
+    .pos { color:#059669; } .neg { color:#dc2626; }
+    .hot-pill { font-size:9.5px; font-weight:700; background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; border-radius:999px; padding:2px 7px; white-space:nowrap; }
+
+    /* Investors */
+    .inv-row { display:flex; align-items:center; gap:11px; padding:10px 0; border-top:1px solid #f4f1fb; }
+    .inv-row:first-child { border-top:none; }
+    .avatar { width:34px; height:34px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff; background:linear-gradient(135deg,#7c3aed,#a855f7); }
+    .inv-info { flex:1; min-width:0; }
+    .inv-name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .inv-strat { font-size:11px; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .inv-nums { text-align:right; }
+    .inv-amt { font-size:13px; font-weight:700; }
+    .inv-roi { font-size:11px; font-weight:600; }
+
+    /* Summary */
+    .sum-row { display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-top:1px solid #f4f1fb; }
+    .sum-row:first-child { border-top:none; }
+    .sum-label { font-size:12px; color:#64748b; display:flex; align-items:center; gap:8px; }
+    .sum-label i { width:16px; text-align:center; color:#7c3aed; }
+    .sum-val { font-size:13px; font-weight:700; }
+
+    .muted { color:#94a3b8; }
+    .skeleton { color:#cbd5e1; }
+  </style>
+  <script src="/js/cc-badge.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar"></aside>
+<script src="/js/sidebar.js"></script>
+
+  <main class="main-content">
+    <div class="fin-hero">
+      <div>
+        <h1><i class="fas fa-chart-pie"></i> Finances</h1>
+        <p>The money view — what's invested, what MINT earns, what investors earn, and where it's all coming from.</p>
+      </div>
+      <span class="live-pill"><span class="live-dot"></span> Live · real accounts only</span>
+    </div>
+
+    <div class="stats" id="finStats"></div>
+
+    <!-- Fees -->
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Fees collected</div>
+          <div class="card-sub">Per active fee, across all investment orders</div>
+        </div>
+        <div style="text-align:right;"><div class="card-sub">Total fees</div><div style="font-size:18px;font-weight:800;" id="feesTotal">—</div></div>
+      </div>
+      <div class="fees-grid" id="feesGrid"></div>
+    </div>
+
+    <div class="grid-2">
+      <!-- LEFT -->
+      <div>
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Strategy performance</div>
+              <div class="card-sub">Investors vs. average ROI per strategy</div>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="stratChart"></canvas></div>
+          <div class="legend">
+            <div class="legend-item"><span class="legend-sw" style="background:#7c3aed;"></span> Investors</div>
+            <div class="legend-item"><span class="legend-sw" style="background:#059669;"></span> Avg ROI %</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Top strategies</div>
+              <div class="card-sub">Ranked by adoption</div>
+            </div>
+          </div>
+          <div id="stratList"><div class="skeleton" style="padding:20px 0;text-align:center;">Loading…</div></div>
+        </div>
+      </div>
+
+      <!-- RIGHT -->
+      <div>
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Top investors</div><div class="card-sub">By portfolio value</div></div></div>
+          <div id="invList"><div class="skeleton" style="padding:20px 0;text-align:center;">Loading…</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div class="card-title">Platform summary</div></div>
+          <div id="summaryList"><div class="skeleton" style="padding:20px 0;text-align:center;">Loading…</div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="mintAppOverlay" style="display:none;position:fixed;inset:0;z-index:99998;background:#0f172a;">
+    <div style="position:absolute;top:0;left:0;right:0;height:44px;background:#0f172a;display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:1;">
+      <div style="display:flex;align-items:center;gap:8px;"><img src="/icon.png" style="width:22px;height:22px;border-radius:6px;" /><span style="color:white;font-size:13px;font-weight:600;">Mint App</span></div>
+      <button onclick="mintAppClose()" style="background:#1e293b;color:#94a3b8;border:none;border-radius:8px;padding:5px 14px;cursor:pointer;font-size:12px;font-weight:500;">&#8592; Back to Admin</button>
+    </div>
+    <iframe id="mintAppFrame" src="" style="position:absolute;top:44px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 44px);border:none;background:white;" allowfullscreen></iframe>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://mfxnghmuccevsxwcetej.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meG5naG11Y2NldnN4d2NldGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NTI1ODAsImV4cCI6MjA4NDQyODU4MH0.lktfglzBMaHd79hLFDRH1HHSwsEwZ56Tv6e287kQiFg';
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    const money = (rands) => 'R ' + Number(rands || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const money0 = (rands) => 'R ' + Math.round(Number(rands || 0)).toLocaleString('en-ZA');
+    const pct = (n) => (n >= 0 ? '+' : '') + Number(n || 0).toFixed(1) + '%';
+    const initials = (name) => { const p = String(name||'').trim().split(/\s+/).filter(Boolean); return p.length ? ((p[0][0]||'') + (p.length>1?p[p.length-1][0]:'')).toUpperCase() : '?'; };
+    const DOTS = ['#7c3aed','#059669','#8b5cf6','#d97706','#0ea5e9','#db2777','#64748b'];
+
+    // Expected_fill legacy guard (mirrors the orderbook): rands, but some legacy
+    // rows stored cents — divide if it's >5× the avg-fill-in-rands.
+    const guardExpected = (expRaw, avgRands) => {
+      let e = Number(expRaw);
+      if (!Number.isFinite(e) || e <= 0) return null;
+      if (avgRands > 0 && e > avgRands * 5) e = e / 100;
+      return e;
+    };
+
+    const load = async () => {
+      // ── Test/UAT accounts to exclude ──────────────────────────────────────
+      const testIds = new Set();
+      try {
+        const [pf, wl] = await Promise.all([
+          supabaseClient.from('profiles').select('id').eq('is_test', true),
+          supabaseClient.from('wallets').select('user_id').eq('status', 'test'),
+        ]);
+        (pf.data || []).forEach((r) => r.id && testIds.add(String(r.id)));
+        (wl.data || []).forEach((r) => r.user_id && testIds.add(String(r.user_id)));
+      } catch (e) { /* fail open toward showing data */ }
+
+      // ── Holdings + securities + transactions ──────────────────────────────
+      const [holdRes, txRes] = await Promise.all([
+        supabaseClient.from('stock_holdings_c')
+          .select('id, user_id, security_id, quantity, avg_fill, expected_fill:"Expected_fill", strategy_id, strategy_name_snapshot, trade_side, is_active, created_at')
+          .limit(5000),
+        supabaseClient.from('transactions')
+          .select('id, user_id, broker_fee_cents, isin_fee_cents, transaction_fee_cents, base_amount_cents, name, created_at')
+          .limit(5000),
+      ]);
+      if (holdRes.error) throw holdRes.error;
+
+      let holdings = (holdRes.data || []).filter((h) => !testIds.has(String(h.user_id)));
+      // Active BUY positions only (exclude SELL audit rows + closed).
+      holdings = holdings.filter((h) => {
+        const side = String(h.trade_side || '').toUpperCase();
+        return h.is_active !== false && side !== 'SELL';
+      });
+
+      const secIds = [...new Set(holdings.map((h) => h.security_id).filter(Boolean))];
+      const secMap = {};
+      if (secIds.length) {
+        const { data: secs } = await supabaseClient.from('securities_c').select('id, symbol, name, last_price').in('id', secIds);
+        (secs || []).forEach((s) => { secMap[String(s.id)] = s; });
+      }
+      const userIds = [...new Set(holdings.map((h) => h.user_id).filter(Boolean))];
+      const profMap = {};
+      if (userIds.length) {
+        const { data: profs } = await supabaseClient.from('profiles').select('id, first_name, last_name, email').in('id', userIds);
+        (profs || []).forEach((p) => { profMap[String(p.id)] = p; });
+      }
+
+      // ── Shortfall (MINT out-of-pocket) via the service-role endpoint ───────
+      const shortfallByHolding = {};
+      try {
+        const { data: sess } = await supabaseClient.auth.getSession();
+        const tok = sess?.session?.access_token;
+        const holdingIds = holdings.map((h) => String(h.id));
+        if (tok && holdingIds.length) {
+          const r = await fetch('/api/orderbook/send-csv?action=get-buffer-drawdowns', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+            body: JSON.stringify({ holdingIds }),
+          });
+          if (r.ok) {
+            const { drawdowns } = await r.json();
+            (drawdowns || []).forEach((d) => {
+              if (d.event_type === 'shortfall' && d.holding_id) {
+                shortfallByHolding[String(d.holding_id)] = (shortfallByHolding[String(d.holding_id)] || 0) + Math.max(0, Math.round(Number(d.delta_cents) || 0));
+              }
+            });
+          }
+        }
+      } catch (e) { /* shortfall best-effort; MINT profit shows gross gain if it fails */ }
+
+      // ── Aggregate ─────────────────────────────────────────────────────────
+      let totalInvested = 0, totalMarketValue = 0, totalClientPnl = 0, mintGainRands = 0, mintShortfallRands = 0;
+      const activeUsers = new Set();
+      const stratAgg = {};   // key -> { name, investors:Set, invested, pnl, mv }
+      const userAgg = {};    // userId -> { invested, pnl, mv, strat:{} }
+
+      holdings.forEach((h) => {
+        const qty = Math.abs(Number(h.quantity) || 0);
+        if (!qty) return;
+        const sec = secMap[String(h.security_id)] || {};
+        const avgCents = Number(h.avg_fill);
+        const avgRands = Number.isFinite(avgCents) && avgCents > 0 ? avgCents / 100 : null;
+        const expected = guardExpected(h.expected_fill, avgRands || 0);
+        const costBasis = expected != null ? expected : avgRands; // client cost basis
+        const livePrice = Number(sec.last_price);
+        const hasLive = Number.isFinite(livePrice) && livePrice > 0;
+
+        const invested = costBasis != null ? costBasis * qty : 0;
+        const mv = hasLive ? livePrice * qty : invested;
+        const pnl = (hasLive && costBasis != null) ? (livePrice - costBasis) * qty : 0;
+
+        totalInvested += invested; totalMarketValue += mv; totalClientPnl += pnl;
+        if (h.user_id) activeUsers.add(String(h.user_id));
+
+        // MINT execution gain: filled below the client's quote.
+        if (avgRands != null && expected != null && expected > avgRands) {
+          mintGainRands += (expected - avgRands) * qty;
+        }
+        mintShortfallRands += (shortfallByHolding[String(h.id)] || 0) / 100;
+
+        // Strategy bucket
+        const sName = h.strategy_name_snapshot || (h.strategy_id ? 'Strategy' : (sec.name || sec.symbol || 'Individual stock'));
+        const sKey = h.strategy_id ? 'sid:' + h.strategy_id : 'name:' + sName;
+        const sa = stratAgg[sKey] || (stratAgg[sKey] = { name: sName, investors: new Set(), invested: 0, pnl: 0, mv: 0 });
+        sa.name = sName; if (h.user_id) sa.investors.add(String(h.user_id)); sa.invested += invested; sa.pnl += pnl; sa.mv += mv;
+
+        // User bucket
+        const uKey = String(h.user_id || '');
+        const ua = userAgg[uKey] || (userAgg[uKey] = { invested: 0, pnl: 0, mv: 0, strat: {} });
+        ua.invested += invested; ua.pnl += pnl; ua.mv += mv;
+        ua.strat[sName] = (ua.strat[sName] || 0) + invested;
+      });
+
+      const mintPnl = mintGainRands - mintShortfallRands;
+
+      // ── Fees (investment transactions, non-test) ──────────────────────────
+      const txns = (txRes.data || []).filter((t) => !testIds.has(String(t.user_id)));
+      let feeBroker = 0, feeCustody = 0, feeTxn = 0;
+      txns.forEach((t) => {
+        feeBroker += Number(t.broker_fee_cents) || 0;
+        feeCustody += Number(t.isin_fee_cents) || 0;
+        feeTxn += Number(t.transaction_fee_cents) || 0;
+      });
+      feeBroker/=100; feeCustody/=100; feeTxn/=100;
+      const feesTotal = feeBroker + feeCustody + feeTxn;
+
+      // New investors this month: real users whose FIRST investment tx is this month.
+      const now = new Date(); const mStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+      const firstTxByUser = {};
+      txns.forEach((t) => {
+        if (!/^Strategy Investment:|^Purchased /i.test(String(t.name || ''))) return;
+        const ts = new Date(t.created_at || 0).getTime();
+        const u = String(t.user_id || ''); if (!u) return;
+        if (!(u in firstTxByUser) || ts < firstTxByUser[u]) firstTxByUser[u] = ts;
+      });
+      const newThisMonth = Object.values(firstTxByUser).filter((ts) => ts >= mStart).length;
+
+      // ── Render ────────────────────────────────────────────────────────────
+      renderStats({ totalInvested, mintPnl, totalClientPnl, activeInvestors: activeUsers.size });
+      renderFees([
+        { name: 'Broker fee', icon: 'fa-building-columns', val: feeBroker },
+        { name: 'Custody fee', icon: 'fa-vault', val: feeCustody },
+        { name: 'Transaction fee', icon: 'fa-receipt', val: feeTxn },
+      ], feesTotal);
+
+      const strategies = Object.values(stratAgg).map((s) => ({
+        name: s.name, investors: s.investors.size, invested: s.invested, mv: s.mv,
+        roi: s.invested > 0 ? (s.pnl / s.invested) * 100 : 0,
+      })).sort((a, b) => b.investors - a.investors || b.invested - a.invested);
+      renderChart(strategies);
+      renderStrategies(strategies, activeUsers.size);
+
+      const investors = Object.entries(userAgg).map(([uid, u]) => {
+        const prof = profMap[uid];
+        const name = prof ? ([prof.first_name, prof.last_name].filter(Boolean).join(' ').trim() || prof.email || 'Investor') : 'Investor';
+        const topStrat = Object.entries(u.strat).sort((a, b) => b[1] - a[1])[0];
+        return { name, mv: u.mv, roi: u.invested > 0 ? (u.pnl / u.invested) * 100 : 0, strat: topStrat ? topStrat[0] : '—' };
+      }).sort((a, b) => b.mv - a.mv).slice(0, 6);
+      renderInvestors(investors);
+
+      const bestStrat = strategies.filter((s) => s.investors >= 1).slice().sort((a, b) => b.roi - a.roi)[0];
+      renderSummary({
+        avgSize: activeUsers.size ? totalInvested / activeUsers.size : 0,
+        feesTotal,
+        avgRoi: totalInvested > 0 ? (totalClientPnl / totalInvested) * 100 : 0,
+        best: bestStrat ? bestStrat.name : '—',
+        newThisMonth,
+        totalMv: totalMarketValue,
+      });
+    };
+
+    const renderStats = (d) => {
+      const cards = [
+        { cls: 'c-purple', ic: 'fa-coins', bg: '#f5f3ff', col: '#7c3aed', label: 'Total invested', val: `<span class="cur">R </span>${Math.round(d.totalInvested).toLocaleString('en-ZA')}`, sub: 'Client cost basis, active positions' },
+        { cls: 'c-green', ic: 'fa-building-columns', bg: '#ecfdf5', col: '#059669', label: 'MINT profit', val: `<span class="cur">R </span>${Math.round(d.mintPnl).toLocaleString('en-ZA')}`, sub: 'Execution spread, net of shortfall' },
+        { cls: 'c-violet', ic: 'fa-arrow-trend-up', bg: '#f5f3ff', col: '#8b5cf6', label: 'Investor profit', val: `<span class="cur">R </span>${Math.round(d.totalClientPnl).toLocaleString('en-ZA')}`, sub: 'Unrealised P&L, live prices' },
+        { cls: 'c-amber', ic: 'fa-user-check', bg: '#fffbeb', col: '#d97706', label: 'Active investors', val: String(d.activeInvestors), sub: 'Real accounts holding positions' },
+      ];
+      document.getElementById('finStats').innerHTML = cards.map((c) => `
+        <div class="stat-card ${c.cls}">
+          <div class="stat-icon" style="background:${c.bg};color:${c.col};"><i class="fas ${c.ic}"></i></div>
+          <div class="stat-label">${c.label}</div>
+          <div class="stat-value">${c.val}</div>
+          <div class="stat-sub">${esc(c.sub)}</div>
+        </div>`).join('');
+    };
+
+    const renderFees = (fees, total) => {
+      document.getElementById('feesTotal').textContent = money0(total);
+      document.getElementById('feesGrid').innerHTML = fees.map((f) => {
+        const share = total > 0 ? (f.val / total) * 100 : 0;
+        return `<div class="fee-card">
+          <div class="fee-top"><div class="fee-ic"><i class="fas ${f.icon}"></i></div><div class="fee-name">${esc(f.name)}</div></div>
+          <div class="fee-val">${money0(f.val)}</div>
+          <div class="fee-bar"><div style="width:${share.toFixed(1)}%;"></div></div>
+          <div class="fee-share">${share.toFixed(0)}% of fees</div>
+        </div>`;
+      }).join('');
+    };
+
+    let chartInstance = null;
+    const renderChart = (strategies) => {
+      const top = strategies.slice(0, 6);
+      const ctx = document.getElementById('stratChart');
+      if (chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: top.map((s) => s.name), datasets: [
+          { label: 'Investors', data: top.map((s) => s.investors), backgroundColor: 'rgba(124,58,237,.8)', borderRadius: 6, yAxisID: 'y' },
+          { label: 'Avg ROI %', data: top.map((s) => Number(s.roi.toFixed(1))), backgroundColor: 'rgba(5,150,105,.8)', borderRadius: 6, yAxisID: 'y1' },
+        ] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: {
+            callbacks: { label: (c) => c.datasetIndex === 0 ? ` ${c.parsed.y} investors` : ` ROI: ${pct(c.parsed.y)}` } } },
+          scales: {
+            x: { ticks: { color: '#94a3b8', font: { size: 11 } }, grid: { display: false } },
+            y: { position: 'left', beginAtZero: true, ticks: { color: '#94a3b8', font: { size: 11 }, precision: 0 }, grid: { color: '#f1f5f9' } },
+            y1: { position: 'right', ticks: { color: '#059669', font: { size: 11 }, callback: (v) => v + '%' }, grid: { display: false } },
+          },
+        },
+      });
+    };
+
+    const renderStrategies = (strategies, totalInvestors) => {
+      const top = strategies.slice(0, 6);
+      const maxInv = Math.max(1, ...top.map((s) => s.investors));
+      const el = document.getElementById('stratList');
+      if (!top.length) { el.innerHTML = '<div class="muted" style="padding:20px 0;text-align:center;">No strategy data yet.</div>'; return; }
+      el.innerHTML = top.map((s, i) => {
+        const share = totalInvestors > 0 ? Math.round((s.investors / totalInvestors) * 100) : 0;
+        const dot = DOTS[i % DOTS.length];
+        return `<div class="strat-row">
+          <span class="strat-rank">${i + 1}</span>
+          <span class="strat-dot" style="background:${dot};"></span>
+          <div><div class="strat-name">${esc(s.name)}</div><div class="strat-meta">${s.investors} investor${s.investors !== 1 ? 's' : ''} · ${money0(s.invested)}</div></div>
+          <div>${i === 0 ? '<span class="hot-pill">Most bought</span>' : `<div class="bar-bg"><div class="bar-fill" style="width:${(s.investors / maxInv) * 100}%;background:${dot};"></div></div><div class="bar-label">${s.investors}</div>`}</div>
+          <span class="strat-pct">${share}%</span>
+          <span class="strat-roi ${s.roi >= 0 ? 'pos' : 'neg'}">${pct(s.roi)}</span>
+        </div>`;
+      }).join('');
+    };
+
+    const renderInvestors = (investors) => {
+      const el = document.getElementById('invList');
+      if (!investors.length) { el.innerHTML = '<div class="muted" style="padding:20px 0;text-align:center;">No investors yet.</div>'; return; }
+      el.innerHTML = investors.map((iv) => `
+        <div class="inv-row">
+          <div class="avatar">${esc(initials(iv.name))}</div>
+          <div class="inv-info"><div class="inv-name">${esc(iv.name)}</div><div class="inv-strat">${esc(iv.strat)}</div></div>
+          <div class="inv-nums"><div class="inv-amt">${money0(iv.mv)}</div><div class="inv-roi ${iv.roi >= 0 ? 'pos' : 'neg'}">${pct(iv.roi)}</div></div>
+        </div>`).join('');
+    };
+
+    const renderSummary = (d) => {
+      const rows = [
+        { ic: 'fa-chart-pie', label: 'Avg. investment size', val: money0(d.avgSize) },
+        { ic: 'fa-percent', label: 'MINT fees collected', val: money0(d.feesTotal) },
+        { ic: 'fa-arrow-trend-up', label: 'Avg. investor ROI', val: pct(d.avgRoi), cls: d.avgRoi >= 0 ? 'pos' : 'neg' },
+        { ic: 'fa-wallet', label: 'Total portfolio value', val: money0(d.totalMv) },
+        { ic: 'fa-trophy', label: 'Best performing', val: esc(d.best) },
+        { ic: 'fa-user-plus', label: 'New investors this month', val: '+' + d.newThisMonth, cls: 'pos' },
+      ];
+      document.getElementById('summaryList').innerHTML = rows.map((r) => `
+        <div class="sum-row">
+          <span class="sum-label"><i class="fas ${r.ic}"></i> ${esc(r.label)}</span>
+          <span class="sum-val ${r.cls || ''}">${r.val}</span>
+        </div>`).join('');
+    };
+
+    (async () => {
+      const { data } = await supabaseClient.auth.getSession();
+      if (!data.session) { window.location.href = '/signin.html'; return; }
+      try { await load(); }
+      catch (err) {
+        console.error('Finances load error:', err);
+        document.getElementById('finStats').innerHTML = '<div class="muted" style="padding:20px;">Could not load financial data: ' + esc(err.message || 'unknown error') + '</div>';
+      }
+    })();
+  </script>
+
+  <script>
+  (function(){
+    var link=document.getElementById("teamNavLink");
+    if(!link)return;
+    var key=Object.keys(localStorage).find(function(k){return k.startsWith("sb-")&&k.endsWith("-auth-token");});
+    if(!key)return;
+    try{
+      var token=JSON.parse(localStorage.getItem(key))&&JSON.parse(localStorage.getItem(key)).access_token;
+      if(!token)return;
+      fetch("/api/team?action=me",{headers:{Authorization:"Bearer "+token}})
+        .then(function(r){return r.json();})
+        .then(function(d){if(d.role==="admin")link.style.display="";})
+        .catch(function(){});
+    }catch(e){}
+  })();
+  </script>
+  <script>window.PAGE_ACCESS_KEY = "finances";</script>
+  <script src="/js/access-guard.js"></script>
+</body>
+</html>
