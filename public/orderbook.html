@@ -1976,6 +1976,28 @@
       return `<div class="ob-fill-by" title="${escapeHtml(title)}">by ${escapeHtml(label)}</div>`;
     };
 
+    /* "Actual Fill" = the higher of Expected Fill vs Avg Fill (how the app shows
+       the user their fill). Prefers a precomputed row.higherFill (strategy parent
+       sum); for strategy snapshots without it, recomputes Σ(max × qty) from the
+       underlying holdings so old Closed-Book snapshots stay correct; otherwise
+       per-share max. Shared by the live table and the Closed Books table. */
+    const higherFillText = (row) => {
+      if (row.higherFill != null && row.higherFill !== '') return asRandValue(row.higherFill);
+      const fmt = (n) => `R ${Number(n).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      if (row.isStrategy && Array.isArray(row.strategyHoldings)) {
+        let tot = 0, has = false;
+        row.strategyHoldings.forEach((h) => {
+          const sd = String(h.tradeSide || h.side || '').toUpperCase();
+          if (sd === 'SELL' || h.isActive === false) return;
+          const hi = Math.max(Number(h.actualFillNumber) || 0, Number(h.avgFillNumber) || 0);
+          if (hi > 0) { tot += hi * Math.abs(h.quantityValue || 0); has = true; }
+        });
+        return has ? fmt(tot) : '-';
+      }
+      const hi = Math.max(Number(row.actualFillNumber) || 0, Number(row.avgFillNumber) || 0);
+      return hi > 0 ? fmt(hi) : '-';
+    };
+
     const renderBndDetailsTable = (row) => {
       const bndRows = buildBndRowsForOrder(row);
       if (!bndRows.length) {
@@ -5234,6 +5256,7 @@
               <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
               <td>${escapeHtml(asRandValue(row.avgFill))}</td>
               <td>${escapeHtml(asRandValue(row.actualFill))}</td>
+              <td>${escapeHtml(higherFillText(row))}</td>
               <td class="ob-liveprice-col">${escapeHtml(asRandValue(row.marketValue))}</td>
               <td class="ob-constant-col">${escapeHtml(row.orderType || '-')}</td>
               <td class="ob-constant-col">${escapeHtml(row.settlementAccount || '')}</td>
@@ -5241,7 +5264,7 @@
               ${renderInitialPnlCell(row.unrealizedPnlNumber, row.unrealizedPnl)}${renderMintPnlCell(row)}
             </tr>
             <tr class="orderbook-detail-row is-hidden" data-closed-detail-row data-closed-line-key="${escapeHtml(rowKey)}">
-              <td colspan="14">
+              <td colspan="15">
                 <div class="orderbook-detail-wrap">
                   ${row.isStrategy ? renderStrategyDetailsTable(row, { editable: false, cleanup: cleanupMode, bookId: book.id, rowIndex }) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderSnapshotBndDetailsTable(rows, row, book.sequence, { cleanup: cleanupMode, bookId: book.id, rowIndex })}`}
                 </div>
@@ -5249,7 +5272,7 @@
             </tr>
           `;
           }).join('')
-          : '<tr><td class="orderbook-empty-row" colspan="14">No rows captured.</td></tr>';
+          : '<tr><td class="orderbook-empty-row" colspan="15">No rows captured.</td></tr>';
 
         return `
           <details class="filled-orderbook-item">
@@ -5280,6 +5303,7 @@
                       <th>Total QYT</th>
                       <th>Avg Fill</th>
                       <th>Expected Fill</th>
+                      <th>Actual Fill</th>
                       <th class="ob-liveprice-col">Live Price</th>
                       <th class="ob-constant-col">Order Type</th>
                       <th class="ob-constant-col">Settlement Account</th>
@@ -5602,17 +5626,8 @@
           priceActionHtml = renderEditableAvgFill(row);
         }
 
-        // "Actual Fill" = the higher of expected fill vs avg fill — how the user
-        // is shown the fill in the app. Strategy parent rows carry a precomputed
-        // sum (row.higherFill); per-security rows take the per-share max of their
-        // two fill numbers.
-        let higherFillDisplay;
-        if (row.higherFill != null && row.higherFill !== '') {
-          higherFillDisplay = asRandValue(row.higherFill);
-        } else {
-          const _hi = Math.max(Number(row.actualFillNumber) || 0, Number(row.avgFillNumber) || 0);
-          higherFillDisplay = _hi > 0 ? `R ${_hi.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-';
-        }
+        // "Actual Fill" = higher of expected vs avg fill (see higherFillText).
+        const higherFillDisplay = higherFillText(row);
 
         // Build Actions column (first column)
         let actionsHtml = '';
