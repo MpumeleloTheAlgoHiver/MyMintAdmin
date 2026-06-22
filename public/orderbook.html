@@ -349,8 +349,10 @@
        the pinned book) — column 9 only, header + data rows — via a body-level toggle
        so dynamically rendered tables are covered too. Direct-child selectors keep
        nested detail tables and Client PnL / MINT PnL untouched. */
-    body.ob-hide-liveprice .orderbook-table > thead > tr > th:nth-child(9),
-    body.ob-hide-liveprice .orderbook-table > tbody > tr > td:nth-child(9) {
+    /* Hide the Live Price / Mkt Value column on the live book (UAT re-shows it).
+       Class-based (not nth-child) so it stays correct across the main, Active and
+       Closed tables even as columns are added/reordered. */
+    body.ob-hide-liveprice .orderbook-table .ob-liveprice-col {
       display: none;
     }
 
@@ -488,29 +490,36 @@
     .orderbook-table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 1020px;
+      min-width: 880px;
     }
 
     .orderbook-table thead th {
       background: #f9fafb;
       color: #4b5563;
       text-align: left;
-      font-size: 0.78rem;
-      letter-spacing: 0.03em;
+      font-size: 0.66rem;
+      letter-spacing: 0.02em;
       text-transform: uppercase;
       font-weight: 700;
-      padding: 12px 14px;
+      padding: 7px 9px;
       border-bottom: 1px solid #e5e7eb;
       white-space: nowrap;
     }
 
     .orderbook-table tbody td {
-      padding: 12px 14px;
+      padding: 7px 9px;
       border-bottom: 1px solid #f3f4f6;
       color: #1f2937;
-      font-size: 0.86rem;
+      font-size: 0.76rem;
       vertical-align: top;
     }
+
+    /* Compact: hide the always-constant columns (Order Type=Market,
+       Settlement=ComputerShare, Broker=Longmark) from the table view — the data
+       stays in the DOM/exports, it's just not worth horizontal scroll. */
+    .orderbook-table .ob-constant-col { display: none; }
+    /* Keep the status/actions column from stretching wide. */
+    .orderbook-table .ob-status-col { max-width: 150px; }
 
     .orderbook-table tbody tr:last-child td {
       border-bottom: none;
@@ -1355,24 +1364,25 @@
             <table class="orderbook-table">
               <thead>
                 <tr>
-                  <th style="width:190px;">Client Email</th>
+                  <th class="ob-status-col" style="width:130px;">Status</th>
                   <th>Line</th>
-                  <th>Instrument Name</th>
+                  <th>Instrument</th>
                   <th>Ticker</th>
                   <th>Side</th>
-                  <th>Total QYT</th>
+                  <th>Qty</th>
                   <th>Avg Fill</th>
-                  <th>Expected Fill</th>
-                  <th>Live Price</th>
-                  <th>Order Type</th>
-                  <th>Settlement Account</th>
-                  <th>Broker Ref</th>
-                  <th>Client PnL</th><th>MINT PnL</th>
+                  <th>Exp Fill</th>
+                  <th>Actual Fill</th>
+                  <th class="ob-liveprice-col">Mkt Value</th>
+                  <th class="ob-constant-col">Type</th>
+                  <th class="ob-constant-col">Settle</th>
+                  <th class="ob-constant-col">Broker</th>
+                  <th>Client P&amp;L</th><th>MINT P&amp;L</th>
                 </tr>
               </thead>
               <tbody id="orderbookTableBody">
                 <tr>
-                  <td class="orderbook-empty-row" colspan="14">Loading orderbook...</td>
+                  <td class="orderbook-empty-row" colspan="15">Loading orderbook...</td>
                 </tr>
               </tbody>
             </table>
@@ -2235,6 +2245,16 @@
             hasAvgFillSum = true;
           }
         });
+        /* Strategy-level Actual Fill = Σ(max(Expected_fill, avg_fill) × qty) — the
+           per-security "higher of" the user is shown, summed across the basket. */
+        let totalHigherFill = 0;
+        let hasHigherFillTotal = false;
+        liveHoldings.forEach((h) => {
+          const exp = Number(h.actualFillNumber) || 0;
+          const avg = Number(h.avgFillNumber) || 0;
+          const hi = Math.max(exp, avg);
+          if (hi > 0) { totalHigherFill += hi * Math.abs(h.quantityValue || 0); hasHigherFillTotal = true; }
+        });
         const latestTs = holdings.reduce((l, h) => {
           const t = new Date(h.timestamp || 0).getTime();
           return t > l ? t : l;
@@ -2347,6 +2367,10 @@
           actualFillNumber: hasActualFillTotal ? totalActualFill : null,
           actualFill: hasActualFillTotal
             ? `R ${totalActualFill.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : '-',
+          higherFillNumber: hasHigherFillTotal ? totalHigherFill : null,
+          higherFill: hasHigherFillTotal
+            ? `R ${totalHigherFill.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
             : '-',
           marketValueNumber: totalMV,
           marketValue: `R ${totalMV.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
@@ -4888,10 +4912,10 @@
                 <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
                 <td>${escapeHtml(asRandValue(row.avgFill))}</td>
                 <td>${escapeHtml(asRandValue(row.actualFill))}</td>
-                <td>${escapeHtml(asRandValue(row.marketValue))}</td>
-                <td>${escapeHtml(row.orderType || '-')}</td>
-                <td>${escapeHtml(row.settlementAccount || '')}</td>
-                <td>${escapeHtml(row.brokerRef || '')}</td>
+                <td class="ob-liveprice-col">${escapeHtml(asRandValue(row.marketValue))}</td>
+                <td class="ob-constant-col">${escapeHtml(row.orderType || '-')}</td>
+                <td class="ob-constant-col">${escapeHtml(row.settlementAccount || '')}</td>
+                <td class="ob-constant-col">${escapeHtml(row.brokerRef || '')}</td>
                 ${renderInitialPnlCell(row.unrealizedPnlNumber, row.unrealizedPnl)}${renderMintPnlCell(row)}
                 ${showActiveBooksFilledColumn ? `<td><span class="filled-status-pill ${rowFillStatus.filled ? 'is-filled' : 'is-open'}">${escapeHtml(rowFillStatus.text)}</span></td>` : ''}
               </tr>
@@ -4934,10 +4958,10 @@
                         <th>Total QYT</th>
                         <th>Avg Fill</th>
                         <th>Expected Fill</th>
-                        <th>Live Price</th>
-                        <th>Order Type</th>
-                        <th>Settlement Account</th>
-                        <th>Broker Ref</th>
+                        <th class="ob-liveprice-col">Live Price</th>
+                        <th class="ob-constant-col">Order Type</th>
+                        <th class="ob-constant-col">Settlement Account</th>
+                        <th class="ob-constant-col">Broker Ref</th>
                         <th>Client PnL <span class="orderbook-plus-toggle" data-toggle-filled-col title="Toggle filled status">+</span></th>
                         <th>MINT PnL</th>
                         ${showActiveBooksFilledColumn ? '<th>Filled</th>' : ''}
@@ -5210,10 +5234,10 @@
               <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
               <td>${escapeHtml(asRandValue(row.avgFill))}</td>
               <td>${escapeHtml(asRandValue(row.actualFill))}</td>
-              <td>${escapeHtml(asRandValue(row.marketValue))}</td>
-              <td>${escapeHtml(row.orderType || '-')}</td>
-              <td>${escapeHtml(row.settlementAccount || '')}</td>
-              <td>${escapeHtml(row.brokerRef || '')}</td>
+              <td class="ob-liveprice-col">${escapeHtml(asRandValue(row.marketValue))}</td>
+              <td class="ob-constant-col">${escapeHtml(row.orderType || '-')}</td>
+              <td class="ob-constant-col">${escapeHtml(row.settlementAccount || '')}</td>
+              <td class="ob-constant-col">${escapeHtml(row.brokerRef || '')}</td>
               ${renderInitialPnlCell(row.unrealizedPnlNumber, row.unrealizedPnl)}${renderMintPnlCell(row)}
             </tr>
             <tr class="orderbook-detail-row is-hidden" data-closed-detail-row data-closed-line-key="${escapeHtml(rowKey)}">
@@ -5256,10 +5280,10 @@
                       <th>Total QYT</th>
                       <th>Avg Fill</th>
                       <th>Expected Fill</th>
-                      <th>Live Price</th>
-                      <th>Order Type</th>
-                      <th>Settlement Account</th>
-                      <th>Broker Ref</th>
+                      <th class="ob-liveprice-col">Live Price</th>
+                      <th class="ob-constant-col">Order Type</th>
+                      <th class="ob-constant-col">Settlement Account</th>
+                      <th class="ob-constant-col">Broker Ref</th>
                       <th>Client PnL</th><th>MINT PnL</th>
                     </tr>
                   </thead>
@@ -5578,6 +5602,18 @@
           priceActionHtml = renderEditableAvgFill(row);
         }
 
+        // "Actual Fill" = the higher of expected fill vs avg fill — how the user
+        // is shown the fill in the app. Strategy parent rows carry a precomputed
+        // sum (row.higherFill); per-security rows take the per-share max of their
+        // two fill numbers.
+        let higherFillDisplay;
+        if (row.higherFill != null && row.higherFill !== '') {
+          higherFillDisplay = asRandValue(row.higherFill);
+        } else {
+          const _hi = Math.max(Number(row.actualFillNumber) || 0, Number(row.avgFillNumber) || 0);
+          higherFillDisplay = _hi > 0 ? `R ${_hi.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-';
+        }
+
         // Build Actions column (first column)
         let actionsHtml = '';
         if (isPending) {
@@ -5646,14 +5682,15 @@
             <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
             <td>${priceActionHtml}</td>
             <td>${escapeHtml(asRandValue(row.actualFill))}</td>
-            <td>${escapeHtml(asRandValue(row.marketValue))}</td>
-            <td>${escapeHtml(row.orderType || '-')}</td>
-            <td>
+            <td>${escapeHtml(higherFillDisplay)}</td>
+            <td class="ob-liveprice-col">${escapeHtml(asRandValue(row.marketValue))}</td>
+            <td class="ob-constant-col">${escapeHtml(row.orderType || '-')}</td>
+            <td class="ob-constant-col">
               <select class="orderbook-select" data-settlement-select data-line="${lineKey}">
                 ${settlementOptions}
               </select>
             </td>
-            <td>
+            <td class="ob-constant-col">
               <select class="orderbook-select" data-broker-select data-line="${lineKey}">
                 ${brokerRefOptions}
               </select>
@@ -5661,7 +5698,7 @@
             ${renderInitialPnlCell(row.unrealizedPnlNumber, row.unrealizedPnl)}${renderMintPnlCell(row)}
           </tr>
           <tr class="orderbook-detail-row is-hidden" data-orderbook-detail-row data-line-key="${lineKey}">
-            <td colspan="14">
+            <td colspan="15">
               <div class="orderbook-detail-wrap">
                 ${row.isStrategy ? renderStrategyDetailsTable(row, detailOpts) : `<div class="orderbook-detail-title">BND Allocation Details</div>${renderBndDetailsTable(row)}`}
               </div>
@@ -5671,7 +5708,7 @@
     };
 
     const renderSectionHeaderRow = (label) =>
-      `<tr class="orderbook-section-row"><td colspan="14" class="orderbook-section-cell">${escapeHtml(label)}</td></tr>`;
+      `<tr class="orderbook-section-row"><td colspan="15" class="orderbook-section-cell">${escapeHtml(label)}</td></tr>`;
 
     const renderOrderbookRows = (rows) => {
       if (!orderbookTableBody || !orderbookCount || !exportOrderbookBtn) return;
@@ -5679,7 +5716,7 @@
       exportOrderbookBtn.disabled = rows.length === 0;
 
       if (!rows.length) {
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="14">No orderbook records found.</td></tr>';
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="15">No orderbook records found.</td></tr>';
         return;
       }
 
@@ -5713,7 +5750,7 @@
       const liveHtml = renderSectionHeaderRow('Live')
         + (liveRows.length
           ? liveRows.map((row) => buildOrderbookRowHtml(row)).join('')
-          : '<tr><td class="orderbook-empty-row" colspan="14">No new orders yet.</td></tr>');
+          : '<tr><td class="orderbook-empty-row" colspan="15">No new orders yet.</td></tr>');
 
       orderbookTableBody.innerHTML = pinnedHtml + liveHtml;
     };
@@ -6318,7 +6355,7 @@
       const { data } = await supabaseClient.auth.getSession();
       const accessToken = data?.session?.access_token;
       if (!accessToken) {
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">No active session found.</td></tr>';
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="15">No active session found.</td></tr>';
         return;
       }
 
@@ -6344,7 +6381,7 @@
         }
       } catch (error) {
         console.error('Orderbook load error:', error);
-        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="10">Could not load orderbook data.</td></tr>';
+        orderbookTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="15">Could not load orderbook data.</td></tr>';
         allBirSourceRows = [];
         renderStrateBirPreview();
       } finally {
