@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gifting · Mint admin</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <style>
     * { box-sizing: border-box; }
     body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; background:#f6f5fb; color:#0f172a; }
@@ -78,7 +79,7 @@
 
   <main class="main-content">
     <div class="gift-hero">
-      <h1><span>🎁</span> Gifting</h1>
+      <h1><i class="fas fa-gift"></i> Gifting</h1>
       <p>Every investment gift sent through the app — who sent it, to whom, what they gifted, and where it stands right now.</p>
     </div>
 
@@ -171,16 +172,16 @@
         else if (s === 'expired' || s === 'refunded') expired++;
       });
       const cards = [
-        { label: 'Total gifts', value: gifts.length, icon: '🎁', bg: '#f5f3ff', color: '#7c3aed' },
-        { label: 'Total value', value: rand(value), icon: '💰', bg: '#ecfdf5', color: '#059669' },
-        { label: 'Claimed', value: claimed, icon: '✅', bg: '#ecfdf5', color: '#059669' },
-        { label: 'Pending', value: pending, icon: '⏳', bg: '#f5f3ff', color: '#7c3aed' },
-        { label: 'Expired / refunded', value: expired, icon: '⌛', bg: '#fffbeb', color: '#d97706' },
+        { label: 'Total gifts', value: gifts.length, icon: 'fa-gift', bg: '#f5f3ff', color: '#7c3aed' },
+        { label: 'Total value', value: rand(value), icon: 'fa-coins', bg: '#ecfdf5', color: '#059669' },
+        { label: 'Claimed', value: claimed, icon: 'fa-circle-check', bg: '#ecfdf5', color: '#059669' },
+        { label: 'Pending', value: pending, icon: 'fa-clock', bg: '#f5f3ff', color: '#7c3aed' },
+        { label: 'Expired / refunded', value: expired, icon: 'fa-hourglass-end', bg: '#fffbeb', color: '#d97706' },
       ];
       document.getElementById('giftStats').innerHTML = cards.map((c) => `
         <div class="stat-card">
           <div class="stat-top">
-            <div class="stat-icon" style="background:${c.bg};">${c.icon}</div>
+            <div class="stat-icon" style="background:${c.bg};"><i class="fas ${c.icon}" style="color:${c.color};"></i></div>
             <div class="stat-label">${esc(c.label)}</div>
           </div>
           <div class="stat-value" style="color:${c.color};">${esc(c.value)}</div>
@@ -191,7 +192,7 @@
       const tbody = document.getElementById('giftRows');
       document.getElementById('giftCount').textContent = gifts.length || '';
       if (!gifts.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="big">🎁</div>No gifts found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="big"><i class="fas fa-gift"></i></div>No gifts found.</td></tr>';
         return;
       }
       tbody.innerHTML = gifts.map((g) => {
@@ -208,7 +209,7 @@
               <span class="who-name">${esc(g._senderName || 'Unknown')}</span>
             </div>
           </td>
-          <td><span class="arrow">→</span> ${recipient}</td>
+          <td><i class="fas fa-arrow-right-long arrow"></i> ${recipient}</td>
           <td><span class="asset">${esc(g.asset_name || '—')}</span>${assetTag}</td>
           <td class="r amount">${rand(g.amount)}</td>
           <td><span class="badge ${s.cls}">${esc(s.label)}</span></td>
