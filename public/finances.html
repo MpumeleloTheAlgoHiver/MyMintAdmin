@@ -49,7 +49,8 @@
     .fee-card { border:1px solid var(--line); border-radius:9px; padding:14px 15px; background:#fafbfc; }
     .fee-top { display:flex; align-items:center; gap:9px; margin-bottom:9px; }
     .fee-ic { width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:12px; background:var(--accent-soft); color:var(--accent); }
-    .fee-name { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+    .fee-name { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; flex:1; }
+    .fee-rate { font-size:11px; font-weight:700; color:var(--accent); background:var(--accent-soft); border-radius:5px; padding:2px 7px; white-space:nowrap; }
     .fee-val { font-size:18px; font-weight:700; letter-spacing:-.01em; }
     .fee-bar { height:4px; border-radius:3px; background:var(--line-soft); margin-top:9px; overflow:hidden; }
     .fee-bar > div { height:4px; border-radius:3px; background:var(--accent); }
@@ -219,6 +220,20 @@
       const profMap = Object.fromEntries(profiles.map((p) => [p.id, p]));
       const secMetaMap = Object.fromEntries(secMeta.map((s) => [s.id, s]));
 
+      // Fee rates from app_settings('fees') — same source the App Settings page edits.
+      let appFees = {};
+      try {
+        const { data: sess } = await supabaseClient.auth.getSession();
+        const tok = sess?.session?.access_token;
+        if (tok) {
+          const fr = await fetch('/api/team?action=app-settings-get&key=fees', { headers: { Authorization: 'Bearer ' + tok } });
+          const fj = await fr.json();
+          if (fj && fj.value) appFees = fj.value;
+        }
+      } catch (e) { /* rates are best-effort */ }
+      const asPct = (rate) => { const n = Number(rate); return Number.isFinite(n) ? (Math.round(n * 10000) / 100) + '%' : null; };
+      const asRand = (v) => { const n = Number(v); return Number.isFinite(n) ? 'R' + n.toLocaleString('en-ZA') : null; };
+
       // Live price per security: current_price is in CENTS → rands (first/latest wins).
       const priceR = {};
       secLive.forEach((s) => { if (s && s.security_id != null && priceR[s.security_id] === undefined) priceR[s.security_id] = (Number(s.current_price) || 0) / 100; });
@@ -310,9 +325,9 @@
       // ── Render ────────────────────────────────────────────────────────────
       renderStats({ totalInvested, mintPnl, totalClientPnl, activeInvestors: activeUsers.size });
       renderFees([
-        { name: 'Broker fee', icon: 'fa-building-columns', val: feeBroker },
-        { name: 'Custody fee', icon: 'fa-vault', val: feeCustody },
-        { name: 'Transaction fee', icon: 'fa-receipt', val: feeTxn },
+        { name: 'Broker fee', icon: 'fa-building-columns', val: feeBroker, rate: asPct(appFees.brokerFeeRate) },
+        { name: 'Custody fee', icon: 'fa-vault', val: feeCustody, rate: appFees.isinFeePerAsset != null ? asRand(appFees.isinFeePerAsset) + ' / asset' : null },
+        { name: 'Transaction fee', icon: 'fa-receipt', val: feeTxn, rate: asPct(appFees.transactionFeeRate) },
       ], feesTotal);
 
       const strategiesArr = Object.values(stratAgg).map((s) => ({
@@ -365,7 +380,11 @@
       document.getElementById('feesGrid').innerHTML = fees.map((f) => {
         const share = total > 0 ? (f.val / total) * 100 : 0;
         return `<div class="fee-card">
-          <div class="fee-top"><div class="fee-ic"><i class="fas ${f.icon}"></i></div><div class="fee-name">${esc(f.name)}</div></div>
+          <div class="fee-top">
+            <div class="fee-ic"><i class="fas ${f.icon}"></i></div>
+            <div class="fee-name">${esc(f.name)}</div>
+            ${f.rate ? `<span class="fee-rate" title="Current rate">${esc(f.rate)}</span>` : ''}
+          </div>
           <div class="fee-val">${money0(f.val)}</div>
           <div class="fee-bar"><div style="width:${share.toFixed(1)}%;"></div></div>
           <div class="fee-share">${share.toFixed(0)}% of fees</div>
