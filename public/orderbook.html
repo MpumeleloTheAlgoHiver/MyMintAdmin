@@ -1324,6 +1324,7 @@
     .reverse-btn-confirm:hover { background: #b91c1c; }
     .reverse-btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
   </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <script src="/js/cc-badge.js" defer></script>
 </head>
 <body>
@@ -4936,7 +4937,7 @@
               <tr class="orderbook-main-row" data-archive-main-row data-archive-line-key="${escapeHtml(rowKey)}">
                 <td style="white-space:nowrap;">${actionsHtml}</td>
                 <td>${escapeHtml(String(row.line ?? '-'))}</td>
-                <td>${escapeHtml(row.instrumentName || '-')}${row.isGift ? ' <span class="ob-gift-badge" title="Came from a gift">🎁 Gift</span>' : ''}</td>
+                <td>${escapeHtml(row.instrumentName || '-')}${row.isGift ? ' <span class="ob-gift-badge" title="Came from a gift"><i class="fas fa-gift"></i> Gift</span>' : ''}</td>
                 <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
                 <td>${escapeHtml(row.side || '-')}</td>
                 <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
@@ -5258,7 +5259,7 @@
             <tr class="orderbook-main-row" data-closed-main-row data-closed-line-key="${escapeHtml(rowKey)}">
               <td style="white-space:nowrap;">${actionsHtml}</td>
               <td>${escapeHtml(String(row.line ?? '-'))}</td>
-              <td>${escapeHtml(row.instrumentName || '-')}${row.isGift ? ' <span class="ob-gift-badge" title="Came from a gift">🎁 Gift</span>' : ''}</td>
+              <td>${escapeHtml(row.instrumentName || '-')}${row.isGift ? ' <span class="ob-gift-badge" title="Came from a gift"><i class="fas fa-gift"></i> Gift</span>' : ''}</td>
               <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
               <td>${escapeHtml(row.side || '-')}</td>
               <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
@@ -5612,7 +5613,7 @@
         const rebalancedBadge = (!isPending && row.rebalanceBatchId && !row.isStrategy)
           ? ' <span style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc;font-size:9px;font-weight:700;padding:1px 6px;border-radius:6px;margin-left:4px;letter-spacing:.03em;">REBALANCED</span>'
           : '';
-        const giftBadge = row.isGift ? ' <span class="ob-gift-badge" title="Came from a gift">🎁 Gift</span>' : '';
+        const giftBadge = row.isGift ? ' <span class="ob-gift-badge" title="Came from a gift"><i class="fas fa-gift"></i> Gift</span>' : '';
         const settlementOptions = (row.settlementAccountOptions || []).map((option) => {
           const isSelected = option === row.settlementAccount ? ' selected' : '';
           return `<option value="${escapeHtml(option)}"${isSelected}>${escapeHtml(option)}</option>`;
