@@ -5,35 +5,70 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gifting · Mint admin</title>
   <style>
-    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; background:#f5f6fa; color:#0f172a; }
-    .main-content { margin-left:220px; min-height:100vh; padding:28px 32px; box-sizing:border-box; }
-    .page-head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap; }
-    .page-title { font-size:22px; font-weight:800; letter-spacing:-0.02em; margin:0; }
-    .page-sub { font-size:13px; color:#64748b; margin:4px 0 0; }
-    .stats { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
-    .stat-card { background:#fff; border:1px solid #ede9fe; border-radius:14px; padding:14px 18px; min-width:130px; }
-    .stat-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#94a3b8; }
-    .stat-value { font-size:20px; font-weight:800; margin-top:4px; }
-    .card { background:#fff; border:1px solid #ede9fe; border-radius:16px; overflow:hidden; box-shadow:0 8px 32px rgba(15,23,42,.05); }
-    .card-head { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #f1f5f9; gap:12px; flex-wrap:wrap; }
-    .card-title { font-size:14px; font-weight:700; }
-    .search { border:1px solid #e2e8f0; border-radius:10px; padding:8px 12px; font-size:13px; min-width:240px; outline:none; }
-    .search:focus { border-color:#a855f7; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; background:#f6f5fb; color:#0f172a; }
+    .main-content { margin-left:220px; min-height:100vh; padding:32px 36px 48px; }
+
+    /* Header band */
+    .gift-hero {
+      position:relative; overflow:hidden; border-radius:22px; padding:26px 30px;
+      background:linear-gradient(135deg,#3b0764 0%,#6d28d9 48%,#9333ea 100%);
+      color:#fff; margin-bottom:24px; box-shadow:0 18px 40px rgba(109,40,217,.28);
+    }
+    .gift-hero::after {
+      content:""; position:absolute; right:-40px; top:-40px; width:220px; height:220px;
+      background:radial-gradient(circle,rgba(255,255,255,.16),transparent 70%); pointer-events:none;
+    }
+    .gift-hero h1 { margin:0; font-size:26px; font-weight:800; letter-spacing:-.02em; display:flex; align-items:center; gap:10px; }
+    .gift-hero p { margin:8px 0 0; font-size:13.5px; color:#e9d5ff; max-width:620px; line-height:1.5; }
+
+    /* Stat cards */
+    .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin:-44px 4px 24px; position:relative; z-index:2; }
+    .stat-card { background:#fff; border:1px solid #efe9fb; border-radius:16px; padding:16px 18px; box-shadow:0 8px 24px rgba(15,23,42,.05); transition:transform .15s ease, box-shadow .15s ease; }
+    .stat-card:hover { transform:translateY(-2px); box-shadow:0 14px 30px rgba(15,23,42,.09); }
+    .stat-top { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    .stat-icon { width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; }
+    .stat-label { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:#94a3b8; }
+    .stat-value { font-size:24px; font-weight:800; letter-spacing:-.02em; }
+
+    /* Table card */
+    .card { background:#fff; border:1px solid #efe9fb; border-radius:18px; overflow:hidden; box-shadow:0 10px 30px rgba(15,23,42,.05); }
+    .card-head { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid #f4f1fb; gap:12px; flex-wrap:wrap; }
+    .card-title { font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; }
+    .card-title .count { font-size:12px; font-weight:600; color:#a78bfa; background:#f5f3ff; border:1px solid #ede9fe; padding:2px 9px; border-radius:999px; }
+    .search { border:1px solid #e7e2f5; border-radius:11px; padding:9px 14px 9px 34px; font-size:13px; min-width:260px; outline:none; background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E") no-repeat 11px center; transition:border-color .15s; }
+    .search:focus { border-color:#a855f7; box-shadow:0 0 0 3px rgba(168,85,247,.12); }
+
+    .table-scroll { max-height:64vh; overflow:auto; }
     table { width:100%; border-collapse:collapse; font-size:13px; }
-    th { text-align:left; padding:10px 16px; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.03em; background:#f8fafc; white-space:nowrap; position:sticky; top:0; }
-    td { padding:11px 16px; border-bottom:1px solid #f1f5f9; vertical-align:middle; white-space:nowrap; }
-    tr:hover td { background:#faf7ff; }
+    thead th { text-align:left; padding:11px 18px; font-size:10.5px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.04em; background:#faf9fe; position:sticky; top:0; z-index:1; white-space:nowrap; }
+    tbody td { padding:13px 18px; border-top:1px solid #f4f1fb; vertical-align:middle; white-space:nowrap; }
+    tbody tr:hover td { background:#faf8ff; }
     .r { text-align:right; }
     .muted { color:#94a3b8; }
-    .amount { font-weight:700; }
-    .badge { font-size:10px; font-weight:700; padding:3px 9px; border-radius:6px; letter-spacing:.02em; display:inline-block; }
-    .b-pending { background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; }
-    .b-claimed { background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; }
-    .b-expired { background:#fffbeb; color:#b45309; border:1px solid #fde68a; }
-    .b-refunded { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
-    .b-cancelled { background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; }
-    .empty-state { padding:48px 0; text-align:center; color:#94a3b8; }
-    .tag { font-size:10px; font-weight:700; color:#7c3aed; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:5px; padding:1px 6px; margin-left:6px; }
+    .amount { font-weight:800; }
+
+    /* Sender cell with avatar */
+    .who { display:flex; align-items:center; gap:10px; }
+    .avatar { width:30px; height:30px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff; background:linear-gradient(135deg,#7c3aed,#a855f7); }
+    .who-name { font-weight:600; }
+    .arrow { color:#cbd5e1; margin:0 2px; }
+
+    /* Asset chip */
+    .asset { font-weight:600; }
+    .asset-tag { font-size:9.5px; font-weight:700; color:#7c3aed; background:#f5f3ff; border:1px solid #ede9fe; border-radius:5px; padding:1px 6px; margin-left:6px; }
+
+    /* Status pill with leading dot */
+    .badge { display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px; }
+    .badge::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+    .b-pending { background:#f5f3ff; color:#7c3aed; }
+    .b-claimed { background:#ecfdf5; color:#059669; }
+    .b-expired { background:#fffbeb; color:#d97706; }
+    .b-refunded { background:#eff6ff; color:#2563eb; }
+    .b-cancelled { background:#f1f5f9; color:#64748b; }
+
+    .empty-state { padding:60px 0; text-align:center; color:#94a3b8; }
+    .empty-state .big { font-size:34px; margin-bottom:10px; }
   </style>
   <script src="/js/cc-badge.js" defer></script>
 </head>
@@ -42,21 +77,19 @@
 <script src="/js/sidebar.js"></script>
 
   <main class="main-content">
-    <div class="page-head">
-      <div>
-        <h1 class="page-title">Gifting</h1>
-        <p class="page-sub">Every investment gift sent through the app — who sent it, to whom, and where it stands.</p>
-      </div>
-      <input id="giftSearch" class="search" type="search" placeholder="Search sender, recipient, asset…" />
+    <div class="gift-hero">
+      <h1><span>🎁</span> Gifting</h1>
+      <p>Every investment gift sent through the app — who sent it, to whom, what they gifted, and where it stands right now.</p>
     </div>
 
     <div class="stats" id="giftStats"></div>
 
     <div class="card">
       <div class="card-head">
-        <div class="card-title">All gifts <span class="muted" id="giftCount"></span></div>
+        <div class="card-title">All gifts <span class="count" id="giftCount"></span></div>
+        <input id="giftSearch" class="search" type="search" placeholder="Search sender, recipient, asset…" />
       </div>
-      <div style="max-height:64vh;overflow:auto;">
+      <div class="table-scroll">
         <table>
           <thead>
             <tr>
@@ -101,6 +134,11 @@
       try { return new Date(iso).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', dateStyle: 'medium', timeStyle: 'short' }); }
       catch { return esc(iso); }
     };
+    const initials = (name) => {
+      const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+      if (!parts.length) return '?';
+      return ((parts[0][0] || '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+    };
 
     // Derive a display status from the row's flags (refunded/cancelled override).
     const statusOf = (g) => {
@@ -114,17 +152,16 @@
 
     let allGifts = [];
 
-    const nameFor = (profile, fallback) => {
+    const plainName = (profile, fallback) => {
       if (profile) {
         const n = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
         if (n) return n;
         if (profile.email) return profile.email;
       }
-      return fallback || '<span class="muted">—</span>';
+      return fallback || '';
     };
 
     const renderStats = (gifts) => {
-      const total = gifts.length;
       let claimed = 0, pending = 0, expired = 0, value = 0;
       gifts.forEach((g) => {
         value += Number(g.amount || 0);
@@ -134,31 +171,45 @@
         else if (s === 'expired' || s === 'refunded') expired++;
       });
       const cards = [
-        ['Total gifts', total],
-        ['Total value', rand(value)],
-        ['Claimed', claimed],
-        ['Pending', pending],
-        ['Expired / refunded', expired],
+        { label: 'Total gifts', value: gifts.length, icon: '🎁', bg: '#f5f3ff', color: '#7c3aed' },
+        { label: 'Total value', value: rand(value), icon: '💰', bg: '#ecfdf5', color: '#059669' },
+        { label: 'Claimed', value: claimed, icon: '✅', bg: '#ecfdf5', color: '#059669' },
+        { label: 'Pending', value: pending, icon: '⏳', bg: '#f5f3ff', color: '#7c3aed' },
+        { label: 'Expired / refunded', value: expired, icon: '⌛', bg: '#fffbeb', color: '#d97706' },
       ];
-      document.getElementById('giftStats').innerHTML = cards.map(([l, v]) =>
-        `<div class="stat-card"><div class="stat-label">${esc(l)}</div><div class="stat-value">${esc(v)}</div></div>`).join('');
+      document.getElementById('giftStats').innerHTML = cards.map((c) => `
+        <div class="stat-card">
+          <div class="stat-top">
+            <div class="stat-icon" style="background:${c.bg};">${c.icon}</div>
+            <div class="stat-label">${esc(c.label)}</div>
+          </div>
+          <div class="stat-value" style="color:${c.color};">${esc(c.value)}</div>
+        </div>`).join('');
     };
 
     const renderRows = (gifts) => {
       const tbody = document.getElementById('giftRows');
-      document.getElementById('giftCount').textContent = gifts.length ? `(${gifts.length})` : '';
+      document.getElementById('giftCount').textContent = gifts.length || '';
       if (!gifts.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No gifts found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="big">🎁</div>No gifts found.</td></tr>';
         return;
       }
       tbody.innerHTML = gifts.map((g) => {
         const s = statusOf(g);
-        const assetTag = g.asset_type ? `<span class="tag">${esc(String(g.asset_type).toUpperCase())}</span>` : '';
+        const assetTag = g.asset_type ? `<span class="asset-tag">${esc(String(g.asset_type).toUpperCase())}</span>` : '';
+        const recipient = g._recipientName
+          ? `<span class="who-name">${esc(g._recipientName)}</span>`
+          : (g.recipient_identifier ? esc(g.recipient_identifier) : '<span class="muted">Unclaimed</span>');
         return `<tr>
           <td>${dt(g.created_at)}</td>
-          <td>${g._senderName}</td>
-          <td>${g._recipientName}</td>
-          <td>${esc(g.asset_name || '—')}${assetTag}</td>
+          <td>
+            <div class="who">
+              <div class="avatar">${esc(initials(g._senderName))}</div>
+              <span class="who-name">${esc(g._senderName || 'Unknown')}</span>
+            </div>
+          </td>
+          <td><span class="arrow">→</span> ${recipient}</td>
+          <td><span class="asset">${esc(g.asset_name || '—')}</span>${assetTag}</td>
           <td class="r amount">${rand(g.amount)}</td>
           <td><span class="badge ${s.cls}">${esc(s.label)}</span></td>
           <td>${dt(s.at)}</td>
@@ -170,7 +221,7 @@
       const q = (document.getElementById('giftSearch').value || '').trim().toLowerCase();
       if (!q) { renderRows(allGifts); return; }
       const filtered = allGifts.filter((g) =>
-        [g._senderText, g._recipientText, g.asset_name, statusOf(g).label]
+        [g._senderName, g._recipientName, g.recipient_identifier, g.asset_name, statusOf(g).label]
           .some((v) => String(v || '').toLowerCase().includes(q)));
       renderRows(filtered);
     };
@@ -184,7 +235,6 @@
           .limit(2000);
         if (error) throw error;
 
-        // Resolve sender + recipient names from profiles in one lookup.
         const ids = [...new Set((gifts || []).flatMap((g) => [g.sender_user_id, g.recipient_user_id]).filter(Boolean))];
         const profMap = {};
         if (ids.length) {
@@ -193,21 +243,11 @@
           (profs || []).forEach((p) => { profMap[String(p.id)] = p; });
         }
 
-        allGifts = (gifts || []).map((g) => {
-          const sender = profMap[String(g.sender_user_id)];
-          const recipient = profMap[String(g.recipient_user_id)];
-          const senderName = nameFor(sender, '<span class="muted">Unknown</span>');
-          const recipientName = recipient
-            ? nameFor(recipient, '')
-            : (g.recipient_identifier ? esc(g.recipient_identifier) : '<span class="muted">Unclaimed</span>');
-          return {
-            ...g,
-            _senderName: senderName,
-            _recipientName: recipientName,
-            _senderText: sender ? [sender.first_name, sender.last_name, sender.email].filter(Boolean).join(' ') : '',
-            _recipientText: recipient ? [recipient.first_name, recipient.last_name, recipient.email].filter(Boolean).join(' ') : (g.recipient_identifier || ''),
-          };
-        });
+        allGifts = (gifts || []).map((g) => ({
+          ...g,
+          _senderName: plainName(profMap[String(g.sender_user_id)], 'Unknown'),
+          _recipientName: plainName(profMap[String(g.recipient_user_id)], ''),
+        }));
 
         renderStats(allGifts);
         renderRows(allGifts);

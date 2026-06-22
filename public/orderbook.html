@@ -520,6 +520,12 @@
     .orderbook-table .ob-constant-col { display: none; }
     /* Keep the status/actions column from stretching wide. */
     .orderbook-table .ob-status-col { max-width: 150px; }
+    /* Compact inline "Gift" badge (sits beside the instrument name, no new column). */
+    .ob-gift-badge {
+      display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .02em;
+      padding: 1px 6px; border-radius: 6px; margin-left: 4px; white-space: nowrap;
+      background: #fdf2f8; color: #be185d; border: 1px solid #fbcfe8; vertical-align: middle;
+    }
 
     .orderbook-table tbody tr:last-child td {
       border-bottom: none;
@@ -2363,6 +2369,7 @@
 
         return {
           isStrategy: true,
+          isGift: holdings.some((h) => h.isGift),
           strategyId,
           strategyName: first.strategyName || 'Unknown Strategy',
           strategyShortName: first.strategyShortName || '',
@@ -2830,6 +2837,7 @@
         group.quantityValue += Number(row.quantityValue || 0);
         group.marketValueNumber += Number(row.marketValueNumber || 0);
         group.unrealizedPnlNumber += Number(row.unrealizedPnlNumber || 0);
+        if (row.isGift) group.isGift = true; // any gift in the group flags the row
         const rowAvgFillNumber = (row.avgFillNumber != null) ? Number(row.avgFillNumber) : NaN;
         if (Number.isFinite(rowAvgFillNumber)) {
           const rowQtyWeight = Math.abs(Number(row.quantityValue || 0));
@@ -4928,7 +4936,7 @@
               <tr class="orderbook-main-row" data-archive-main-row data-archive-line-key="${escapeHtml(rowKey)}">
                 <td style="white-space:nowrap;">${actionsHtml}</td>
                 <td>${escapeHtml(String(row.line ?? '-'))}</td>
-                <td>${escapeHtml(row.instrumentName || '-')}</td>
+                <td>${escapeHtml(row.instrumentName || '-')}${row.isGift ? ' <span class="ob-gift-badge" title="Came from a gift">🎁 Gift</span>' : ''}</td>
                 <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
                 <td>${escapeHtml(row.side || '-')}</td>
                 <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
@@ -5250,7 +5258,7 @@
             <tr class="orderbook-main-row" data-closed-main-row data-closed-line-key="${escapeHtml(rowKey)}">
               <td style="white-space:nowrap;">${actionsHtml}</td>
               <td>${escapeHtml(String(row.line ?? '-'))}</td>
-              <td>${escapeHtml(row.instrumentName || '-')}</td>
+              <td>${escapeHtml(row.instrumentName || '-')}${row.isGift ? ' <span class="ob-gift-badge" title="Came from a gift">🎁 Gift</span>' : ''}</td>
               <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
               <td>${escapeHtml(row.side || '-')}</td>
               <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
@@ -5604,6 +5612,7 @@
         const rebalancedBadge = (!isPending && row.rebalanceBatchId && !row.isStrategy)
           ? ' <span style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc;font-size:9px;font-weight:700;padding:1px 6px;border-radius:6px;margin-left:4px;letter-spacing:.03em;">REBALANCED</span>'
           : '';
+        const giftBadge = row.isGift ? ' <span class="ob-gift-badge" title="Came from a gift">🎁 Gift</span>' : '';
         const settlementOptions = (row.settlementAccountOptions || []).map((option) => {
           const isSelected = option === row.settlementAccount ? ' selected' : '';
           return `<option value="${escapeHtml(option)}"${isSelected}>${escapeHtml(option)}</option>`;
@@ -5691,7 +5700,7 @@
           <tr class="orderbook-main-row${isPending ? ' orderbook-pending-row' : ''}" data-orderbook-main-row data-line-key="${lineKey}">
             <td style="white-space:nowrap;">${actionsHtml}</td>
             <td>${escapeHtml(String(row.line ?? '-'))}</td>
-            <td>${escapeHtml(row.instrumentName || '-')}${strategyTag}${pendingBadge}${rebalancedBadge}</td>
+            <td>${escapeHtml(row.instrumentName || '-')}${strategyTag}${giftBadge}${pendingBadge}${rebalancedBadge}</td>
             <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
             <td><span class="side-badge ${sideClass}">${escapeHtml(sideValue || '-')}</span></td>
             <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
@@ -5834,6 +5843,16 @@
       const _keepRow = (uid) => orderbookUatMode ? _testIds.has(uid) : !_testIds.has(uid);
       holdings = holdings.filter((h) => _keepRow(h.user_id));
       rebEvents = rebEvents.filter((e) => _keepRow(e.user_id));
+
+      // Gift-claimed holdings link to a GIFT2-CLAIM transaction — flag them so the
+      // orderbook can show a compact "Gift" badge without widening the row. Gifts
+      // are rare, so a single unfiltered lookup is cheap.
+      const giftTransactionIds = new Set();
+      try {
+        const { data: _giftTx } = await supabaseClient
+          .from('transactions').select('id').like('store_reference', 'GIFT2-CLAIM%');
+        (_giftTx || []).forEach((t) => giftTransactionIds.add(String(t.id)));
+      } catch (e) { /* gift badge is best-effort */ }
 
       const batchById = rebBatches.reduce((acc, b) => { acc[b.id] = b; return acc; }, {});
       holdingFillDateById.clear();
@@ -6186,6 +6205,7 @@
           createdAt: row.created_at || null,
           fillSetBy: row.fill_set_by || null,
           fillSetAt: row.fill_set_at || null,
+          isGift: !!(row.transaction_id && giftTransactionIds.has(String(row.transaction_id))),
         };
       });
 
