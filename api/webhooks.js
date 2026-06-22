@@ -32,15 +32,18 @@ const sbGet = async (path) => {
 };
 
 const sendEmail = async ({ to, subject, html, emailType, source = 'webhook', metadata = {} }) => {
+  // Accept a single address, a comma-separated string, or an array → Resend wants an array.
+  const toList = (Array.isArray(to) ? to : String(to || '').split(','))
+    .map((s) => String(s).trim()).filter(Boolean);
   const resp = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${RESEND()}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: process.env.ORDERBOOK_EMAIL_FROM || 'noreply@mymint.co.za', to: [to], subject, html })
+    body: JSON.stringify({ from: process.env.ORDERBOOK_EMAIL_FROM || 'noreply@mymint.co.za', to: toList, subject, html })
   });
   const payload = await resp.json().catch(() => ({}));
   const ok = resp.ok && !payload.error;
   await logEmail({
-    emailType, recipient: to, subject,
+    emailType, recipient: toList.join(', '), subject,
     resendId: payload.id || null,
     status: ok ? 'sent' : 'failed',
     triggerSource: source,
@@ -422,7 +425,7 @@ async function handleOrderAlert(record, trigger) {
   const amountRands = Number(record.amount || 0) / 100;
   const whenIso = record.created_at || record.transaction_date || new Date().toISOString();
   const whenText = new Date(whenIso).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', dateStyle: 'medium', timeStyle: 'short' });
-  const to = process.env.ORDERBOOK_ALERT_TO || process.env.ORDERBOOK_EMAIL_TO || 'lulamasw@gmail.com';
+  const to = process.env.ORDERBOOK_ALERT_TO || 'petrone.nel@mymint.co.za,support@mymint.co.za';
 
   // ── Gift ──────────────────────────────────────────────────────────────────
   if (isGift) {
@@ -539,7 +542,7 @@ module.exports = async (req, res) => {
   // to preview the desk order-alert email immediately — no real purchase needed.
   if (payload?.test_email === 'order_alert') {
     try {
-      const to = process.env.ORDERBOOK_ALERT_TO || process.env.ORDERBOOK_EMAIL_TO || 'lulamasw@gmail.com';
+      const to = process.env.ORDERBOOK_ALERT_TO || 'petrone.nel@mymint.co.za,support@mymint.co.za';
       await sendEmail({
         to,
         subject: 'New order — Test Client: Strategy · Yield',
