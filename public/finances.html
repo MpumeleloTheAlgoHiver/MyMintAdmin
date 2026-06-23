@@ -214,7 +214,8 @@
       const holdings = data.holdings || [], strategies = data.strategies || [],
             profiles = data.profiles || [], secMeta = data.secMeta || [],
             secLive = data.secLive || [], txns = data.txns || [],
-            residuals = data.residuals || [], drawdowns = data.drawdowns || [];
+            residuals = data.residuals || [], drawdowns = data.drawdowns || [],
+            aumFeeTxns = data.aumFeeTxns || [];
 
       const stratMap = Object.fromEntries(strategies.map((s) => [s.id, s]));
       const profMap = Object.fromEntries(profiles.map((p) => [p.id, p]));
@@ -304,7 +305,15 @@
         feeTxn += Number(t.transaction_fee_cents) || 0;
       });
       feeBroker /= 100; feeCustody /= 100; feeTxn /= 100;
-      const feesTotal = feeBroker + feeCustody + feeTxn;
+      // AUM management fee actually collected (settled ledger), all-time + per user.
+      let feeAum = 0; const aumByUser = {};
+      aumFeeTxns.forEach((t) => {
+        const c = Number(t.deducted_from_cash_cents) || 0;
+        feeAum += c;
+        const u = String(t.user_id || ''); if (u) aumByUser[u] = (aumByUser[u] || 0) + c;
+      });
+      feeAum /= 100;
+      const feesTotal = feeBroker + feeCustody + feeTxn + feeAum;
 
       // New investors this month: first investment tx in the current month.
       const now = new Date(); const mStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
@@ -328,6 +337,7 @@
         { name: 'Broker fee', icon: 'fa-building-columns', val: feeBroker, rate: asPct(appFees.brokerFeeRate) },
         { name: 'Custody fee', icon: 'fa-vault', val: feeCustody, rate: appFees.isinFeePerAsset != null ? asRand(appFees.isinFeePerAsset) + ' / asset' : null },
         { name: 'Transaction fee', icon: 'fa-receipt', val: feeTxn, rate: asPct(appFees.transactionFeeRate) },
+        { name: 'AUM management fee', icon: 'fa-chart-pie', val: feeAum, rate: appFees.aumFeeRate != null ? asPct(appFees.aumFeeRate) + ' p.a.' : '0.99% p.a.' },
       ], feesTotal);
 
       const strategiesArr = Object.values(stratAgg).map((s) => ({
@@ -341,7 +351,7 @@
         const prof = profMap[uid];
         const name = prof ? ([prof.first_name, prof.last_name].filter(Boolean).join(' ').trim() || prof.email || 'Investor') : 'Investor';
         const topStrat = Object.entries(userAgg[uid].strat).sort((a, b) => b[1] - a[1])[0];
-        return { name, mv: investorValue(uid), roi: userAgg[uid].invested > 0 ? (userAgg[uid].pnl / userAgg[uid].invested) * 100 : 0, strat: topStrat ? topStrat[0] : '—' };
+        return { name, mv: investorValue(uid), roi: userAgg[uid].invested > 0 ? (userAgg[uid].pnl / userAgg[uid].invested) * 100 : 0, strat: topStrat ? topStrat[0] : '—', aum: (aumByUser[uid] || 0) / 100 };
       }).sort((a, b) => b.mv - a.mv).slice(0, 6);
       renderInvestors(investors);
 
@@ -441,7 +451,7 @@
       el.innerHTML = investors.map((iv) => `
         <div class="inv-row">
           <div class="avatar">${esc(initials(iv.name))}</div>
-          <div class="inv-info"><div class="inv-name">${esc(iv.name)}</div><div class="inv-strat">${esc(iv.strat)}</div></div>
+          <div class="inv-info"><div class="inv-name">${esc(iv.name)}</div><div class="inv-strat">${esc(iv.strat)}${iv.aum > 0 ? ` · <span title="AUM fees collected from this investor">AUM ${money0(iv.aum)}</span>` : ''}</div></div>
           <div class="inv-nums"><div class="inv-amt">${money0(iv.mv)}</div><div class="inv-roi ${iv.roi >= 0 ? 'pos' : 'neg'}">${pct(iv.roi)}</div></div>
         </div>`).join('');
     };

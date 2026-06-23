@@ -95,7 +95,7 @@ module.exports = async (req, res) => {
       }
     });
 
-    const [profiles, secMeta, secReturns, secIntraday, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches, closedHoldings] = await Promise.all([
+    const [profiles, secMeta, secReturns, secIntraday, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches, closedHoldings, aumFeeState, aumFeeTxns] = await Promise.all([
       userIds.length
         ? sbGet(`profiles?select=id,first_name,last_name,email,mint_number,computershare_number&id=in.(${userIds.join(',')})`)
         : Promise.resolve([]),
@@ -150,6 +150,17 @@ module.exports = async (req, res) => {
       userIds.length
         ? sbGet(`stock_holdings_c?select=user_id,family_member_id,strategy_id,quantity,avg_fill,avg_exit&is_active=eq.false&user_id=in.(${userIds.join(',')})`)
         : Promise.resolve([]),
+      /* AUM management fee taken from each strategy's cash sleeve (cumulative).
+         Subtracted from the held 8% buffer when valuing a position so the CRM's
+         portfolio value matches the app. Kept separate from broker slippage. */
+      userIds.length
+        ? sbGet(`strategy_aum_fee_state?select=user_id,family_member_id,strategy_id,aum_fee_consumed_cents,aum_fee_receivable_cents,low_cash_flag&user_id=in.(${userIds.join(',')})`)
+        : Promise.resolve([]),
+      /* Settled AUM fee ledger — one row per user/strategy/month. Source for the
+         Finances "AUM fee collected" card + per-investor AUM totals. */
+      userIds.length
+        ? sbGet(`aum_fee_transactions?select=user_id,family_member_id,strategy_id,fee_amount_cents,deducted_from_cash_cents,fee_receivable_cents,period_start,period_end,settled_at&user_id=in.(${userIds.join(',')})`)
+        : Promise.resolve([]),
     ]);
 
     /* Merge intraday current_price (cents) into secLive rows so the client
@@ -176,7 +187,7 @@ module.exports = async (req, res) => {
     });
 
     res.statusCode = 200;
-    res.end(JSON.stringify({ holdings, strategies, stratHist, profiles, secMeta, secLive, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches, closedHoldings }));
+    res.end(JSON.stringify({ holdings, strategies, stratHist, profiles, secMeta, secLive, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches, closedHoldings, aumFeeState, aumFeeTxns }));
   } catch (err) {
     res.statusCode = 500;
     res.end(JSON.stringify({ error: err.message }));
