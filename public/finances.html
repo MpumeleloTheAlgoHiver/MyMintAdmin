@@ -527,9 +527,8 @@
           <div class="fee-share">${esc(sub)}</div>
         </div>`;
       document.getElementById('aumStats').innerHTML =
-        stat('Total AUM', money0(totals.totalBasis), 'Client assets under management', '#3949ab') +
-        stat('Accruing this month', money0(totals.accrued), 'Management fee building up now', '#0f7b53') +
-        stat('Collected to date', money0(totals.collected), 'Settled & taken from sleeves', '#0f766e') +
+        stat('AUM fees collected', money0(totals.collected), 'Settled & taken from sleeves, to date', '#0f7b53') +
+        stat('Accruing this month', money0(totals.accrued), 'Building up now, not yet settled', '#3949ab') +
         stat('Outstanding', money0(totals.receivable), 'Unpaid (low-cash IOU)', totals.receivable > 0 ? '#b42318' : '#94a0b0');
 
       const el = document.getElementById('aumTable');
@@ -543,7 +542,7 @@
           <td>${r.receivable > 0 ? `<span class="aum-flag">${money0(r.receivable)}</span>` : '—'}</td>
         </tr>`).join('');
       el.innerHTML = `<table class="aum-table">
-        <thead><tr><th>Investor</th><th>AUM (portfolio)</th><th>Accruing this month</th><th>Collected to date</th><th>Outstanding</th></tr></thead>
+        <thead><tr><th>Investor</th><th>Portfolio value</th><th>Accruing this month</th><th>Collected to date</th><th>Outstanding</th></tr></thead>
         <tbody>${body}</tbody></table>`;
     };
 
