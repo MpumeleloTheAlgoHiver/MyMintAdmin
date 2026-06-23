@@ -56,6 +56,16 @@
     .fee-bar > div { height:4px; border-radius:3px; background:var(--accent); }
     .fee-share { font-size:10.5px; color:var(--faint); margin-top:5px; }
 
+    /* AUM table */
+    .aum-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+    .aum-table th { text-align:right; font-size:10.5px; font-weight:600; color:var(--faint); text-transform:uppercase; letter-spacing:.04em; padding:6px 10px; border-bottom:1px solid var(--line); }
+    .aum-table th:first-child { text-align:left; }
+    .aum-table td { padding:8px 10px; border-bottom:1px solid var(--line-soft); text-align:right; white-space:nowrap; }
+    .aum-table td:first-child { text-align:left; font-weight:600; color:var(--ink); }
+    .aum-table tr:hover td { background:#fafbfc; }
+    .aum-name-sub { font-size:10.5px; color:var(--faint); font-weight:400; }
+    .aum-flag { font-size:10px; font-weight:700; color:var(--neg); background:#fdecec; border-radius:4px; padding:1px 6px; }
+
     .grid-2 { display:grid; grid-template-columns:1fr 320px; gap:14px; }
     @media (max-width:1150px){ .stats{grid-template-columns:repeat(2,1fr);} .grid-2{grid-template-columns:1fr;} }
 
@@ -127,6 +137,18 @@
         <div style="text-align:right;"><div class="card-sub">Total fees</div><div style="font-size:18px;font-weight:800;" id="feesTotal">—</div></div>
       </div>
       <div class="fees-grid" id="feesGrid"></div>
+    </div>
+
+    <!-- Assets Under Management -->
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Assets under management (AUM)</div>
+          <div class="card-sub">Who contributes to AUM, and the management fee accruing on it</div>
+        </div>
+      </div>
+      <div class="fees-grid" id="aumStats" style="margin-bottom:14px;"></div>
+      <div id="aumTable"><div class="skeleton" style="padding:20px 0;text-align:center;">Loading…</div></div>
     </div>
 
     <div class="grid-2">
@@ -215,7 +237,8 @@
             profiles = data.profiles || [], secMeta = data.secMeta || [],
             secLive = data.secLive || [], txns = data.txns || [],
             residuals = data.residuals || [], drawdowns = data.drawdowns || [],
-            aumFeeTxns = data.aumFeeTxns || [];
+            aumFeeTxns = data.aumFeeTxns || [], aumSegments = data.aumSegments || [],
+            aumFeeState = data.aumFeeState || [];
 
       const stratMap = Object.fromEntries(strategies.map((s) => [s.id, s]));
       const profMap = Object.fromEntries(profiles.map((p) => [p.id, p]));
@@ -355,6 +378,35 @@
       }).sort((a, b) => b.mv - a.mv).slice(0, 6);
       renderInvestors(investors);
 
+      // ── AUM: who contributes (basis = portfolio value) + fee accrued/collected ──
+      const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+      const accruedByUser = {}; // this month, in progress (cents)
+      aumSegments.forEach((s) => {
+        if (String(s.period_month).slice(0, 10) !== curMonth) return; // current month only
+        const u = String(s.user_id || ''); if (!u) return;
+        accruedByUser[u] = (accruedByUser[u] || 0) + (Number(s.accrued_fee_cents) || 0);
+      });
+      const receivableByUser = {};
+      aumFeeState.forEach((s) => {
+        const u = String(s.user_id || ''); if (!u) return;
+        receivableByUser[u] = (receivableByUser[u] || 0) + (Number(s.aum_fee_receivable_cents) || 0);
+      });
+      const aumRows = Object.keys(userAgg).map((uid) => {
+        const prof = profMap[uid];
+        const nm = prof ? ([prof.first_name, prof.last_name].filter(Boolean).join(' ').trim() || prof.email || 'Investor') : 'Investor';
+        return {
+          name: nm, email: prof && prof.email ? prof.email : '',
+          basis: investorValue(uid),
+          accrued: (accruedByUser[uid] || 0) / 100,
+          collected: (aumByUser[uid] || 0) / 100,
+          receivable: (receivableByUser[uid] || 0) / 100,
+        };
+      }).filter((r) => r.basis > 0 || r.collected > 0 || r.accrued > 0)
+        .sort((a, b) => b.basis - a.basis);
+      const accruedTotal = Object.values(accruedByUser).reduce((a, b) => a + b, 0) / 100;
+      const receivableTotal = Object.values(receivableByUser).reduce((a, b) => a + b, 0) / 100;
+      renderAum(aumRows, { totalBasis: totalPortfolio, accrued: accruedTotal, collected: feeAum, receivable: receivableTotal });
+
       const bestStrat = strategiesArr.filter((s) => s.investors >= 1).slice().sort((a, b) => b.roi - a.roi)[0];
       renderSummary({
         avgSize: activeUsers.size ? totalInvested / activeUsers.size : 0,
@@ -454,6 +506,34 @@
           <div class="inv-info"><div class="inv-name">${esc(iv.name)}</div><div class="inv-strat">${esc(iv.strat)}${iv.aum > 0 ? ` · <span title="AUM fees collected from this investor">AUM ${money0(iv.aum)}</span>` : ''}</div></div>
           <div class="inv-nums"><div class="inv-amt">${money0(iv.mv)}</div><div class="inv-roi ${iv.roi >= 0 ? 'pos' : 'neg'}">${pct(iv.roi)}</div></div>
         </div>`).join('');
+    };
+
+    const renderAum = (rows, totals) => {
+      const stat = (label, val, sub, col) => `
+        <div class="fee-card">
+          <div class="fee-top"><div class="fee-name">${esc(label)}</div></div>
+          <div class="fee-val" style="${col ? 'color:' + col + ';' : ''}">${val}</div>
+          <div class="fee-share">${esc(sub)}</div>
+        </div>`;
+      document.getElementById('aumStats').innerHTML =
+        stat('Total AUM', money0(totals.totalBasis), 'Client assets under management', '#3949ab') +
+        stat('Accruing this month', money0(totals.accrued), 'Management fee building up now', '#0f7b53') +
+        stat('Collected to date', money0(totals.collected), 'Settled & taken from sleeves', '#0f766e') +
+        stat('Outstanding', money0(totals.receivable), 'Unpaid (low-cash IOU)', totals.receivable > 0 ? '#b42318' : '#94a0b0');
+
+      const el = document.getElementById('aumTable');
+      if (!rows.length) { el.innerHTML = '<div class="muted" style="padding:20px 0;text-align:center;">No AUM data yet.</div>'; return; }
+      const body = rows.map((r) => `
+        <tr>
+          <td>${esc(r.name)}${r.email ? `<div class="aum-name-sub">${esc(r.email)}</div>` : ''}</td>
+          <td>${money0(r.basis)}</td>
+          <td>${r.accrued > 0 ? money0(r.accrued) : '—'}</td>
+          <td>${r.collected > 0 ? money0(r.collected) : '—'}</td>
+          <td>${r.receivable > 0 ? `<span class="aum-flag">${money0(r.receivable)}</span>` : '—'}</td>
+        </tr>`).join('');
+      el.innerHTML = `<table class="aum-table">
+        <thead><tr><th>Investor</th><th>AUM (portfolio)</th><th>Accruing this month</th><th>Collected to date</th><th>Outstanding</th></tr></thead>
+        <tbody>${body}</tbody></table>`;
     };
 
     const renderSummary = (d) => {

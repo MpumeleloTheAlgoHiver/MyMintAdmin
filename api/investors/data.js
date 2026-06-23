@@ -95,7 +95,7 @@ module.exports = async (req, res) => {
       }
     });
 
-    const [profiles, secMeta, secReturns, secIntraday, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches, closedHoldings, aumFeeState, aumFeeTxns] = await Promise.all([
+    const [profiles, secMeta, secReturns, secIntraday, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches, closedHoldings, aumFeeState, aumFeeTxns, aumSegments] = await Promise.all([
       userIds.length
         ? sbGet(`profiles?select=id,first_name,last_name,email,mint_number,computershare_number&id=in.(${userIds.join(',')})`)
         : Promise.resolve([]),
@@ -161,6 +161,11 @@ module.exports = async (req, res) => {
       userIds.length
         ? sbGet(`aum_fee_transactions?select=user_id,family_member_id,strategy_id,fee_amount_cents,deducted_from_cash_cents,fee_receivable_cents,period_start,period_end,settled_at&user_id=in.(${userIds.join(',')})`)
         : Promise.resolve([]),
+      /* In-progress accrual segments — the fee building up THIS month before it
+         settles. Open segments (segment_end_date is null) hold the running accrual. */
+      userIds.length
+        ? sbGet(`aum_fee_accrual_segments?select=user_id,family_member_id,strategy_id,period_month,accrued_fee_cents,days_in_segment,value_basis_cents,segment_end_date&user_id=in.(${userIds.join(',')})&segment_end_date=is.null`)
+        : Promise.resolve([]),
     ]);
 
     /* Merge intraday current_price (cents) into secLive rows so the client
@@ -187,7 +192,7 @@ module.exports = async (req, res) => {
     });
 
     res.statusCode = 200;
-    res.end(JSON.stringify({ holdings, strategies, stratHist, profiles, secMeta, secLive, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches, closedHoldings, aumFeeState, aumFeeTxns }));
+    res.end(JSON.stringify({ holdings, strategies, stratHist, profiles, secMeta, secLive, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches, closedHoldings, aumFeeState, aumFeeTxns, aumSegments }));
   } catch (err) {
     res.statusCode = 500;
     res.end(JSON.stringify({ error: err.message }));
