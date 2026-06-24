@@ -11,6 +11,7 @@ const webhooksHandler = require('./api/webhooks');
 const cyberComplianceHandler = require('./api/cyber-compliance');
 const sendEftEmailHandler = require('./api/send-eft-email');
 const { runHealthCheck } = require('./api/monitor/_health-check');
+const { syncStrategyDailyReturns } = require('./api/strategies-sync');
 
 const port = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, 'public');
@@ -2142,6 +2143,25 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── POST /api/strategies/sync-daily-returns ──────────────────────────────
+  // Calculates weighted 1d_pct from live intraday data and writes it to
+  // strategies_returns_c for every active strategy.
+  if (req.url.startsWith('/api/strategies/sync-daily-returns') && req.method === 'POST') {
+    const token = parseBearerToken(req.headers.authorization);
+    if (!token) { sendJson(res, 401, { error: 'Missing Authorization bearer token' }); return; }
+    (async () => {
+      try {
+        await fetchSupabaseJson('/auth/v1/user', token, false);
+        const result = await syncStrategyDailyReturns();
+        sendJson(res, 200, { ok: true, ...result });
+      } catch (err) {
+        console.error('[StrategySync] Manual trigger error:', err?.message || err);
+        sendJson(res, 500, { error: err?.message || 'Sync failed' });
+      }
+    })();
+    return;
+  }
+
   // Team management routes
   if (req.url.startsWith('/api/team')) {
     (async () => {
@@ -2214,6 +2234,31 @@ process.on('unhandledRejection', (reason) => {
   console.error('[Process] Unhandled promise rejection:', reason?.message || reason);
 });
 
+// ── Strategy daily returns scheduler (every hour, during JSE market hours) ───
+// JSE trades 09:00–17:00 SAST = 07:00–15:00 UTC
+let _stratSyncLastHourKey = '';
+const startStrategyDailyReturnsScheduler = () => {
+  const runCheck = async () => {
+    const now = new Date();
+    const utcHour = now.getUTCHours();
+    const hourKey = `${now.toISOString().slice(0, 13)}`;
+    if (utcHour < 6 || utcHour > 16) return; // only run 06:00–16:00 UTC (08:00–18:00 SAST)
+    if (_stratSyncLastHourKey === hourKey) return;
+    _stratSyncLastHourKey = hourKey;
+    try {
+      const result = await syncStrategyDailyReturns();
+      console.log(`[StrategySync] Scheduled run — updated: ${result.updated}/${result.total}, date: ${result.latestDate}`);
+    } catch (err) {
+      console.error('[StrategySync] Scheduled run error:', err?.message || err);
+    }
+  };
+  // Run 20 seconds after server start so Supabase creds are confirmed ready
+  setTimeout(() => runCheck().catch(err => console.error('[StrategySync] Startup error:', err?.message || err)), 20000);
+  // Then check every 30 minutes (will only actually run once per UTC hour)
+  setInterval(() => runCheck().catch(err => console.error('[StrategySync] Interval error:', err?.message || err)), 30 * 60 * 1000);
+  console.log('[StrategySync] Scheduler started — runs hourly during JSE market hours (06:00–16:00 UTC)');
+};
+
 // ── Health check scheduler (every 15 minutes) ────────────────────────────────
 const startHealthCheckScheduler = () => {
   const INTERVAL_MS = 15 * 60 * 1000;
@@ -2235,6 +2280,7 @@ const startServer = (portToUse) => {
     startMarketDataScheduler();
     startMintMorningsScheduler();
     startHealthCheckScheduler();
+    startStrategyDailyReturnsScheduler();
   });
 };
 
