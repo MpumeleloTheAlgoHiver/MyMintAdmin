@@ -480,7 +480,8 @@
 
         // Open the window synchronously inside the click handler so popup
         // blockers don't kill it — then navigate it once we have the URL.
-        const previewWin = window.open('/phone-preview.html?loading=1', '_blank', 'noopener');
+        // Note: no 'noopener' here so the reference stays live for location.href later.
+        const previewWin = window.open('/phone-preview.html?loading=1', '_blank');
 
         renderLaunchCard(client, envAtClick, 'loading');
         try {
