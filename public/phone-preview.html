@@ -109,6 +109,38 @@
     }
     .frame-label input { accent-color: var(--accent); cursor: pointer; }
 
+    /* Zoom slider */
+    .zoom-wrap {
+      display: inline-flex; align-items: center; gap: 7px;
+      flex-shrink: 0;
+    }
+    .zoom-icon { color: var(--text-muted); font-size: 13px; line-height: 1; }
+    .zoom-slider {
+      -webkit-appearance: none; appearance: none;
+      width: 72px; height: 3px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.12);
+      outline: none; cursor: pointer;
+    }
+    .zoom-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 13px; height: 13px; border-radius: 50%;
+      background: #fff;
+      border: none;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+      cursor: pointer;
+    }
+    .zoom-slider::-moz-range-thumb {
+      width: 13px; height: 13px; border-radius: 50%;
+      background: #fff; border: none;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+      cursor: pointer;
+    }
+    .zoom-val {
+      font-size: 10px; font-weight: 600; color: var(--text-muted);
+      min-width: 28px; text-align: right;
+    }
+
     /* Close */
     .close-btn {
       display: inline-flex; align-items: center; justify-content: center;
@@ -339,6 +371,14 @@
       Frame
     </label>
 
+    <div class="tb-divider" id="zoomSep"></div>
+    <div class="zoom-wrap" id="zoomWrap">
+      <span class="zoom-icon">⊖</span>
+      <input type="range" class="zoom-slider" id="zoomSlider" min="40" max="100" value="75" step="5">
+      <span class="zoom-icon">⊕</span>
+      <span class="zoom-val" id="zoomVal">75%</span>
+    </div>
+
     <div class="tb-divider"></div>
     <a href="javascript:window.close()" class="close-btn" title="Close">
       <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
@@ -491,6 +531,50 @@
     const phoneShell = document.getElementById('phoneShell');
     document.getElementById('frameToggle').addEventListener('change', e => {
       phoneShell.classList.toggle('frame-off', !e.target.checked);
+    });
+
+    // Zoom slider — only shown in phone mode
+    const zoomSlider = document.getElementById('zoomSlider');
+    const zoomVal    = document.getElementById('zoomVal');
+    const zoomWrap   = document.getElementById('zoomWrap');
+    const zoomSep    = document.getElementById('zoomSep');
+    const phoneWrap  = document.querySelector('.phone-wrap');
+
+    function applyZoom(pct) {
+      const scale = pct / 100;
+      // Scale from top-center so it stays centered
+      phoneWrap.style.transform       = `scale(${scale})`;
+      phoneWrap.style.transformOrigin = 'top center';
+      // Collapse the visual space the shell no longer occupies
+      const shellH = phoneWrap.getBoundingClientRect().height || 858;
+      // Use margin-bottom to pull up the dead space when shrunk
+      phoneWrap.style.marginBottom = `${(shellH * (scale - 1))}px`;
+    }
+
+    // Auto-detect a good starting zoom based on viewport height
+    (function initZoom() {
+      const availH  = window.innerHeight - 44 - 96; // bar + padding
+      const shellH  = 858;  // phone shell natural height (px)
+      const ideal   = Math.floor((availH / shellH) * 100 / 5) * 5;
+      const clamped = Math.min(100, Math.max(40, ideal));
+      zoomSlider.value = clamped;
+      zoomVal.textContent = clamped + '%';
+      applyZoom(clamped);
+    })();
+
+    zoomSlider.addEventListener('input', () => {
+      const pct = Number(zoomSlider.value);
+      zoomVal.textContent = pct + '%';
+      applyZoom(pct);
+    });
+
+    // Hide zoom controls when switching to desktop mode (already handled by display:none on phoneStage)
+    // But keep them visible only in phone mode
+    const origToggle = document.getElementById('viewToggle').onclick;
+    document.getElementById('viewToggle').addEventListener('click', () => {
+      const isPhone = currentMode === 'phone';
+      zoomWrap.style.display = isPhone ? 'inline-flex' : 'none';
+      zoomSep.style.display  = isPhone ? 'block' : 'none';
     });
   </script>
 </body>
