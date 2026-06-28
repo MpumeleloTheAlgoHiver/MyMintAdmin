@@ -3800,6 +3800,8 @@
 
     const getNextFilledOrderbookSequence = () => {
       const maxExisting = filledOrderbooksArchive.reduce((maxValue, item) => {
+        // UAT (test) books have their OWN sequence — never let them bump the live one.
+        if (bookIsTestBook(item)) return maxValue;
         const directSequence = Number(item?.sequence);
         if (Number.isFinite(directSequence) && directSequence > maxValue) {
           return directSequence;
@@ -3834,7 +3836,8 @@
     const getTodayOrderbookSequence = () => {
       const now = new Date();
       const dateKey = getArchiveDateKey(now);
-      const todayItems = filledOrderbooksArchive.filter((item) => String(item?.dateKey || '') === dateKey);
+      // Live sequence ignores UAT/test books so test numbering never shifts it.
+      const todayItems = filledOrderbooksArchive.filter((item) => String(item?.dateKey || '') === dateKey && !bookIsTestBook(item));
 
       if (!todayItems.length) {
         return getNextFilledOrderbookSequence();
