@@ -1943,6 +1943,15 @@
       </span>
     `;
 
+    // SELL rows: show/edit the EXIT price (avg_exit) — empty until the broker fill
+    // returns. The edit modal already writes avg_exit for SELL rows.
+    const renderEditableExit = (row) => `
+      <span class="orderbook-editable-price">
+        <span>${escapeHtml(asRandValue(row?.avgExit))}</span>
+        ${renderEditPriceButton(row, 'Edit exit price')}
+      </span>
+    `;
+
     const renderEditableTotalFill = (row) => `
       <span class="orderbook-editable-price">
         <span>${escapeHtml(asRandValue(row?.marketValue || '-'))}</span>
@@ -2381,7 +2390,10 @@
           instrumentName: first.strategyName || 'Unknown Strategy',
           ticker: first.strategyShortName || first.strategySlug || '-',
           isin: '-',
-          side: totalQty < 0 ? 'SELL' : 'BUY',
+          // Sell quantities are positive, so qty-sign can't tell BUY from SELL.
+          // Derive the strategy's side from its holdings: all SELL → SELL.
+          side: (holdings.length > 0 && holdings.every((h) => String(h.tradeSide || h.side || '').toUpperCase() === 'SELL')) ? 'SELL' : 'BUY',
+          isPendingSell: holdings.length > 0 && holdings.every((h) => String(h.tradeSide || h.side || '').toUpperCase() === 'SELL') && holdings.some((h) => h.isPendingSell),
           isPendingRebalance: hasPendingRebalance,
           rebalanceBatchId: pendingBatchId,
           rebalanceBatchStatus: hasPendingRebalance ? 'PENDING' : null,
@@ -2394,6 +2406,14 @@
           avgFill: hasAvgFillSum
             ? `R ${totalAvgFill.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
             : '-',
+          // Exit total for SELL strategies — sum of filled exits, else '-' (empty
+          // until the broker fill comes back).
+          avgExit: (() => {
+            const hs = (holdings || []).filter((h) => Number.isFinite(h.avgExitNumber) && h.avgExitNumber > 0);
+            if (!hs.length) return '-';
+            const sum = hs.reduce((s, h) => s + h.avgExitNumber * Math.abs(h.quantityValue || 0), 0);
+            return `R ${sum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          })(),
           actualFillNumber: hasActualFillTotal ? totalActualFill : null,
           actualFill: hasActualFillTotal
             ? `R ${totalActualFill.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -2485,7 +2505,7 @@
             <td class="orderbook-cell-muted">${escapeHtml(h.ticker || '-')}</td>
             <td>${escapeHtml(h.side || '-')}</td>
             <td class="r">${escapeHtml(String(h.totalQuantity ?? '-'))}</td>
-            <td class="r">${escapeHtml(asRandValue(h.avgFill))}${renderFillByline(h)}</td>
+            <td class="r">${escapeHtml(asRandValue(String(h.side || h.tradeSide || '').toUpperCase() === 'SELL' ? h.avgExit : h.avgFill))}${renderFillByline(h)}</td>
             <td class="r">${escapeHtml(asRandValue(h.marketValue))}</td>
             <td class="r ${pnlCls}">${pnl >= 0 ? '+' : ''}${escapeHtml(formatMoney(pnl))}</td>
           </tr>`;
@@ -2647,7 +2667,7 @@
           <td class="orderbook-cell-muted">${escapeHtml(h.ticker || '-')}</td>
           <td><span class="side-badge ${hSideClass}">${escapeHtml(hSide)}</span></td>
           <td>${escapeHtml(String(h.totalQuantity ?? '-'))}</td>
-          <td>${escapeHtml(asRandValue(h.avgFill))}${renderFillByline(h)}</td>
+          <td>${escapeHtml(asRandValue(String(h.side || h.tradeSide || '').toUpperCase() === 'SELL' ? h.avgExit : h.avgFill))}${renderFillByline(h)}</td>
           <td>${escapeHtml(asRandValue(h.actualFill))}</td>
           <td>${escapeHtml(asRandValue(h.marketValue))}</td>
           ${renderInitialPnlCell(h.unrealizedPnlNumber, h.unrealizedPnl)}${renderMintPnlCell(h)}
@@ -2665,7 +2685,7 @@
                 <th>Ticker</th>
                 <th>Side</th>
                 <th>Total QYT</th>
-                <th>Avg Fill</th>
+                <th>${String(row.side || '').toUpperCase() === 'SELL' ? 'Avg Exit' : 'Avg Fill'}</th>
                 <th>Expected Fill</th>
                 <th>Live Price</th>
                 <th>Client PnL</th><th>MINT PnL</th>
@@ -5636,8 +5656,12 @@
           priceActionHtml = escapeHtml(asRandValue(row.avgFill));
         } else if (row.isStrategy) {
           // Strategies are filled via the broker-fills Excel upload (per investor),
-          // not the pencil — show the value only, no edit affordance.
-          priceActionHtml = escapeHtml(asRandValue(row.avgFill));
+          // not the pencil — show the value only, no edit affordance. SELL strategies
+          // show the EXIT total (empty until the broker fill returns).
+          const isSellRow = String(row.side || row.tradeSide || '').toUpperCase() === 'SELL';
+          priceActionHtml = escapeHtml(asRandValue(isSellRow ? row.avgExit : row.avgFill));
+        } else if (String(row.side || row.tradeSide || '').toUpperCase() === 'SELL') {
+          priceActionHtml = renderEditableExit(row);
         } else {
           priceActionHtml = renderEditableAvgFill(row);
         }
@@ -6103,6 +6127,10 @@
         const avgFillRaw = (row.avg_fill != null && row.avg_fill !== '') ? Number(row.avg_fill) : NaN;
         const avgFillValue = Number.isFinite(avgFillRaw) ? (avgFillRaw / 100) : NaN;
         const hasAvgFill = Number.isFinite(avgFillValue);
+        // Exit price (rands) — what a SELL fill stamps. Empty until the broker fills.
+        const avgExitRaw = (row.avg_exit != null && row.avg_exit !== '') ? Number(row.avg_exit) : NaN;
+        const avgExitValue = Number.isFinite(avgExitRaw) ? (avgExitRaw / 100) : NaN;
+        const hasAvgExit = Number.isFinite(avgExitValue);
         /* Expected_fill is the per-share price recorded at click time (rands).
            Guard against legacy rows that stored it in cents &mdash; if >5&times; the
            avg_fill-in-rands, treat as cents and divide. Used for the Actual
@@ -6147,6 +6175,9 @@
         const avgFill = hasAvgFill
           ? `R ${avgFillValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : '-';
+        const avgExit = hasAvgExit
+          ? `R ${avgExitValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          : '-';
         const actualFill = hasActualFill
           ? `R ${actualFillValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : '-';
@@ -6182,6 +6213,8 @@
           totalQuantity,
           avgFillNumber: hasAvgFill ? avgFillValue : null,
           avgFill,
+          avgExitNumber: hasAvgExit ? avgExitValue : null,
+          avgExit,
           actualFillNumber: hasActualFill ? actualFillValue : null,
           actualFill,
           marketValueNumber: computedMarketValueNumber,
