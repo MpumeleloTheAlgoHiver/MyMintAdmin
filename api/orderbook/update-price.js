@@ -119,16 +119,18 @@ async function reconcileBufferDrawdowns(holdingIds) {
   }
 }
 
-// Brokerage fee charged to the client on a sell (CEO: 8%). Net proceeds = 92%.
-const SELL_FEE_RATE = 0.08;
-
 /**
  * Settle SELL fills: once an exit price (avg_exit, cents) is stamped on a
  * client-requested sell, realise it — close the holding, credit the client's
- * wallet with the net proceeds (gross − 8%), and mark the pending "Sell:" txn
- * completed.
+ * wallet, and mark the pending "Sell:" txn completed.
  *
- * Units: avg_exit & market value are CENTS; wallets.balance is RANDS;
+ * Credit basis mirrors buys: the client is paid at the price THEY SAW when they
+ * tapped Sell (expected_exit, per-share cents), NOT the broker's avg_exit. MINT
+ * keeps the spread when the broker sold higher (and absorbs it when lower) — the
+ * exact symmetric counterpart of the buy "higher-of" model. Falls back to
+ * avg_exit for legacy sells captured before expected_exit existed.
+ *
+ * Units: expected_exit/avg_exit are CENTS; wallets.balance is RANDS;
  * family_members.available_balance and transactions.amount are CENTS.
  *
  * Idempotent: only settles holdings still is_active=true, then flips them to
@@ -139,7 +141,7 @@ async function settleSellFills(holdingIds) {
   try {
     if (!holdingIds || !holdingIds.length) return;
     const holdings = await fetchSupabaseJson(
-      `/rest/v1/stock_holdings_c?id=in.(${buildInFilter(holdingIds)})&select=id,user_id,family_member_id,quantity,avg_exit,trade_side,is_active`
+      `/rest/v1/stock_holdings_c?id=in.(${buildInFilter(holdingIds)})&select=id,user_id,family_member_id,quantity,avg_exit,expected_exit,trade_side,is_active`
     );
     const toSettle = (holdings || []).filter((h) =>
       String(h.trade_side || '').toUpperCase() === 'SELL' &&
@@ -156,9 +158,10 @@ async function settleSellFills(holdingIds) {
 
     for (const h of toSettle) {
       const qty = Number(h.quantity) || 0;
-      const exitCents = Number(h.avg_exit) || 0;
-      const proceedsCents = Math.round(exitCents * qty);
-      const netCents = Math.round(proceedsCents * (1 - SELL_FEE_RATE));
+      // Credit at the client's expected exit (what they saw); fall back to the
+      // broker's avg_exit only if it was never captured.
+      const creditPerShare = Number(h.expected_exit) > 0 ? Number(h.expected_exit) : Number(h.avg_exit) || 0;
+      const netCents = Math.round(creditPerShare * qty);
       if (h.family_member_id) {
         netCentsByChild[h.family_member_id] = (netCentsByChild[h.family_member_id] || 0) + netCents;
       } else {
