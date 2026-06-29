@@ -4965,18 +4965,20 @@
             }).join('')
             : '<tr><td class="orderbook-empty-row" colspan="14">No rows captured.</td></tr>';
 
-          const moveToClosedBtn = book.readyToClose
+          // UAT/test books: no emails and no "move to Closed Books" — they're test data.
+          const isTestBook = bookIsTestBook(book);
+          const moveToClosedBtn = (book.readyToClose && !isTestBook)
             ? `<button type="button" class="orderbook-export-btn" data-move-to-closed data-book-id="${escapeHtml(String(book.id || ''))}" style="padding:4px 10px;height:26px;font-size:11px;background:#16a34a;color:#fff;border-color:#16a34a;" title="All rows are filled &mdash; move this book to Closed Books">Move to Closed Book</button>`
             : '';
 
           return `
             <details class="filled-orderbook-item">
               <summary class="filled-orderbook-summary">
-                <span>${escapeHtml(formatBookTitle(book))}</span>
+                <span>${escapeHtml(formatBookTitle(book))}${isTestBook ? ' <span style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:9px;font-weight:700;padding:1px 6px;border-radius:5px;margin-left:4px;letter-spacing:.04em;">UAT</span>' : ''}</span>
                 <span class="filled-orderbook-meta">
                   <span>${escapeHtml(book.dateLabel || '-')}</span>
-                  ${book.sentAt ? `<span>Sent: ${escapeHtml(new Date(book.sentAt).toLocaleString())}</span>` : ''}
-                  <span data-book-id="${escapeHtml(String(book.id || ''))}">${emailStatusChip(book.emailStatus)}</span>
+                  ${(!isTestBook && book.sentAt) ? `<span>Sent: ${escapeHtml(new Date(book.sentAt).toLocaleString())}</span>` : ''}
+                  ${isTestBook ? '' : `<span data-book-id="${escapeHtml(String(book.id || ''))}">${emailStatusChip(book.emailStatus)}</span>`}
                   ${moveToClosedBtn}
                 </span>
               </summary>
@@ -8247,16 +8249,20 @@
           const nowIso = new Date().toISOString();
           const fillDateStr = nowIso.split('T')[0];
           const side = String(currentEditRow.tradeSide || currentEditRow.side || '').toUpperCase();
-          const dbPayload = {
-            avg_fill: newPriceCents,
-            "Fill_date": fillDateStr,
-            updated_at: nowIso,
-            as_of_date: fillDateStr
-          };
-          if (side === 'SELL') {
-            dbPayload.avg_exit = newPriceCents;
-            dbPayload["Exit_date"] = fillDateStr;
-          }
+          // SELL = exit fill (avg_exit), never overwrite the entry price (avg_fill).
+          const dbPayload = side === 'SELL'
+            ? {
+                avg_exit: newPriceCents,
+                "Exit_date": fillDateStr,
+                updated_at: nowIso,
+                as_of_date: fillDateStr
+              }
+            : {
+                avg_fill: newPriceCents,
+                "Fill_date": fillDateStr,
+                updated_at: nowIso,
+                as_of_date: fillDateStr
+              };
 
           const { data: sessionData } = await supabaseClient.auth.getSession();
           const accessToken = sessionData?.session?.access_token;
@@ -8593,8 +8599,11 @@
         for (const m of brokerFillsRows) {
           if (!m.sourceId) continue;
           const side = String(m.side || '').toUpperCase();
-          const dbPayload = { avg_fill: m.priceCents, "Fill_date": fillDateStr, updated_at: nowIso, as_of_date: fillDateStr };
-          if (side === 'SELL') { dbPayload.avg_exit = m.priceCents; dbPayload["Exit_date"] = fillDateStr; }
+          // SELL fills set the EXIT price (avg_exit) and must NOT overwrite the
+          // original entry price (avg_fill). BUY fills set avg_fill as before.
+          const dbPayload = side === 'SELL'
+            ? { avg_exit: m.priceCents, "Exit_date": fillDateStr, updated_at: nowIso, as_of_date: fillDateStr }
+            : { avg_fill: m.priceCents, "Fill_date": fillDateStr, updated_at: nowIso, as_of_date: fillDateStr };
 
           confirmBtn.textContent = `Applying ${applied + pending + 1}/${brokerFillsRows.length}...`;
 
