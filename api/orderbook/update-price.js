@@ -119,6 +119,94 @@ async function reconcileBufferDrawdowns(holdingIds) {
   }
 }
 
+// Brokerage fee charged to the client on a sell (CEO: 8%). Net proceeds = 92%.
+const SELL_FEE_RATE = 0.08;
+
+/**
+ * Settle SELL fills: once an exit price (avg_exit, cents) is stamped on a
+ * client-requested sell, realise it — close the holding, credit the client's
+ * wallet with the net proceeds (gross − 8%), and mark the pending "Sell:" txn
+ * completed.
+ *
+ * Units: avg_exit & market value are CENTS; wallets.balance is RANDS;
+ * family_members.available_balance and transactions.amount are CENTS.
+ *
+ * Idempotent: only settles holdings still is_active=true, then flips them to
+ * is_active=false — a re-fill/price correction never double-credits.
+ * Never throws — a settlement hiccup must not fail the admin's price update.
+ */
+async function settleSellFills(holdingIds) {
+  try {
+    if (!holdingIds || !holdingIds.length) return;
+    const holdings = await fetchSupabaseJson(
+      `/rest/v1/stock_holdings_c?id=in.(${buildInFilter(holdingIds)})&select=id,user_id,family_member_id,quantity,avg_exit,trade_side,is_active`
+    );
+    const toSettle = (holdings || []).filter((h) =>
+      String(h.trade_side || '').toUpperCase() === 'SELL' &&
+      h.is_active !== false &&
+      Number(h.avg_exit) > 0 &&
+      Number(h.quantity) > 0
+    );
+    if (!toSettle.length) return;
+
+    const nowIso = new Date().toISOString();
+    const netRandsByUser = {};   // own holdings → wallets.balance (rands)
+    const netCentsByChild = {};  // child holdings → family_members.available_balance (cents)
+    const userIds = new Set();
+
+    for (const h of toSettle) {
+      const qty = Number(h.quantity) || 0;
+      const exitCents = Number(h.avg_exit) || 0;
+      const proceedsCents = Math.round(exitCents * qty);
+      const netCents = Math.round(proceedsCents * (1 - SELL_FEE_RATE));
+      if (h.family_member_id) {
+        netCentsByChild[h.family_member_id] = (netCentsByChild[h.family_member_id] || 0) + netCents;
+      } else {
+        netRandsByUser[h.user_id] = (netRandsByUser[h.user_id] || 0) + netCents / 100;
+        userIds.add(h.user_id);
+      }
+      // Close the position (also the idempotency guard).
+      await requestSupabaseJson(`/rest/v1/stock_holdings_c?id=eq.${encodeURIComponent(h.id)}`, {
+        method: 'PATCH',
+        body: { is_active: false, Status: 'closed', closed_at: nowIso, closed_reason: 'sold', updated_at: nowIso },
+      });
+    }
+
+    // Credit own wallets (rands).
+    for (const [uid, addRands] of Object.entries(netRandsByUser)) {
+      const wRows = await fetchSupabaseJson(`/rest/v1/wallets?user_id=eq.${encodeURIComponent(uid)}&select=balance`);
+      const cur = Number(wRows?.[0]?.balance || 0);
+      await requestSupabaseJson(`/rest/v1/wallets?user_id=eq.${encodeURIComponent(uid)}`, {
+        method: 'PATCH', body: { balance: cur + addRands },
+      });
+    }
+    // Credit child accounts (cents).
+    for (const [fmId, addCents] of Object.entries(netCentsByChild)) {
+      const fmRows = await fetchSupabaseJson(`/rest/v1/family_members?id=eq.${encodeURIComponent(fmId)}&select=available_balance`);
+      const cur = Number(fmRows?.[0]?.available_balance || 0);
+      await requestSupabaseJson(`/rest/v1/family_members?id=eq.${encodeURIComponent(fmId)}`, {
+        method: 'PATCH', body: { available_balance: cur + addCents },
+      });
+    }
+
+    // Complete the user's most recent pending "Sell:" transaction with the net amount (cents).
+    for (const uid of userIds) {
+      const txns = await fetchSupabaseJson(
+        `/rest/v1/transactions?user_id=eq.${encodeURIComponent(uid)}&status=eq.pending&name=like.Sell:*&select=id&order=created_at.desc&limit=1`
+      );
+      const tx = txns && txns[0];
+      if (tx) {
+        const netCents = Math.round((netRandsByUser[uid] || 0) * 100);
+        await requestSupabaseJson(`/rest/v1/transactions?id=eq.${encodeURIComponent(tx.id)}`, {
+          method: 'PATCH', body: { status: 'completed', amount: netCents, updated_at: nowIso },
+        });
+      }
+    }
+  } catch (err) {
+    console.error('[settle-sell] failed:', err?.message || err);
+  }
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -198,6 +286,12 @@ module.exports = async (req, res) => {
     // fail the request (the helper swallows its own errors).
     if (Object.prototype.hasOwnProperty.call(payload, 'avg_fill')) {
       await reconcileBufferDrawdowns(ids);
+    }
+
+    // If an exit price was set, realise the sell(s): close holding(s), credit
+    // the client's wallet with net proceeds (gross − 8%), complete the txn.
+    if (Object.prototype.hasOwnProperty.call(payload, 'avg_exit')) {
+      await settleSellFills(ids);
     }
 
     return sendJson(res, 200, {
