@@ -2248,13 +2248,18 @@
 
       const strategyParentRows = Array.from(strategyBuckets.entries()).map(([strategyId, holdings]) => {
         const first = holdings[0];
-        /* Totals count only LIVE positions: active rows that aren't the SELL audit
-           row. A rebalance SELL records shares that LEFT the portfolio, so it must
-           not inflate the strategy's value or quantity. It still stays in `holdings`
-           (strategyHoldings) so it shows in the detail table as a red sale record. */
+        /* Totals count only LIVE positions: active rows that aren't a settled
+           rebalance SELL audit record. A rebalance SELL records shares that LEFT
+           the portfolio (already stamped with avg_fill + rebalanceBatchId at
+           creation), so it must not inflate the strategy's value or quantity.
+           A CLIENT-REQUESTED pending sell (no rebalanceBatchId, awaiting an exit
+           price) is still an open position until settled, so it DOES count —
+           otherwise Mkt Value/Qty/Avg Fill all read 0 the moment a client taps
+           Sell, even though nothing has actually left the portfolio yet. */
         const isLive = (h) => {
           const sd = String(h.tradeSide || h.side || '').toUpperCase();
-          return h.isActive !== false && sd !== 'SELL';
+          if (sd !== 'SELL') return h.isActive !== false;
+          return h.isActive !== false && !h.rebalanceBatchId && !!h.isPendingSell;
         };
         const liveHoldings = holdings.filter(isLive);
         const totalMV = liveHoldings.reduce((s, h) => s + (h.marketValueNumber || 0), 0);
@@ -2354,10 +2359,11 @@
           }
           const u = userMap.get(key);
           /* Only LIVE positions count toward the investor's value + holdings count.
-             The SELL audit row (inactive, side SELL) records shares that left the
-             portfolio — counting it would inflate Live Price and Holdings. */
+             A settled rebalance SELL audit row records shares that left the
+             portfolio — counting it would inflate Live Price and Holdings. A
+             client-requested pending sell hasn't left yet, so it still counts. */
           const rSide = String(r.tradeSide || r.side || '').toUpperCase();
-          const rLive = r.isActive !== false && rSide !== 'SELL';
+          const rLive = r.isActive !== false && (rSide !== 'SELL' || (!r.rebalanceBatchId && !!r.isPendingSell));
           if (rLive) {
             u.totalMarketValue += r.marketValueNumber || 0;
             u.holdingsCount += 1;
@@ -3549,8 +3555,15 @@
          - gain  = filled BELOW the client's quote: max(0, Expected - avg) x qty
          - loss  = slippage BEYOND the 8% reserve: -shortfall (0 if reserve absorbed it)
        So a cheaper fill reads as profit; slippage inside the cushion reads 0; only
-       slippage that exhausts the reserve shows a real (red) loss. Unfilled -> "-". */
+       slippage that exhausts the reserve shows a real (red) loss. Unfilled -> "-".
+       A pending sell reuses the same holding row as its original buy, so the
+       buy-time buffer ledger entry is still attached to that id — show "-" until
+       the sell itself settles (avg_exit set), otherwise this displays stale
+       buy-fill economics as if they were the sell's result. */
     const renderMintPnlCell = (row) => {
+      if (row.isPendingSell) {
+        return '<td style="color:#64748b;font-weight:600;">-</td>';
+      }
       const ids = collectHoldingIds(row);
       let filled = false;
       let gainCents = 0;
