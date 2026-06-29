@@ -212,7 +212,7 @@ async function settleSellFills(holdingIds) {
         const allSettled = all.every((h) => h.is_active === false);
         await requestSupabaseJson(`/rest/v1/transactions?id=eq.${encodeURIComponent(txnId)}`, {
           method: 'PATCH',
-          body: { amount: realizedCents, status: allSettled ? 'completed' : 'pending', updated_at: nowIso },
+          body: { amount: realizedCents, status: allSettled ? 'posted' : 'pending', updated_at: nowIso },
         });
       } catch (txErr) {
         console.error(`[settle-sell] transaction reconcile failed for ${txnId}:`, txErr?.message || txErr);
@@ -235,7 +235,7 @@ async function settleSellFills(holdingIds) {
       const tx = txns && txns[0];
       if (tx) {
         await requestSupabaseJson(`/rest/v1/transactions?id=eq.${encodeURIComponent(tx.id)}`, {
-          method: 'PATCH', body: { status: 'completed', amount: netCents, updated_at: nowIso },
+          method: 'PATCH', body: { status: 'posted', amount: netCents, updated_at: nowIso },
         });
       }
     }
