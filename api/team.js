@@ -67,9 +67,24 @@ module.exports = async (req, res) => {
       if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
       const result = await requireAdmin(req, res);
       if (!result) return;
-      const data = await supabaseRequest(
-        '/rest/v1/admin_team?select=id,user_id,email,full_name,role,page_access,status,invited_by,approver_tier,permissions,created_at,updated_at&order=created_at.asc'
-      );
+      let data, error;
+      try {
+        const res = await supabaseRequest(
+          '/rest/v1/admin_team?select=id,user_id,email,full_name,role,page_access,status,invited_by,approver_tier,permissions,created_at,updated_at&order=created_at.asc'
+        );
+        if (res.error) throw res.error;
+        data = res;
+      } catch (err) {
+        // Fallback for Bug 4: if migration hasn't run, approver_tier and permissions don't exist
+        try {
+          const fallbackRes = await supabaseRequest(
+            '/rest/v1/admin_team?select=id,user_id,email,full_name,role,page_access,status,invited_by,created_at,updated_at&order=created_at.asc'
+          );
+          data = fallbackRes;
+        } catch (fallbackErr) {
+          error = fallbackErr;
+        }
+      }
       // Enrich with last_sign_in_at from Supabase Auth (best-effort).
       let signInByEmail = {};
       let signInByUserId = {};
@@ -815,6 +830,33 @@ module.exports = async (req, res) => {
         approval = Array.isArray(out) ? out[0] : out;
       } catch (err) {
         return sendJson(res, 500, { error: `Could not submit approval: ${err.message}. Have you run the permissions migration SQL?` });
+      }
+
+      if (row.type === 'fill_price') {
+        try {
+          const masterRows = await supabaseRequest('/rest/v1/admin_team?approver_tier=eq.master&select=email');
+          const masterEmails = (masterRows || []).map(r => r.email).filter(Boolean);
+          if (masterEmails.length > 0) {
+            const subject = `[MyMint Admin] Pending Orderbook Price Update: ${row.payload?.ticker || 'Instrument'}`;
+            const html = `
+              <div style="font-family: sans-serif; color: #333; max-width: 600px;">
+                <h2 style="color: #0f172a;">Orderbook Price Change Pending Approval</h2>
+                <p><strong>${result.user.email}</strong> has requested to update a live orderbook fill price.</p>
+                <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                  <p style="margin: 0 0 8px 0;"><strong>Instrument:</strong> ${row.payload?.instrument || ''} (${row.payload?.ticker || ''})</p>
+                  <p style="margin: 0 0 8px 0;"><strong>New Price:</strong> R ${Number(row.payload?.newPriceRand || 0).toFixed(2)}</p>
+                  <p style="margin: 0;"><strong>Notes:</strong> ${row.notes || '-'}</p>
+                </div>
+                <p>Please log in to the MyMint Admin Dashboard and navigate to the <strong>Teams & Approvals</strong> tab to approve or reject this change.</p>
+              </div>
+            `;
+            for (const email of masterEmails) {
+              await sendResendEmail({ to: email, subject, html, text: '' }).catch(e => console.error('[Approvals] Failed to email master admin:', e));
+            }
+          }
+        } catch (e) {
+          console.error('[Approvals] Error fetching master admins or sending email:', e);
+        }
       }
 
       return sendJson(res, 200, { ok: true, approval });

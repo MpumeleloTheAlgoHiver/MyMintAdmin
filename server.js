@@ -10,6 +10,7 @@ const mintMorningsHandler = require('./api/mint-mornings');
 const webhooksHandler = require('./api/webhooks');
 const cyberComplianceHandler = require('./api/cyber-compliance');
 const sendEftEmailHandler = require('./api/send-eft-email');
+const orderbookUpdatePriceHandler = require('./api/orderbook/update-price');
 const { runHealthCheck } = require('./api/monitor/_health-check');
 
 const port = process.env.PORT || 3000;
@@ -1181,7 +1182,11 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.url.startsWith('/api/orderbook')) {
+  if (req.url.startsWith('/api/orderbook/update-price')) {
+    return orderbookUpdatePriceHandler(req, res);
+  }
+
+  if (req.url === '/api/orderbook' || req.url.startsWith('/api/orderbook?')) {
     const token = parseBearerToken(req.headers.authorization);
     if (!token) {
       sendJson(res, 401, { error: 'Missing Authorization bearer token' });

@@ -671,13 +671,28 @@
     };
 
     // ── Permissions Modal ─────────────────────────────────────────────────────
+    // Holds the last known committed permissions from the DB for the member being edited.
+    // This is the source of truth when switching tiers, so we never read dev-locked DOM state.
+    let _permBaseSnapshot = {};
+
     const buildAccordion = (permissions, tier) => {
       const isDevTier = tier === 'dev';
       const acc = document.getElementById('permAccordion');
-      acc.innerHTML = PERMISSION_MATRIX.map(section => {
+
+      // Dev-tier info banner
+      const devBanner = isDevTier
+        ? `<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#92400e;">
+            <strong>Dev tier bypasses all permission checks.</strong> The settings below are saved to the database but are not enforced at runtime for this user.
+           </div>`
+        : '';
+
+      acc.innerHTML = devBanner + PERMISSION_MATRIX.map(section => {
         const fields = section.fields.map(field => {
           const curVal = (permissions[section.key] || {})[field.key];
           if (field.type === 'toggle') {
+            // FIX Bug 2/3: For dev tier, show checked visually but DON'T disable —
+            // we use data-dev-bypass to prevent interaction instead, and always save
+            // the actual stored value (not the visual override) when reading permissions.
             const checked = isDevTier ? true : !!curVal;
             return `
               <div class="perm-field">
@@ -686,13 +701,15 @@
                   <div class="perm-field-desc">${esc(field.desc)}</div>
                 </div>
                 <div class="perm-field-ctrl">
-                  <label class="perm-toggle" title="${isDevTier ? 'Bypassed by Dev tier' : ''}">
-                    <input type="checkbox" class="perm-toggle-input" data-section="${section.key}" data-field="${field.key}" ${checked ? 'checked' : ''} ${isDevTier ? 'disabled' : ''}>
+                  <label class="perm-toggle" title="${isDevTier ? 'Bypassed by Dev tier — saved but not enforced' : ''}">
+                    <input type="checkbox" class="perm-toggle-input" data-section="${section.key}" data-field="${field.key}" data-dev-bypass="${isDevTier}" ${checked ? 'checked' : ''} ${isDevTier ? 'disabled' : ''}>
                     <span class="perm-toggle-track"></span>
                   </label>
                 </div>
               </div>`;
           } else {
+            // FIX Bug 2/3: For dev tier, show max value visually but mark buttons with data-dev-bypass.
+            // readPermissions() will use _permBaseSnapshot for dev-bypass fields instead of reading DOM.
             const activeVal = isDevTier ? (field.options[field.options.length - 1].value) : (curVal !== undefined ? curVal : false);
             const btns = field.options.map(opt => {
               const isActive = String(activeVal) === String(opt.value);
@@ -700,7 +717,7 @@
               let cls = 'ts-btn';
               if (isActive && isBlocked) cls += ' ts-blocked';
               else if (isActive) cls += ' ts-active';
-              return `<button type="button" class="${cls}" data-section="${section.key}" data-field="${field.key}" data-value="${String(opt.value)}" ${isDevTier ? 'disabled' : ''}>${esc(opt.label)}</button>`;
+              return `<button type="button" class="${cls}" data-section="${section.key}" data-field="${field.key}" data-value="${String(opt.value)}" data-dev-bypass="${isDevTier}" ${isDevTier ? 'disabled' : ''}>${esc(opt.label)}</button>`;
             }).join('');
             return `
               <div class="perm-field">
@@ -750,16 +767,27 @@
     };
 
     const readPermissions = () => {
+      // FIX Bug 2 & 3: If the accordion was rendered in dev-bypass mode, disabled DOM
+      // controls cannot be relied on. For those fields we fall back to _permBaseSnapshot
+      // (the real DB value), so downgrading dev→master never leaks max permissions.
       const perms = {};
       PERMISSION_MATRIX.forEach(section => {
         perms[section.key] = {};
         section.fields.forEach(field => {
           if (field.type === 'toggle') {
             const el = document.querySelector(`.perm-toggle-input[data-section="${section.key}"][data-field="${field.key}"]`);
-            perms[section.key][field.key] = el ? el.checked : false;
+            if (el && el.dataset.devBypass === 'true') {
+              // Use the stored DB value, not the forced-checked dev-bypass display value
+              perms[section.key][field.key] = (_permBaseSnapshot[section.key] || {})[field.key] ?? false;
+            } else {
+              perms[section.key][field.key] = el ? el.checked : false;
+            }
           } else {
             const activeBtn = document.querySelector(`.ts-btn.ts-active[data-section="${section.key}"][data-field="${field.key}"], .ts-btn.ts-blocked[data-section="${section.key}"][data-field="${field.key}"]`);
-            if (activeBtn) {
+            if (activeBtn && activeBtn.dataset.devBypass === 'true') {
+              // Use the stored DB value, not the forced-max dev-bypass display value
+              perms[section.key][field.key] = (_permBaseSnapshot[section.key] || {})[field.key] ?? false;
+            } else if (activeBtn) {
               const v = activeBtn.dataset.value;
               perms[section.key][field.key] = v === 'false' ? false : v;
             } else {
@@ -773,19 +801,27 @@
 
     window.openPerms = (id, email, tier, permissions) => {
       currentPermMemberId = id;
+      // FIX Bug 2 & 3: Snapshot the real DB permissions on open so readPermissions()
+      // can use them as a fallback when the accordion is in dev-bypass mode.
+      _permBaseSnapshot = JSON.parse(JSON.stringify(permissions || {}));
       document.getElementById('permMemberEmail').textContent = email;
       const tierInputs = document.querySelectorAll('input[name="permTier"]');
       tierInputs.forEach(inp => { inp.checked = (inp.value === (tier || '')); });
-      const isDevTier = tier === 'dev';
       buildAccordion(permissions || {}, tier || '');
       document.getElementById('permOverlay').classList.add('open');
     };
 
     // Re-build accordion when tier changes
+    // FIX Bug 3: Read permissions BEFORE the rebuild (from the snapshot-aware readPermissions),
+    // so the accordion starts from the real saved values, not forced dev-max state.
     document.addEventListener('change', (e) => {
       if (e.target.name === 'permTier') {
         const tier = e.target.value;
+        // readPermissions respects dev-bypass and uses _permBaseSnapshot for locked fields
         const currentPerms = readPermissions();
+        // After a tier change, update the snapshot to what the user had before switching
+        // so further reads remain consistent within this modal session
+        _permBaseSnapshot = JSON.parse(JSON.stringify(currentPerms));
         buildAccordion(currentPerms, tier);
       }
     });
