@@ -425,7 +425,7 @@ async function handleOrderAlert(record, trigger) {
   const amountRands = Number(record.amount || 0) / 100;
   const whenIso = record.created_at || record.transaction_date || new Date().toISOString();
   const whenText = new Date(whenIso).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', dateStyle: 'medium', timeStyle: 'short' });
-  const to = process.env.ORDERBOOK_ALERT_TO || 'petrone.nel@mymint.co.za,support@mymint.co.za';
+  const to = process.env.ORDERBOOK_ALERT_TO || 'lonwabo@mymint.co.za,keri.leigh@mymint.co.za,support@mymint.co.za';
 
   // ── Gift ──────────────────────────────────────────────────────────────────
   if (isGift) {
@@ -542,7 +542,7 @@ module.exports = async (req, res) => {
   // to preview the desk order-alert email immediately — no real purchase needed.
   if (payload?.test_email === 'order_alert') {
     try {
-      const to = process.env.ORDERBOOK_ALERT_TO || 'petrone.nel@mymint.co.za,support@mymint.co.za';
+      const to = process.env.ORDERBOOK_ALERT_TO || 'lonwabo@mymint.co.za,keri.leigh@mymint.co.za,support@mymint.co.za';
       await sendEmail({
         to,
         subject: 'New order — Test Client: Strategy · Yield',

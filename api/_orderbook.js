@@ -133,7 +133,7 @@ const toOrderbookCsvContent = (rows) => {
 const sendOrderbookCsvEmail = async ({ subject, csvContent, fileName, idempotencyKey }) => {
   const resendApiKey = process.env.RESEND_API_KEY;
   const orderbookEmailFrom = process.env.ORDERBOOK_EMAIL_FROM;
-  const orderbookEmailTo = process.env.ORDERBOOK_EMAIL_TO;
+  const orderbookEmailTo = process.env.ORDERBOOK_EMAIL_TO || 'keri.leigh@mymint.co.za,support@mymint.co.za';
 
   if (!resendApiKey || !orderbookEmailFrom || !orderbookEmailTo) {
     throw new Error('Email service not configured. Set RESEND_API_KEY, ORDERBOOK_EMAIL_FROM, ORDERBOOK_EMAIL_TO');
