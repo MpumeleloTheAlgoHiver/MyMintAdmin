@@ -1377,7 +1377,7 @@
                   <th>Ticker</th>
                   <th>Side</th>
                   <th>Qty</th>
-                  <th>Avg Fill</th>
+                  <th>Avg Fill / Exit</th>
                   <th>Exp Fill</th>
                   <th>Actual Fill</th>
                   <th class="ob-liveprice-col">Mkt Value</th>
@@ -2413,6 +2413,15 @@
             if (!hs.length) return '-';
             const sum = hs.reduce((s, h) => s + h.avgExitNumber * Math.abs(h.quantityValue || 0), 0);
             return `R ${sum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          })(),
+          // Numeric exit totals for the SELL Exp/Actual columns.
+          expectedExitTotalNum: (() => {
+            const hs = (holdings || []).filter((h) => Number.isFinite(h.expectedExitNumber) && h.expectedExitNumber > 0);
+            return hs.length ? hs.reduce((s, h) => s + h.expectedExitNumber * Math.abs(h.quantityValue || 0), 0) : null;
+          })(),
+          avgExitTotalNum: (() => {
+            const hs = (holdings || []).filter((h) => Number.isFinite(h.avgExitNumber) && h.avgExitNumber > 0);
+            return hs.length ? hs.reduce((s, h) => s + h.avgExitNumber * Math.abs(h.quantityValue || 0), 0) : null;
           })(),
           actualFillNumber: hasActualFillTotal ? totalActualFill : null,
           actualFill: hasActualFillTotal
@@ -5669,6 +5678,18 @@
         // "Actual Fill" = higher of expected vs avg fill (see higherFillText).
         const higherFillDisplay = higherFillText(row);
 
+        // SELL columns mirror buys: Exp Fill = what the client saw (expected exit
+        // total); Actual Fill = realised difference (broker avg_exit − expected),
+        // i.e. the MINT spread. Empty until the broker fill returns.
+        const _fmtRand = (n) => `R ${Number(n).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const _isSellRow = sideValue === 'SELL';
+        const expFillCell = _isSellRow
+          ? (row.expectedExitTotalNum != null ? _fmtRand(row.expectedExitTotalNum) : '-')
+          : asRandValue(row.actualFill);
+        const actualFillCell = _isSellRow
+          ? ((row.avgExitTotalNum != null && row.expectedExitTotalNum != null) ? _fmtRand(row.avgExitTotalNum - row.expectedExitTotalNum) : '-')
+          : higherFillDisplay;
+
         // Build Actions column (first column)
         let actionsHtml = '';
         if (isPending) {
@@ -5736,8 +5757,8 @@
             <td><span class="side-badge ${sideClass}">${escapeHtml(sideValue || '-')}</span></td>
             <td>${escapeHtml(String(row.totalQuantity ?? '-'))}</td>
             <td>${priceActionHtml}</td>
-            <td>${escapeHtml(asRandValue(row.actualFill))}</td>
-            <td>${escapeHtml(higherFillDisplay)}</td>
+            <td>${escapeHtml(expFillCell)}</td>
+            <td>${escapeHtml(actualFillCell)}</td>
             <td class="ob-liveprice-col">${escapeHtml(asRandValue(row.marketValue))}</td>
             <td class="ob-constant-col">${escapeHtml(row.orderType || '-')}</td>
             <td class="ob-constant-col">
@@ -5847,7 +5868,7 @@
       const [holdingsResult, rebEventsResult, rebBatchesResult] = await Promise.all([
         supabaseClient
           .from('stock_holdings_c')
-          .select('id, user_id, family_member_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, as_of_date, created_at, updated_at, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", avg_exit, strategy_id, trade_side, is_active, closed_reason, closed_at, rebalance_batch_id, strategy_name_snapshot, transaction_id, expected_fill:"Expected_fill", fill_set_by, fill_set_at')
+          .select('id, user_id, family_member_id, security_id, quantity, avg_fill, market_value, unrealized_pnl, as_of_date, created_at, updated_at, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", avg_exit, expected_exit, strategy_id, trade_side, is_active, closed_reason, closed_at, rebalance_batch_id, strategy_name_snapshot, transaction_id, expected_fill:"Expected_fill", fill_set_by, fill_set_at')
           .order('updated_at', { ascending: false }),
         supabaseClient
           .from('rebalance_event')
@@ -6131,6 +6152,10 @@
         const avgExitRaw = (row.avg_exit != null && row.avg_exit !== '') ? Number(row.avg_exit) : NaN;
         const avgExitValue = Number.isFinite(avgExitRaw) ? (avgExitRaw / 100) : NaN;
         const hasAvgExit = Number.isFinite(avgExitValue);
+        // Expected exit (rands/share) — the price the client SAW when they sold.
+        const expExitRaw = (row.expected_exit != null && row.expected_exit !== '') ? Number(row.expected_exit) : NaN;
+        const expExitValue = Number.isFinite(expExitRaw) ? (expExitRaw / 100) : NaN;
+        const hasExpExit = Number.isFinite(expExitValue);
         /* Expected_fill is the per-share price recorded at click time (rands).
            Guard against legacy rows that stored it in cents &mdash; if >5&times; the
            avg_fill-in-rands, treat as cents and divide. Used for the Actual
@@ -6215,6 +6240,10 @@
           avgFill,
           avgExitNumber: hasAvgExit ? avgExitValue : null,
           avgExit,
+          expectedExitNumber: hasExpExit ? expExitValue : null,
+          // SELL display totals (rands): what they saw, and what the broker gave.
+          expectedExitTotalNum: hasExpExit ? expExitValue * Math.abs(quantityValue || 0) : null,
+          avgExitTotalNum: hasAvgExit ? avgExitValue * Math.abs(quantityValue || 0) : null,
           actualFillNumber: hasActualFill ? actualFillValue : null,
           actualFill,
           marketValueNumber: computedMarketValueNumber,
