@@ -617,6 +617,16 @@
     const getCheckedPages = (containerId) =>
       Array.from(document.querySelectorAll(`#${containerId} input[type=checkbox]:checked`)).map(cb => cb.value);
 
+    // Returns true if a staff member has at least one permission explicitly enabled.
+    // Used to detect the "page access granted but no actions enabled" misconfiguration.
+    const hasAnyPermission = (permissions) => {
+      if (!permissions || typeof permissions !== 'object') return false;
+      return Object.values(permissions).some(section =>
+        section && typeof section === 'object' &&
+        Object.values(section).some(v => v !== false && v !== undefined && v !== null)
+      );
+    };
+
     // ── Member Table ──────────────────────────────────────────────────────────
     const renderTable = (members) => {
       const body = document.getElementById('teamTableBody');
@@ -638,12 +648,30 @@
         const resendBtn = m.status === 'pending'
           ? `<button class="btn btn-sm btn-ghost" onclick='resendInvite(${JSON.stringify(m.id)},${JSON.stringify(m.email)})'>Resend</button>`
           : '';
+
+        // Warn if staff has page access granted but no fine-grained permissions set —
+        // users in this state can navigate to pages but all actions will be blocked.
+        const needsPermWarning = m.role === 'staff'
+          && m.status === 'active'
+          && perms.length > 0
+          && !hasAnyPermission(m.permissions);
+        const permBtnStyle = needsPermWarning
+          ? 'background:#fff3cd;color:#92400e;border:1px solid #fcd34d;'
+          : 'background:#ede9fe;color:#5b21b6;';
+        const permBtnLabel = needsPermWarning
+          ? '⚠ Permissions'
+          : 'Permissions';
+        const permBtnTitle = needsPermWarning
+          ? 'title="This user has page access but no actions are enabled — they will be blocked from doing anything. Click to configure permissions."'
+          : '';
+
         return `
-          <tr>
+          <tr ${needsPermWarning ? 'style="background:#fffbeb;"' : ''}>
             <td>
               <div style="font-weight:600">${esc(m.full_name || '—')}</div>
               <div style="font-size:11px;color:#8e8e93;margin-top:2px">${esc(m.email)}</div>
               ${m.last_sign_in_at ? `<div style="font-size:10px;color:#8e8e93;margin-top:1px">Last login: ${new Date(m.last_sign_in_at).toLocaleDateString('en-ZA')}</div>` : ''}
+              ${needsPermWarning ? `<div style="font-size:10px;color:#92400e;font-weight:600;margin-top:3px;">⚠ No actions enabled — configure Permissions</div>` : ''}
             </td>
             <td>${tierBadge(m.approver_tier)}</td>
             <td><span class="badge badge-${m.role}">${m.role === 'admin' ? 'Admin' : 'Staff'}</span></td>
@@ -653,7 +681,7 @@
               <div class="td-actions">
                 ${resendBtn}
                 <button class="btn btn-sm btn-ghost" onclick='openEdit(${JSON.stringify(m.id)},${JSON.stringify(m.role)},${JSON.stringify(perms)})'>Role</button>
-                <button class="btn btn-sm" style="background:#ede9fe;color:#5b21b6;" onclick='openPerms(${JSON.stringify(m.id)},${JSON.stringify(m.email)},${JSON.stringify(m.approver_tier||null)},${JSON.stringify(m.permissions||{})})'>Permissions</button>
+                <button class="btn btn-sm" style="${permBtnStyle}" ${permBtnTitle} onclick='openPerms(${JSON.stringify(m.id)},${JSON.stringify(m.email)},${JSON.stringify(m.approver_tier||null)},${JSON.stringify(m.permissions||{})})'>${permBtnLabel}</button>
                 ${!m.email.endsWith('@mymint.co.za') ? `<button class="btn btn-sm" style="background:#fff8e1;color:#b45309;" onclick='openUpdateEmail(${JSON.stringify(m.id)},${JSON.stringify(m.email)})'>Update Email</button>` : ''}
                 ${isSelf ? '' : `<button class="btn btn-sm btn-danger" onclick='removeMember(${JSON.stringify(m.id)},${JSON.stringify(m.full_name || m.email)})'>Remove</button>`}
               </div>
