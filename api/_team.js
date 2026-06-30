@@ -486,6 +486,37 @@ const auditMasterAction = async (member, section, field, details = {}) => {
     'commit_rebalance', 'approve_deposits', 'manual_funds', 'export'
   ];
   if (!auditedActions.includes(field)) return;
+
+  // Let's intercept to check if this is a test account
+  let isTestUser = false;
+  try {
+    const targetUserId = details.user_id || details.userId || details.payload?.userId || details.payload?.user_id;
+    const targetHoldingId = details.holdingId || details.payload?.holdingId || (details.ids && details.ids[0]) || (details.payload?.ids && details.payload.ids[0]);
+    
+    if (targetUserId) {
+      const profs = await supabaseRequest(`/rest/v1/profiles?id=eq.${encodeURIComponent(targetUserId)}&select=is_test&limit=1`, { method: 'GET', useServiceRoleAuth: true });
+      if (profs && profs[0]?.is_test) isTestUser = true;
+    } else if (targetHoldingId) {
+      const holdings = await supabaseRequest(`/rest/v1/stock_holdings?id=eq.${encodeURIComponent(targetHoldingId)}&select=user_id&limit=1`, { method: 'GET', useServiceRoleAuth: true });
+      if (holdings && holdings[0]?.user_id) {
+        const profs = await supabaseRequest(`/rest/v1/profiles?id=eq.${encodeURIComponent(holdings[0].user_id)}&select=is_test&limit=1`, { method: 'GET', useServiceRoleAuth: true });
+        if (profs && profs[0]?.is_test) isTestUser = true;
+      }
+    }
+    
+    // Also if explicit isUatMode is sent in payload
+    if (details.isUatMode || details.payload?.isUatMode) {
+      isTestUser = true;
+    }
+  } catch (e) {
+    console.error('Audit: Failed to check test user status', e);
+  }
+
+  if (isTestUser) {
+    console.log(`[Audit] Skipping audit log for ${field} because target is a test user`);
+    return;
+  }
+
   
   // Format details for the email, filtering out empty values and massive payloads (like CSV content)
   let detailsHtml = '';
