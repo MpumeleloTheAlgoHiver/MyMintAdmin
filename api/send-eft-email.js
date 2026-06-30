@@ -33,7 +33,16 @@ const handleAddWallet = async (req, res, token) => {
     return sendJson(res, 400, { error: 'body-parse: ' + e.message });
   }
 
-  const { user_id, amount, account_type, wallet_status = 'active' } = body || {};
+  let { user_id, amount, account_type, wallet_status = 'active' } = body || {};
+
+  try {
+    const profs = await fetchSupabaseJson(`/rest/v1/profiles?id=eq.${encodeURIComponent(user_id)}&select=is_test&limit=1`);
+    if (profs && profs.length > 0 && profs[0].is_test === true) {
+      wallet_status = 'test';
+    }
+  } catch (e) {
+    console.error('Failed to lookup profile for EFT test check', e.message);
+  }
 
   if (!user_id) return sendJson(res, 400, { error: 'Missing user_id' });
   if (!amount || Number(amount) <= 0) return sendJson(res, 400, { error: 'Invalid amount' });
@@ -186,6 +195,7 @@ const sendApprovalNotification = async (userId, amount) => {
       <tr><td style="padding:6px 0;font-size:13px;color:#94a3b8;width:120px;">Client</td><td style="font-size:13px;font-weight:600;color:#1e293b;">${clientName}</td></tr>
       <tr><td style="padding:6px 0;font-size:13px;color:#94a3b8;">Amount</td><td style="font-size:15px;font-weight:700;color:#f59e0b;">${zarAmount}</td></tr>
       <tr><td style="padding:6px 0;font-size:13px;color:#94a3b8;">Status</td><td style="font-size:13px;font-weight:600;color:#7c3aed;">Pending Approval</td></tr>
+      <tr><td style="padding:6px 0;font-size:13px;color:#94a3b8;">Time</td><td style="font-size:13px;font-weight:600;color:#1e293b;">${new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', dateStyle: 'medium', timeStyle: 'short' })}</td></tr>
     </table>
     <p style="font-size:13px;color:#64748b;margin:0 0 20px 0;">Log in to the Mint Admin Portal and go to <strong>EFT Payments → Pending Approvals</strong> to approve or review this request.</p>
     <a href="https://mint-crm.vercel.app/eft.html" style="display:inline-block;background:#7c3aed;color:#fff;font-size:13px;font-weight:600;padding:12px 24px;border-radius:8px;text-decoration:none;">Review in Admin Portal</a>

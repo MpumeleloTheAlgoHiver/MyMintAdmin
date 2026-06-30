@@ -115,7 +115,8 @@ const requirePermission = async (req, res, section, field) => {
   // Devs and Master Admins bypass fine-grained checks
   if (member.approver_tier === 'dev' || member.role === 'master_admin' || member.approver_tier === 'master') {
     // Fire off an audit email for sensitive actions asynchronously
-    auditMasterAction(member, section, field).catch(() => {});
+    const details = { ...req.query, ...(req.body && typeof req.body === 'object' ? req.body : {}) };
+    auditMasterAction(member, section, field, details).catch(() => {});
     return result;
   }
   
@@ -479,26 +480,76 @@ const isMasterOrDev = (member) =>
 const isDev = (member) => member && member.approver_tier === 'dev';
 
 // Audit helper to email master admins when a sensitive action is executed
-const auditMasterAction = async (member, section, field) => {
+const auditMasterAction = async (member, section, field, details = {}) => {
   const auditedActions = [
     'edit_fill_price', 'send_confirmation', 'refund_investor', 
     'commit_rebalance', 'approve_deposits', 'manual_funds', 'export'
   ];
   if (!auditedActions.includes(field)) return;
 
+  // Let's intercept to check if this is a test account
+  let isTestUser = false;
+  try {
+    const targetUserId = details.user_id || details.userId || details.payload?.userId || details.payload?.user_id;
+    const targetHoldingId = details.holdingId || details.payload?.holdingId || (details.ids && details.ids[0]) || (details.payload?.ids && details.payload.ids[0]);
+    
+    if (targetUserId) {
+      const profs = await supabaseRequest(`/rest/v1/profiles?id=eq.${encodeURIComponent(targetUserId)}&select=is_test&limit=1`, { method: 'GET', useServiceRoleAuth: true });
+      if (profs && profs[0]?.is_test) isTestUser = true;
+    } else if (targetHoldingId) {
+      const holdings = await supabaseRequest(`/rest/v1/stock_holdings?id=eq.${encodeURIComponent(targetHoldingId)}&select=user_id&limit=1`, { method: 'GET', useServiceRoleAuth: true });
+      if (holdings && holdings[0]?.user_id) {
+        const profs = await supabaseRequest(`/rest/v1/profiles?id=eq.${encodeURIComponent(holdings[0].user_id)}&select=is_test&limit=1`, { method: 'GET', useServiceRoleAuth: true });
+        if (profs && profs[0]?.is_test) isTestUser = true;
+      }
+    }
+    
+    // Also if explicit isUatMode is sent in payload
+    if (details.isUatMode || details.payload?.isUatMode) {
+      isTestUser = true;
+    }
+  } catch (e) {
+    console.error('Audit: Failed to check test user status', e);
+  }
+
+  if (isTestUser) {
+    console.log(`[Audit] Skipping audit log for ${field} because target is a test user`);
+    return;
+  }
+
+  
+  // Format details for the email, filtering out empty values and massive payloads (like CSV content)
+  let detailsHtml = '';
+  const safeKeys = Object.keys(details).filter(k => k !== 'csvContent' && k !== 'action' && details[k] !== undefined && details[k] !== null && details[k] !== '');
+  if (safeKeys.length > 0) {
+    detailsHtml = `
+      <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0;">
+        <h3 style="margin: 0 0 12px 0; font-size: 14px; color: #475569; text-transform: uppercase;">Execution Payload Details</h3>
+        <ul style="margin: 0; padding-left: 20px;">
+          ${safeKeys.map(k => {
+            let val = details[k];
+            if (typeof val === 'object') val = JSON.stringify(val);
+            return `<li style="margin-bottom: 4px;"><strong>${k}:</strong> ${val}</li>`;
+          }).join('')}
+        </ul>
+      </div>
+    `;
+  }
+
   const subject = `[Audit] Master Action Executed: ${field}`;
   const html = `
-    <div style="font-family: sans-serif; color: #1c1c1e;">
+    <div style="font-family: sans-serif; color: #1c1c1e; max-width: 600px;">
       <h2 style="color: #7c3aed;">Master Action Executed</h2>
       <p>A sensitive action was executed directly by a Master Admin or Dev.</p>
-      <ul>
+      <ul style="margin-bottom: 24px;">
         <li><strong>Actor:</strong> ${member.full_name || member.email} (${member.email})</li>
         <li><strong>Role:</strong> ${member.role} | <strong>Tier:</strong> ${member.approver_tier || 'none'}</li>
         <li><strong>Module:</strong> ${section}</li>
         <li><strong>Action:</strong> ${field}</li>
-        <li><strong>Time:</strong> ${new Date().toISOString()}</li>
+        <li><strong>Time:</strong> ${new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', timeZoneName: 'short' })}</li>
       </ul>
-      <p style="font-size: 12px; color: #8e8e93;">This is an automated audit log notification.</p>
+      ${detailsHtml}
+      <p style="font-size: 12px; color: #8e8e93; margin-top: 32px;">This is an automated audit log notification.</p>
     </div>
   `;
 
