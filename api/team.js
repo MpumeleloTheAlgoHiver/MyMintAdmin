@@ -4,7 +4,7 @@ const {
   sendJson,
   isAllowedDomain,
   requireAuth,
-  requireAdmin,
+  requireMasterAdmin,
   supabaseRequest,
   createAuthUser,
   listAuthUsers,
@@ -65,7 +65,7 @@ module.exports = async (req, res) => {
     // LIST — admin only
     if (action === 'list') {
       if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
-      const result = await requireAdmin(req, res);
+      const result = await requireMasterAdmin(req, res);
       if (!result) return;
       let data, error;
       try {
@@ -107,7 +107,7 @@ module.exports = async (req, res) => {
     // INVITE — admin only. Stores token, returns signup link, tries to email it.
     if (action === 'invite') {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
-      const result = await requireAdmin(req, res);
+      const result = await requireMasterAdmin(req, res);
       if (!result) return;
       const email = normEmail(req.body?.email);
       const full_name = (req.body?.full_name || '').trim() || null;
@@ -229,7 +229,7 @@ module.exports = async (req, res) => {
     // and re-sends the invitation email (or returns the new link).
     if (action === 'resend') {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
-      const result = await requireAdmin(req, res);
+      const result = await requireMasterAdmin(req, res);
       if (!result) return;
       const id = req.body?.id;
       if (!id) return sendJson(res, 400, { error: 'id is required' });
@@ -404,7 +404,7 @@ module.exports = async (req, res) => {
     // Updates both the admin_team row and the Supabase Auth user record.
     if (action === 'update-email') {
       if (req.method !== 'POST' && req.method !== 'PATCH') return sendJson(res, 405, { error: 'Method not allowed' });
-      const result = await requireAdmin(req, res);
+      const result = await requireMasterAdmin(req, res);
       if (!result) return;
       const { id, new_email } = req.body || {};
       if (!id || !new_email) return sendJson(res, 400, { error: 'id and new_email are required' });
@@ -461,7 +461,7 @@ module.exports = async (req, res) => {
       if (req.method !== 'PUT' && req.method !== 'POST' && req.method !== 'PATCH') {
         return sendJson(res, 405, { error: 'Method not allowed' });
       }
-      const result = await requireAdmin(req, res);
+      const result = await requireMasterAdmin(req, res);
       if (!result) return;
       const { id, role, page_access } = req.body || {};
       if (!id) return sendJson(res, 400, { error: 'id is required' });
@@ -499,7 +499,7 @@ module.exports = async (req, res) => {
     // REMOVE — admin only
     if (action === 'remove') {
       if (req.method !== 'DELETE') return sendJson(res, 405, { error: 'Method not allowed' });
-      const result = await requireAdmin(req, res);
+      const result = await requireMasterAdmin(req, res);
       if (!result) return;
       const id = req.body?.id || url.searchParams.get('id');
       if (!id) return sendJson(res, 400, { error: 'id is required' });
@@ -526,7 +526,7 @@ module.exports = async (req, res) => {
     // so the admin can preview the live Mint client app signed in as them.
     if (action === 'impersonate') {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
-      const result = await requireAdmin(req, res);
+      const result = await requireMasterAdmin(req, res);
       if (!result) return;
       const userId = (req.body?.user_id || '').trim();
       const target = (req.body?.target || 'dev').toLowerCase() === 'live' ? 'live' : 'dev';
@@ -607,7 +607,7 @@ module.exports = async (req, res) => {
     // AUDIT-LIST — admin only
     if (action === 'audit-list') {
       if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
-      const result = await requireAdmin(req, res);
+      const result = await requireMasterAdmin(req, res);
       if (!result) return;
       const limit = Math.min(parseInt(url.searchParams.get('limit') || '100', 10) || 100, 500);
 
@@ -670,7 +670,7 @@ module.exports = async (req, res) => {
       if (req.method !== 'POST' && req.method !== 'PUT' && req.method !== 'PATCH') {
         return sendJson(res, 405, { error: 'Method not allowed' });
       }
-      const result = await requireAdmin(req, res);
+      const result = await requireMasterAdmin(req, res);
       if (!result) return;
       const key = (req.body?.key || 'fees').trim();
       const incoming = req.body?.value;
@@ -732,7 +732,7 @@ module.exports = async (req, res) => {
     // UPDATE-PERMISSIONS — admin only. Sets a member's approver_tier + permissions JSONB.
     if (action === 'update-permissions') {
       if (req.method !== 'POST' && req.method !== 'PATCH') return sendJson(res, 405, { error: 'Method not allowed' });
-      const result = await requireAdmin(req, res);
+      const result = await requireMasterAdmin(req, res);
       if (!result) return;
       const { id, approver_tier, permissions } = req.body || {};
       if (!id) return sendJson(res, 400, { error: 'id is required' });

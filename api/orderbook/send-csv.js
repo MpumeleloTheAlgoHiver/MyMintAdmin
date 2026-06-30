@@ -286,6 +286,7 @@ module.exports = async (req, res) => {
     // RLS only grants SELECT to the owning user, so a browser read returns {} for
     // every other client — this lets the admin see every holder's residual.
     if (action === 'rebalance-load-residuals') {
+      if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
       const body = req.body && typeof req.body === 'object' ? req.body : {};
       const strategyId = String(body.strategyId || '').trim();
       if (!strategyId) return sendJson(res, 400, { error: 'strategyId required' });
@@ -313,6 +314,7 @@ module.exports = async (req, res) => {
     // no write RLS policy (writes are service-role only by design), so a browser
     // upsert fails with "new row violates row-level security policy".
     if (action === 'rebalance-upsert-residuals') {
+      if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
       const body = req.body && typeof req.body === 'object' ? req.body : {};
       const strategyId = String(body.strategyId || '').trim();
       if (!strategyId) return sendJson(res, 400, { error: 'strategyId required' });
