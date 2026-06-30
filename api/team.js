@@ -778,8 +778,12 @@ module.exports = async (req, res) => {
       if (!result) return;
       
       const targetId = req.body?.id;
-      const approvals = req.body?.approvals !== false;
-      const audits = req.body?.audits !== false;
+      const trade_confirmation = req.body?.trade_confirmation === true;
+      const fill_price = req.body?.fill_price === true;
+      const audits = req.body?.audits === true;
+      const order_alerts = req.body?.order_alerts === true;
+      const eft_approvals = req.body?.eft_approvals === true;
+      const csv_exports = req.body?.csv_exports === true;
       
       if (!targetId) return sendJson(res, 400, { error: 'User ID is required' });
       
@@ -789,7 +793,7 @@ module.exports = async (req, res) => {
       const user = beforeRows[0];
       
       const safePerms = typeof user.permissions === 'object' && user.permissions !== null ? user.permissions : {};
-      const newNotifs = { ...safePerms.notifications, approvals, audits };
+      const newNotifs = { ...safePerms.notifications, trade_confirmation, fill_price, audits, order_alerts, eft_approvals, csv_exports };
       safePerms.notifications = newNotifs;
       
       const [updated] = await supabaseRequest(`/rest/v1/admin_team?id=eq.${targetId}`, {
@@ -861,7 +865,7 @@ module.exports = async (req, res) => {
         return sendJson(res, 500, { error: `Could not submit approval: ${err.message}. Have you run the permissions migration SQL?` });
       }
 
-      if (row.type === 'fill_price') {
+      if (row.type === 'fill_price' || row.type === 'trade_confirmation') {
         try {
           const masterRows = await supabaseRequest('/rest/v1/admin_team?approver_tier=eq.master&select=email,permissions');
           const masterEmails = (masterRows || [])
@@ -869,25 +873,44 @@ module.exports = async (req, res) => {
               if (!r.email) return false;
               const perms = r.permissions || {};
               const notifs = perms.notifications || {};
-              return notifs.approvals !== false;
+              return notifs[row.type] === true; // Opt-in only
             })
             .map(r => r.email);
           if (masterEmails.length > 0) {
-            const subject = `[MyMint Admin] Pending Orderbook Price Update: ${row.payload?.ticker || 'Instrument'}`;
-            const html = `
-              <div style="font-family: sans-serif; color: #333; max-width: 600px;">
-                <h2 style="color: #0f172a;">Orderbook Price Change Pending Approval</h2>
-                <p><strong>${result.user.email}</strong> has requested to update a live orderbook fill price.</p>
-                <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0;">
-                  <p style="margin: 0 0 8px 0;"><strong>Instrument:</strong> ${row.payload?.instrument || ''} (${row.payload?.ticker || ''})</p>
-                  <p style="margin: 0 0 8px 0;"><strong>New Price:</strong> R ${Number(row.payload?.newPriceRand || 0).toFixed(2)}</p>
-                  <p style="margin: 0;"><strong>Notes:</strong> ${row.notes || '-'}</p>
+            let subject = '';
+            let html = '';
+            if (row.type === 'fill_price') {
+              subject = `[MyMint Admin] Pending Orderbook Price Update: ${row.payload?.ticker || 'Instrument'}`;
+              html = `
+                <div style="font-family: sans-serif; color: #333; max-width: 600px;">
+                  <h2 style="color: #0f172a;">Orderbook Price Change Pending Approval</h2>
+                  <p><strong>${result.user.email}</strong> has requested to update a live orderbook fill price.</p>
+                  <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                    <p style="margin: 0 0 8px 0;"><strong>Instrument:</strong> ${row.payload?.instrument || ''} (${row.payload?.ticker || ''})</p>
+                    <p style="margin: 0 0 8px 0;"><strong>New Price:</strong> R ${Number(row.payload?.newPriceRand || 0).toFixed(2)}</p>
+                    <p style="margin: 0;"><strong>Notes:</strong> ${row.notes || '-'}</p>
+                  </div>
+                  <p>Please log in to the MyMint Admin Dashboard and navigate to the <strong>Teams & Approvals</strong> tab to approve or reject this change.</p>
                 </div>
-                <p>Please log in to the MyMint Admin Dashboard and navigate to the <strong>Teams & Approvals</strong> tab to approve or reject this change.</p>
-              </div>
-            `;
+              `;
+            } else if (row.type === 'trade_confirmation') {
+              subject = `[MyMint Admin] Pending Trade Confirmation Send: ${row.payload?.holdingId || 'Holding'}`;
+              html = `
+                <div style="font-family: sans-serif; color: #333; max-width: 600px;">
+                  <h2 style="color: #0f172a;">Trade Confirmation Send Pending Approval</h2>
+                  <p><strong>${result.user.email}</strong> has requested to send a trade confirmation email.</p>
+                  <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                    <p style="margin: 0 0 8px 0;"><strong>Holding ID:</strong> ${row.payload?.holdingId || ''}</p>
+                    <p style="margin: 0 0 8px 0;"><strong>Bond Reference:</strong> ${row.payload?.bndReference || '-'}</p>
+                    <p style="margin: 0;"><strong>Notes:</strong> ${row.notes || '-'}</p>
+                  </div>
+                  <p>Please log in to the MyMint Admin Dashboard and navigate to the <strong>Teams & Approvals</strong> tab to approve or reject this send request.</p>
+                </div>
+              `;
+            }
+            
             for (const email of masterEmails) {
-              await sendResendEmail({ to: email, subject, html, text: '' }).catch(e => console.error('[Approvals] Failed to email master admin:', e));
+              await sendResendEmail({ to: email, subject, html, text: '' }).catch(e => console.error(`[Approvals] Failed to email master admin for ${row.type}:`, e));
             }
           }
         } catch (e) {

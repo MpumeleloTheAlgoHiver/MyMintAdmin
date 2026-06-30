@@ -31,6 +31,21 @@ const sbGet = async (path) => {
   return data;
 };
 
+const getRecipients = async (type) => {
+  try {
+    const rows = await sbGet('/rest/v1/admin_team?select=email,permissions');
+    const emails = (rows || []).filter(r => {
+      if (!r.email) return false;
+      const notifs = (r.permissions || {}).notifications || {};
+      return notifs[type] === true;
+    }).map(r => r.email);
+    if (emails.length > 0) return emails;
+  } catch (e) {
+    console.error(`[Webhooks] Failed to fetch recipients for ${type}:`, e.message);
+  }
+  return []; // no one opted in, return empty array
+};
+
 const sendEmail = async ({ to, subject, html, emailType, source = 'webhook', metadata = {} }) => {
   // Accept a single address, a comma-separated string, or an array → Resend wants an array.
   const toList = (Array.isArray(to) ? to : String(to || '').split(','))
@@ -425,7 +440,8 @@ async function handleOrderAlert(record, trigger) {
   const amountRands = Number(record.amount || 0) / 100;
   const whenIso = record.created_at || record.transaction_date || new Date().toISOString();
   const whenText = new Date(whenIso).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', dateStyle: 'medium', timeStyle: 'short' });
-  const to = process.env.ORDERBOOK_ALERT_TO || 'lonwabo@mymint.co.za,keri.leigh@mymint.co.za,support@mymint.co.za';
+  const to = await getRecipients('order_alerts');
+  if (!to || to.length === 0) return { ok: true, skipped: true, reason: 'No admins subscribed to order_alerts' };
 
   // ── Gift ──────────────────────────────────────────────────────────────────
   if (isGift) {
@@ -542,7 +558,8 @@ module.exports = async (req, res) => {
   // to preview the desk order-alert email immediately — no real purchase needed.
   if (payload?.test_email === 'order_alert') {
     try {
-      const to = process.env.ORDERBOOK_ALERT_TO || 'lonwabo@mymint.co.za,keri.leigh@mymint.co.za,support@mymint.co.za';
+      const to = await getRecipients('order_alerts');
+      if (!to || to.length === 0) return sendJson(res, 200, { ok: true, notice: 'No one is subscribed to order_alerts' });
       await sendEmail({
         to,
         subject: 'New order — Test Client: Strategy · Yield',

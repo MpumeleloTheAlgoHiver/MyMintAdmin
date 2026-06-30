@@ -130,19 +130,38 @@ const toOrderbookCsvContent = (rows) => {
   return csvLines.join('\n');
 };
 
-const sendOrderbookCsvEmail = async ({ subject, csvContent, fileName, idempotencyKey }) => {
+const sendOrderbookCsvEmail = async ({ subject, csvContent, fileName, idempotencyKey, to }) => {
   const resendApiKey = process.env.RESEND_API_KEY;
   const orderbookEmailFrom = process.env.ORDERBOOK_EMAIL_FROM;
-  const orderbookEmailTo = process.env.ORDERBOOK_EMAIL_TO || 'keri.leigh@mymint.co.za,support@mymint.co.za';
 
-  if (!resendApiKey || !orderbookEmailFrom || !orderbookEmailTo) {
-    throw new Error('Email service not configured. Set RESEND_API_KEY, ORDERBOOK_EMAIL_FROM, ORDERBOOK_EMAIL_TO');
+  if (!resendApiKey || !orderbookEmailFrom) {
+    throw new Error('Email service not configured. Set RESEND_API_KEY, ORDERBOOK_EMAIL_FROM');
   }
 
-  const recipients = String(orderbookEmailTo)
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
+  let recipients = [];
+  if (to && Array.isArray(to) && to.length > 0) {
+    recipients = to;
+  } else if (to && typeof to === 'string') {
+    recipients = to.split(',').map(item => item.trim()).filter(Boolean);
+  }
+
+  if (recipients.length === 0) {
+    try {
+      const adminRows = await fetchSupabaseJson('/rest/v1/admin_team?select=email,permissions');
+      recipients = (adminRows || []).filter(r => {
+        if (!r.email) return false;
+        const notifs = (r.permissions || {}).notifications || {};
+        return notifs.csv_exports === true;
+      }).map(r => r.email);
+    } catch (e) {
+      console.error('Failed to fetch csv_exports recipients:', e.message);
+    }
+  }
+
+  if (recipients.length === 0) {
+    console.log('No recipients configured for csv_exports; skipping CSV email.');
+    return;
+  }
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',

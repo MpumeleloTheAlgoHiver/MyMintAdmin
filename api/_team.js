@@ -509,7 +509,7 @@ const auditMasterAction = async (member, section, field) => {
         if (!r.email) return false;
         const perms = r.permissions || {};
         const notifs = perms.notifications || {};
-        return notifs.audits !== false;
+        return notifs.audits === true;
       })
       .map(r => r.email);
     const emailsToNotify = [...new Set([...masterEmails, member.email])];

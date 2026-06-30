@@ -379,8 +379,8 @@ module.exports = async (req, res) => {
             det:  chk(process.env.RESEND_API_KEY) ? 'RESEND_API_KEY configured' : 'RESEND_API_KEY missing — email sending will fail',
             rec:  'Set RESEND_API_KEY in Vercel environment variables' },
           { name: 'Orderbook Email Addresses',   cat: 'Communications',    sev: 'medium',
-            pass: chk(process.env.ORDERBOOK_EMAIL_FROM) && chk(process.env.ORDERBOOK_EMAIL_TO),
-            det:  (chk(process.env.ORDERBOOK_EMAIL_FROM) && chk(process.env.ORDERBOOK_EMAIL_TO))
+            pass: chk(process.env.ORDERBOOK_EMAIL_FROM) ,
+            det:  (chk(process.env.ORDERBOOK_EMAIL_FROM) )
                     ? `FROM: ${process.env.ORDERBOOK_EMAIL_FROM} | TO configured`
                     : `Missing: ${!chk(process.env.ORDERBOOK_EMAIL_FROM) ? 'ORDERBOOK_EMAIL_FROM ' : ''}${!chk(process.env.ORDERBOOK_EMAIL_TO) ? 'ORDERBOOK_EMAIL_TO' : ''}`.trim(),
             rec:  'Set ORDERBOOK_EMAIL_FROM and ORDERBOOK_EMAIL_TO in Vercel environment variables' },

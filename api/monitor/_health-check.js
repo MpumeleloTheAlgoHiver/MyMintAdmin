@@ -318,9 +318,9 @@ const runPolicyChecksAsync = async () => {
     {
       policy_name: 'Orderbook Email Configured',
       category: 'Communications',
-      passed: Boolean(process.env.ORDERBOOK_EMAIL_FROM && process.env.ORDERBOOK_EMAIL_TO),
+      passed: Boolean(process.env.ORDERBOOK_EMAIL_FROM ),
       severity: 'medium',
-      detail: (process.env.ORDERBOOK_EMAIL_FROM && process.env.ORDERBOOK_EMAIL_TO)
+      detail: (process.env.ORDERBOOK_EMAIL_FROM )
         ? 'Orderbook FROM/TO configured' : 'ORDERBOOK_EMAIL_FROM or ORDERBOOK_EMAIL_TO missing',
       recommendation: 'Set ORDERBOOK_EMAIL_FROM and ORDERBOOK_EMAIL_TO in environment',
       checked_at: now, target_env: 'crm'

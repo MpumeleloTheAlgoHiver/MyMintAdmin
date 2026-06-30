@@ -334,12 +334,16 @@
               <tr>
                 <th style="padding:10px;font-weight:600;border-radius:6px 0 0 6px;">Staff Member</th>
                 <th style="padding:10px;font-weight:600;">Role</th>
-                <th style="padding:10px;font-weight:600;text-align:center;">Approval Requests</th>
-                <th style="padding:10px;font-weight:600;text-align:center;border-radius:0 6px 6px 0;">Audit Logs</th>
+                <th style="padding:10px;font-weight:600;text-align:center;">Trade Confirmations</th>
+                <th style="padding:10px;font-weight:600;text-align:center;">Orderbook Fill Prices</th>
+                <th style="padding:10px;font-weight:600;text-align:center;">Audit Logs</th>
+                <th style="padding:10px;font-weight:600;text-align:center;">Order Alerts</th>
+                <th style="padding:10px;font-weight:600;text-align:center;">EFT Approvals</th>
+                <th style="padding:10px;font-weight:600;text-align:center;border-radius:0 6px 6px 0;">CSV Exports</th>
               </tr>
             </thead>
             <tbody id="routingTableBody">
-              <tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">Loading...</td></tr>
+              <tr><td colspan="8" style="padding:20px;text-align:center;color:#94a3b8;">Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -1224,34 +1228,30 @@
         if (!member) throw new Error('Member not found');
         const notifs = (member.permissions || {}).notifications || {};
         
-        if (type === 'approvals') {
-          body.approvals = checkbox.checked;
-          body.audits = notifs.audits !== false;
-        } else {
-          body.audits = checkbox.checked;
-          body.approvals = notifs.approvals !== false;
-        }
+        body.trade_confirmation = notifs.trade_confirmation === true;
+        body.fill_price = notifs.fill_price === true;
+        body.audits = notifs.audits === true;
+        body.order_alerts = notifs.order_alerts === true;
+        body.eft_approvals = notifs.eft_approvals === true;
+        body.csv_exports = notifs.csv_exports === true;
+        
+        body[type] = checkbox.checked;
         
         const res = await fetch('/api/team', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(),
           body: JSON.stringify(body)
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to update routing');
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to update');
         
-        // Update local state
-        const idx = allMembers.findIndex(m => m.id === id);
-        if (idx >= 0) allMembers[idx] = data.member;
-        
+        member.permissions = data.member.permissions;
       } catch (err) {
         alert(err.message);
         checkbox.checked = !checkbox.checked;
-      } finally {
-        checkbox.disabled = false;
       }
+      checkbox.disabled = false;
     };
-
     window.toggleNotification = toggleNotification;
 
     const renderRouting = (members) => {
@@ -1261,14 +1261,18 @@
       const routedMembers = members.filter(m => m.approver_tier === 'master' || m.approver_tier === 'dev' || m.role === 'master_admin');
       
       if (!routedMembers.length) {
-        body.innerHTML = '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No master admins found.</td></tr>';
+        body.innerHTML = '<tr><td colspan="8" style="padding:20px;text-align:center;color:#94a3b8;">No master admins found.</td></tr>';
         return;
       }
       
       body.innerHTML = routedMembers.map(m => {
         const notifs = (m.permissions || {}).notifications || {};
-        const getApp = notifs.approvals !== false;
-        const getAud = notifs.audits !== false;
+        const getTrade = notifs.trade_confirmation === true;
+        const getPrice = notifs.fill_price === true;
+        const getAud = notifs.audits === true;
+        const getAlerts = notifs.order_alerts === true;
+        const getEft = notifs.eft_approvals === true;
+        const getCsv = notifs.csv_exports === true;
         
         return `
           <tr style="border-bottom:1px solid #f1f5f9;">
@@ -1282,10 +1286,22 @@
               </span>
             </td>
             <td style="padding:10px;text-align:center;">
-              <input type="checkbox" ${getApp ? 'checked' : ''} onchange="toggleNotification('${m.id}', 'approvals', this)" style="cursor:pointer;width:14px;height:14px;" />
+              <input type="checkbox" ${getTrade ? 'checked' : ''} onchange="toggleNotification('${m.id}', 'trade_confirmation', this)" style="cursor:pointer;width:14px;height:14px;" />
+            </td>
+            <td style="padding:10px;text-align:center;">
+              <input type="checkbox" ${getPrice ? 'checked' : ''} onchange="toggleNotification('${m.id}', 'fill_price', this)" style="cursor:pointer;width:14px;height:14px;" />
             </td>
             <td style="padding:10px;text-align:center;">
               <input type="checkbox" ${getAud ? 'checked' : ''} onchange="toggleNotification('${m.id}', 'audits', this)" style="cursor:pointer;width:14px;height:14px;" />
+            </td>
+            <td style="padding:10px;text-align:center;">
+              <input type="checkbox" ${getAlerts ? 'checked' : ''} onchange="toggleNotification('${m.id}', 'order_alerts', this)" style="cursor:pointer;width:14px;height:14px;" />
+            </td>
+            <td style="padding:10px;text-align:center;">
+              <input type="checkbox" ${getEft ? 'checked' : ''} onchange="toggleNotification('${m.id}', 'eft_approvals', this)" style="cursor:pointer;width:14px;height:14px;" />
+            </td>
+            <td style="padding:10px;text-align:center;">
+              <input type="checkbox" ${getCsv ? 'checked' : ''} onchange="toggleNotification('${m.id}', 'csv_exports', this)" style="cursor:pointer;width:14px;height:14px;" />
             </td>
           </tr>
         `;
