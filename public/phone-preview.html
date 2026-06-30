@@ -455,15 +455,6 @@
       text-align: center; letter-spacing: 0.01em;
     }
 
-    /* ── View-only shield: blocks all interaction with the iframe ── */
-    .view-only-shield {
-      position: absolute;
-      inset: 0;
-      z-index: 20;
-      cursor: not-allowed;
-      background: transparent;
-    }
-
     /* ── View-only badge in top bar ── */
     .view-only-badge {
       display: inline-flex; align-items: center; gap: 5px;
@@ -570,7 +561,6 @@
             <iframe id="phoneFrame" class="preview-iframe"
               allow="fullscreen"
               referrerpolicy="no-referrer-when-downgrade"></iframe>
-            <div class="view-only-shield" title="View only — interactions are disabled"></div>
           </div>
 
           <div class="phone-home"></div>
@@ -578,7 +568,7 @@
       </div>
     </div>
 
-    <div class="hint-text">View only — interactions disabled · Mint Admin</div>
+    <div class="hint-text">Admin preview · interactions logged · Mint Admin</div>
     </div><!-- /.phone-col -->
   </div>
 
@@ -603,7 +593,6 @@
       <iframe id="desktopFrame" class="preview-iframe"
         allow="fullscreen"
         referrerpolicy="no-referrer-when-downgrade"></iframe>
-      <div class="view-only-shield" title="View only — interactions are disabled"></div>
     </div>
   </div>
 
