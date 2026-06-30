@@ -632,6 +632,40 @@
 
     function hideOverlay(el) { el.classList.add('hidden'); }
 
+    // Extract target origin once for safe postMessage calls
+    let targetOrigin = '*';
+    try { targetOrigin = new URL(targetUrl).origin; } catch {}
+
+    // Send the admin-preview flag into the iframe.
+    // We use postMessage rather than relying on the ?admin_preview=1 query param
+    // because Supabase's client-side auth processing calls router.replace() to
+    // clean the URL hash, which strips query params BEFORE useEffect can read them.
+    // postMessage fires after the app has settled, so it always lands correctly.
+    function sendAdminPreviewFlag() {
+      try {
+        if (phoneFrame.contentWindow) {
+          phoneFrame.contentWindow.postMessage({ type: 'MINT_ADMIN_PREVIEW' }, targetOrigin);
+        }
+        if (desktopFrame.contentWindow) {
+          desktopFrame.contentWindow.postMessage({ type: 'MINT_ADMIN_PREVIEW' }, targetOrigin);
+        }
+      } catch(e) {}
+    }
+
+    // Retry sender — the Mint app navigates 2-3 times during Supabase auth before
+    // the layout finally mounts and the message listener is registered. We keep
+    // pinging every 2 s for up to 30 s so at least one message lands.
+    let _adminPreviewInterval = null;
+    function startAdminPreviewRetry() {
+      if (_adminPreviewInterval) return;
+      sendAdminPreviewFlag();
+      let ticks = 0;
+      _adminPreviewInterval = setInterval(() => {
+        sendAdminPreviewFlag();
+        if (++ticks >= 14) { clearInterval(_adminPreviewInterval); _adminPreviewInterval = null; }
+      }, 2000);
+    }
+
     if (!isLoading) {
       if (!targetUrl) {
         document.getElementById('phoneLoading').innerHTML = `
@@ -640,7 +674,10 @@
           <div class="error-msg">Open this page from the Client View Studio.</div>`;
       } else {
         phoneFrame.src = targetUrl;
-        phoneFrame.addEventListener('load', () => hideOverlay(phoneLoading));
+        phoneFrame.addEventListener('load', () => {
+          hideOverlay(phoneLoading);
+          startAdminPreviewRetry();
+        });
         setTimeout(() => hideOverlay(phoneLoading), 7000);
       }
     }
@@ -668,7 +705,10 @@
         if (!desktopReady && targetUrl) {
           desktopReady = true;
           desktopFrame.src = targetUrl;
-          desktopFrame.addEventListener('load', () => hideOverlay(desktopLoading));
+          desktopFrame.addEventListener('load', () => {
+            hideOverlay(desktopLoading);
+            startAdminPreviewRetry();
+          });
           setTimeout(() => hideOverlay(desktopLoading), 8000);
         }
       } else {

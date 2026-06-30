@@ -1,9 +1,7 @@
 # Admin Preview Mode — Mint App Changes
 
 ## What this does
-When an admin opens a client's profile from the CRM (via "Open as [Name] in Mint"), the CRM generates a magic link that includes `?admin_preview=1` in the URL AND sends a `postMessage` into the iframe after it loads. The changes below make the Mint app detect both signals and disable all transactional buttons — invest, gift, save goal, edit goal, add/delete child, refund, cancel — while keeping the full app navigable and viewable.
-
-> **Why two signals?** The `?admin_preview=1` URL param is the primary signal, but Supabase's client-side auth processing calls `router.replace()` to clean the hash/token from the URL, which strips query params BEFORE `useEffect` has a chance to read them. The CRM's `phone-preview.html` also sends a `postMessage({ type: 'MINT_ADMIN_PREVIEW' })` into the iframe every 2 seconds for 30 seconds as a reliable backup. The Mint app must listen for this message (see step 2 below) so admin preview mode activates even when the URL param is lost during auth.
+When an admin opens a client's profile from the CRM (via "Open as [Name] in Mint"), the CRM generates a magic link that includes `?admin_preview=1` in the URL. The changes below make the Mint app detect that flag and disable all transactional buttons — invest, gift, save goal, edit goal, add/delete child, refund, cancel — while keeping the full app navigable and viewable.
 
 ---
 
@@ -22,20 +20,17 @@ Apply the following changes to this codebase. Read each file listed, make only t
 /**
  * Admin Preview Mode
  *
- * When the Mint CRM opens a client session via impersonation it signals this
- * app in two ways:
- *   1. Appends ?admin_preview=1 to the magic link redirect URL.
- *   2. Sends postMessage({ type: 'MINT_ADMIN_PREVIEW' }) into the iframe
- *      every 2 s for 30 s (because Supabase's router.replace() strips query
- *      params before useEffect can read them).
+ * When the Mint CRM opens a client session via impersonation, it appends
+ * ?admin_preview=1 to the magic link redirect URL.
  *
- * initAdminPreview()            — call once on app load. Checks URL param and
- *                                 saves the flag to localStorage.
- * listenForAdminPreviewMessage() — call once on app load. Listens for the
- *                                  postMessage signal from the CRM iframe
- *                                  wrapper. Returns a cleanup function.
- * isAdminPreview()              — call in any component to check the flag.
- * clearAdminPreview()           — call on sign-out to reset the flag.
+ * initAdminPreview() — call once on app load. Detects the flag in the URL
+ *   and saves it to localStorage so it survives client-side navigation.
+ *
+ * isAdminPreview() — call in any component to check if this is a read-only
+ *   admin session. Returns true when the admin preview flag is active.
+ *
+ * clearAdminPreview() — call on sign-out to clean up the flag so a real
+ *   client logging in on the same browser gets a normal session.
  */
 
 export function initAdminPreview(): void {
@@ -43,17 +38,6 @@ export function initAdminPreview(): void {
   if (new URLSearchParams(window.location.search).has('admin_preview')) {
     localStorage.setItem('mint_admin_preview', '1');
   }
-}
-
-export function listenForAdminPreviewMessage(): () => void {
-  if (typeof window === 'undefined') return () => {};
-  const handler = (event: MessageEvent) => {
-    if (event.data?.type === 'MINT_ADMIN_PREVIEW') {
-      localStorage.setItem('mint_admin_preview', '1');
-    }
-  };
-  window.addEventListener('message', handler);
-  return () => window.removeEventListener('message', handler);
 }
 
 export function isAdminPreview(): boolean {
@@ -76,21 +60,17 @@ export function clearAdminPreview(): void {
 
 **Add this near the top of the file (with other imports):**
 ```ts
-import { initAdminPreview, listenForAdminPreviewMessage } from '@/lib/adminPreview';
+import { initAdminPreview } from '@/lib/adminPreview';
 ```
 
 **Add this inside the root component (inside a `useEffect` that runs once):**
 ```ts
 useEffect(() => {
-  initAdminPreview();                       // catches ?admin_preview=1 in the URL
-  const cleanup = listenForAdminPreviewMessage(); // catches postMessage from CRM iframe
-  return cleanup;
+  initAdminPreview();
 }, []);
 ```
 
-If there is already a `useEffect` that runs on mount (empty dependency array `[]`), add both calls inside that existing one and return `cleanup` from it instead of creating a duplicate.
-
-> **Why both?** `initAdminPreview()` catches the flag if it survives in the URL (fast path). `listenForAdminPreviewMessage()` catches it via `postMessage` from the CRM's phone-preview wrapper (reliable path — the CRM sends this every 2 s for 30 s so it always arrives after auth settles).
+If there is already a `useEffect` that runs on mount (empty dependency array `[]`), add the `initAdminPreview()` call inside that existing one instead of creating a duplicate.
 
 ---
 
@@ -250,7 +230,7 @@ className={readOnly ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}
 | Action | File |
 |---|---|
 | Create new file | `lib/adminPreview.ts` |
-| Call `initAdminPreview()` + `listenForAdminPreviewMessage()` on app load | `app/layout.tsx` or `pages/_app.tsx` |
+| Call `initAdminPreview()` on app load | `app/layout.tsx` or `pages/_app.tsx` |
 | Call `clearAdminPreview()` on sign-out | Wherever `supabase.auth.signOut()` is called |
 | Disable invest/purchase buttons | Component with "Choose a method" / invest flow |
 | Disable gift invest button | Gift screen component |
