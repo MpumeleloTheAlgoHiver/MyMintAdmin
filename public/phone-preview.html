@@ -454,6 +454,26 @@
       font-size: 10.5px; color: rgba(255,255,255,0.18);
       text-align: center; letter-spacing: 0.01em;
     }
+
+    /* ── View-only shield: blocks all interaction with the iframe ── */
+    .view-only-shield {
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      cursor: not-allowed;
+      background: transparent;
+    }
+
+    /* ── View-only badge in top bar ── */
+    .view-only-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+      padding: 3px 9px; border-radius: 20px; flex-shrink: 0;
+      background: rgba(255, 69, 58, 0.15);
+      color: #ff6b63;
+      border: 1px solid rgba(255, 69, 58, 0.28);
+    }
+    .view-only-badge svg { width: 9px; height: 9px; fill: currentColor; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -472,6 +492,11 @@
     <div class="tb-divider"></div>
     <span class="tb-client" id="clientNameLabel">Loading…</span>
     <span class="env-pill" id="envBadge"><span class="dot"></span> —</span>
+
+    <div class="view-only-badge">
+      <svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2 2 2 0 0 0 2 2m6-9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h1V6a5 5 0 0 1 5-5 5 5 0 0 1 5 5v2h1m-6-5a3 3 0 0 0-3 3v2h6V6a3 3 0 0 0-3-3z"/></svg>
+      View Only
+    </div>
 
     <div class="tb-spacer"></div>
 
@@ -545,6 +570,7 @@
             <iframe id="phoneFrame" class="preview-iframe"
               allow="fullscreen"
               referrerpolicy="no-referrer-when-downgrade"></iframe>
+            <div class="view-only-shield" title="View only — interactions are disabled"></div>
           </div>
 
           <div class="phone-home"></div>
@@ -552,7 +578,7 @@
       </div>
     </div>
 
-    <div class="hint-text">Viewing as client · Mint Admin</div>
+    <div class="hint-text">View only — interactions disabled · Mint Admin</div>
     </div><!-- /.phone-col -->
   </div>
 
@@ -577,6 +603,7 @@
       <iframe id="desktopFrame" class="preview-iframe"
         allow="fullscreen"
         referrerpolicy="no-referrer-when-downgrade"></iframe>
+      <div class="view-only-shield" title="View only — interactions are disabled"></div>
     </div>
   </div>
 
