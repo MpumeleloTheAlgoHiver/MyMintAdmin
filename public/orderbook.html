@@ -5579,8 +5579,8 @@
           return alert('You do not have permission to send trade confirmations. Contact an admin.');
         }
 
-        // 'test_only' routes to approval instead of live send
-        if (sendPerm === 'test_only') {
+        // 'test_only' routes to approval instead of live send (unless we are in UAT mode, which bypasses approvals)
+        if (sendPerm === 'test_only' && !orderbookUatMode) {
           const approvalRes = await fetch('/api/team?action=submit-approval', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -8362,7 +8362,7 @@
           if (!accessToken) throw new Error('Your session has expired. Please sign in again.');
 
           // ── Approval routing (permission = 'pending') ─────────────────────
-          if (fillPricePerm === 'pending') {
+          if (fillPricePerm === 'pending' && !orderbookUatMode) {
             priceModalConfirm.textContent = 'Submitting for approval...';
             const approvalRes = await fetch('/api/team?action=submit-approval', {
               method: 'POST',
@@ -8700,7 +8700,7 @@
 
           confirmBtn.textContent = `Applying ${applied + pending + 1}/${brokerFillsRows.length}...`;
 
-          if (fillPricePerm === 'pending') {
+          if (fillPricePerm === 'pending' && !orderbookUatMode) {
             const resp = await fetch('/api/team?action=submit-approval', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },

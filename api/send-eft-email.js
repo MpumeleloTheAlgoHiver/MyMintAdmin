@@ -195,10 +195,19 @@ const sendApprovalNotification = async (userId, amount) => {
 </body></html>`;
 
   try {
+    const adminRows = await fetchSupabaseJson('/rest/v1/admin_team?select=email,permissions');
+    const to = (adminRows || []).filter(r => {
+      if (!r.email) return false;
+      const notifs = (r.permissions || {}).notifications || {};
+      return notifs.eft_approvals === true;
+    }).map(r => r.email);
+
+    if (to.length === 0) return;
+
     await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: fromAddress, to: ['lonwabo@mymint.co.za'], subject: `Wallet Request — ${clientName} (${zarAmount})`, html }),
+      body: JSON.stringify({ from: fromAddress, to, subject: `Wallet Request — ${clientName} (${zarAmount})`, html }),
     });
   } catch (e) {
     console.error('Approval notification email failed:', e.message);
