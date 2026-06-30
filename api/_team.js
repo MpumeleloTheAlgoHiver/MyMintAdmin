@@ -515,7 +515,7 @@ const auditMasterAction = async (member, section, field, details = {}) => {
         <li><strong>Role:</strong> ${member.role} | <strong>Tier:</strong> ${member.approver_tier || 'none'}</li>
         <li><strong>Module:</strong> ${section}</li>
         <li><strong>Action:</strong> ${field}</li>
-        <li><strong>Time:</strong> ${new Date().toISOString()}</li>
+        <li><strong>Time:</strong> ${new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', timeZoneName: 'short' })}</li>
       </ul>
       ${detailsHtml}
       <p style="font-size: 12px; color: #8e8e93; margin-top: 32px;">This is an automated audit log notification.</p>
