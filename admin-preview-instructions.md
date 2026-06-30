@@ -217,7 +217,44 @@ className={readOnly ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}
 
 ---
 
-## 8. DISABLE refund and cancel buttons
+## 8. DISABLE the "Invest Now" button inside child accounts
+
+> **This is a separate component from the main invest flow (section 4).** Child accounts have their own invest/purchase button that renders inside the child profile or child strategy view. It must be disabled independently.
+
+**File to find:** Search the codebase for the child account investment component — look for text like `"Invest Now"`, `"Invest for"`, `"Invest in"`, `"child"` combined with `"invest"` or `"purchase"` in JSX/TSX files. This is often a page like `children/[id]/invest`, `child-invest`, or a modal named something like `ChildInvestModal`, `InvestForChild`, or `ChildPurchase`.
+
+**Add this import:**
+```ts
+import { isAdminPreview } from '@/lib/adminPreview';
+```
+
+**Add inside the component:**
+```ts
+const readOnly = isAdminPreview();
+```
+
+**On the "Invest Now" / "Purchase" / "Confirm" button:**
+```tsx
+disabled={readOnly}
+className={readOnly ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}
+```
+
+**If the invest options or strategy cards are clickable (to open the invest flow), wrap their container:**
+```tsx
+<div className={readOnly ? 'opacity-40 pointer-events-none select-none' : ''}>
+  {/* child invest option cards / strategy picker */}
+</div>
+```
+
+**Also block any "Choose a method" step if it has its own child-specific modal:**
+```tsx
+disabled={readOnly}
+onClick={readOnly ? undefined : handleInvest}
+```
+
+---
+
+## 9. DISABLE refund and cancel buttons
 
 **File to find:** Search for transaction detail or order management components — look for `"Refund"`, `"Cancel order"`, or `"Cancel investment"` in JSX files.
 
@@ -247,16 +284,17 @@ className={readOnly ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}
 
 ## Summary of all files to change
 
-| Action | File |
-|---|---|
-| Create new file | `lib/adminPreview.ts` |
-| Call `initAdminPreview()` + `listenForAdminPreviewMessage()` on app load | `app/layout.tsx` or `pages/_app.tsx` |
-| Call `clearAdminPreview()` on sign-out | Wherever `supabase.auth.signOut()` is called |
-| Disable invest/purchase buttons | Component with "Choose a method" / invest flow |
-| Disable gift invest button | Gift screen component |
-| Disable save/edit goal buttons | Goal creation + goal editing components |
-| Disable add/delete child buttons | Child account component |
-| Disable refund/cancel buttons | Transaction detail / order component |
+| # | Action | File |
+|---|---|---|
+| 1 | Create new file | `lib/adminPreview.ts` |
+| 2 | Call `initAdminPreview()` + `listenForAdminPreviewMessage()` on app load | `app/layout.tsx` or `pages/_app.tsx` |
+| 3 | Call `clearAdminPreview()` on sign-out | Wherever `supabase.auth.signOut()` is called |
+| 4 | Disable main invest/purchase buttons | Component with "Choose a method" / invest flow |
+| 5 | Disable gift invest button | Gift screen component |
+| 6 | Disable save/edit goal buttons | Goal creation + goal editing components |
+| 7 | Disable add/delete child buttons | Child account management component |
+| **8** | **Disable "Invest Now" inside child accounts** | **Child invest page/modal — separate from #4** |
+| 9 | Disable refund/cancel buttons | Transaction detail / order component |
 
 ---
 
