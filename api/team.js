@@ -111,8 +111,8 @@ module.exports = async (req, res) => {
       if (!result) return;
       const email = normEmail(req.body?.email);
       const full_name = (req.body?.full_name || '').trim() || null;
-      const role = req.body?.role === 'admin' ? 'admin' : 'staff';
-      const page_access = role === 'admin' ? [] : (Array.isArray(req.body?.page_access) ? req.body.page_access : []);
+      const role = req.body?.role === 'admin' ? 'admin' : (req.body?.role === 'master_admin' ? 'master_admin' : 'staff');
+      const page_access = Array.isArray(req.body?.page_access) ? req.body.page_access : [];
 
       if (!email) return sendJson(res, 400, { error: 'Email is required' });
       if (!isAllowedDomain(email)) {
@@ -469,8 +469,8 @@ module.exports = async (req, res) => {
       const beforeRows = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}&limit=1`);
       const before = beforeRows && beforeRows[0];
 
-      const safeRole = role === 'admin' ? 'admin' : 'staff';
-      const safePages = safeRole === 'admin' ? [] : (Array.isArray(page_access) ? page_access : []);
+      const safeRole = role === 'admin' ? 'admin' : (role === 'master_admin' ? 'master_admin' : 'staff');
+      const safePages = Array.isArray(page_access) ? page_access : [];
       const [updated] = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}`, {
         method: 'PATCH',
         extraHeaders: { 'Prefer': 'return=representation' },
@@ -867,7 +867,7 @@ module.exports = async (req, res) => {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
       const result = await requireAuth(req, res);
       if (!result) return;
-      if (!isMasterOrDev(result.member) && result.member.role !== 'admin') {
+      if (!isMasterOrDev(result.member) && result.member.role !== 'master_admin') {
         return sendJson(res, 403, { error: 'Not authorized to resolve approvals' });
       }
 

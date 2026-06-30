@@ -218,12 +218,32 @@
       <!-- Members Tab -->
       <div class="tab-pane active" id="tab-members">
         <div class="card">
-          <div class="card-header">
-            <span class="card-title">Staff Roster</span>
-            <button class="btn btn-primary" id="inviteBtn">
-              <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#fff"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-              Invite Member
-            </button>
+          <div class="card-header" style="flex-direction:column; align-items:stretch; gap:16px;">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <div style="display:flex; align-items:center; gap:20px;">
+                <span class="card-title">Staff Roster</span>
+                <div class="tabs" style="margin-bottom:0; border-bottom:none;">
+                  <button class="tab-btn domain-filter-btn active" data-domain="all">All</button>
+                  <button class="tab-btn domain-filter-btn" data-domain="mymint">MyMint</button>
+                  <button class="tab-btn domain-filter-btn" data-domain="external">External</button>
+                </div>
+              </div>
+              <button class="btn btn-primary" id="inviteBtn">
+                <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#fff"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                Invite Member
+              </button>
+            </div>
+            
+            <div style="display:flex; gap:12px; align-items:center;">
+              <input type="text" id="memberSearch" placeholder="Search name or email..." style="max-width:300px; padding:8px 12px; font-size:13px; border-radius:8px;">
+              <select id="memberTierFilter" style="max-width:180px; padding:8px 12px; font-size:13px; border-radius:8px;">
+                <option value="all">All Tiers & Roles</option>
+                <option value="dev">Dev</option>
+                <option value="master">Master / Master Admin</option>
+                <option value="admin">Admin</option>
+                <option value="staff">Staff</option>
+              </select>
+            </div>
           </div>
           <div style="overflow-x:auto;">
             <table>
@@ -497,13 +517,17 @@
 
     const ALL_PAGES = [
       { key: 'clients',    label: 'Clients',      href: '/index.html' },
+      { key: 'studio',     label: 'Client View Studio', href: '/studio.html' },
       { key: 'dashboard',  label: 'Dashboard',    href: '/dashboard.html' },
-      { key: 'strategies', label: 'Strategies',   href: '/strategies.html' },
       { key: 'factsheets', label: 'Factsheets',   href: '/factsheets.html' },
       { key: 'investors',  label: 'Investors',    href: '/investors.html' },
-      { key: 'eft',        label: 'EFT Payments', href: '/eft.html' },
       { key: 'orderbook',  label: 'Order Book',   href: '/orderbook.html' },
+      { key: 'gifting',    label: 'Gifting',      href: '/gifting.html' },
+      { key: 'finances',   label: 'Finances',     href: '/finances.html' },
+      { key: 'eft',        label: 'EFT Payments', href: '/eft.html' },
       { key: 'settings',   label: 'Settings',     href: '/settings.html' },
+      { key: 'team',       label: 'Team',         href: '/team.html' },
+      { key: 'cyber_compliance', label: 'Cyber Compliance', href: '/cyber-compliance.html' },
     ];
 
     // ── Permission Matrix Definition ──────────────────────────────────────────
@@ -627,11 +651,13 @@
       );
     };
 
+    let allMembers = [];
+    
     // ── Member Table ──────────────────────────────────────────────────────────
     const renderTable = (members) => {
       const body = document.getElementById('teamTableBody');
       if (!members.length) {
-        body.innerHTML = '<tr><td colspan="6" class="empty-state">No team members yet. Invite someone to get started.</td></tr>';
+        body.innerHTML = '<tr><td colspan="6" class="empty-state">No matching team members.</td></tr>';
         return;
       }
       body.innerHTML = members.map(m => {
@@ -694,8 +720,52 @@
     const updateStats = (members) => {
       document.getElementById('statTotal').textContent   = members.length;
       document.getElementById('statDev').textContent     = members.filter(m => m.approver_tier === 'dev').length;
-      document.getElementById('statMaster').textContent  = members.filter(m => m.approver_tier === 'master').length;
+      document.getElementById('statMaster').textContent  = members.filter(m => m.approver_tier === 'master' || m.role === 'master_admin').length;
       document.getElementById('statPending').textContent = members.filter(m => m.status === 'pending').length;
+    };
+
+    // ── Filter Logic ──────────────────────────────────────────────────────────
+    let activeDomainFilter = 'all';
+    
+    document.querySelectorAll('.domain-filter-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.domain-filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeDomainFilter = btn.getAttribute('data-domain');
+        applyFilters();
+      });
+    });
+
+    document.getElementById('memberSearch').addEventListener('input', () => applyFilters());
+    document.getElementById('memberTierFilter').addEventListener('change', () => applyFilters());
+
+    const applyFilters = () => {
+      const searchQ = document.getElementById('memberSearch').value.toLowerCase();
+      const tierFilter = document.getElementById('memberTierFilter').value;
+      
+      const filtered = allMembers.filter(m => {
+        // Domain Filter
+        const isMyMint = (m.email || '').toLowerCase().endsWith('@mymint.co.za');
+        if (activeDomainFilter === 'mymint' && !isMyMint) return false;
+        if (activeDomainFilter === 'external' && isMyMint) return false;
+
+        // Tier / Role Filter
+        if (tierFilter === 'dev' && m.approver_tier !== 'dev') return false;
+        if (tierFilter === 'master' && m.approver_tier !== 'master' && m.role !== 'master_admin') return false;
+        if (tierFilter === 'admin' && m.role !== 'admin') return false;
+        if (tierFilter === 'staff' && m.role !== 'staff') return false;
+
+        // Search Filter
+        if (searchQ) {
+          const emailMatch = (m.email || '').toLowerCase().includes(searchQ);
+          const nameMatch = (m.full_name || '').toLowerCase().includes(searchQ);
+          if (!emailMatch && !nameMatch) return false;
+        }
+
+        return true;
+      });
+
+      renderTable(filtered);
     };
 
     // ── Permissions Modal ─────────────────────────────────────────────────────
@@ -1039,10 +1109,10 @@
     };
 
     // ── Tabs ──────────────────────────────────────────────────────────────────
-    document.querySelectorAll('.tab-btn').forEach(btn => {
+    document.querySelectorAll('button.tab-btn[data-tab]').forEach(btn => {
       btn.addEventListener('click', () => {
         const tab = btn.getAttribute('data-tab');
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+        document.querySelectorAll('button.tab-btn[data-tab]').forEach(b => b.classList.toggle('active', b === btn));
         document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
         if (tab === 'audit') loadAudit();
         if (tab === 'impersonation') loadImpersonation();
@@ -1198,8 +1268,9 @@
     const loadTeam = async () => {
       const data = await api('GET', '/api/team?action=list');
       if (data.ok) {
-        updateStats(data.members);
-        renderTable(data.members);
+        allMembers = data.members || [];
+        updateStats(allMembers);
+        applyFilters();
       } else {
         document.getElementById('teamTableBody').innerHTML = '<tr><td colspan="6" class="empty-state">Could not load team (Access Denied or not configured)</td></tr>';
         updateStats([]);
@@ -1346,7 +1417,14 @@
 
     // ── Remove ────────────────────────────────────────────────────────────────
     window.removeMember = async (id, name) => {
-      if (!confirm(`Remove ${name} from the team?`)) return;
+      const confirmText = `yes i am sure i want to delete ${name}`.toLowerCase();
+      const userType = prompt(`Remove ${name} from the team?\n\nThis action cannot be reversed.\nType exactly: "yes i am sure i want to delete ${name}"\nto confirm.`);
+      
+      if (!userType || userType.trim().toLowerCase() !== confirmText) {
+        if (userType !== null) alert('Confirmation text did not match. Deletion cancelled.');
+        return;
+      }
+      
       const data = await api('DELETE', '/api/team?action=remove', { id });
       if (data.ok) { await loadTeam(); }
       else { alert(data.error || 'Failed to remove member'); }
@@ -1369,7 +1447,7 @@
       const ok = await requireSession();
       if (!ok) return;
       const me = await api('GET', '/api/team?action=me');
-      if (!me.ok || me.role !== 'admin') { window.location.href = '/index.html'; return; }
+      if (!me.ok || (me.role !== 'admin' && me.role !== 'master_admin')) { window.location.href = '/index.html'; return; }
       myMemberId = me.id || null;
       myApproverTier = me.approver_tier || null;
       await loadTeam();

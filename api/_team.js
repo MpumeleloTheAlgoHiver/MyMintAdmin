@@ -89,12 +89,34 @@ const requireAdmin = async (req, res) => {
   const result = await requireAuth(req, res);
   if (!result) return null;
   const role = result.member.role || 'staff';
-  if (role !== 'admin') {
+  if (role !== 'admin' && role !== 'master_admin') {
     sendJson(res, 403, { error: 'Admin access required' });
     return null;
   }
   return result;
 };
+
+const requirePermission = async (req, res, section, field) => {
+  const result = await requireAuth(req, res);
+  if (!result) return null;
+  
+  const { member } = result;
+  
+  // Devs and Master Admins bypass fine-grained checks
+  if (member.approver_tier === 'dev' || member.role === 'master_admin' || member.approver_tier === 'master') {
+    return result;
+  }
+  
+  const permissions = member.permissions || {};
+  const sec = permissions[section] || {};
+  if (sec[field] !== true) {
+    sendJson(res, 403, { error: `Permission denied: Requires ${section}.${field}` });
+    return null;
+  }
+  
+  return result;
+};
+
 
 const supabaseRequest = async (path, options = {}) => {
   const { supabaseUrl, serviceRoleKey } = getSupabaseCreds();
@@ -451,6 +473,7 @@ module.exports = {
   isAllowedDomain,
   requireAuth,
   requireAdmin,
+  requirePermission,
   supabaseRequest,
   createAuthUser,
   listAuthUsers,

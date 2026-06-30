@@ -2031,8 +2031,8 @@ const server = http.createServer((req, res) => {
   // Studio config — non-secret URLs the Client View Studio needs in the browser
   if (req.url.startsWith('/api/studio-config')) {
     sendJson(res, 200, {
-      mintAppUrlDev:  (process.env.MINT_APP_URL_DEV  || '').trim().replace(/\/+$/, ''),
-      mintAppUrlLive: (process.env.MINT_APP_URL_LIVE || '').trim().replace(/\/+$/, '')
+      mintAppUrlDev:  (process.env.MINT_APP_URL_DEV  || 'https://mint-development.vercel.app').trim().replace(/\/+$/, ''),
+      mintAppUrlLive: (process.env.MINT_APP_URL_LIVE || 'https://app.mymint.co.za').trim().replace(/\/+$/, '')
     });
     return;
   }
