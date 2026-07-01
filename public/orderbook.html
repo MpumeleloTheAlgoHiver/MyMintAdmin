@@ -6621,12 +6621,24 @@
           const buyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY');
           const walletBuyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY_WALLET');
 
-          const sellCommitR = sellEvts[0]?.price_at_commit ? (Number(sellEvts[0].price_at_commit) / 100).toFixed(2) : '';
-          const buyCommitR = buyEvts[0]?.price_at_commit ? (Number(buyEvts[0].price_at_commit) / 100).toFixed(2) : '';
-          const extraCommitR = walletBuyEvts[0]?.price_at_commit ? (Number(walletBuyEvts[0].price_at_commit) / 100).toFixed(2) : '';
-          const totalSellQty = sellEvts.reduce((s, e) => s + Number(e.quantity || 0), 0);
-          const totalBuyQty = buyEvts.reduce((s, e) => s + Number(e.quantity || 0), 0);
-          const totalExtraQty = walletBuyEvts.reduce((s, e) => s + Number(e.quantity || 0), 0);
+          // Securities on both sides → symbol, for matching the uploaded sheet.
+          const evtSecIds = [...new Set(events.map((e) => e.security_id).filter(Boolean))];
+          const symbolBySecId = {};
+          if (evtSecIds.length) {
+            const { data: secs } = await supabaseClient.from('securities_c').select('id, symbol').in('id', evtSecIds);
+            (secs || []).forEach((s) => { symbolBySecId[s.id] = s.symbol || String(s.id).slice(0, 6); });
+          }
+          // One required line per (security, side), qty aggregated across clients.
+          const reqMap = new Map();
+          const addReq = (evt, side) => {
+            const key = evt.security_id + '|' + side;
+            const cur = reqMap.get(key) || { security_id: evt.security_id, side, symbol: symbolBySecId[evt.security_id] || '?', qty: 0 };
+            cur.qty += Number(evt.quantity) || 0;
+            reqMap.set(key, cur);
+          };
+          sellEvts.forEach((e) => addReq(e, 'SELL'));
+          [...buyEvts, ...walletBuyEvts].forEach((e) => addReq(e, 'BUY'));
+          const required = [...reqMap.values()];
 
           let fillModal = document.getElementById('fillSettleModal');
           if (!fillModal) {
@@ -6636,34 +6648,26 @@
             document.body.appendChild(fillModal);
           }
 
+          const reqRowsHtml = required.map((r) => `
+            <div data-req-sec="${escapeHtml(String(r.security_id))}" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border:1px solid #334155;border-radius:8px;">
+              <span style="font-size:13px;color:#f1f5f9;"><span style="color:${r.side === 'SELL' ? '#fca5a5' : '#6ee7b7'};font-weight:700;">${r.side}</span> ${escapeHtml(r.symbol)} &middot; ${r.qty} units</span>
+              <span class="req-price" style="font-size:13px;color:#94a3b8;">&mdash;</span>
+            </div>`).join('');
+
           fillModal.innerHTML = `
             <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:28px 32px;max-width:540px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
               <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;color:#f1f5f9;">Fill &amp; Settle Rebalance</h3>
-              <p style="margin:0 0 20px;font-size:13px;color:#94a3b8;">${batch.strategy_name_snapshot || batch.strategy_id} &mdash; ${events.length} events for ${[...new Set(events.map((e)=>e.user_id))].length} clients</p>
-              <div style="display:grid;gap:14px;">
-                ${sellEvts.length ? `
-                <div>
-                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">SELL Fill Price (R) &mdash; ${totalSellQty} units &middot; committed ${fmtRand(sellEvts[0]?.price_at_commit)}</label>
-                  <input id="fillSellPrice" type="number" step="0.01" min="0" value="${sellCommitR}" placeholder="e.g. 142.50"
-                    style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
-                </div>` : ''}
-                ${buyEvts.length ? `
-                <div>
-                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">BUY Fill Price (R) &mdash; ${totalBuyQty} units &middot; committed ${fmtRand(buyEvts[0]?.price_at_commit)}</label>
-                  <input id="fillBuyPrice" type="number" step="0.01" min="0" value="${buyCommitR}" placeholder="e.g. 98.20"
-                    style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
-                </div>` : ''}
-                ${walletBuyEvts.length ? `
-                <div>
-                  <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">Extra BUY Fill Price (R) &mdash; ${totalExtraQty} units &middot; committed ${fmtRand(walletBuyEvts[0]?.price_at_commit)}</label>
-                  <input id="fillExtraBuyPrice" type="number" step="0.01" min="0" value="${extraCommitR}" placeholder="e.g. 98.20"
-                    style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box;" />
-                </div>` : ''}
-                ${!sellEvts.length && !buyEvts.length && !walletBuyEvts.length ? '<p style="color:#fca5a5;font-size:13px;">No events to settle in this batch.</p>' : ''}
+              <p style="margin:0 0 6px;font-size:13px;color:#94a3b8;">${batch.strategy_name_snapshot || batch.strategy_id} &mdash; ${events.length} events for ${[...new Set(events.map((e)=>e.user_id))].length} clients</p>
+              <p style="margin:0 0 14px;font-size:12px;color:#94a3b8;">Upload the broker fills sheet (Excel/CSV) with a price for <strong>every security on both sides</strong>. Settlement stays locked until all are matched.</p>
+              <div style="display:grid;gap:8px;margin-bottom:14px;">
+                ${reqRowsHtml || '<p style="color:#fca5a5;font-size:13px;">No events to settle in this batch.</p>'}
               </div>
-              <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:24px;">
+              <input id="fillSettleFile" type="file" accept=".xlsx,.xls,.csv" style="display:none;" />
+              <button id="fillSettleUploadBtn" style="width:100%;padding:11px;background:#0f172a;border:1px dashed #475569;border-radius:8px;color:#a5b4fc;font-size:13px;font-weight:600;cursor:pointer;">Upload broker fills (Excel / CSV)</button>
+              <p id="fillSettleStatus" style="font-size:12px;margin:10px 0 0;min-height:16px;color:#94a3b8;"></p>
+              <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
                 <button id="fillSettleCancelBtn" style="padding:10px 20px;background:transparent;border:1px solid #475569;border-radius:8px;color:#94a3b8;font-size:14px;cursor:pointer;">Cancel</button>
-                <button id="fillSettleConfirmBtn" style="padding:10px 20px;background:#7c3aed;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">Confirm Fill &amp; Settle</button>
+                <button id="fillSettleConfirmBtn" disabled style="padding:10px 20px;background:#7c3aed;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:not-allowed;opacity:.5;">Confirm Fill &amp; Settle</button>
               </div>
             </div>`;
 
@@ -6673,21 +6677,60 @@
           document.getElementById('fillSettleCancelBtn').addEventListener('click', closeFillModal);
           fillModal.addEventListener('click', (e) => { if (e.target === fillModal) closeFillModal(); });
 
+          let fillBySecId = null; // set once a COMPLETE sheet (every security) is parsed
+          const fileInput = document.getElementById('fillSettleFile');
+          const uploadBtn = document.getElementById('fillSettleUploadBtn');
+          const statusEl = document.getElementById('fillSettleStatus');
           const confirmBtn = document.getElementById('fillSettleConfirmBtn');
-          confirmBtn.addEventListener('click', async () => {
-            const sellInput = document.getElementById('fillSellPrice');
-            const buyInput = document.getElementById('fillBuyPrice');
-            const extraBuyInput = document.getElementById('fillExtraBuyPrice');
-            const sellR = sellInput ? parseFloat(sellInput.value || '0') : 0;
-            const buyR = buyInput ? parseFloat(buyInput.value || '0') : 0;
-            const extraBuyR = extraBuyInput ? parseFloat(extraBuyInput.value || '0') : 0;
-            if (sellEvts.length && (!sellR || sellR <= 0)) { alert('Enter a valid SELL fill price.'); return; }
-            if (buyEvts.length && (!buyR || buyR <= 0)) { alert('Enter a valid BUY fill price.'); return; }
-            if (walletBuyEvts.length && (!extraBuyR || extraBuyR <= 0)) { alert('Enter a valid Extra BUY fill price.'); return; }
-            confirmBtn.disabled = true;
-            confirmBtn.textContent = 'SettlingÃ¢â¬Â¦';
+          if (uploadBtn) uploadBtn.addEventListener('click', () => fileInput && fileInput.click());
+
+          if (fileInput) fileInput.addEventListener('change', async (ev) => {
+            const file = ev.target.files && ev.target.files[0];
+            if (!file) return;
             try {
-              await executeFillAndSettle(batch, events, Math.round(sellR * 100), Math.round(buyR * 100), walletBuyEvts.length ? Math.round(extraBuyR * 100) : 0);
+              const rows = await parseBrokerFillsWorkbook(file); // [{ side, code, priceCents }]
+              const byKey = new Map(), byTicker = new Map();
+              rows.forEach((r) => {
+                const t = normalizeFillTicker(r.code);
+                if (r.side) byKey.set(String(r.side).toUpperCase() + '|' + t, r.priceCents);
+                if (!byTicker.has(t)) byTicker.set(t, r.priceCents);
+              });
+              const map = {}; const missing = [];
+              required.forEach((r) => {
+                const t = normalizeFillTicker(r.symbol);
+                const px = byKey.has(r.side + '|' + t) ? byKey.get(r.side + '|' + t) : byTicker.get(t);
+                const el = fillModal.querySelector(`[data-req-sec="${r.security_id}"] .req-price`);
+                if (Number.isFinite(px) && px > 0) {
+                  map[r.security_id] = px;
+                  if (el) { el.textContent = 'R ' + (px / 100).toFixed(2); el.style.color = '#6ee7b7'; }
+                } else {
+                  missing.push(`${r.side} ${r.symbol}`);
+                  if (el) { el.textContent = 'missing'; el.style.color = '#fca5a5'; }
+                }
+              });
+              if (missing.length) {
+                fillBySecId = null;
+                confirmBtn.disabled = true; confirmBtn.style.opacity = '.5'; confirmBtn.style.cursor = 'not-allowed';
+                statusEl.textContent = `Missing a price for: ${missing.join(', ')}. Upload a sheet covering every security.`;
+                statusEl.style.color = '#fca5a5';
+              } else {
+                fillBySecId = map;
+                confirmBtn.disabled = false; confirmBtn.style.opacity = '1'; confirmBtn.style.cursor = 'pointer';
+                statusEl.textContent = 'All securities matched — ready to settle.';
+                statusEl.style.color = '#6ee7b7';
+              }
+            } catch (e) {
+              statusEl.textContent = 'Could not read the file: ' + (e.message || 'unknown error');
+              statusEl.style.color = '#fca5a5';
+            }
+          });
+
+          confirmBtn.addEventListener('click', async () => {
+            if (!fillBySecId) { alert('Upload a broker fills sheet covering every security on both sides first.'); return; }
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Settling...';
+            try {
+              await executeFillAndSettle(batch, events, fillBySecId);
               closeFillModal();
               loadOrderbook().catch(console.error);
               alert('Batch settled successfully. Holdings updated.');
@@ -6702,7 +6745,9 @@
         }
       };
 
-      const executeFillAndSettle = async (batch, events, sellFillCents, buyFillCents, extraBuyFillCents) => {
+      // fillBySecId: { [security_id]: fillCents } — per-security broker fill prices
+      // from the uploaded sheet (covers both the SELL side and the BUY side).
+      const executeFillAndSettle = async (batch, events, fillBySecId) => {
         const nowIso = new Date().toISOString();
         const fillDateStr = nowIso.split('T')[0];
         const strategyId = batch.strategy_id;
@@ -6772,7 +6817,7 @@
                 closed_reason: 'REBALANCE_SELL',
                 closed_at: nowIso,
                 updated_at: nowIso,
-                avg_exit: sellFillCents,
+                avg_exit: fillBySecId[evt.security_id],
                 "Exit_date": fillDateStr,
                 Status: 'inactive',
               }).eq('id', activePos.id);
@@ -6817,7 +6862,7 @@
                 strategy_id: strategyId,
                 trade_side: 'BUY',
                 is_active: true,
-                avg_fill: sellFillCents,          // best available price reference
+                avg_fill: fillBySecId[evt.security_id],          // best available price reference
                 "Fill_date": fillDateStr,
                 rebalance_batch_id: batch.id,
                 strategy_name_snapshot: batch.strategy_name_snapshot,
@@ -6840,7 +6885,7 @@
             strategy_id: strategyId,
             trade_side: 'SELL',
             is_active: false,
-            avg_fill: sellFillCents,
+            avg_fill: fillBySecId[evt.security_id],
             "Fill_date": fillDateStr,
             rebalance_batch_id: batch.id,
             strategy_name_snapshot: batch.strategy_name_snapshot,
@@ -6849,7 +6894,7 @@
             Status: 'inactive',
             closed_reason: 'REBALANCE_SELL',
             closed_at: nowIso,
-            avg_exit: sellFillCents,
+            avg_exit: fillBySecId[evt.security_id],
             "Exit_date": fillDateStr,
             as_of_date: fillDateStr,
           });
@@ -6858,7 +6903,7 @@
           // Update rebalance_event with fill info
           const { error: evtUpErr } = await supabaseClient
             .from('rebalance_event')
-            .update({ avg_fill: sellFillCents, fill_date: fillDateStr, updated_at: nowIso })
+            .update({ avg_fill: fillBySecId[evt.security_id], fill_date: fillDateStr, updated_at: nowIso })
             .eq('id', evt.id);
           if (evtUpErr) errors.push(`SELL event update: ${evtUpErr.message}`);
         }
@@ -6867,15 +6912,13 @@
         // perUserFillCents: optional map of user_id -> avg_fill_cents that
         // overrides defaultFillCents. Used for cost-basis carryover on
         // primary BUYs (the carried-over basis preserves PnL across the swap).
-        const applyBuySettlement = async (buyEvtList, defaultFillCents, label, perUserFillCents) => {
+        const applyBuySettlement = async (buyEvtList, label) => {
           for (const evt of buyEvtList) {
             const qty = Number(evt.quantity) || 0;
             if (qty <= 0) continue;
 
-            const uid = String(evt.user_id || '');
-            const fillCentsForUser = (perUserFillCents && perUserFillCents[uid] != null)
-              ? perUserFillCents[uid]
-              : defaultFillCents;
+            // Per-security fill price from the uploaded sheet.
+            const fillCentsForUser = fillBySecId[evt.security_id];
 
             /* Expected_fill = committed price in rands (price_at_commit is cents).
                This is the price the admin locked in at execution time — the best
@@ -6929,9 +6972,9 @@
         // at their actual market fill price (see docs/rebalance-cost-basis-
         // carryover.md for the rationale). Realized gain from the sell side
         // flows into wallets.rebalance_residual via the commit handler.
-        await applyBuySettlement(buyEvts, buyFillCents, 'BUY', null);
+        await applyBuySettlement(buyEvts, 'BUY');
         if (walletBuyEvts.length) {
-          await applyBuySettlement(walletBuyEvts, extraBuyFillCents || buyFillCents, 'WALLET_BUY', null);
+          await applyBuySettlement(walletBuyEvts, 'WALLET_BUY');
         }
 
         /* ââ 2.5 Write a R0 transactions row per affected (user,family_member)
