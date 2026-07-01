@@ -14,7 +14,7 @@ const orderbookUpdatePriceHandler = require('./api/orderbook/update-price');
 const orderbookSendCsvHandler = require('./api/orderbook/send-csv');
 const { runHealthCheck } = require('./api/monitor/_health-check');
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 5000;
 const publicDir = path.join(__dirname, 'public');
 const indexPath = path.join(publicDir, 'index.html');
 
