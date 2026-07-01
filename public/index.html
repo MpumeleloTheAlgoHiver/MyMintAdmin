@@ -3975,6 +3975,14 @@
     .holding-card.holding-pending { border-color: #fbbf24 !important; background: #fffbeb !important; }
     .holding-pending-badge { font-size: 0.62rem !important; }
     .holdings-empty-state { padding: 32px 20px !important; }
+
+    /* ── Read-only profile view: hide all write/edit actions ── */
+    .card-action,
+    .phone-add-btn,
+    #phoneModalSave,
+    #certModalAcceptBtn,
+    #certModalRejectBtn,
+    #certModalReevaluateBtn { display: none !important; }
   </style>
 <script src="/js/cc-badge.js" defer></script>
 </head>
