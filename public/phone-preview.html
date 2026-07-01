@@ -616,6 +616,21 @@
 
     function hideOverlay(el) { el.classList.add('hidden'); }
 
+    // Broadcasts MINT_ADMIN_PREVIEW into both iframes every 2 s for 30 s.
+    // This is the reliable signal path — Supabase's router.replace() strips
+    // the ?admin_preview=1 query param before the Mint app can read it, so
+    // the postMessage is required as a backup.
+    function startAdminPreviewBroadcast() {
+      let count = 0;
+      const interval = setInterval(() => {
+        const msg = { type: 'MINT_ADMIN_PREVIEW' };
+        try { if (phoneFrame.contentWindow) phoneFrame.contentWindow.postMessage(msg, '*'); } catch(e) {}
+        try { if (desktopFrame.contentWindow) desktopFrame.contentWindow.postMessage(msg, '*'); } catch(e) {}
+        count++;
+        if (count >= 15) clearInterval(interval); // 15 × 2 s = 30 s
+      }, 2000);
+    }
+
     if (!isLoading) {
       if (!targetUrl) {
         document.getElementById('phoneLoading').innerHTML = `
@@ -626,6 +641,7 @@
         phoneFrame.src = targetUrl;
         phoneFrame.addEventListener('load', () => hideOverlay(phoneLoading));
         setTimeout(() => hideOverlay(phoneLoading), 7000);
+        startAdminPreviewBroadcast();
       }
     }
 
