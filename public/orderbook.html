@@ -8426,6 +8426,7 @@
        pencil uses — so permission checks + buffer reconciliation are reused. */
     let brokerFillsCtx = null;   // { strategyName, userName, sourceIds, excelRows }
     let brokerFillsRows = null;  // preview rows ready to apply
+    let brokerFillsMissing = []; // basket securities with NO broker price (blocks a strategy fill)
 
     // Broker codes come back bare ("CLI"); our securities carry an exchange
     // suffix ("CLI.JO"). Normalise both sides so they compare cleanly.
@@ -8447,6 +8448,7 @@
       if (modal) modal.classList.remove('is-active');
       if (password) password.value = '';
       brokerFillsRows = null;
+      brokerFillsMissing = [];
     };
 
     // Parse the broker workbook into [{ side, code, nominal, priceCents }].
@@ -8569,6 +8571,9 @@
           </table>`;
       }
       brokerFillsRows = matched.filter((m) => m.willApply);
+      // Basket securities the upload has NO price for — a strategy fill must
+      // include every security (baskets never partial-fill), so these block it.
+      brokerFillsMissing = matched.filter((m) => m.sourceId && !m.willApply);
       if (confirm) {
         confirm.disabled = applyCount === 0;
         confirm.textContent = applyCount ? `Confirm & apply ${applyCount} fill${applyCount !== 1 ? 's' : ''}` : 'Nothing to apply';
@@ -8668,6 +8673,14 @@
       const confirmBtn = event.target.closest('#brokerFillsConfirm');
       if (!confirmBtn) return;
       event.preventDefault();
+      // A basket must fill in full — if the upload is missing a price for any of
+      // its securities, refuse the whole fill and name what's missing. Prevents
+      // a half-filled/mixed-state basket (esp. strategy buys).
+      if (brokerFillsMissing && brokerFillsMissing.length) {
+        const names = brokerFillsMissing.map((m) => m.ticker || m.instrumentName || 'a security').join(', ');
+        alert(`Fill can't proceed — this basket is missing a broker price for: ${names}.\n\nA basket must be filled in full. Upload a file that includes every security in the basket, then try again.`);
+        return;
+      }
       if (!brokerFillsRows || !brokerFillsRows.length) return;
       const { password } = getBrokerFillsEls();
 
