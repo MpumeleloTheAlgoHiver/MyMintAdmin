@@ -307,7 +307,7 @@ const syncAllSecuritiesFromYahoo = async () => {
 
       const rawChangePct = price.regularMarketChangePercent?.raw ?? null;
       const rawDivYield = summary.dividendYield?.raw ?? null;
-      const rawYtd = keyStats.ytdReturn?.raw ?? keyStats['52WeekChange']?.raw ?? null;
+      const rawYtd = keyStats.ytdReturn?.raw ?? null;  // do NOT fall back to 52WeekChange (1-year, not YTD)
 
       // If YTD not returned by quoteSummary, calculate it from the chart API
       let calculatedYtd = null;
