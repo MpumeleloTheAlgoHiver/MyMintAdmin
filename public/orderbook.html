@@ -2352,6 +2352,7 @@
               familyMemberRelationship: r.familyMemberRelationship || null,
               clientName: r.clientName,
               clientAccountId: r.clientAccountId, clientIdRegNo: r.clientIdRegNo,
+              computershareNumber: r.computershareNumber || null,
               totalMarketValue: 0, holdingsCount: 0,
               sourceIds: [], securityIds: [],
               transactionId: r.transactionId || null,
@@ -2798,16 +2799,19 @@
           const pinCell = showPin
             ? `<td class="pin-investor-col"><button type="button" class="pin-order-btn${isPinned ? ' is-pinned' : ''}" data-pin-investor data-pin-key="${escapeHtml(bookIdForPin)}" title="${isPinned ? 'Unpin this order book from top' : 'Pin this order book to top'}" aria-pressed="${isPinned}"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H19v-2l-3-2z"/></svg></button></td>`
             : '';
-          // Show purchase time so two buys of the same strategy by the same
-          // user are visually distinguishable.
+          // Show Computershare number under client name; purchase time under Account ID.
+          const csNum = String(u.computershareNumber || '').trim();
+          const computershareHtml = csNum
+            ? `<span class="orderbook-cell-muted" style="font-size:10.5px;display:block;">${escapeHtml(csNum)}</span>`
+            : '';
           const buyTime = u.createdAtBucket
             ? `<span class="orderbook-cell-muted" style="font-size:10.5px;display:block;">${escapeHtml(u.createdAtBucket.replace('T', ' '))}</span>`
             : '';
           return `
           <tr class="investor-row ${isSelected ? 'selected' : ''}" data-investor-row data-investor-key="${escapeHtml(investorKey)}" data-user-id="${escapeHtml(String(u.userId || ''))}" data-family-member-id="${escapeHtml(String(u.familyMemberId || ''))}" data-strategy-id="${escapeHtml(String(row.strategyId || ''))}" data-transaction-id="${escapeHtml(String(u.transactionId || ''))}" data-created-at-from="${escapeHtml(String(u.createdAtFrom || ''))}" data-created-at-to="${escapeHtml(String(u.createdAtTo || ''))}"${archiveAttrs}>
             <td>${escapeHtml(String(i + 1))}</td>
-            <td>${escapeHtml(u.clientName || '-')}${buyTime}</td>
-            <td>${escapeHtml(u.clientAccountId || '-')}</td>
+            <td>${escapeHtml(u.clientName || '-')}${computershareHtml}</td>
+            <td>${escapeHtml(u.clientAccountId || '-')}${buyTime}</td>
             <td>${escapeHtml(maskIdentifier(u.clientIdRegNo || '-'))}</td>
             <td>${escapeHtml(formatMoney(u.totalMarketValue))}</td>
             <td>${escapeHtml(String(u.holdingsCount))}</td>
@@ -6020,7 +6024,7 @@
         parallelQueries.push(
           supabaseClient
             .from('family_members')
-            .select('id, first_name, last_name, id_number, mint_number, available_balance, relationship')
+            .select('id, first_name, last_name, id_number, mint_number, available_balance, relationship, computershare_number')
             .in('id', familyMemberIds)
             .then(({ data, error }) => {
               if (error) { console.error('Family members load error:', error); return; }
@@ -6033,7 +6037,7 @@
         parallelQueries.push(
           supabaseClient
             .from('profiles')
-            .select('id, first_name, last_name, mint_number, id_number, address')
+            .select('id, first_name, last_name, mint_number, id_number, address, computershare_number')
             .in('id', userIds)
             .then(({ data, error }) => {
               if (error) { console.error('Profiles load error:', error); return; }
@@ -6309,6 +6313,7 @@
           fillSetBy: row.fill_set_by || null,
           fillSetAt: row.fill_set_at || null,
           isGift: !!(row.transaction_id && giftTransactionIds.has(String(row.transaction_id))),
+          computershareNumber: String(familyMember?.computershare_number || profile.computershare_number || '').trim() || null,
         };
       });
 
