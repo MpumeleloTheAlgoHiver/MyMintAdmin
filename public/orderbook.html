@@ -1568,6 +1568,10 @@
     let orderbookPins = new Set();
     let allOrderbookRawRows = [];
     let allBirSourceRows = [];
+    // userId / familyMemberId -> Computershare number (e.g. "MP003"). Populated on
+    // every orderbook load so BOTH the live table and archived/sent snapshots can
+    // show the number under the client name (archived rows don't carry it).
+    const computershareByOwnerId = new Map();
     let strateBirPreviewMode = 'table';
     let strateBirTableViewMode = 'simple';
     let strateBirExpandedIndividualRef = '';
@@ -2800,7 +2804,14 @@
             ? `<td class="pin-investor-col"><button type="button" class="pin-order-btn${isPinned ? ' is-pinned' : ''}" data-pin-investor data-pin-key="${escapeHtml(bookIdForPin)}" title="${isPinned ? 'Unpin this order book from top' : 'Pin this order book to top'}" aria-pressed="${isPinned}"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H19v-2l-3-2z"/></svg></button></td>`
             : '';
           // Show Computershare number under client name; purchase time under Account ID.
-          const csNum = String(u.computershareNumber || '').trim();
+          // Prefer the row's own value (live path); fall back to the global map so
+          // archived/sent snapshots (which don't carry it) still resolve it.
+          const csNum = String(
+            u.computershareNumber
+            || computershareByOwnerId.get(String(u.familyMemberId || ''))
+            || computershareByOwnerId.get(String(u.userId || ''))
+            || ''
+          ).trim();
           const computershareHtml = csNum
             ? `<span class="orderbook-cell-muted" style="font-size:10.5px;display:block;">${escapeHtml(csNum)}</span>`
             : '';
@@ -4520,6 +4531,18 @@
       let latestFillDate = null;
       let hasSent = false;
       let hasFailed = false;
+      /* Track the live SELL state so the archived row reflects what actually
+         happened to the position — a rebalance SELL (or a client-requested
+         pending sell) keeps a POSITIVE quantity, so side must NOT be derived
+         from the qty sign. Prefer the live row's already-correct side. */
+      let liveIsSell = false;
+      let liveIsPendingSell = false;
+      let avgExitWeighted = 0;
+      let avgExitWeight = 0;
+      let expExitWeighted = 0;
+      let expExitWeight = 0;
+      let liveRebalanceBatchId = null;
+      let liveClosedReason = '';
 
       liveRows.forEach((live) => {
         const q = Number(live.quantityValue || 0);
@@ -4527,6 +4550,24 @@
         const pnl = Number(live.unrealizedPnlNumber || 0);
         const avg = Number(live.avgFillNumber);
         const act = Number(live.actualFillNumber);
+
+        const liveSide = String(live.side || live.tradeSide || '').toUpperCase();
+        if (liveSide === 'SELL') liveIsSell = true;
+        if (live.isPendingSell) liveIsPendingSell = true;
+        if (live.rebalanceBatchId) liveRebalanceBatchId = live.rebalanceBatchId;
+        if (live.closedReason) liveClosedReason = live.closedReason;
+        const ex = Number(live.avgExitNumber);
+        if (Number.isFinite(ex)) {
+          const w = Math.abs(q) || 1;
+          avgExitWeighted += ex * w;
+          avgExitWeight += w;
+        }
+        const ee = Number(live.expectedExitNumber);
+        if (Number.isFinite(ee)) {
+          const w = Math.abs(q) || 1;
+          expExitWeighted += ee * w;
+          expExitWeight += w;
+        }
 
         if (Number.isFinite(q)) qtyTotal += q;
         if (Number.isFinite(mv)) mvTotal += mv;
@@ -4572,11 +4613,26 @@
         unrealizedPnl: Number.isFinite(pnlTotal)
           ? pnlTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
           : (row.unrealizedPnl ?? '-'),
-        side: Number.isFinite(qtyTotal) ? (qtyTotal < 0 ? 'SELL' : 'BUY') : (row.side || '-'),
+        /* Side follows the LIVE position, not the qty sign. A rebalance SELL /
+           pending sell keeps qty positive but must render as SELL. */
+        side: liveIsSell ? 'SELL' : (Number.isFinite(qtyTotal) ? (qtyTotal < 0 ? 'SELL' : 'BUY') : (row.side || '-')),
+        tradeSide: liveIsSell ? 'SELL' : (Number.isFinite(qtyTotal) ? (qtyTotal < 0 ? 'SELL' : 'BUY') : (row.tradeSide || row.side || '-')),
+        isPendingSell: liveIsPendingSell,
+        rebalanceBatchId: liveRebalanceBatchId || row.rebalanceBatchId || null,
+        closedReason: liveClosedReason || row.closedReason || '',
         timestamp: latestTimestamp || row.timestamp || null,
         fillDate: latestFillDate || row.fillDate || null,
         notificationStatus: hasSent ? 'sent' : (hasFailed ? 'failed' : (row.notificationStatus || 'pending'))
       };
+
+      if (avgExitWeight > 0) {
+        const avgExitNumber = avgExitWeighted / avgExitWeight;
+        next.avgExitNumber = avgExitNumber;
+        next.avgExit = formatMoneyText(avgExitNumber);
+      }
+      if (expExitWeight > 0) {
+        next.expectedExitNumber = expExitWeighted / expExitWeight;
+      }
 
       if (avgWeight > 0) {
         const avgFillNumber = avgWeighted / avgWeight;
@@ -4603,6 +4659,9 @@
         avgFill: row.avgFill,
         actualFillNumber: row.actualFillNumber,
         actualFill: row.actualFill,
+        side: row.side,
+        avgExit: row.avgExit,
+        expectedExitNumber: row.expectedExitNumber,
         timestamp: row.timestamp,
         fillDate: row.fillDate
       }) !== JSON.stringify({
@@ -4618,6 +4677,9 @@
         avgFill: next.avgFill,
         actualFillNumber: next.actualFillNumber,
         actualFill: next.actualFill,
+        side: next.side,
+        avgExit: next.avgExit,
+        expectedExitNumber: next.expectedExitNumber,
         timestamp: next.timestamp,
         fillDate: next.fillDate
       });
@@ -6028,7 +6090,11 @@
             .in('id', familyMemberIds)
             .then(({ data, error }) => {
               if (error) { console.error('Family members load error:', error); return; }
-              (data || []).forEach((fm) => { familyMembersMap[fm.id] = fm; });
+              (data || []).forEach((fm) => {
+                familyMembersMap[fm.id] = fm;
+                const cs = String(fm.computershare_number || '').trim();
+                if (cs) computershareByOwnerId.set(String(fm.id), cs);
+              });
             })
         );
       }
@@ -6041,7 +6107,11 @@
             .in('id', userIds)
             .then(({ data, error }) => {
               if (error) { console.error('Profiles load error:', error); return; }
-              (data || []).forEach((p) => { profilesMap[p.id] = p; });
+              (data || []).forEach((p) => {
+                profilesMap[p.id] = p;
+                const cs = String(p.computershare_number || '').trim();
+                if (cs) computershareByOwnerId.set(String(p.id), cs);
+              });
             })
         );
 
