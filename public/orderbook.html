@@ -6212,11 +6212,18 @@
           : 0;
         const normalizedUnrealizedPnlNumber = computedInitialPnlNumber;
         const explicitSide = String(row.trade_side || '').trim().toUpperCase();
-        const side = (explicitSide === 'BUY' || explicitSide === 'SELL')
-          ? explicitSide
-          : (isQuantityNumeric
-            ? (quantityValue < 0 ? 'SELL' : 'BUY')
-            : '-');
+        // A holding closed by a rebalance is a SELL leg — the original position
+        // keeps trade_side='BUY' but is stamped closed_reason='REBALANCE_SELL' with
+        // an exit price. Treat it as SELL so the order book shows SELL + Avg Exit
+        // (and the exit editor) instead of a misleading BUY row.
+        const isRebalanceSell = String(row.closed_reason || '').trim().toUpperCase() === 'REBALANCE_SELL';
+        const side = isRebalanceSell
+          ? 'SELL'
+          : ((explicitSide === 'BUY' || explicitSide === 'SELL')
+            ? explicitSide
+            : (isQuantityNumeric
+              ? (quantityValue < 0 ? 'SELL' : 'BUY')
+              : '-'));
         const orderType = 'Market';
         const totalQuantity = isQuantityNumeric
           ? quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 })
@@ -6337,6 +6344,12 @@
         // They get a "Rebalanced" badge in the render so they're visually distinct
         // from original purchases. Only hide the inactive side (the sold shares
         // are already captured by the SELL audit row and the Rebalances tab).
+
+        // A fully-sold rebalance leg leaves TWO rows: the closed ORIGINAL position
+        // (no rebalance_batch_id) and the SELL AUDIT row (has the batch id). They're
+        // the same sale — keep only the audit row so the sell shows once, carrying
+        // its REB badge and exit price, and isn't double-counted.
+        if (reason === 'REBALANCE_SELL' && !row.rebalanceBatchId) return false;
 
         if (isActive) return true;
         if (side === 'SELL') return true;
