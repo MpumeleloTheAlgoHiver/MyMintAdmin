@@ -2215,12 +2215,54 @@
           /* Sort by daily change descending */
           _returnInsightsData.sort((a, b) => (b.change_percent ?? -Infinity) - (a.change_percent ?? -Infinity));
           /* Compute alert count and update badges */
-          const alertCount = _returnInsightsData.filter(a => {
+          const alertingAssets = _returnInsightsData.filter(a => {
             const live = _riIntradayMap[a.id]?.['1d_pct'] != null ? Number(_riIntradayMap[a.id]['1d_pct']) : (a.change_percent != null ? Number(a.change_percent) : null);
             return live != null && live <= ALERT_THRESHOLD;
-          }).length;
+          });
+          const alertCount = alertingAssets.length;
           _updateAlertBadges(alertCount);
           _renderReturnInsights(_activeReturnTab);
+
+          /* ── Email alert notification (once per day per symbol set) ── */
+          if (alertingAssets.length > 0) {
+            try {
+              const symStratMap = _getSymbolStrategyMap();
+              const todayKey = new Date().toISOString().slice(0, 10);
+              const alertSymbols = alertingAssets.map(a => a.symbol).sort().join(',');
+              const storageKey = `mint_alert_sent_${todayKey}`;
+              const alreadySent = localStorage.getItem(storageKey) === alertSymbols;
+              if (!alreadySent) {
+                const token = (() => {
+                  try {
+                    const k = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+                    return k ? JSON.parse(localStorage.getItem(k))?.access_token || null : null;
+                  } catch { return null; }
+                })();
+                if (token) {
+                  const alertPayload = alertingAssets.map(a => ({
+                    symbol: a.symbol,
+                    name: a.name || '',
+                    change: _riIntradayMap[a.id]?.['1d_pct'] != null ? Number(_riIntradayMap[a.id]['1d_pct']) : Number(a.change_percent),
+                    strategies: symStratMap[a.symbol] || []
+                  }));
+                  fetch('/api/return-alerts/notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                    body: JSON.stringify({ alerts: alertPayload, dateKey: todayKey })
+                  }).then(r => r.json()).then(data => {
+                    if (data.ok) {
+                      localStorage.setItem(storageKey, alertSymbols);
+                      console.log('[ReturnAlerts] Alert email sent to', data.recipients, 'recipient(s)');
+                    } else {
+                      console.warn('[ReturnAlerts] Email send failed:', data.error);
+                    }
+                  }).catch(err => console.warn('[ReturnAlerts] Notify error:', err.message));
+                }
+              }
+            } catch (notifyErr) {
+              console.warn('[ReturnAlerts] Notification error:', notifyErr.message);
+            }
+          }
         } catch(e) {
           const listEl = document.getElementById('returnInsightsList');
           if (listEl) listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">Data unavailable</div>';

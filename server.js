@@ -13,6 +13,7 @@ const sendEftEmailHandler = require('./api/send-eft-email');
 const orderbookUpdatePriceHandler = require('./api/orderbook/update-price');
 const orderbookSendCsvHandler = require('./api/orderbook/send-csv');
 const { runHealthCheck } = require('./api/monitor/_health-check');
+const returnAlertsHandler = require('./api/return-alerts');
 
 const port = process.env.PORT || 5000;
 const publicDir = path.join(__dirname, 'public');
@@ -628,6 +629,18 @@ const server = http.createServer((req, res) => {
         sendJson(res, 200, { mandate_data: mandateData });
       } catch (err) {
         sendJson(res, 500, { error: err.message || 'Failed to fetch mandate data' });
+      }
+    })();
+    return;
+  }
+
+  if (req.url.startsWith('/api/return-alerts/notify') && req.method === 'POST') {
+    (async () => {
+      try {
+        req.body = await readJsonBody(req).catch(() => ({}));
+        await returnAlertsHandler(req, res);
+      } catch (err) {
+        if (!res.headersSent) sendJson(res, 500, { error: err.message });
       }
     })();
     return;
