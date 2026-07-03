@@ -6933,6 +6933,32 @@
         _tabMenuEl.style.display = "none";
         _tabMenuOpen = null;
       };
+      /* Category (sector) display order — app_settings('category_order') maps a
+         sector name → a number. The app orders its basket sections by it (lower
+         first). Edited from the Strategy Details modal below. Cached per page load. */
+      let categoryOrderMap = null;
+      async function loadCategoryOrder() {
+        if (categoryOrderMap) return categoryOrderMap;
+        try {
+          const token = await rebApiToken();
+          const res = await fetch('/api/team?action=app-settings-get&key=category_order', { headers: { Authorization: 'Bearer ' + token } });
+          const j = await res.json().catch(() => ({}));
+          categoryOrderMap = (j && j.value && typeof j.value === 'object') ? j.value : {};
+        } catch { categoryOrderMap = {}; }
+        return categoryOrderMap;
+      }
+      async function saveCategoryOrder(map) {
+        const token = await rebApiToken();
+        const res = await fetch('/api/team?action=app-settings-save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ key: 'category_order', value: map }),
+        });
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + res.status)); }
+        categoryOrderMap = map;
+        return map;
+      }
+
       /* ── Strategy Details Modal ── */
       const openStrategyDetailsModal = (strategy) => {
         const existing = document.getElementById("_stratDetailsModal");
@@ -7022,6 +7048,14 @@
                 </div>
               </div>
 
+              <!-- Sector display order (category ordering in the app) -->
+              <div style="margin-bottom:16px;">
+                <label style="display:block;font-size:11px;font-weight:700;color:#64748b;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:6px;">Category order in app</label>
+                <input id="_sdSectorOrder" type="number" min="1" step="1" placeholder="e.g. 1"
+                  style="width:100%;border:1.5px solid #e2e8f0;border-radius:9px;padding:9px 13px;font-size:13.5px;color:#1e293b;outline:none;background:#f8fafc;box-sizing:border-box;transition:border-color 0.15s;" />
+                <div style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.45;">Where the <b id="_sdSectorOrderName">this category</b> section appears in the app — lower shows first. Applies to <b>every basket</b> in this sector. Leave blank to leave it unordered (shows last).</div>
+              </div>
+
               <!-- Toggles -->
               <div style="display:flex;gap:0;border:1.5px solid #e2e8f0;border-radius:11px;overflow:hidden;margin-bottom:22px;">
                 <label style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 14px;cursor:pointer;gap:10px;border-right:1.5px solid #e2e8f0;">
@@ -7106,7 +7140,21 @@
           sdSector.value = val;
           newSectorInput2.value = "";
           newSectorRow2.style.display = "none";
+          refreshOrderField(categoryOrderMap || {});
         });
+
+        /* Category order: prefill from app_settings and keep it in sync with the
+           selected sector (each sector has one shared order across all its baskets). */
+        const sdOrderInput = overlay.querySelector("#_sdSectorOrder");
+        const sdOrderName = overlay.querySelector("#_sdSectorOrderName");
+        const refreshOrderField = (map) => {
+          const sec = sdSector.value || "";
+          sdOrderName.textContent = sec ? ('"' + sec + '"') : "this category";
+          const v = sec ? map[sec] : undefined;
+          sdOrderInput.value = (v != null && v !== "") ? String(v) : "";
+        };
+        loadCategoryOrder().then((map) => refreshOrderField(map)).catch(() => refreshOrderField({}));
+        sdSector.addEventListener("change", () => refreshOrderField(categoryOrderMap || {}));
 
         const closeModal = () => overlay.remove();
 
@@ -7140,6 +7188,21 @@
             saveBtn.disabled = false;
             alert("Could not save: " + error.message);
             return;
+          }
+
+          /* Persist this sector's display order (shared across every basket in the
+             sector). Non-fatal: the strategy itself is already saved. */
+          const secForOrder = payload.sector;
+          const orderRaw = (overlay.querySelector("#_sdSectorOrder").value || "").trim();
+          if (secForOrder) {
+            try {
+              const map = { ...(categoryOrderMap || (await loadCategoryOrder())) };
+              if (orderRaw === "") { delete map[secForOrder]; }
+              else { const n = parseInt(orderRaw, 10); if (Number.isFinite(n) && n > 0) map[secForOrder] = n; }
+              await saveCategoryOrder(map);
+            } catch (e) {
+              alert("Strategy saved, but the category order didn't save: " + (e.message || e));
+            }
           }
 
           /* Sync hidden form fields if this is the active strategy */
