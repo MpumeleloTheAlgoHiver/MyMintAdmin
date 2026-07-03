@@ -13,7 +13,8 @@ const sendEftEmailHandler = require('./api/send-eft-email');
 const orderbookUpdatePriceHandler = require('./api/orderbook/update-price');
 const orderbookSendCsvHandler = require('./api/orderbook/send-csv');
 const { runHealthCheck } = require('./api/monitor/_health-check');
-const returnAlertsHandler = require('./api/return-alerts');
+// Return-alerts was merged into mint-mornings to stay under Vercel's 12-function limit.
+const { handleReturnAlertsNotify: returnAlertsHandler } = require('./api/mint-mornings');
 
 const port = process.env.PORT || 5000;
 const publicDir = path.join(__dirname, 'public');
