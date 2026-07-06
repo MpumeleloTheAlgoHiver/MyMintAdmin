@@ -37,9 +37,10 @@ module.exports = async (req, res) => {
     /* Exclude UAT/test accounts (profiles.is_test = true) from the investor list
        entirely — they must never show on investors.html. Filtering holdings here
        scopes userIds/secIds/famIds and everything fetched from them downstream. */
+    let testIds = new Set();
     try {
       const testRows = await sbGet('profiles?select=id&is_test=eq.true');
-      const testIds = new Set((testRows || []).map((r) => r.id));
+      testIds = new Set((testRows || []).map((r) => r.id));
       if (testIds.size) holdings = (holdings || []).filter((h) => !testIds.has(h.user_id));
     } catch (e) { /* is_test column absent -> no filtering */ }
 
@@ -197,8 +198,24 @@ module.exports = async (req, res) => {
       secLive.push({ security_id: sid, current_price: cents });
     });
 
+    /* UAT/test activity — kept SEPARATE from the real-account aggregates above so
+       totals/investors/AUM stay real-only, but surfaced (with names) so the
+       Finances activity feed can show test buys/sells behind a "UAT" badge. */
+    let uatTxns = [], uatProfiles = [], uatFamilyMembers = [];
+    const testIdArr = [...testIds];
+    if (testIdArr.length) {
+      [uatTxns, uatProfiles] = await Promise.all([
+        sbGet(`transactions?select=id,user_id,family_member_id,amount,direction,name,status,transaction_date&user_id=in.(${testIdArr.join(',')})&order=transaction_date.desc&limit=500`),
+        sbGet(`profiles?select=id,first_name,last_name,email&id=in.(${testIdArr.join(',')})`),
+      ]);
+      const uatFamIds = [...new Set((uatTxns || []).map((t) => t.family_member_id).filter(Boolean))];
+      uatFamilyMembers = uatFamIds.length
+        ? await sbGet(`family_members?select=id,first_name,last_name&id=in.(${uatFamIds.join(',')})`)
+        : [];
+    }
+
     res.statusCode = 200;
-    res.end(JSON.stringify({ holdings, strategies, stratHist, profiles, secMeta, secLive, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches, closedHoldings, aumFeeState, aumFeeTxns, aumSegments, wallets }));
+    res.end(JSON.stringify({ holdings, strategies, stratHist, profiles, secMeta, secLive, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches, closedHoldings, aumFeeState, aumFeeTxns, aumSegments, wallets, uatTxns, uatProfiles, uatFamilyMembers }));
   } catch (err) {
     res.statusCode = 500;
     res.end(JSON.stringify({ error: err.message }));

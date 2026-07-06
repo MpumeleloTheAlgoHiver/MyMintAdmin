@@ -269,7 +269,9 @@
             residuals = data.residuals || [], drawdowns = data.drawdowns || [],
             aumFeeTxns = data.aumFeeTxns || [], aumSegments = data.aumSegments || [],
             aumFeeState = data.aumFeeState || [],
-            familyMembers = data.familyMembers || [], wallets = data.wallets || [];
+            familyMembers = data.familyMembers || [], wallets = data.wallets || [],
+            uatTxns = data.uatTxns || [], uatProfiles = data.uatProfiles || [],
+            uatFamilyMembers = data.uatFamilyMembers || [];
 
       const stratMap = Object.fromEntries(strategies.map((s) => [s.id, s]));
       const profMap = Object.fromEntries(profiles.map((p) => [p.id, p]));
@@ -422,7 +424,11 @@
       renderInvestors(investors);
 
       // ── Historical activity: every purchase + sell/withdrawal, newest first ──
-      const famMap = Object.fromEntries(familyMembers.map((f) => [f.id, [f.first_name, f.last_name].filter(Boolean).join(' ').trim()]));
+      // Real + UAT profiles/family merged for name resolution; UAT rows carry a flag.
+      const actProfMap = { ...profMap, ...Object.fromEntries(uatProfiles.map((p) => [p.id, p])) };
+      const actFamMap = Object.fromEntries(
+        [...familyMembers, ...uatFamilyMembers].map((f) => [f.id, [f.first_name, f.last_name].filter(Boolean).join(' ').trim()])
+      );
       const classifyAct = (t) => {
         const n = String(t.name || '');
         if (/^Strategy Investment:|^Purchased /i.test(n)) return { kind: 'buy', label: 'BUY' };
@@ -430,22 +436,26 @@
         if (/^Execution reserve refund/i.test(n)) return { kind: 'refund', label: 'REFUND' };
         return null; // deposits/gifts/fees etc. stay out of this feed
       };
-      _actRows = txns.map((t) => {
+      const buildActRow = (t, uat) => {
         const c = classifyAct(t); if (!c) return null;
-        const prof = profMap[String(t.user_id || '')];
+        const prof = actProfMap[String(t.user_id || '')];
         const who = prof ? ([prof.first_name, prof.last_name].filter(Boolean).join(' ').trim() || prof.email || 'Investor') : 'Investor';
         const what = String(t.name || '')
           .replace(/^Strategy Investment:\s*/i, '').replace(/^Purchased\s*/i, '')
           .replace(/^Sell:\s*/i, '').replace(/^Execution reserve refund:\s*/i, '').trim();
         return {
-          kind: c.kind, label: c.label, who,
-          child: t.family_member_id ? (famMap[t.family_member_id] || 'family member') : '',
+          kind: c.kind, label: c.label, who, uat: !!uat,
+          child: t.family_member_id ? (actFamMap[t.family_member_id] || 'family member') : '',
           what: what || 'holdings',
           amt: (Number(t.amount) || 0) / 100,      // transactions.amount is CENTS
           status: String(t.status || ''),
           ts: new Date(t.transaction_date || 0).getTime(),
         };
-      }).filter(Boolean).sort((a, b) => b.ts - a.ts);
+      };
+      _actRows = [
+        ...txns.map((t) => buildActRow(t, false)),
+        ...uatTxns.map((t) => buildActRow(t, true)),
+      ].filter(Boolean).sort((a, b) => b.ts - a.ts);
       renderActivity();
 
       // ── AUM: who contributes (basis = portfolio value) + fee accrued/collected ──
@@ -611,13 +621,14 @@
       refund: 'background:#ecfdf5;color:#0f7b53;',
     };
     const actWhen = (r) => `${new Date(r.ts).toLocaleString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}${r.status === 'pending' ? ' &middot; <span style="color:#b45309;font-weight:700;">pending</span>' : ''}`;
+    const UAT_TAG = '<span title="Test / UAT account" style="font-size:9px;font-weight:800;letter-spacing:.05em;padding:2px 6px;border-radius:6px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;margin-left:6px;vertical-align:middle;">UAT</span>';
 
     // Flat timeline row (shows who + child tag).
     const actRowHtml = (r) => `
       <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f1f5f9;">
         <div class="avatar" style="width:30px;height:30px;font-size:11px;flex-shrink:0;">${esc(initials(r.who))}</div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:12.5px;font-weight:700;color:#0f172a;">${esc(r.who)}${r.child ? ` <span style="color:#7c3aed;font-size:10.5px;font-weight:600;">for ${esc(r.child)}</span>` : ''}</div>
+          <div style="font-size:12.5px;font-weight:700;color:#0f172a;">${esc(r.who)}${r.uat ? UAT_TAG : ''}${r.child ? ` <span style="color:#7c3aed;font-size:10.5px;font-weight:600;">for ${esc(r.child)}</span>` : ''}</div>
           <div style="font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(r.what)}</div>
         </div>
         <span style="flex-shrink:0;font-size:10px;font-weight:800;letter-spacing:.04em;padding:3px 9px;border-radius:7px;${ACT_BADGE[r.kind] || ACT_BADGE.buy}">${r.label}</span>
@@ -671,6 +682,7 @@
       rows.forEach((r) => { (groups[r.who] = groups[r.who] || []).push(r); });
       const people = Object.entries(groups).map(([who, list]) => ({
         who, list,
+        uat: list.some((x) => x.uat),
         buys: list.filter((x) => x.kind === 'buy').length,
         sells: list.filter((x) => x.kind !== 'buy').length,
         latest: Math.max.apply(null, list.map((x) => x.ts)),
@@ -681,7 +693,7 @@
         <div data-grp="${i}" style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #eef1f5;cursor:pointer;" title="Show ${esc(p.who)}'s activity">
           <div class="avatar" style="width:34px;height:34px;font-size:12px;flex-shrink:0;">${esc(initials(p.who))}</div>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:800;color:#0f172a;">${esc(p.who)}</div>
+            <div style="font-size:13px;font-weight:800;color:#0f172a;">${esc(p.who)}${p.uat ? UAT_TAG : ''}</div>
             <div style="font-size:11px;color:#94a3b8;">${p.list.length} event${p.list.length !== 1 ? 's' : ''} &middot; ${p.buys} buy${p.buys !== 1 ? 's' : ''} &middot; ${p.sells} sell${p.sells !== 1 ? 's' : ''}</div>
           </div>
           <span id="grpChev${i}" style="color:#94a3b8;font-size:12px;flex-shrink:0;transition:transform .15s;">&#9656;</span>
