@@ -203,8 +203,12 @@
           <div class="card-title">Historical activity</div>
           <div class="card-sub">Every strategy &amp; security purchase, sell and withdrawal &mdash; newest first</div>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <span class="card-sub" id="actCount">&mdash;</span>
+          <div style="display:inline-flex;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+            <button id="actView_person" onclick="actSetView('person')" style="border:none;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer;background:#3949ab;color:#fff;">By person</button>
+            <button id="actView_timeline" onclick="actSetView('timeline')" style="border:none;border-left:1px solid #e2e8f0;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer;background:#fff;color:#475569;">Timeline</button>
+          </div>
           <select id="actFilter" onchange="actSetFilter(this.value)" style="border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:12px;color:#0f172a;background:#fff;cursor:pointer;">
             <option value="all">All activity</option>
             <option value="buy">Purchases</option>
@@ -596,35 +600,103 @@
     let _actRows = [];
     let _actShown = 30;
     let _actFilter = 'all';
+    let _actView = 'person'; // 'person' (grouped, default) | 'timeline' (flat)
     window.actSetFilter = (v) => { _actFilter = v; _actShown = 30; renderActivity(); };
     window.actShowMore = () => { _actShown += 30; renderActivity(); };
+    window.actSetView = (v) => { _actView = v; _actShown = 30; renderActivity(); };
+
+    const ACT_BADGE = {
+      buy:    'background:#eef2ff;color:#3949ab;',
+      sell:   'background:#fef2f2;color:#b42318;',
+      refund: 'background:#ecfdf5;color:#0f7b53;',
+    };
+    const actWhen = (r) => `${new Date(r.ts).toLocaleString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}${r.status === 'pending' ? ' &middot; <span style="color:#b45309;font-weight:700;">pending</span>' : ''}`;
+
+    // Flat timeline row (shows who + child tag).
+    const actRowHtml = (r) => `
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f1f5f9;">
+        <div class="avatar" style="width:30px;height:30px;font-size:11px;flex-shrink:0;">${esc(initials(r.who))}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12.5px;font-weight:700;color:#0f172a;">${esc(r.who)}${r.child ? ` <span style="color:#7c3aed;font-size:10.5px;font-weight:600;">for ${esc(r.child)}</span>` : ''}</div>
+          <div style="font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(r.what)}</div>
+        </div>
+        <span style="flex-shrink:0;font-size:10px;font-weight:800;letter-spacing:.04em;padding:3px 9px;border-radius:7px;${ACT_BADGE[r.kind] || ACT_BADGE.buy}">${r.label}</span>
+        <div style="text-align:right;flex-shrink:0;min-width:96px;">
+          <div style="font-size:12.5px;font-weight:800;color:#0f172a;">${money(r.amt)}</div>
+          <div style="font-size:10.5px;color:#94a3b8;">${actWhen(r)}</div>
+        </div>
+      </div>`;
+
+    // Compact row inside a person group (no avatar — the group header carries it).
+    const actGroupRowHtml = (r) => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(r.what)}${r.child ? ` <span style="color:#7c3aed;font-size:10px;font-weight:600;">for ${esc(r.child)}</span>` : ''}</div>
+          <div style="font-size:10.5px;color:#94a3b8;">${actWhen(r)}</div>
+        </div>
+        <span style="flex-shrink:0;font-size:9.5px;font-weight:800;letter-spacing:.04em;padding:2px 8px;border-radius:6px;${ACT_BADGE[r.kind] || ACT_BADGE.buy}">${r.label}</span>
+        <div style="font-size:12px;font-weight:800;color:#0f172a;text-align:right;min-width:90px;">${money(r.amt)}</div>
+      </div>`;
+
+    const syncActViewBtns = () => ['person', 'timeline'].forEach((v) => {
+      const b = document.getElementById('actView_' + v);
+      if (b) { const on = _actView === v; b.style.background = on ? '#3949ab' : '#fff'; b.style.color = on ? '#fff' : '#475569'; }
+    });
 
     const renderActivity = () => {
       const el = document.getElementById('actList');
       if (!el) return;
-      const BADGE = {
-        buy:    'background:#eef2ff;color:#3949ab;',
-        sell:   'background:#fef2f2;color:#b42318;',
-        refund: 'background:#ecfdf5;color:#0f7b53;',
-      };
-      const rows = _actRows.filter((r) => _actFilter === 'all' ? true : (_actFilter === 'buy' ? r.kind === 'buy' : r.kind !== 'buy'));
+      syncActViewBtns();
+      const moreBtn = document.getElementById('actMore');
       const countEl = document.getElementById('actCount');
-      if (countEl) countEl.textContent = rows.length + ' event' + (rows.length !== 1 ? 's' : '');
-      if (!rows.length) { el.innerHTML = '<div class="muted" style="padding:20px 0;text-align:center;">No activity yet.</div>'; document.getElementById('actMore').style.display = 'none'; return; }
-      el.innerHTML = rows.slice(0, _actShown).map((r) => `
-        <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f1f5f9;">
-          <div class="avatar" style="width:30px;height:30px;font-size:11px;flex-shrink:0;">${esc(initials(r.who))}</div>
+      const rows = _actRows.filter((r) => _actFilter === 'all' ? true : (_actFilter === 'buy' ? r.kind === 'buy' : r.kind !== 'buy'));
+
+      if (!rows.length) {
+        el.innerHTML = '<div class="muted" style="padding:20px 0;text-align:center;">No activity yet.</div>';
+        if (moreBtn) moreBtn.style.display = 'none';
+        if (countEl) countEl.textContent = '0 events';
+        return;
+      }
+
+      // ── Flat timeline (newest-first, paged) ──
+      if (_actView === 'timeline') {
+        if (countEl) countEl.textContent = rows.length + ' event' + (rows.length !== 1 ? 's' : '');
+        el.innerHTML = rows.slice(0, _actShown).map(actRowHtml).join('');
+        if (moreBtn) moreBtn.style.display = rows.length > _actShown ? 'block' : 'none';
+        return;
+      }
+
+      // ── Grouped by person (account holder) — collapsible, no long flat list ──
+      const groups = {};
+      rows.forEach((r) => { (groups[r.who] = groups[r.who] || []).push(r); });
+      const people = Object.entries(groups).map(([who, list]) => ({
+        who, list,
+        buys: list.filter((x) => x.kind === 'buy').length,
+        sells: list.filter((x) => x.kind !== 'buy').length,
+        latest: Math.max.apply(null, list.map((x) => x.ts)),
+      })).sort((a, b) => b.latest - a.latest);
+
+      if (countEl) countEl.textContent = rows.length + ' event' + (rows.length !== 1 ? 's' : '') + ' · ' + people.length + ' ' + (people.length !== 1 ? 'people' : 'person');
+      el.innerHTML = people.map((p, i) => `
+        <div data-grp="${i}" style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #eef1f5;cursor:pointer;" title="Show ${esc(p.who)}'s activity">
+          <div class="avatar" style="width:34px;height:34px;font-size:12px;flex-shrink:0;">${esc(initials(p.who))}</div>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:12.5px;font-weight:700;color:#0f172a;">${esc(r.who)}${r.child ? ` <span style="color:#7c3aed;font-size:10.5px;font-weight:600;">for ${esc(r.child)}</span>` : ''}</div>
-            <div style="font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(r.what)}</div>
+            <div style="font-size:13px;font-weight:800;color:#0f172a;">${esc(p.who)}</div>
+            <div style="font-size:11px;color:#94a3b8;">${p.list.length} event${p.list.length !== 1 ? 's' : ''} &middot; ${p.buys} buy${p.buys !== 1 ? 's' : ''} &middot; ${p.sells} sell${p.sells !== 1 ? 's' : ''}</div>
           </div>
-          <span style="flex-shrink:0;font-size:10px;font-weight:800;letter-spacing:.04em;padding:3px 9px;border-radius:7px;${BADGE[r.kind] || BADGE.buy}">${r.label}</span>
-          <div style="text-align:right;flex-shrink:0;min-width:96px;">
-            <div style="font-size:12.5px;font-weight:800;color:#0f172a;">${money(r.amt)}</div>
-            <div style="font-size:10.5px;color:#94a3b8;">${new Date(r.ts).toLocaleString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}${r.status === 'pending' ? ' &middot; <span style="color:#b45309;font-weight:700;">pending</span>' : ''}</div>
-          </div>
-        </div>`).join('');
-      document.getElementById('actMore').style.display = rows.length > _actShown ? 'block' : 'none';
+          <span id="grpChev${i}" style="color:#94a3b8;font-size:12px;flex-shrink:0;transition:transform .15s;">&#9656;</span>
+        </div>
+        <div id="grp${i}" style="display:none;padding:2px 0 12px 44px;">${p.list.map(actGroupRowHtml).join('')}</div>`).join('');
+      el.querySelectorAll('[data-grp]').forEach((h) => h.addEventListener('click', () => {
+        const idx = h.getAttribute('data-grp');
+        const body = document.getElementById('grp' + idx);
+        const chev = document.getElementById('grpChev' + idx);
+        if (!body) return;
+        const open = body.style.display !== 'none';
+        body.style.display = open ? 'none' : 'block';
+        if (chev) chev.style.transform = open ? 'rotate(0deg)' : 'rotate(90deg)';
+      }));
+      if (moreBtn) moreBtn.style.display = 'none'; // grouped view expands per-person instead of paging
     };
 
     window.toggleAum = () => {
