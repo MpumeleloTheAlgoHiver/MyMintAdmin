@@ -214,9 +214,9 @@
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
     const money = (rands) => 'R ' + Number(rands || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const money0 = (rands) => 'R ' + Math.round(Number(rands || 0)).toLocaleString('en-ZA');
-    // AUM accrual is tiny and daily — show cents always (min 2 dp) and up to 4 dp
-    // so sub-cent daily growth is visible (you can watch it tick up).
-    const moneyAccrue = (rands) => 'R ' + Number(rands || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+    // AUM accrual is tiny — show it to the cent (2 dp) so R0.21 reads sensibly
+    // (money0 rounded it to whole rands, hiding sub-rand accrual).
+    const moneyAccrue = (rands) => 'R ' + Number(rands || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const pct = (n) => (n >= 0 ? '+' : '') + Number(n || 0).toFixed(1) + '%';
     const initials = (name) => { const p = String(name||'').trim().split(/\s+/).filter(Boolean); return p.length ? ((p[0][0]||'') + (p.length>1?p[p.length-1][0]:'')).toUpperCase() : '?'; };
     const DOTS = ['#3949ab','#0f7b53','#0f766e','#b45309','#475569','#1d4ed8','#64748b'];
