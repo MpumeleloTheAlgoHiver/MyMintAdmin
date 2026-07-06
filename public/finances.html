@@ -195,6 +195,26 @@
         </div>
       </div>
     </div>
+
+    <!-- Historical activity: every purchase + sell/withdrawal across real accounts -->
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Historical activity</div>
+          <div class="card-sub">Every strategy &amp; security purchase, sell and withdrawal &mdash; newest first</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="card-sub" id="actCount">&mdash;</span>
+          <select id="actFilter" onchange="actSetFilter(this.value)" style="border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:12px;color:#0f172a;background:#fff;cursor:pointer;">
+            <option value="all">All activity</option>
+            <option value="buy">Purchases</option>
+            <option value="sell">Sells &amp; withdrawals</option>
+          </select>
+        </div>
+      </div>
+      <div id="actList"><div class="skeleton" style="padding:20px 0;text-align:center;">Loading&hellip;</div></div>
+      <button id="actMore" onclick="actShowMore()" style="display:none;width:100%;margin-top:10px;border:1px solid #e2e8f0;background:#f8fafc;color:#3949ab;font-weight:700;font-size:12px;border-radius:9px;padding:9px 0;cursor:pointer;">Show more</button>
+    </div>
   </main>
 
   <div id="mintAppOverlay" style="display:none;position:fixed;inset:0;z-index:99998;background:#0f172a;">
@@ -244,7 +264,8 @@
             secLive = data.secLive || [], txns = data.txns || [],
             residuals = data.residuals || [], drawdowns = data.drawdowns || [],
             aumFeeTxns = data.aumFeeTxns || [], aumSegments = data.aumSegments || [],
-            aumFeeState = data.aumFeeState || [];
+            aumFeeState = data.aumFeeState || [],
+            familyMembers = data.familyMembers || [], wallets = data.wallets || [];
 
       const stratMap = Object.fromEntries(strategies.map((s) => [s.id, s]));
       const profMap = Object.fromEntries(profiles.map((p) => [p.id, p]));
@@ -376,13 +397,52 @@
       renderChart(strategiesArr);
       renderStrategies(strategiesArr, activeUsers.size);
 
+      // Spendable wallet cash per investor (wallets.balance is RANDS).
+      const walletByUser = {};
+      wallets.forEach((w) => { const u = String(w.user_id || ''); if (u) walletByUser[u] = Number(w.balance) || 0; });
+
       const investors = Object.keys(userAgg).map((uid) => {
         const prof = profMap[uid];
         const name = prof ? ([prof.first_name, prof.last_name].filter(Boolean).join(' ').trim() || prof.email || 'Investor') : 'Investor';
         const topStrat = Object.entries(userAgg[uid].strat).sort((a, b) => b[1] - a[1])[0];
-        return { name, mv: investorValue(uid), roi: userAgg[uid].invested > 0 ? (userAgg[uid].pnl / userAgg[uid].invested) * 100 : 0, strat: topStrat ? topStrat[0] : '—', aum: (aumByUser[uid] || 0) / 100 };
+        return {
+          name, mv: investorValue(uid), roi: userAgg[uid].invested > 0 ? (userAgg[uid].pnl / userAgg[uid].invested) * 100 : 0,
+          strat: topStrat ? topStrat[0] : '—', aum: (aumByUser[uid] || 0) / 100,
+          // Traceable balance breakdown (all rands) — shown on click.
+          wallet: walletByUser[uid] || 0,          // spendable wallet cash
+          assets: userAgg[uid].holdings,           // live position value
+          buffer: bufByUser[uid] || 0,             // held 8% execution reserve
+          residual: residualByUser[uid] || 0,      // rebalance residual cash
+        };
       }).sort((a, b) => b.mv - a.mv).slice(0, 6);
       renderInvestors(investors);
+
+      // ── Historical activity: every purchase + sell/withdrawal, newest first ──
+      const famMap = Object.fromEntries(familyMembers.map((f) => [f.id, [f.first_name, f.last_name].filter(Boolean).join(' ').trim()]));
+      const classifyAct = (t) => {
+        const n = String(t.name || '');
+        if (/^Strategy Investment:|^Purchased /i.test(n)) return { kind: 'buy', label: 'BUY' };
+        if (/^Sell:/i.test(n)) return { kind: 'sell', label: 'SELL' };
+        if (/^Execution reserve refund/i.test(n)) return { kind: 'refund', label: 'REFUND' };
+        return null; // deposits/gifts/fees etc. stay out of this feed
+      };
+      _actRows = txns.map((t) => {
+        const c = classifyAct(t); if (!c) return null;
+        const prof = profMap[String(t.user_id || '')];
+        const who = prof ? ([prof.first_name, prof.last_name].filter(Boolean).join(' ').trim() || prof.email || 'Investor') : 'Investor';
+        const what = String(t.name || '')
+          .replace(/^Strategy Investment:\s*/i, '').replace(/^Purchased\s*/i, '')
+          .replace(/^Sell:\s*/i, '').replace(/^Execution reserve refund:\s*/i, '').trim();
+        return {
+          kind: c.kind, label: c.label, who,
+          child: t.family_member_id ? (famMap[t.family_member_id] || 'family member') : '',
+          what: what || 'holdings',
+          amt: (Number(t.amount) || 0) / 100,      // transactions.amount is CENTS
+          status: String(t.status || ''),
+          ts: new Date(t.transaction_date || 0).getTime(),
+        };
+      }).filter(Boolean).sort((a, b) => b.ts - a.ts);
+      renderActivity();
 
       // ── AUM: who contributes (basis = portfolio value) + fee accrued/collected ──
       const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -506,12 +566,65 @@
     const renderInvestors = (investors) => {
       const el = document.getElementById('invList');
       if (!investors.length) { el.innerHTML = '<div class="muted" style="padding:20px 0;text-align:center;">No investors yet.</div>'; return; }
-      el.innerHTML = investors.map((iv) => `
-        <div class="inv-row">
+      /* Each balance line is one traceable pot; together they account for every
+         cent the platform holds for this investor. money() (2 dp) on purpose. */
+      const bLine = (label, hint, val, strong) => `
+        <div style="display:flex;justify-content:space-between;align-items:baseline;padding:${strong ? '8px 0 2px' : '4px 0'};${strong ? 'border-top:1px solid #e2e8f0;margin-top:6px;' : ''}">
+          <span style="font-size:12px;color:#64748b;">${label}${hint ? ` <span style="font-size:10.5px;color:#94a3b8;">${hint}</span>` : ''}</span>
+          <span style="font-size:12.5px;font-weight:${strong ? '800' : '700'};color:#0f172a;">${money(val)}</span>
+        </div>`;
+      el.innerHTML = investors.map((iv, i) => `
+        <div class="inv-row" data-inv-toggle="${i}" style="cursor:pointer;" title="Click to view this investor's traceable balances">
           <div class="avatar">${esc(initials(iv.name))}</div>
-          <div class="inv-info"><div class="inv-name">${esc(iv.name)}</div><div class="inv-strat">${esc(iv.strat)}${iv.aum > 0 ? ` · <span title="AUM fees collected from this investor">AUM ${money0(iv.aum)}</span>` : ''}</div></div>
+          <div class="inv-info"><div class="inv-name">${esc(iv.name)}</div><div class="inv-strat">${esc(iv.strat)}${iv.aum > 0 ? ` &middot; <span title="AUM fees collected from this investor">AUM ${money0(iv.aum)}</span>` : ''}</div></div>
           <div class="inv-nums"><div class="inv-amt">${money0(iv.mv)}</div><div class="inv-roi ${iv.roi >= 0 ? 'pos' : 'neg'}">${pct(iv.roi)}</div></div>
+        </div>
+        <div id="invDetail${i}" style="display:none;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;margin:2px 0 10px 42px;">
+          ${bLine('Wallet balance', 'spendable cash', iv.wallet)}
+          ${bLine('Asset value', 'live positions', iv.assets)}
+          ${bLine('Execution reserve', 'held 8%', iv.buffer)}
+          ${bLine('Rebalance residual', 'strategy cash', iv.residual)}
+          ${bLine('Total traceable', '', iv.wallet + iv.assets + iv.buffer + iv.residual, true)}
         </div>`).join('');
+      el.querySelectorAll('[data-inv-toggle]').forEach((row) => row.addEventListener('click', () => {
+        const d = document.getElementById('invDetail' + row.getAttribute('data-inv-toggle'));
+        if (d) d.style.display = d.style.display === 'none' ? 'block' : 'none';
+      }));
+    };
+
+    // ── Historical activity feed (purchases + sells/withdrawals) ─────────────
+    let _actRows = [];
+    let _actShown = 30;
+    let _actFilter = 'all';
+    window.actSetFilter = (v) => { _actFilter = v; _actShown = 30; renderActivity(); };
+    window.actShowMore = () => { _actShown += 30; renderActivity(); };
+
+    const renderActivity = () => {
+      const el = document.getElementById('actList');
+      if (!el) return;
+      const BADGE = {
+        buy:    'background:#eef2ff;color:#3949ab;',
+        sell:   'background:#fef2f2;color:#b42318;',
+        refund: 'background:#ecfdf5;color:#0f7b53;',
+      };
+      const rows = _actRows.filter((r) => _actFilter === 'all' ? true : (_actFilter === 'buy' ? r.kind === 'buy' : r.kind !== 'buy'));
+      const countEl = document.getElementById('actCount');
+      if (countEl) countEl.textContent = rows.length + ' event' + (rows.length !== 1 ? 's' : '');
+      if (!rows.length) { el.innerHTML = '<div class="muted" style="padding:20px 0;text-align:center;">No activity yet.</div>'; document.getElementById('actMore').style.display = 'none'; return; }
+      el.innerHTML = rows.slice(0, _actShown).map((r) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f1f5f9;">
+          <div class="avatar" style="width:30px;height:30px;font-size:11px;flex-shrink:0;">${esc(initials(r.who))}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12.5px;font-weight:700;color:#0f172a;">${esc(r.who)}${r.child ? ` <span style="color:#7c3aed;font-size:10.5px;font-weight:600;">for ${esc(r.child)}</span>` : ''}</div>
+            <div style="font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(r.what)}</div>
+          </div>
+          <span style="flex-shrink:0;font-size:10px;font-weight:800;letter-spacing:.04em;padding:3px 9px;border-radius:7px;${BADGE[r.kind] || BADGE.buy}">${r.label}</span>
+          <div style="text-align:right;flex-shrink:0;min-width:96px;">
+            <div style="font-size:12.5px;font-weight:800;color:#0f172a;">${money(r.amt)}</div>
+            <div style="font-size:10.5px;color:#94a3b8;">${new Date(r.ts).toLocaleString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}${r.status === 'pending' ? ' &middot; <span style="color:#b45309;font-weight:700;">pending</span>' : ''}</div>
+          </div>
+        </div>`).join('');
+      document.getElementById('actMore').style.display = rows.length > _actShown ? 'block' : 'none';
     };
 
     window.toggleAum = () => {
