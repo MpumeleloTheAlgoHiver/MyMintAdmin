@@ -2691,9 +2691,11 @@
           <td><span class="side-badge ${hSideClass}">${escapeHtml(hSide)}</span></td>
           <td>${escapeHtml(String(h.totalQuantity ?? '-'))}</td>
           <td>
-            ${editable 
-              ? (String(h.side || h.tradeSide || '').toUpperCase() === 'SELL' ? renderEditableExit(h) : renderEditableAvgFill(h))
-              : escapeHtml(asRandValue(String(h.side || h.tradeSide || '').toUpperCase() === 'SELL' ? h.avgExit : h.avgFill))
+            ${String(h.side || h.tradeSide || '').toUpperCase() === 'SELL'
+              ? (editable ? renderEditableExit(h) : escapeHtml(asRandValue(h.avgExit)))
+              /* BUY avg fill is READ-ONLY — fills come exclusively from the
+                 broker-fills Excel upload, never the pencil. */
+              : escapeHtml(asRandValue(h.avgFill))
             }${renderFillByline(h)}
           </td>
           <td>${escapeHtml(hSide === 'SELL'
@@ -2876,7 +2878,12 @@
           String(row.side || '').toUpperCase(),
           String(row.orderType || '').toUpperCase(),
           String(row.strategyId || ''),
-          row.isPendingRebalance ? 'PENDING' : 'SETTLED'
+          row.isPendingRebalance ? 'PENDING' : 'SETTLED',
+          /* Fill-state split: a brand-new UNFILLED purchase must never blend
+             with other investors' already-FILLED rows of the same security —
+             blending made a fresh pending order display their avg fill, as if
+             it had been pre-filled. */
+          (Number(row.avgFillNumber) > 0 ? 'FILLED' : 'UNFILLED')
         ].join('|');
 
         if (!groups.has(key)) {
@@ -2925,7 +2932,10 @@
           .filter((rawRow) => {
             return String(rawRow.securityId || '') === String(group.securityId || '')
               && String(rawRow.side || '').toUpperCase() === String(group.side || '').toUpperCase()
-              && String(rawRow.orderType || '').toUpperCase() === String(group.orderType || '').toUpperCase();
+              && String(rawRow.orderType || '').toUpperCase() === String(group.orderType || '').toUpperCase()
+              /* Match the group's fill-state split so a pending group's investor
+                 lines don't list other investors' filled purchases. */
+              && (Number(rawRow.avgFillNumber) > 0) === (Number(group.avgFillNumber) > 0);
           })
           .sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
 
@@ -5762,7 +5772,9 @@
         } else if (String(row.side || row.tradeSide || '').toUpperCase() === 'SELL') {
           priceActionHtml = renderEditableExit(row);
         } else {
-          priceActionHtml = renderEditableAvgFill(row);
+          // BUY avg fill is READ-ONLY — fills come exclusively from the
+          // broker-fills Excel upload, never the pencil.
+          priceActionHtml = escapeHtml(asRandValue(row.avgFill));
         }
 
         // "Actual Fill" = higher of expected vs avg fill (see higherFillText).
