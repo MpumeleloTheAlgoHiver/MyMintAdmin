@@ -1,0 +1,47 @@
+Build a modern, light-themed React frontend component for an internal administrative page titled "DIVIDEND DATA ACQUISITION & PROCESSING".
+
+Brand & Aesthetic Guidelines:
+
+Style: Premium, minimalist "Apple UI" aesthetic. Use high-quality whitespace, clean sans-serif typography, subtle drop shadows, and soft glassmorphism effects for cards and overlays.
+
+Brand Name: MINT (always all-caps).
+
+Color Palette: Light mode, predominantly crisp whites and very light grays for backgrounds, with a subdued, professional blue for primary action buttons. Text should be high-contrast dark gray/black.
+
+Layout & Architecture:
+The page should sit within a standard dashboard layout (assume a sidebar and top nav exist). The main content area should have a clear header: DIVIDEND DATA ACQUISITION & PROCESSING, with a subtext description: Securely ingest and parse dividend payout data from Excel to prepare for client communications.
+
+Component 1: Secure Ingestion Module (Primary Card)
+Create a central, elevated card for the upload process containing:
+
+Drag-and-Drop Zone: A stylized file upload area displaying the mock uploaded file: MINT Payment Date Holdings.xlsx.
+
+Effective Payment Date Picker: A clean date picker input. Include a small UI indicator (like a spark icon or text) noting "Auto-detected from file" to show it dynamically pulls the date from the Excel metadata, but ensure it allows manual admin override.
+
+Password Input: Labeled "Computershare Report Password". The input text MUST be completely hidden by default using secure password dots (••••••••), with a small eye icon toggle on the right side to reveal the text.
+
+Action Button: A primary button at the bottom labeled EXTRACT DATA.
+
+Component 2: State Management & Micro-interactions (Simulate these states)
+
+Loading State: When the button is clicked, it should smoothly transition to a disabled state with a spinner and the text Decrypting file... to prevent double-clicks.
+
+Toast Notifications: Build a slide-in toast notification system (top right) to handle graceful errors. Include mock states for:
+
+Auth Error (red/warning): "Decryption failed. Please verify the Computershare password."
+
+Format Error (orange/warning): "Invalid file structure. Missing 'Net cash' column."
+
+Success (green): "File unlocked and parsed successfully."
+
+Component 3: Sanity Check Summary (Secondary Card)
+Create a secondary card below the main ingestion module that fades in only upon a simulated successful extraction. It should display high-level parsed metrics in a clean list:
+
+Total Records Found: 342
+
+Total Net Cash Value: R 1,250,000.00
+
+Unmatched Security Codes: 0
+
+Component 4: Recent Activity (Audit Log)
+At the very bottom of the page, include a minimalist, subdued section titled "RECENT ACTIVITY". Show a list of past extractions for compliance tracking.

@@ -1,0 +1,333 @@
+Here are the corrected Node.js files. They now properly implement msoffcrypto-js to bypass the SheetJS limitation, correctly parse South African localized financial strings into clean floats, and push the actual client records into a dedicated Supabase/PostgreSQL staging table so you don't lose the data.
+
+1. The Extraction API Route (api/dividends/extract.js)
+JavaScript
+'use strict';
+
+const Busboy = require('busboy');
+const XLSX   = require('xlsx');
+const stream = require('stream');
+const msoffcrypto = require('msoffcrypto-js');
+const { saveRun } = require('./dividends-db');
+
+/**
+ * POST /api/dividends/extract
+ * multipart/form-data:
+ *   file     — .xlsx file
+ *   password — Computershare password ('' if none)
+ *   date     — YYYY-MM-DD effective payment date
+ */
+module.exports = async function dividendsExtractHandler(req, res) {
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: false, error: 'Method not allowed' }));
+  }
+
+  const ct = req.headers['content-type'] || '';
+  if (!ct.includes('multipart/form-data')) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: false, error: 'Expected multipart/form-data' }));
+  }
+
+  let fileBuffer = null;
+  let fileName   = 'upload.xlsx';
+  let password   = '';
+  let paymentDate = '';
+
+  try {
+    await new Promise((resolve, reject) => {
+      const bb = Busboy({ headers: req.headers, limits: { fileSize: 50 * 1024 * 1024 } });
+      const fields = {};
+      
+      bb.on('field', (name, val) => { fields[name] = val; });
+
+      bb.on('file', (_field, fileStream, info) => {
+        if (info && info.filename) fileName = info.filename;
+        const chunks = [];
+        fileStream.on('data',  (d) => chunks.push(d));
+        fileStream.on('end',   ()  => { fileBuffer = Buffer.concat(chunks); });
+        fileStream.on('error', reject);
+      });
+
+      bb.on('finish', () => {
+        if (fields.password != null) password    = fields.password;
+        if (fields.date     != null) paymentDate = fields.date;
+        if (fields.filename != null) fileName    = fields.filename;
+        resolve();
+      });
+      bb.on('error', reject);
+      req.pipe(bb);
+    });
+  } catch (err) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: false, error: `Upload parse failed: ${err.message}` }));
+  }
+
+  if (!fileBuffer || fileBuffer.length === 0) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: false, error: 'No file received' }));
+  }
+
+  // ── 1. Decrypt Workbook ─────────────────────────────────────────────────────
+  let unlockedBuffer = fileBuffer;
+  
+  if (password) {
+    try {
+      const cryptoFile = new msoffcrypto(fileBuffer);
+      cryptoFile.loadKey(password);
+      
+      const pass = new stream.PassThrough();
+      const chunks = [];
+      pass.on('data', chunk => chunks.push(chunk));
+      
+      cryptoFile.decrypt(pass);
+      unlockedBuffer = Buffer.concat(chunks);
+    } catch (err) {
+      // Catch specific decryption failures
+      const msg = 'Decryption failed. Please verify the Computershare password.';
+      try { await saveRun({ file_name: fileName, payment_date: paymentDate || null, records: 0, status: 'error', error_message: msg }, []); } catch (_) {}
+      res.writeHead(422, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: msg }));
+    }
+  }
+
+  // ── 2. Parse Workbook ───────────────────────────────────────────────────────
+  let workbook;
+  try {
+    workbook = XLSX.read(unlockedBuffer, { type: 'buffer' });
+  } catch (err) {
+    const msg = `File could not be parsed: ${err.message}`;
+    try { await saveRun({ file_name: fileName, payment_date: paymentDate || null, records: 0, status: 'error', error_message: msg }, []); } catch (_) {}
+    res.writeHead(422, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: false, error: msg }));
+  }
+
+  const sheetNames = workbook.SheetNames;
+  if (!sheetNames.length) {
+    res.writeHead(422, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: false, error: 'Workbook contains no sheets' }));
+  }
+
+  const sheet = workbook.Sheets[sheetNames[0]];
+  const rows  = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+  if (!rows.length) {
+    res.writeHead(422, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: false, error: 'Sheet is empty or has no data rows' }));
+  }
+
+  const headers = Object.keys(rows[0]);
+
+  // ── 3. Data Sanitization & Extraction ──────────────────────────────────────
+  const NET_PATTERNS = [/net\s*cash/i, /net_cash/i, /nett\s*cash/i, /amount/i, /payout/i, /dividend/i];
+  const netCashCol = headers.find((h) => NET_PATTERNS.some((p) => p.test(h))) || null;
+  
+  const SEC_PATTERNS = [/security\s*code/i, /isin/i, /ticker/i, /symbol/i, /code/i, /jse/i];
+  const secCol = headers.find((h) => SEC_PATTERNS.some((p) => p.test(h))) || null;
+
+  let totalNetCash = 0;
+  let unmatchedCount = 0;
+  const extractedRows = [];
+
+  if (netCashCol) {
+    for (const row of rows) {
+      const raw = row[netCashCol];
+      let n = 0;
+
+      // Handle South African localized strings (e.g., 'R 1 500,50')
+      if (typeof raw === 'number') {
+        n = raw;
+      } else if (raw != null && raw !== '') {
+        let clean = String(raw).replace(/R|\s/gi, ''); // Strip 'R' and spaces
+        
+        // Convert comma decimals to dot, but ignore comma thousands
+        if (clean.includes(',') && !clean.includes('.')) {
+            clean = clean.replace(',', '.');
+        } else if (clean.includes(',') && clean.includes('.')) {
+            clean = clean.replace(/,/g, '');
+        }
+        n = parseFloat(clean);
+      }
+
+      if (!isNaN(n)) totalNetCash += n;
+
+      // Map staging data
+      const secCode = secCol ? String(row[secCol]).trim() : '';
+      if (!secCode || !/^[A-Z0-9]{3,12}$/i.test(secCode)) unmatchedCount++;
+      
+      extractedRows.push({
+        security_code: secCode,
+        net_cash: isNaN(n) ? 0 : n,
+        raw_row: row
+      });
+    }
+  }
+  
+  totalNetCash = Math.round(totalNetCash * 100) / 100;
+  const previewRows = rows.slice(0, 20);
+
+  // ── 4. Save Metadata & Staging Rows ─────────────────────────────────────────
+  let savedRun = null;
+  try {
+    savedRun = await saveRun({
+      file_name:       fileName,
+      payment_date:    paymentDate || null,
+      records:         extractedRows.length,
+      total_net_cash:  totalNetCash,
+      unmatched_count: unmatchedCount,
+      net_cash_col:    netCashCol,
+      sheet_names:     sheetNames,
+      headers,
+      status:          'success',
+    }, extractedRows); // Pass the rows to the DB
+  } catch (dbErr) {
+    console.error('[dividends-extract] DB save failed:', dbErr.message);
+  }
+
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    ok:             true,
+    records:        extractedRows.length,
+    totalNetCash,
+    unmatchedCount,
+    sheetNames,
+    headers,
+    netCashCol,
+    paymentDate:    paymentDate || null,
+    previewRows,
+    runId:          savedRun?.id || null,
+  }));
+};
+2. The Database Layer (dividends-db.js)
+JavaScript
+'use strict';
+
+const { Pool } = require('pg');
+
+let _pool = null;
+function pool() {
+  if (!_pool) {
+    _pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  }
+  return _pool;
+}
+
+const SETUP_SQL = `
+  CREATE TABLE IF NOT EXISTS dividend_runs (
+    id            SERIAL PRIMARY KEY,
+    file_name     TEXT        NOT NULL,
+    payment_date  DATE,
+    records       INTEGER     NOT NULL DEFAULT 0,
+    total_net_cash NUMERIC(18,2),
+    unmatched_count INTEGER   DEFAULT 0,
+    net_cash_col  TEXT,
+    sheet_names   TEXT[],
+    headers       TEXT[],
+    status        TEXT        NOT NULL DEFAULT 'success',
+    error_message TEXT,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE TABLE IF NOT EXISTS dividend_payouts_staging (
+    id            SERIAL PRIMARY KEY,
+    run_id        INTEGER REFERENCES dividend_runs(id) ON DELETE CASCADE,
+    security_code TEXT,
+    net_cash      NUMERIC(18,2),
+    raw_row       JSONB,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`;
+
+let _setupDone = false;
+async function ensureSetup() {
+  if (_setupDone) return;
+  await pool().query(SETUP_SQL);
+  _setupDone = true;
+}
+
+/**
+ * Save an extraction run and immediately stage the parsed rows.
+ */
+async function saveRun(data, extractedRows = []) {
+  await ensureSetup();
+  
+  // 1. Save the Run Metadata
+  const runResult = await pool().query(
+    `INSERT INTO dividend_runs
+       (file_name, payment_date, records, total_net_cash, unmatched_count,
+        net_cash_col, sheet_names, headers, status, error_message)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     RETURNING *`,
+    [
+      data.file_name     || 'unknown.xlsx',
+      data.payment_date  || null,
+      data.records       || 0,
+      data.total_net_cash != null ? data.total_net_cash : null,
+      data.unmatched_count != null ? data.unmatched_count : null,
+      data.net_cash_col  || null,
+      data.sheet_names   || null,
+      data.headers       || null,
+      data.status        || 'success',
+      data.error_message || null,
+    ]
+  );
+  
+  const runRecord = runResult.rows[0];
+  
+  // 2. Bulk Insert Staging Rows
+  if (data.status === 'success' && extractedRows.length > 0) {
+    let placeholders = [];
+    let vals = [];
+    let paramIndex = 1;
+
+    for (const row of extractedRows) {
+      placeholders.push(`($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++})`);
+      vals.push(
+        runRecord.id, 
+        row.security_code || null, 
+        row.net_cash, 
+        JSON.stringify(row.raw_row) // Store the entire original row to safely handle shifting columns
+      );
+    }
+
+    const insertQuery = `
+      INSERT INTO dividend_payouts_staging (run_id, security_code, net_cash, raw_row) 
+      VALUES ${placeholders.join(',')}
+    `;
+    
+    await pool().query(insertQuery, vals);
+  }
+
+  return runRecord;
+}
+
+/**
+ * Fetch the N most recent runs.
+ */
+async function getRuns(limit = 50) {
+  await ensureSetup();
+  const { rows } = await pool().query(
+    `SELECT * FROM dividend_runs ORDER BY created_at DESC LIMIT $1`,
+    [limit]
+  );
+  return rows;
+}
+
+/**
+ * Aggregate stats across all runs.
+ */
+async function getStats() {
+  await ensureSetup();
+  const { rows } = await pool().query(`
+    SELECT
+      COUNT(*)                                     AS total_runs,
+      COALESCE(SUM(records), 0)                 AS total_records,
+      COALESCE(SUM(total_net_cash), 0)          AS total_net_cash,
+      COUNT(*) FILTER (WHERE status = 'success') AS successful_runs,
+      MAX(created_at)                            AS last_run_at
+    FROM dividend_runs
+  `);
+  return rows[0];
+}
+
+module.exports = { saveRun, getRuns, getStats };

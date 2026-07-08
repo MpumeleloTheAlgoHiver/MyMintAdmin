@@ -29,6 +29,8 @@
       @keyframes ov-ticker-scroll { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
       .ov-ticker-anim { animation: ov-ticker-scroll 300s linear infinite; }
       .ov-ticker-anim:hover { animation-play-state: paused; }
+      [data-ticker-sym] { cursor:pointer; transition:background 0.15s; }
+      [data-ticker-sym]:hover { background:#e8e4f3 !important; }
       @keyframes strat-drop-in { from { opacity:0; transform:translateY(-10px) scale(0.96); } to { opacity:1; transform:translateY(0) scale(1); } }
       @keyframes strat-drop-out { from { opacity:1; transform:translateY(0) scale(1); } to { opacity:0; transform:translateY(-6px) scale(0.96); } }
       @keyframes strat-item-in { from { opacity:0; transform:translateX(-5px); } to { opacity:1; transform:translateX(0); } }
@@ -1886,7 +1888,7 @@
               const logoEl = x.logo_url
                 ? `<img src="${x.logo_url}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;border:1px solid #e2e8f0;flex-shrink:0;" onerror="this.outerHTML='<div style=\\'width:26px;height:26px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#7c3aed;\\'>${init}</div>'">`
                 : `<div style="width:26px;height:26px;border-radius:50%;background:${isG ? '#dcfce7' : '#fee2e2'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:${isG ? '#16a34a' : '#dc2626'};flex-shrink:0;">${init}</div>`;
-              return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;margin-bottom:2px;">
+              return `<div onclick="window.filterStratBrowseNews('${x.id}')" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;margin-bottom:2px;cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='#f5f3ff'" onmouseleave="this.style.background=''">
                 <span style="font-size:10px;color:#cbd5e1;font-weight:700;width:14px;text-align:center;flex-shrink:0;">${rank}</span>
                 ${logoEl}
                 <div style="flex:1;min-width:0;">
@@ -2050,7 +2052,7 @@
             ? `<img src="${a.logo_url}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;border:1px solid #e2e8f0;flex-shrink:0;" onerror="this.outerHTML='<div style=\\'width:26px;height:26px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#7c3aed;\\'>${init}</div>'">`
             : `<div style="width:26px;height:26px;border-radius:50%;background:${isGainer ? '#dcfce7' : '#fee2e2'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:${isGainer ? '#16a34a' : '#dc2626'};flex-shrink:0;">${init}</div>`;
           const sym = (a.symbol || '').replace('.JO','');
-          return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;margin-bottom:2px;">
+          return `<div onclick="window.filterStratBrowseNews('${a.symbol}')" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;margin-bottom:2px;cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='#f5f3ff'" onmouseleave="this.style.background=''">
             <span style="font-size:10px;color:#cbd5e1;font-weight:700;width:14px;text-align:center;flex-shrink:0;">${rank}</span>
             ${logoEl}
             <div style="flex:1;min-width:0;">
@@ -2167,6 +2169,83 @@
         _renderReturnInsights(tab);
       };
 
+      /* ── Strategy Browse News: ticker filter ── */
+      window._stratBrowseNewsFilter = null;
+
+      window.renderStratBrowseNews = function(activeSym) {
+        const listEl = document.getElementById('stratBrowseNewsList');
+        if (!listEl) return;
+        const all = window._stratBrowseNewsData || [];
+        const sym = activeSym ? activeSym.replace('.JO', '') : null;
+
+        // Resolve company name from securities map (e.g. "ABG" → "Absa")
+        let companyWord = null;
+        if (sym && typeof globalSecuritiesMap !== 'undefined' && globalSecuritiesMap) {
+          const sec = globalSecuritiesMap.get(activeSym) ||
+                      globalSecuritiesMap.get(sym + '.JO') ||
+                      globalSecuritiesMap.get(sym);
+          if (sec && sec.name) {
+            const first = sec.name.split(/\s+/)[0];
+            if (first && first.length > 2 && first.toLowerCase() !== sym.toLowerCase()) {
+              companyWord = first; // e.g. "Absa" from "Absa Group Limited"
+            }
+          }
+        }
+
+        const articles = sym
+          ? all.filter(a => {
+              const title = (a.title || '').toLowerCase();
+              const body  = (a.body_text || '').toLowerCase();
+              if (title.includes(sym.toLowerCase()) || body.includes(sym.toLowerCase())) return true;
+              if (companyWord) {
+                const cLow = companyWord.toLowerCase();
+                return title.includes(cLow) || body.includes(cLow);
+              }
+              return false;
+            })
+          : all;
+
+        const filterChip = sym
+          ? `<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+              <span style="font-size:11px;font-weight:600;color:#7c3aed;background:#ede9fe;padding:3px 10px;border-radius:20px;display:inline-flex;align-items:center;gap:6px;">
+                ${sym}
+                <button onclick="window.filterStratBrowseNews(null)" style="background:none;border:none;cursor:pointer;color:#7c3aed;font-size:13px;line-height:1;padding:0;" title="Clear filter">&times;</button>
+              </span>
+              <span style="font-size:11px;color:#94a3b8;">news</span>
+            </div>`
+          : '';
+
+        if (!articles.length) {
+          listEl.innerHTML = filterChip + `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">${sym ? 'No news found for ' + sym : 'No news available'}</div>`;
+          return;
+        }
+
+        listEl.innerHTML = filterChip + articles.slice(0, 8).map(article => {
+          const src = article.source || article.channel || 'Mint';
+          const dateStr = article.published_at
+            ? new Date(article.published_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })
+            : '';
+          const preview = (article.body_text || '').slice(0, 120) + ((article.body_text || '').length > 120 ? '&hellip;' : '');
+          return `<div onclick="openNewsArticle(window._newsCache['${article.id}'])" class="news-item-hover" style="border:1px solid #f1f5f9;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s;background:white;" onmouseenter="this.style.borderColor='#ddd6fe';this.style.background='#fafafe'" onmouseleave="this.style.borderColor='#f1f5f9';this.style.background='white'">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+              <span style="font-size:10px;font-weight:700;color:#7c3aed;background:#ede9fe;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:0.04em;">${src}</span>
+              <span style="font-size:10px;color:#94a3b8;">${dateStr}</span>
+            </div>
+            <div style="font-size:12px;font-weight:600;color:#0f172a;line-height:1.4;margin-bottom:3px;">${article.title}</div>
+            ${preview ? `<div style="font-size:11px;color:#64748b;line-height:1.5;">${preview}</div>` : ''}
+            <div style="display:flex;align-items:center;gap:4px;margin-top:6px;">
+              <span style="font-size:10px;color:#a78bfa;font-weight:500;">Read more</span>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2.5"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            </div>
+          </div>`;
+        }).join('');
+      };
+
+      window.filterStratBrowseNews = function(sym) {
+        window._stratBrowseNewsFilter = sym || null;
+        window.renderStratBrowseNews(window._stratBrowseNewsFilter);
+      };
+
       const loadStrategyBrowsePanel = async () => {
         if (_browsePanelLoaded) return;
         _browsePanelLoaded = true;
@@ -2276,7 +2355,7 @@
             .from('News_articles')
             .select('id, title, source, channel, published_at, body_text, author')
             .order('published_at', { ascending: false })
-            .limit(8);
+            .limit(60);
           if (error) { console.error('News fetch error:', error); }
           if (error || !newsData || !newsData.length) {
             listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No news available</div>';
@@ -2284,25 +2363,8 @@
           }
           window._newsCache = window._newsCache || {};
           newsData.forEach(a => { window._newsCache[a.id] = a; });
-          listEl.innerHTML = newsData.map(article => {
-            const src = article.source || article.channel || 'Mint';
-            const dateStr = article.published_at
-              ? new Date(article.published_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })
-              : '';
-            const preview = (article.body_text || '').slice(0, 120) + ((article.body_text || '').length > 120 ? '&hellip;' : '');
-            return `<div onclick="openNewsArticle(window._newsCache['${article.id}'])" class="news-item-hover" style="border:1px solid #f1f5f9;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s;background:white;" onmouseenter="this.style.borderColor='#ddd6fe';this.style.background='#fafafe'" onmouseleave="this.style.borderColor='#f1f5f9';this.style.background='white'">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-                <span style="font-size:10px;font-weight:700;color:#7c3aed;background:#ede9fe;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:0.04em;">${src}</span>
-                <span style="font-size:10px;color:#94a3b8;">${dateStr}</span>
-              </div>
-              <div style="font-size:12px;font-weight:600;color:#0f172a;line-height:1.4;margin-bottom:3px;">${article.title}</div>
-              ${preview ? `<div style="font-size:11px;color:#64748b;line-height:1.5;">${preview}</div>` : ''}
-              <div style="display:flex;align-items:center;gap:4px;margin-top:6px;">
-                <span style="font-size:10px;color:#a78bfa;font-weight:500;">Read more</span>
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2.5"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
-              </div>
-            </div>`;
-          }).join('');
+          window._stratBrowseNewsData = newsData;
+          window.renderStratBrowseNews(window._stratBrowseNewsFilter);
         } catch(e) {
           if (listEl) listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">News unavailable</div>';
         }
@@ -5858,6 +5920,15 @@
       };
 
       /* ── Bottom Section Tab Switching Logic ── */
+      /* ── Ticker chip click — capture phase so animation/stopPropagation can't block it ── */
+      document.addEventListener('click', function _tickerCapture(e) {
+        const chip = e.target.closest('[data-ticker-sym]');
+        if (!chip) return;
+        const sym = chip.dataset.tickerSym;
+        if (!sym) return;
+        window.ovTickerClick(sym);
+      }, true /* capture */);
+
       window.switchBottomTab = (tab) => {
         const btnComp = document.getElementById('btnTabComposition');
         const btnNews = document.getElementById('btnTabNews');
@@ -5879,27 +5950,83 @@
       };
 
       /* ── News & Insights Fetching ── */
-      window.fetchNewsInsights = async function() {
+      window._newsTickerFilter = null; // currently active ticker filter
+
+      window.ovTickerClick = function(sym) {
+        window._newsTickerFilter = sym;
+        window.switchBottomTab('news');
+      };
+
+      window.ovNewsClearFilter = function() {
+        window._newsTickerFilter = null;
+        window.fetchNewsInsights();
+      };
+
+      window.fetchNewsInsights = async function(tickerSym) {
+        // Allow caller to override the stored filter (e.g. ovTickerClick already set it)
+        if (tickerSym !== undefined) window._newsTickerFilter = tickerSym || null;
+        const activeTicker = window._newsTickerFilter;
+
         const listEl = document.getElementById('ovNewsList');
         if (!listEl) return;
 
+        // Show loading skeleton
+        listEl.innerHTML = '<div style="display:flex;flex-direction:column;gap:10px;">' +
+          '<div style="height:64px;background:#f1f5f9;border-radius:10px;"></div>'.repeat(3) + '</div>';
+
         try {
-          const { data: newsData, error } = await supabaseClient
+          let query = supabaseClient
             .from('News_articles')
             .select('id, title, source, channel, published_at, body_text, author')
-            .order('published_at', { ascending: false })
-            .limit(10);
+            .order('published_at', { ascending: false });
+
+          if (activeTicker) {
+            const sym = activeTicker.replace('.JO', '');
+            // Look up company name for better matching (e.g. "ABG" → "Absa")
+            const orParts = [`title.ilike.%${sym}%`, `body_text.ilike.%${sym}%`];
+            if (typeof globalSecuritiesMap !== 'undefined' && globalSecuritiesMap) {
+              const sec = globalSecuritiesMap.get(activeTicker) ||
+                          globalSecuritiesMap.get(sym + '.JO') ||
+                          globalSecuritiesMap.get(sym);
+              if (sec && sec.name) {
+                const first = sec.name.split(/\s+/)[0];
+                if (first && first.length > 2 && first.toLowerCase() !== sym.toLowerCase()) {
+                  orParts.push(`title.ilike.%${first}%`, `body_text.ilike.%${first}%`);
+                }
+              }
+            }
+            query = query.or(orParts.join(','));
+          }
+
+          query = query.limit(15);
+
+          const { data: newsData, error } = await query;
 
           if (error) { console.error('News insights fetch error:', error); }
+
+          // Ticker filter chip
+          const filterChip = activeTicker
+            ? `<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
+                <span style="font-size:11px;font-weight:600;color:#7c3aed;background:#ede9fe;padding:3px 10px;border-radius:20px;display:flex;align-items:center;gap:6px;">
+                  ${activeTicker.replace('.JO','')}
+                  <button onclick="window.ovNewsClearFilter()" style="background:none;border:none;cursor:pointer;color:#7c3aed;font-size:13px;line-height:1;padding:0;margin:0;" title="Clear filter">&times;</button>
+                </span>
+                <span style="font-size:11px;color:#94a3b8;">news</span>
+               </div>`
+            : '';
+
           if (error || !newsData || newsData.length === 0) {
-            listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;">No news available</div>';
+            listEl.innerHTML = filterChip +
+              `<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;">
+                ${activeTicker ? `No news found for ${activeTicker.replace('.JO','')}` : 'No news available'}
+               </div>`;
             return;
           }
 
           window._newsCache = window._newsCache || {};
           newsData.forEach(a => { window._newsCache[a.id] = a; });
 
-          listEl.innerHTML = newsData.map(article => `
+          listEl.innerHTML = filterChip + newsData.map(article => `
             <div onclick="openNewsArticle(window._newsCache['${article.id}'])" style="border:1px solid #f1f5f9;border-radius:10px;padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:border-color 0.15s,background 0.15s;" onmouseenter="this.style.borderColor='#ddd6fe';this.style.background='#fafafe'" onmouseleave="this.style.borderColor='#f1f5f9';this.style.background=''">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                 <span style="font-size:10px;font-weight:700;color:#7c3aed;background:#ede9fe;padding:2px 8px;border-radius:20px;text-transform:uppercase;">
@@ -5992,9 +6119,10 @@
           const logoEl = item.logo
             ? `<img src="${item.logo}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;border:1px solid #e2e8f0;flex-shrink:0;background:#f8fafc;" onerror="this.outerHTML='<div style=\\'width:26px;height:26px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#7c3aed;flex-shrink:0;\\'>${init}</div>'">`
             : `<div style="width:26px;height:26px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#7c3aed;flex-shrink:0;">${init}</div>`;
-          return `<div style="display:flex;align-items:center;gap:8px;padding:0 20px;border-right:1px solid #e2e8f0;flex-shrink:0;height:50px;">
+          /* Use data-sym for delegation — inline onclick is unreliable on CSS-animated elements */
+          return `<div data-ticker-sym="${item.sym}" title="View news for ${item.sym.replace('.JO','')}" style="display:flex;align-items:center;gap:8px;padding:0 20px;border-right:1px solid #e2e8f0;flex-shrink:0;height:50px;cursor:pointer;transition:background 0.15s;">
             ${logoEl}
-            <span style="font-size:12px;font-weight:700;color:#0f172a;font-family:ui-monospace,monospace;letter-spacing:0.04em;">${item.sym}</span>
+            <span style="font-size:12px;font-weight:700;color:#0f172a;font-family:ui-monospace,monospace;letter-spacing:0.04em;">${item.sym.replace('.JO','')}</span>
             <span style="font-size:12px;color:#475569;font-family:ui-monospace,monospace;">R ${priceStr}</span>
             ${changeStr ? `<span style="font-size:12px;font-family:ui-monospace,monospace;font-weight:600;color:${cc};">${changeStr}</span>` : ''}
           </div>`;
