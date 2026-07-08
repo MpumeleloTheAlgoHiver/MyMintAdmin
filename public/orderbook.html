@@ -1323,6 +1323,77 @@
     }
     .reverse-btn-confirm:hover { background: #b91c1c; }
     .reverse-btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Dividends tab ─────────────────────────────────────────────────────── */
+    .div-page { padding: 28px 32px 48px; max-width: 720px; }
+    .div-page-header { margin-bottom: 28px; }
+    .div-page-title { font-size: 15px; font-weight: 700; letter-spacing: 0.07em; color: #0f172a; text-transform: uppercase; }
+    .div-page-sub { font-size: 13px; color: #64748b; margin-top: 5px; line-height: 1.5; }
+
+    .div-card { background: #fff; border: 1px solid #e8e4f3; border-radius: 16px; padding: 26px 28px; box-shadow: 0 4px 20px rgba(80,38,157,0.06); margin-bottom: 20px; }
+    .div-card-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: #7c3aed; text-transform: uppercase; margin-bottom: 20px; }
+
+    .div-dropzone { border: 1.5px dashed #c4b5fd; border-radius: 12px; background: #faf8ff; cursor: pointer; transition: border-color 0.15s, background 0.15s; margin-bottom: 20px; min-height: 110px; display: flex; align-items: center; justify-content: center; }
+    .div-dropzone:hover, .div-dropzone-over { border-color: #7c3aed; background: #f3effeff; }
+    .div-dropzone-inner { display: flex; flex-direction: column; align-items: center; padding: 22px 16px; gap: 8px; }
+    .div-dropzone-icon { width: 36px; height: 36px; color: #a78bfa; stroke: currentColor; }
+    .div-dropzone-text { font-size: 13.5px; color: #475569; text-align: center; }
+    .div-dropzone-link { color: #7c3aed; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+    .div-dropzone-hint { font-size: 11.5px; color: #94a3b8; }
+    .div-file-attached { display: flex; align-items: center; gap: 10px; padding: 14px 18px; width: 100%; }
+    .div-file-name { font-size: 13px; font-weight: 600; color: #1e293b; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .div-file-remove { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 15px; padding: 2px 4px; line-height: 1; border-radius: 4px; transition: color 0.1s; }
+    .div-file-remove:hover { color: #ef4444; }
+
+    .div-field { margin-bottom: 18px; }
+    .div-field-row { display: flex; gap: 16px; margin-bottom: 18px; }
+    .div-field-label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 7px; letter-spacing: 0.01em; }
+    .div-field-input { width: 100%; padding: 10px 14px; border: 1px solid #ddd6fe; border-radius: 10px; font-size: 13.5px; color: #0f172a; background: #fff; outline: none; transition: border-color 0.15s, box-shadow 0.15s; font-family: inherit; appearance: none; }
+    .div-field-input:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
+
+    .div-auto-badge { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: none; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 600; color: #7c3aed; background: #ede9fe; border-radius: 20px; padding: 3px 9px; pointer-events: none; white-space: nowrap; }
+
+    .div-password-wrap { position: relative; }
+    .div-password-input { padding-right: 44px; }
+    .div-eye-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #94a3b8; padding: 4px; display: flex; align-items: center; transition: color 0.12s; }
+    .div-eye-btn:hover { color: #5b21b6; }
+    .div-eye-btn svg { width: 18px; height: 18px; }
+
+    .div-extract-btn { width: 100%; padding: 13px; background: #0f172a; color: #fff; border: none; border-radius: 11px; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; cursor: pointer; transition: background 0.15s, opacity 0.15s; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .div-extract-btn:hover:not(:disabled) { background: #1e293b; }
+    .div-extract-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .div-spinner { width: 16px; height: 16px; animation: div-spin 0.75s linear infinite; }
+    @keyframes div-spin { to { transform: rotate(360deg); } }
+
+    .div-sanity-card { }
+    .div-sanity-list { list-style: none; display: flex; flex-direction: column; gap: 0; }
+    .div-sanity-row { display: flex; justify-content: space-between; align-items: center; padding: 13px 0; border-bottom: 1px solid #f1f5f9; font-size: 13.5px; }
+    .div-sanity-row:last-child { border-bottom: none; }
+    .div-sanity-key { color: #475569; }
+    .div-sanity-val { font-weight: 700; color: #0f172a; font-variant-numeric: tabular-nums; }
+
+    .div-activity-section { margin-top: 8px; }
+    .div-activity-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: #94a3b8; text-transform: uppercase; margin-bottom: 14px; }
+    .div-activity-list { list-style: none; display: flex; flex-direction: column; gap: 0; }
+    .div-activity-row { display: flex; align-items: flex-start; gap: 12px; padding: 13px 0; border-bottom: 1px solid #f1f5f9; }
+    .div-activity-row:last-child { border-bottom: none; }
+    .div-activity-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+    .div-dot-green { background: #22c55e; }
+    .div-dot-red { background: #ef4444; }
+    .div-dot-orange { background: #f97316; }
+    .div-activity-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .div-activity-file { font-size: 13px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .div-activity-meta { font-size: 11.5px; color: #94a3b8; }
+    .div-activity-time { font-size: 11.5px; color: #94a3b8; white-space: nowrap; flex-shrink: 0; }
+
+    .div-toast-container { position: fixed; top: 20px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+    .div-toast { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 12px; font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,0.12); max-width: 360px; opacity: 0; transform: translateX(20px); transition: opacity 0.25s ease, transform 0.25s ease; line-height: 1.4; }
+    .div-toast-visible { opacity: 1; transform: translateX(0); }
+    .div-toast-success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
+    .div-toast-error   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+    .div-toast-warning { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+    .div-toast-icon { display: flex; align-items: center; flex-shrink: 0; }
+    .div-toast-msg { flex: 1; }
   </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <script src="/js/cc-badge.js" defer></script>
@@ -1346,6 +1417,7 @@
         <button class="orderbook-tab-btn" id="closedBooksTab" type="button" role="tab" aria-selected="false" aria-controls="closedBooksPanel">Closed Books</button>
         <button class="orderbook-tab-btn" id="pendingRebalancesTab" type="button" role="tab" aria-selected="false" aria-controls="pendingRebalancesPanel">Rebalances</button>
         <button class="orderbook-tab-btn" id="strateBirTab" type="button" role="tab" aria-selected="false" aria-controls="strateBirPanel">Strate BIR</button>
+        <button class="orderbook-tab-btn" id="dividendsTab" type="button" role="tab" aria-selected="false" aria-controls="dividendsPanel">Dividends</button>
         <div class="orderbook-tab-search">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13 11a5 5 0 10-1.41 1.41l3.54 3.55 1.41-1.42L13 11zm-5 1a4 4 0 110-8 4 4 0 010 8z"/></svg>
           <input id="orderbookSearch" type="search" placeholder="Search instrument, ticker, side&hellip;" aria-label="Search orderbook">
@@ -1434,6 +1506,132 @@
           <div class="filled-orderbooks-list" id="rebalanceBooksList">
             <div class="filled-orderbook-empty">No rebalance batches yet.</div>
           </div>
+        </div>
+      </div>
+
+      <div class="orderbook-tab-panel" id="dividendsPanel" role="tabpanel" aria-labelledby="dividendsTab">
+        <div class="div-page">
+
+          <!-- Toast container -->
+          <div id="divToastContainer" class="div-toast-container" aria-live="polite"></div>
+
+          <!-- Page header -->
+          <div class="div-page-header">
+            <div>
+              <h1 class="div-page-title">DIVIDEND DATA ACQUISITION &amp; PROCESSING</h1>
+              <p class="div-page-sub">Securely ingest and parse dividend payout data from Excel to prepare for client communications.</p>
+            </div>
+          </div>
+
+          <!-- Primary card: ingestion -->
+          <div class="div-card div-ingest-card">
+            <div class="div-card-label">SECURE INGESTION MODULE</div>
+
+            <!-- Drop zone -->
+            <div class="div-dropzone" id="divDropzone">
+              <div class="div-dropzone-inner" id="divDropzoneInner">
+                <svg class="div-dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+                <p class="div-dropzone-text" id="divDropzoneText">Drag &amp; drop your Excel file here, or <span class="div-dropzone-link">browse</span></p>
+                <p class="div-dropzone-hint">.xlsx files only</p>
+              </div>
+              <div class="div-file-attached" id="divFileAttached" style="display:none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:20px;height:20px;color:#16a34a;flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+                <span id="divFileName" class="div-file-name">MINT Payment Date Holdings.xlsx</span>
+                <button class="div-file-remove" id="divFileRemove" type="button" title="Remove file">&#x2715;</button>
+              </div>
+              <input type="file" id="divFileInput" accept=".xlsx,.xls" style="display:none;">
+            </div>
+
+            <!-- Date picker -->
+            <div class="div-field-row">
+              <div class="div-field" style="flex:1;">
+                <label class="div-field-label" for="divPaymentDate">Effective Payment Date</label>
+                <div style="position:relative;">
+                  <input type="date" id="divPaymentDate" class="div-field-input">
+                  <span class="div-auto-badge" id="divAutoBadge">
+                    <svg viewBox="0 0 20 20" fill="currentColor" style="width:11px;height:11px;"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                    Auto-detected from file
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Password -->
+            <div class="div-field">
+              <label class="div-field-label" for="divPassword">Computershare Report Password</label>
+              <div class="div-password-wrap">
+                <input type="password" id="divPassword" class="div-field-input div-password-input" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="off">
+                <button class="div-eye-btn" id="divEyeBtn" type="button" aria-label="Toggle password visibility">
+                  <svg id="divEyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Action button -->
+            <button class="div-extract-btn" id="divExtractBtn" type="button">
+              <span id="divExtractLabel">EXTRACT DATA</span>
+              <svg id="divExtractSpinner" class="div-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none;"><path stroke-linecap="round" d="M12 3a9 9 0 109 9"/></svg>
+            </button>
+          </div>
+
+          <!-- Secondary card: sanity check — fades in on success -->
+          <div class="div-card div-sanity-card" id="divSanityCard" style="display:none;">
+            <div class="div-card-label">SANITY CHECK SUMMARY</div>
+            <ul class="div-sanity-list">
+              <li class="div-sanity-row">
+                <span class="div-sanity-key">Total Records Found</span>
+                <span class="div-sanity-val" id="divSanityRecords">342</span>
+              </li>
+              <li class="div-sanity-row">
+                <span class="div-sanity-key">Total Net Cash Value</span>
+                <span class="div-sanity-val" id="divSanityValue">R 1,250,000.00</span>
+              </li>
+              <li class="div-sanity-row">
+                <span class="div-sanity-key">Unmatched Security Codes</span>
+                <span class="div-sanity-val" id="divSanityUnmatched" style="color:#16a34a;">0</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Recent activity log -->
+          <div class="div-activity-section">
+            <div class="div-activity-label">RECENT ACTIVITY</div>
+            <ul class="div-activity-list" id="divActivityList">
+              <li class="div-activity-row">
+                <span class="div-activity-dot div-dot-green"></span>
+                <div class="div-activity-info">
+                  <span class="div-activity-file">MINT Payment Date Holdings — 2025-11-14.xlsx</span>
+                  <span class="div-activity-meta">342 records &middot; R 1,250,000.00 net cash &middot; 0 unmatched</span>
+                </div>
+                <span class="div-activity-time">14 Nov 2025, 09:42</span>
+              </li>
+              <li class="div-activity-row">
+                <span class="div-activity-dot div-dot-green"></span>
+                <div class="div-activity-info">
+                  <span class="div-activity-file">MINT Payment Date Holdings — 2025-08-21.xlsx</span>
+                  <span class="div-activity-meta">298 records &middot; R 980,500.00 net cash &middot; 0 unmatched</span>
+                </div>
+                <span class="div-activity-time">21 Aug 2025, 10:15</span>
+              </li>
+              <li class="div-activity-row">
+                <span class="div-activity-dot div-dot-red"></span>
+                <div class="div-activity-info">
+                  <span class="div-activity-file">MINT Payment Date Holdings — 2025-05-07.xlsx</span>
+                  <span class="div-activity-meta">Decryption failed — incorrect password</span>
+                </div>
+                <span class="div-activity-time">7 May 2025, 08:59</span>
+              </li>
+              <li class="div-activity-row">
+                <span class="div-activity-dot div-dot-green"></span>
+                <div class="div-activity-info">
+                  <span class="div-activity-file">MINT Payment Date Holdings — 2025-02-28.xlsx</span>
+                  <span class="div-activity-meta">261 records &middot; R 712,000.00 net cash &middot; 2 unmatched</span>
+                </div>
+                <span class="div-activity-time">28 Feb 2025, 11:03</span>
+              </li>
+            </ul>
+          </div>
+
         </div>
       </div>
 
@@ -4316,12 +4514,13 @@
     };
 
     const setActiveTab = (tabName) => {
-      const validTabs = ['closed', 'strate-bir', 'pending-rebalances'];
+      const validTabs = ['closed', 'strate-bir', 'pending-rebalances', 'dividends'];
       const normalizedTab = validTabs.includes(tabName) ? tabName : 'active';
       const isActiveBooks = normalizedTab === 'active';
       const isClosedBooks = normalizedTab === 'closed';
       const isStrateBir = normalizedTab === 'strate-bir';
       const isPendingRebalances = normalizedTab === 'pending-rebalances';
+      const isDividends = normalizedTab === 'dividends';
 
       if (activeBooksTab) {
         activeBooksTab.classList.toggle('active', isActiveBooks);
@@ -4339,6 +4538,11 @@
         strateBirTab.classList.toggle('active', isStrateBir);
         strateBirTab.setAttribute('aria-selected', isStrateBir ? 'true' : 'false');
       }
+      const dividendsTabEl = document.getElementById('dividendsTab');
+      if (dividendsTabEl) {
+        dividendsTabEl.classList.toggle('active', isDividends);
+        dividendsTabEl.setAttribute('aria-selected', isDividends ? 'true' : 'false');
+      }
       if (activeBooksPanel) {
         activeBooksPanel.classList.toggle('active', isActiveBooks);
       }
@@ -4350,6 +4554,10 @@
       }
       if (pendingRebalancesPanel) {
         pendingRebalancesPanel.classList.toggle('active', isPendingRebalances);
+      }
+      const dividendsPanelEl = document.getElementById('dividendsPanel');
+      if (dividendsPanelEl) {
+        dividendsPanelEl.classList.toggle('active', isDividends);
       }
     };
 
@@ -6693,6 +6901,148 @@
     if (strateBirTab) {
       strateBirTab.addEventListener('click', () => setActiveTab('strate-bir'));
     }
+
+    // ── Dividends tab ──────────────────────────────────────────────────────────
+    (function initDividendsTab() {
+      const dividendsTabBtn  = document.getElementById('dividendsTab');
+      const dropzone         = document.getElementById('divDropzone');
+      const fileAttached     = document.getElementById('divFileAttached');
+      const fileInput        = document.getElementById('divFileInput');
+      const fileName         = document.getElementById('divFileName');
+      const fileRemove       = document.getElementById('divFileRemove');
+      const dropzoneInner    = document.getElementById('divDropzoneInner');
+      const paymentDate      = document.getElementById('divPaymentDate');
+      const autoBadge        = document.getElementById('divAutoBadge');
+      const passwordInput    = document.getElementById('divPassword');
+      const eyeBtn           = document.getElementById('divEyeBtn');
+      const eyeIcon          = document.getElementById('divEyeIcon');
+      const extractBtn       = document.getElementById('divExtractBtn');
+      const extractLabel     = document.getElementById('divExtractLabel');
+      const extractSpinner   = document.getElementById('divExtractSpinner');
+      const sanityCard       = document.getElementById('divSanityCard');
+      const toastContainer   = document.getElementById('divToastContainer');
+      const activityList     = document.getElementById('divActivityList');
+
+      if (!dividendsTabBtn) return;
+
+      dividendsTabBtn.addEventListener('click', () => setActiveTab('dividends'));
+
+      // ── File picking ──────────────────────────────────────────────────────
+      let hasFile = false;
+
+      const attachFile = (name) => {
+        hasFile = true;
+        fileName.textContent = name;
+        dropzoneInner.style.display = 'none';
+        fileAttached.style.display  = 'flex';
+        const today = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        paymentDate.value = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+        autoBadge.style.display = 'inline-flex';
+      };
+
+      const clearFile = () => {
+        hasFile = false;
+        fileInput.value = '';
+        dropzoneInner.style.display = '';
+        fileAttached.style.display  = 'none';
+        paymentDate.value = '';
+        autoBadge.style.display = 'none';
+      };
+
+      dropzone.addEventListener('click', (e) => {
+        if (fileRemove && (e.target === fileRemove || fileRemove.contains(e.target))) return;
+        if (!hasFile) fileInput.click();
+      });
+      dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('div-dropzone-over'); });
+      dropzone.addEventListener('dragleave', () => dropzone.classList.remove('div-dropzone-over'));
+      dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('div-dropzone-over');
+        const f = e.dataTransfer.files[0];
+        if (f) attachFile(f.name);
+      });
+      fileInput.addEventListener('change', () => { if (fileInput.files[0]) attachFile(fileInput.files[0].name); });
+      if (fileRemove) fileRemove.addEventListener('click', (e) => { e.stopPropagation(); clearFile(); });
+
+      // ── Password eye toggle ───────────────────────────────────────────────
+      if (eyeBtn) {
+        eyeBtn.addEventListener('click', () => {
+          const hidden = passwordInput.type === 'password';
+          passwordInput.type = hidden ? 'text' : 'password';
+          eyeIcon.innerHTML = hidden
+            ? '<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
+            : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+        });
+      }
+
+      // ── Toast ─────────────────────────────────────────────────────────────
+      const showToast = (type, message) => {
+        const toast = document.createElement('div');
+        toast.className = `div-toast div-toast-${type}`;
+        const icons = {
+          success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>',
+          error:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+          warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
+        };
+        toast.innerHTML = `<span class="div-toast-icon">${icons[type] || icons.error}</span><span class="div-toast-msg">${message}</span>`;
+        toastContainer.appendChild(toast);
+        requestAnimationFrame(() => toast.classList.add('div-toast-visible'));
+        setTimeout(() => {
+          toast.classList.remove('div-toast-visible');
+          toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+        }, 4500);
+      };
+
+      // ── Extract button ────────────────────────────────────────────────────
+      const setLoading = (on) => {
+        extractBtn.disabled = on;
+        extractLabel.textContent = on ? 'Decrypting file...' : 'EXTRACT DATA';
+        extractSpinner.style.display = on ? 'block' : 'none';
+      };
+
+      let _demoStep = 0;
+      if (extractBtn) {
+        extractBtn.addEventListener('click', () => {
+          const step = _demoStep % 3;
+          _demoStep++;
+          setLoading(true);
+          sanityCard.style.display = 'none';
+
+          setTimeout(() => {
+            setLoading(false);
+            if (step === 0) {
+              showToast('error', 'Decryption failed. Please verify the Computershare password.');
+            } else if (step === 1) {
+              showToast('warning', "Invalid file structure. Missing 'Net cash' column.");
+            } else {
+              showToast('success', 'File unlocked and parsed successfully.');
+              sanityCard.style.display = '';
+              sanityCard.style.opacity = '0';
+              sanityCard.style.transform = 'translateY(8px)';
+              requestAnimationFrame(() => {
+                sanityCard.style.transition = 'opacity 0.35s ease, transform 0.35s ease';
+                sanityCard.style.opacity = '1';
+                sanityCard.style.transform = 'translateY(0)';
+              });
+              const now = new Date();
+              const dateStr = now.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+              const timeStr = now.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
+              const li = document.createElement('li');
+              li.className = 'div-activity-row';
+              li.innerHTML = `
+                <span class="div-activity-dot div-dot-green"></span>
+                <div class="div-activity-info">
+                  <span class="div-activity-file">${hasFile ? fileName.textContent : 'MINT Payment Date Holdings.xlsx'}</span>
+                  <span class="div-activity-meta">342 records &middot; R 1,250,000.00 net cash &middot; 0 unmatched</span>
+                </div>
+                <span class="div-activity-time">${dateStr}, ${timeStr}</span>`;
+              activityList.prepend(li);
+            }
+          }, 2200);
+        });
+      }
+    })();
 
     const fmtRand = (cents) => {
       if (!cents && cents !== 0) return '&mdash;';
