@@ -1,0 +1,111 @@
+No, this extraction is completely incorrect. It failed to parse the data properly.
+
+Look closely at the table preview in your screenshot. The parser completely missed the financial data because of how the Excel file is structured.
+
+The Diagnosis: What Went Wrong
+The Header Offset: The SheetJS library (XLSX.utils.sheet_to_json) blindly assumes the very first row of an Excel file contains the column headers. Because the Computershare file has a title row (COMPUTERSHARE (PTY) LTD) sitting at the top, the script made that the first header and filled the rest with __EMPTY, __EMPTY_1, etc.
+
+Blind Regex: Because the actual headers (NETT CASH, JSE CODE) got pushed down into a standard data row, your regex could not find them. That is why Net Cash is R 0,00 and Unmatched is 4 (it failed to map everything).
+
+Swallowing Garbage Data: Because it is just reading top-to-bottom, the script ingested the TOTAL row and the COMPUTERSHARE CONFIDENTIAL footer row, treating them as if they were actual MINT clients waiting for a payout.
+
+The Fix
+You need to update api/dividends/extract.js to dynamically hunt down the true header row before it converts the sheet to JSON, and you need to tell it to explicitly ignore the footer garbage.
+
+Replace Section 2 and Section 3 in your api/dividends/extract.js file with this updated code:
+
+JavaScript
+  // ── 2. Parse Workbook ───────────────────────────────────────────────────────
+  let workbook;
+  try {
+    workbook = XLSX.read(unlockedBuffer, { type: 'buffer' });
+  } catch (err) {
+    const msg = `File could not be parsed: ${err.message}`;
+    try { await saveRun({ file_name: fileName, payment_date: paymentDate || null, records: 0, status: 'error', error_message: msg }, []); } catch (_) {}
+    res.writeHead(422, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: false, error: msg }));
+  }
+
+  const sheetNames = workbook.SheetNames;
+  if (!sheetNames.length) {
+    res.writeHead(422, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: false, error: 'Workbook contains no sheets' }));
+  }
+
+  const sheet = workbook.Sheets[sheetNames[0]];
+  
+  // FIX 1: Convert to 2D array first to hunt for the actual header row
+  const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  let headerRowIndex = 0;
+  
+  for (let i = 0; i < rawData.length; i++) {
+    const rowStr = rawData[i].join(' ').toUpperCase();
+    if (rowStr.includes('CLIENT') && (rowStr.includes('CODE') || rowStr.includes('CASH'))) {
+      headerRowIndex = i;
+      break;
+    }
+  }
+
+  // Parse JSON explicitly starting from the detected header row
+  const rows  = XLSX.utils.sheet_to_json(sheet, { range: headerRowIndex, defval: '' });
+
+  if (!rows.length) {
+    res.writeHead(422, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: false, error: 'Sheet is empty or has no data rows' }));
+  }
+
+  const headers = Object.keys(rows[0]);
+
+  // ── 3. Data Sanitization & Extraction ──────────────────────────────────────
+  const NET_PATTERNS = [/net\s*cash/i, /net_cash/i, /nett\s*cash/i, /amount/i, /payout/i, /dividend/i];
+  const netCashCol = headers.find((h) => NET_PATTERNS.some((p) => p.test(h))) || null;
+  
+  const SEC_PATTERNS = [/security\s*code/i, /isin/i, /ticker/i, /symbol/i, /code/i, /jse/i];
+  const secCol = headers.find((h) => SEC_PATTERNS.some((p) => p.test(h))) || null;
+
+  let totalNetCash = 0;
+  let unmatchedCount = 0;
+  const extractedRows = [];
+
+  if (netCashCol) {
+    for (const row of rows) {
+      
+      // FIX 2: Skip Totals, Footers, and completely empty rows
+      const firstColVal = String(row[headers[0]]).toUpperCase().trim();
+      if (firstColVal.includes('TOTAL') || firstColVal.includes('CONFIDENTIAL') || firstColVal === '') {
+        continue; 
+      }
+
+      const raw = row[netCashCol];
+      let n = 0;
+
+      // Handle localized formatting (e.g., 'R 1 500,50')
+      if (typeof raw === 'number') {
+        n = raw;
+      } else if (raw != null && raw !== '') {
+        let clean = String(raw).replace(/R|\s/gi, ''); 
+        
+        if (clean.includes(',') && !clean.includes('.')) {
+            clean = clean.replace(',', '.');
+        } else if (clean.includes(',') && clean.includes('.')) {
+            clean = clean.replace(/,/g, '');
+        }
+        n = parseFloat(clean);
+      }
+
+      if (!isNaN(n)) totalNetCash += n;
+
+      const secCode = secCol ? String(row[secCol]).trim() : '';
+      if (!secCode || !/^[A-Z0-9]{3,12}$/i.test(secCode)) unmatchedCount++;
+      
+      extractedRows.push({
+        security_code: secCode,
+        net_cash: isNaN(n) ? 0 : n,
+        raw_row: row
+      });
+    }
+  }
+  
+  totalNetCash = Math.round(totalNetCash * 100) / 100;
+  // ... continue to Section 4 ...
+This dynamic approach ensures that whether Computershare puts the headers on Row 1, Row 4, or Row 10 next month, your MINT pipeline will seamlessly hunt them down, ignore the junk data, and perfectly extract the cash values.

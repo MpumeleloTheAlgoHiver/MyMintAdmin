@@ -101,7 +101,22 @@ module.exports = async function dividendsExtractHandler(req, res) {
   }
 
   const sheet = workbook.Sheets[sheetNames[0]];
-  const rows  = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+  // ── 3. Hunt for the real header row ────────────────────────────────────────
+  // Computershare files have a title row at the top (e.g. "COMPUTERSHARE (PTY) LTD"),
+  // so blindly reading row 0 as headers gives __EMPTY columns and misses all data.
+  // Scan the raw 2-D array for the first row that looks like actual column headers.
+  const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  let headerRowIndex = 0;
+  for (let i = 0; i < Math.min(rawData.length, 20); i++) {
+    const rowStr = rawData[i].join(' ').toUpperCase();
+    if (rowStr.includes('CLIENT') && (rowStr.includes('CODE') || rowStr.includes('CASH'))) {
+      headerRowIndex = i;
+      break;
+    }
+  }
+
+  const rows = XLSX.utils.sheet_to_json(sheet, { range: headerRowIndex, defval: '' });
 
   if (!rows.length) {
     res.writeHead(422, { 'Content-Type': 'application/json' });
@@ -110,14 +125,14 @@ module.exports = async function dividendsExtractHandler(req, res) {
 
   const headers = Object.keys(rows[0]);
 
-  // ── 2. Detect columns ───────────────────────────────────────────────────────
+  // ── 4. Detect columns ───────────────────────────────────────────────────────
   const NET_PATTERNS = [/net\s*cash/i, /net_cash/i, /nett\s*cash/i, /amount/i, /payout/i, /dividend/i];
   const netCashCol = headers.find((h) => NET_PATTERNS.some((p) => p.test(h))) || null;
 
   const SEC_PATTERNS = [/security\s*code/i, /isin/i, /ticker/i, /symbol/i, /code/i, /jse/i];
   const secCol = headers.find((h) => SEC_PATTERNS.some((p) => p.test(h))) || null;
 
-  // ── 3. Extract & sanitize rows ──────────────────────────────────────────────
+  // ── 5. Extract & sanitize rows ──────────────────────────────────────────────
   /**
    * Parse South African localised currency strings into a float.
    * Handles: numbers, "R 1 500,50", "1500.50", "1,500.50", "1 500,50"
@@ -126,12 +141,10 @@ module.exports = async function dividendsExtractHandler(req, res) {
     if (typeof raw === 'number') return raw;
     if (raw == null || raw === '') return NaN;
     let s = String(raw).replace(/R|\s/gi, ''); // strip "R" and spaces
-    // Comma-only decimal separator (e.g. "1500,50")
     if (s.includes(',') && !s.includes('.')) {
-      s = s.replace(',', '.');
+      s = s.replace(',', '.');          // "1500,50" → "1500.50"
     } else if (s.includes(',') && s.includes('.')) {
-      // Thousands comma, dot decimal (e.g. "1,500.50")
-      s = s.replace(/,/g, '');
+      s = s.replace(/,/g, '');          // "1,500.50" → "1500.50"
     }
     return parseFloat(s);
   }
@@ -141,6 +154,10 @@ module.exports = async function dividendsExtractHandler(req, res) {
   const extractedRows = [];
 
   for (const row of rows) {
+    // Skip TOTAL rows, footer/confidentiality notices, and completely empty rows
+    const firstVal = String(row[headers[0]] ?? '').toUpperCase().trim();
+    if (firstVal === '' || firstVal.includes('TOTAL') || firstVal.includes('CONFIDENTIAL')) continue;
+
     const n = netCashCol ? parseSaAmount(row[netCashCol]) : NaN;
     if (!isNaN(n)) totalNetCash += n;
 
