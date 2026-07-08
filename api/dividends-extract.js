@@ -31,21 +31,19 @@ module.exports = async function dividendsExtractHandler(req, res) {
   try {
     await new Promise((resolve, reject) => {
       const bb = Busboy({ headers: req.headers, limits: { fileSize: 50 * 1024 * 1024 } });
-
-      // Collect all field parts — may arrive before OR after the file part
       const fields = {};
+
       bb.on('field', (name, val) => { fields[name] = val; });
 
-      bb.on('file', (_field, stream, info) => {
+      bb.on('file', (_field, fileStream, info) => {
         if (info && info.filename) fileName = info.filename;
         const chunks = [];
-        stream.on('data',  (d) => chunks.push(d));
-        stream.on('end',   ()  => { fileBuffer = Buffer.concat(chunks); });
-        stream.on('error', reject);
+        fileStream.on('data',  (d) => chunks.push(d));
+        fileStream.on('end',   ()  => { fileBuffer = Buffer.concat(chunks); });
+        fileStream.on('error', reject);
       });
 
       bb.on('finish', () => {
-        // Assign fields after finish so we have everything regardless of arrival order
         if (fields.password != null) password    = fields.password;
         if (fields.date     != null) paymentDate = fields.date;
         if (fields.filename != null) fileName    = fields.filename;
@@ -64,7 +62,7 @@ module.exports = async function dividendsExtractHandler(req, res) {
     return res.end(JSON.stringify({ ok: false, error: 'No file received' }));
   }
 
-  // ── Parse workbook ──────────────────────────────────────────────────────────
+  // ── 1. Parse Workbook (with optional password) ──────────────────────────────
   let workbook;
   try {
     const opts = { type: 'buffer' };
@@ -77,8 +75,7 @@ module.exports = async function dividendsExtractHandler(req, res) {
       ? 'Decryption failed. Please verify the Computershare password.'
       : `File could not be parsed: ${msg}`;
 
-    // Save failed run
-    try { await saveRun({ file_name: fileName, payment_date: paymentDate || null, records: 0, status: 'error', error_message: userMsg }); } catch (_) {}
+    try { await saveRun({ file_name: fileName, payment_date: paymentDate || null, records: 0, status: 'error', error_message: userMsg }, []); } catch (_) {}
 
     res.writeHead(422, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: false, error: userMsg }));
@@ -100,46 +97,67 @@ module.exports = async function dividendsExtractHandler(req, res) {
 
   const headers = Object.keys(rows[0]);
 
-  // ── Detect net cash column ─────────────────────────────────────────────────
+  // ── 2. Detect columns ───────────────────────────────────────────────────────
   const NET_PATTERNS = [/net\s*cash/i, /net_cash/i, /nett\s*cash/i, /amount/i, /payout/i, /dividend/i];
   const netCashCol = headers.find((h) => NET_PATTERNS.some((p) => p.test(h))) || null;
 
-  let totalNetCash = 0;
-  if (netCashCol) {
-    for (const row of rows) {
-      const raw = row[netCashCol];
-      const n   = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(/[^0-9.\-]/g, ''));
-      if (!isNaN(n)) totalNetCash += n;
-    }
-  }
-  totalNetCash = Math.round(totalNetCash * 100) / 100;
-
-  // ── Detect unmatched security codes ────────────────────────────────────────
-  const SEC_PATTERNS = [/security\s*code/i, /isin/i, /ticker/i, /symbol/i, /code/i];
+  const SEC_PATTERNS = [/security\s*code/i, /isin/i, /ticker/i, /symbol/i, /code/i, /jse/i];
   const secCol = headers.find((h) => SEC_PATTERNS.some((p) => p.test(h))) || null;
-  let unmatchedCount = 0;
-  if (secCol) {
-    const codes = [...new Set(rows.map((r) => String(r[secCol]).trim()).filter(Boolean))];
-    unmatchedCount = codes.filter((c) => !/^[A-Z0-9]{4,12}$/i.test(c)).length;
+
+  // ── 3. Extract & sanitize rows ──────────────────────────────────────────────
+  /**
+   * Parse South African localised currency strings into a float.
+   * Handles: numbers, "R 1 500,50", "1500.50", "1,500.50", "1 500,50"
+   */
+  function parseSaAmount(raw) {
+    if (typeof raw === 'number') return raw;
+    if (raw == null || raw === '') return NaN;
+    let s = String(raw).replace(/R|\s/gi, ''); // strip "R" and spaces
+    // Comma-only decimal separator (e.g. "1500,50")
+    if (s.includes(',') && !s.includes('.')) {
+      s = s.replace(',', '.');
+    } else if (s.includes(',') && s.includes('.')) {
+      // Thousands comma, dot decimal (e.g. "1,500.50")
+      s = s.replace(/,/g, '');
+    }
+    return parseFloat(s);
   }
 
-  // ── Preview rows (first 20) ─────────────────────────────────────────────────
+  let totalNetCash = 0;
+  let unmatchedCount = 0;
+  const extractedRows = [];
+
+  for (const row of rows) {
+    const n = netCashCol ? parseSaAmount(row[netCashCol]) : NaN;
+    if (!isNaN(n)) totalNetCash += n;
+
+    const secCode = secCol ? String(row[secCol]).trim() : '';
+    if (!secCode || !/^[A-Z0-9]{3,12}$/i.test(secCode)) unmatchedCount++;
+
+    extractedRows.push({
+      security_code: secCode,
+      net_cash:      isNaN(n) ? 0 : n,
+      raw_row:       row,
+    });
+  }
+
+  totalNetCash = Math.round(totalNetCash * 100) / 100;
   const previewRows = rows.slice(0, 20);
 
-  // ── Save to DB ─────────────────────────────────────────────────────────────
+  // ── 4. Save metadata + staging rows ─────────────────────────────────────────
   let savedRun = null;
   try {
     savedRun = await saveRun({
       file_name:       fileName,
       payment_date:    paymentDate || null,
-      records:         rows.length,
+      records:         extractedRows.length,
       total_net_cash:  totalNetCash,
       unmatched_count: unmatchedCount,
       net_cash_col:    netCashCol,
       sheet_names:     sheetNames,
       headers,
       status:          'success',
-    });
+    }, extractedRows);
   } catch (dbErr) {
     console.error('[dividends-extract] DB save failed:', dbErr.message);
   }
@@ -147,7 +165,7 @@ module.exports = async function dividendsExtractHandler(req, res) {
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({
     ok:             true,
-    records:        rows.length,
+    records:        extractedRows.length,
     totalNetCash,
     unmatchedCount,
     sheetNames,

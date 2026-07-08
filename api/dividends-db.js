@@ -25,6 +25,15 @@ const SETUP_SQL = `
     error_message TEXT,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
+
+  CREATE TABLE IF NOT EXISTS dividend_payouts_staging (
+    id            SERIAL PRIMARY KEY,
+    run_id        INTEGER REFERENCES dividend_runs(id) ON DELETE CASCADE,
+    security_code TEXT,
+    net_cash      NUMERIC(18,2),
+    raw_row       JSONB,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
 `;
 
 let _setupDone = false;
@@ -35,11 +44,15 @@ async function ensureSetup() {
 }
 
 /**
- * Save a completed (or failed) extraction run.
+ * Save a completed (or failed) extraction run and stage the parsed rows.
+ * @param {object} data - run metadata
+ * @param {Array}  extractedRows - array of { security_code, net_cash, raw_row }
  */
-async function saveRun(data) {
+async function saveRun(data, extractedRows = []) {
   await ensureSetup();
-  const { rows } = await pool().query(
+
+  // 1. Save run metadata
+  const runResult = await pool().query(
     `INSERT INTO dividend_runs
        (file_name, payment_date, records, total_net_cash, unmatched_count,
         net_cash_col, sheet_names, headers, status, error_message)
@@ -58,7 +71,33 @@ async function saveRun(data) {
       data.error_message || null,
     ]
   );
-  return rows[0];
+
+  const runRecord = runResult.rows[0];
+
+  // 2. Bulk insert staging rows
+  if (data.status === 'success' && extractedRows.length > 0) {
+    const placeholders = [];
+    const vals = [];
+    let paramIndex = 1;
+
+    for (const row of extractedRows) {
+      placeholders.push(`($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++})`);
+      vals.push(
+        runRecord.id,
+        row.security_code || null,
+        row.net_cash,
+        JSON.stringify(row.raw_row) // preserve original row for shifting-column safety
+      );
+    }
+
+    await pool().query(
+      `INSERT INTO dividend_payouts_staging (run_id, security_code, net_cash, raw_row)
+       VALUES ${placeholders.join(',')}`,
+      vals
+    );
+  }
+
+  return runRecord;
 }
 
 /**
@@ -80,7 +119,7 @@ async function getStats() {
   await ensureSetup();
   const { rows } = await pool().query(`
     SELECT
-      COUNT(*)                                   AS total_runs,
+      COUNT(*)                                     AS total_runs,
       COALESCE(SUM(records), 0)                 AS total_records,
       COALESCE(SUM(total_net_cash), 0)          AS total_net_cash,
       COUNT(*) FILTER (WHERE status = 'success') AS successful_runs,
