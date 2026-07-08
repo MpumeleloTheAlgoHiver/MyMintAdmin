@@ -2,6 +2,7 @@
 
 const Busboy = require('busboy');
 const XLSX   = require('xlsx');
+const { OfficeFile, DecryptionError, FileFormatError } = require('office-crypto');
 const { saveRun } = require('./dividends-db');
 
 /**
@@ -62,21 +63,33 @@ module.exports = async function dividendsExtractHandler(req, res) {
     return res.end(JSON.stringify({ ok: false, error: 'No file received' }));
   }
 
-  // ── 1. Parse Workbook (with optional password) ──────────────────────────────
+  // ── 1. Decrypt if password-protected ───────────────────────────────────────
+  let parseBuffer = fileBuffer;
+
+  if (password) {
+    try {
+      const officeFile = OfficeFile(new Uint8Array(fileBuffer));
+      officeFile.loadKey({ password });
+      const decrypted = officeFile.decrypt();
+      parseBuffer = Buffer.from(decrypted);
+    } catch (err) {
+      const isWrongPwd = err instanceof DecryptionError || /password|key|verify|invalid/i.test(err.message || '');
+      const userMsg = isWrongPwd
+        ? 'Decryption failed. Please verify the Computershare password.'
+        : `Could not decrypt file: ${err.message}`;
+      try { await saveRun({ file_name: fileName, payment_date: paymentDate || null, records: 0, status: 'error', error_message: userMsg }, []); } catch (_) {}
+      res.writeHead(422, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: userMsg }));
+    }
+  }
+
+  // ── 2. Parse Workbook ───────────────────────────────────────────────────────
   let workbook;
   try {
-    const opts = { type: 'buffer' };
-    if (password) opts.password = password;
-    workbook = XLSX.read(fileBuffer, opts);
+    workbook = XLSX.read(parseBuffer, { type: 'buffer' });
   } catch (err) {
-    const msg = err.message || '';
-    const isAuth = /password|decrypt|encrypt|cfb|protected/i.test(msg);
-    const userMsg = isAuth
-      ? 'Decryption failed. Please verify the Computershare password.'
-      : `File could not be parsed: ${msg}`;
-
+    const userMsg = `File could not be parsed: ${err.message}`;
     try { await saveRun({ file_name: fileName, payment_date: paymentDate || null, records: 0, status: 'error', error_message: userMsg }, []); } catch (_) {}
-
     res.writeHead(422, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: false, error: userMsg }));
   }
