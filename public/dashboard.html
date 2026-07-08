@@ -1888,7 +1888,7 @@
               const logoEl = x.logo_url
                 ? `<img src="${x.logo_url}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;border:1px solid #e2e8f0;flex-shrink:0;" onerror="this.outerHTML='<div style=\\'width:26px;height:26px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#7c3aed;\\'>${init}</div>'">`
                 : `<div style="width:26px;height:26px;border-radius:50%;background:${isG ? '#dcfce7' : '#fee2e2'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:${isG ? '#16a34a' : '#dc2626'};flex-shrink:0;">${init}</div>`;
-              return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;margin-bottom:2px;">
+              return `<div onclick="window.filterStratBrowseNews('${x.id}')" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;margin-bottom:2px;cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='#f5f3ff'" onmouseleave="this.style.background=''">
                 <span style="font-size:10px;color:#cbd5e1;font-weight:700;width:14px;text-align:center;flex-shrink:0;">${rank}</span>
                 ${logoEl}
                 <div style="flex:1;min-width:0;">
@@ -2052,7 +2052,7 @@
             ? `<img src="${a.logo_url}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;border:1px solid #e2e8f0;flex-shrink:0;" onerror="this.outerHTML='<div style=\\'width:26px;height:26px;border-radius:50%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#7c3aed;\\'>${init}</div>'">`
             : `<div style="width:26px;height:26px;border-radius:50%;background:${isGainer ? '#dcfce7' : '#fee2e2'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:${isGainer ? '#16a34a' : '#dc2626'};flex-shrink:0;">${init}</div>`;
           const sym = (a.symbol || '').replace('.JO','');
-          return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;margin-bottom:2px;">
+          return `<div onclick="window.filterStratBrowseNews('${a.symbol}')" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;margin-bottom:2px;cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='#f5f3ff'" onmouseleave="this.style.background=''">
             <span style="font-size:10px;color:#cbd5e1;font-weight:700;width:14px;text-align:center;flex-shrink:0;">${rank}</span>
             ${logoEl}
             <div style="flex:1;min-width:0;">
@@ -2169,6 +2169,63 @@
         _renderReturnInsights(tab);
       };
 
+      /* ── Strategy Browse News: ticker filter ── */
+      window._stratBrowseNewsFilter = null;
+
+      window.renderStratBrowseNews = function(activeSym) {
+        const listEl = document.getElementById('stratBrowseNewsList');
+        if (!listEl) return;
+        const all = window._stratBrowseNewsData || [];
+        const sym = activeSym ? activeSym.replace('.JO', '') : null;
+        const articles = sym
+          ? all.filter(a => {
+              const t = (a.title || '').toLowerCase();
+              const b = (a.body_text || '').toLowerCase();
+              return t.includes(sym.toLowerCase()) || b.includes(sym.toLowerCase());
+            })
+          : all;
+
+        const filterChip = sym
+          ? `<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+              <span style="font-size:11px;font-weight:600;color:#7c3aed;background:#ede9fe;padding:3px 10px;border-radius:20px;display:inline-flex;align-items:center;gap:6px;">
+                ${sym}
+                <button onclick="window.filterStratBrowseNews(null)" style="background:none;border:none;cursor:pointer;color:#7c3aed;font-size:13px;line-height:1;padding:0;" title="Clear filter">&times;</button>
+              </span>
+              <span style="font-size:11px;color:#94a3b8;">news</span>
+            </div>`
+          : '';
+
+        if (!articles.length) {
+          listEl.innerHTML = filterChip + `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">${sym ? 'No news found for ' + sym : 'No news available'}</div>`;
+          return;
+        }
+
+        listEl.innerHTML = filterChip + articles.slice(0, 8).map(article => {
+          const src = article.source || article.channel || 'Mint';
+          const dateStr = article.published_at
+            ? new Date(article.published_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })
+            : '';
+          const preview = (article.body_text || '').slice(0, 120) + ((article.body_text || '').length > 120 ? '&hellip;' : '');
+          return `<div onclick="openNewsArticle(window._newsCache['${article.id}'])" class="news-item-hover" style="border:1px solid #f1f5f9;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s;background:white;" onmouseenter="this.style.borderColor='#ddd6fe';this.style.background='#fafafe'" onmouseleave="this.style.borderColor='#f1f5f9';this.style.background='white'">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+              <span style="font-size:10px;font-weight:700;color:#7c3aed;background:#ede9fe;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:0.04em;">${src}</span>
+              <span style="font-size:10px;color:#94a3b8;">${dateStr}</span>
+            </div>
+            <div style="font-size:12px;font-weight:600;color:#0f172a;line-height:1.4;margin-bottom:3px;">${article.title}</div>
+            ${preview ? `<div style="font-size:11px;color:#64748b;line-height:1.5;">${preview}</div>` : ''}
+            <div style="display:flex;align-items:center;gap:4px;margin-top:6px;">
+              <span style="font-size:10px;color:#a78bfa;font-weight:500;">Read more</span>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2.5"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            </div>
+          </div>`;
+        }).join('');
+      };
+
+      window.filterStratBrowseNews = function(sym) {
+        window._stratBrowseNewsFilter = sym || null;
+        window.renderStratBrowseNews(window._stratBrowseNewsFilter);
+      };
+
       const loadStrategyBrowsePanel = async () => {
         if (_browsePanelLoaded) return;
         _browsePanelLoaded = true;
@@ -2278,7 +2335,7 @@
             .from('News_articles')
             .select('id, title, source, channel, published_at, body_text, author')
             .order('published_at', { ascending: false })
-            .limit(8);
+            .limit(30);
           if (error) { console.error('News fetch error:', error); }
           if (error || !newsData || !newsData.length) {
             listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No news available</div>';
@@ -2286,25 +2343,8 @@
           }
           window._newsCache = window._newsCache || {};
           newsData.forEach(a => { window._newsCache[a.id] = a; });
-          listEl.innerHTML = newsData.map(article => {
-            const src = article.source || article.channel || 'Mint';
-            const dateStr = article.published_at
-              ? new Date(article.published_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })
-              : '';
-            const preview = (article.body_text || '').slice(0, 120) + ((article.body_text || '').length > 120 ? '&hellip;' : '');
-            return `<div onclick="openNewsArticle(window._newsCache['${article.id}'])" class="news-item-hover" style="border:1px solid #f1f5f9;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s;background:white;" onmouseenter="this.style.borderColor='#ddd6fe';this.style.background='#fafafe'" onmouseleave="this.style.borderColor='#f1f5f9';this.style.background='white'">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-                <span style="font-size:10px;font-weight:700;color:#7c3aed;background:#ede9fe;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:0.04em;">${src}</span>
-                <span style="font-size:10px;color:#94a3b8;">${dateStr}</span>
-              </div>
-              <div style="font-size:12px;font-weight:600;color:#0f172a;line-height:1.4;margin-bottom:3px;">${article.title}</div>
-              ${preview ? `<div style="font-size:11px;color:#64748b;line-height:1.5;">${preview}</div>` : ''}
-              <div style="display:flex;align-items:center;gap:4px;margin-top:6px;">
-                <span style="font-size:10px;color:#a78bfa;font-weight:500;">Read more</span>
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2.5"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
-              </div>
-            </div>`;
-          }).join('');
+          window._stratBrowseNewsData = newsData;
+          window.renderStratBrowseNews(window._stratBrowseNewsFilter);
         } catch(e) {
           if (listEl) listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">News unavailable</div>';
         }
