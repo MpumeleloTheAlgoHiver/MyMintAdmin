@@ -30,12 +30,12 @@ module.exports = async function dividendsExtractHandler(req, res) {
 
   try {
     await new Promise((resolve, reject) => {
-      const bb = Busboy({ headers: req.headers });
-      bb.on('field', (name, val) => {
-        if (name === 'password')    password    = val;
-        if (name === 'date')        paymentDate = val;
-        if (name === 'filename')    fileName    = val;
-      });
+      const bb = Busboy({ headers: req.headers, limits: { fileSize: 50 * 1024 * 1024 } });
+
+      // Collect all field parts — may arrive before OR after the file part
+      const fields = {};
+      bb.on('field', (name, val) => { fields[name] = val; });
+
       bb.on('file', (_field, stream, info) => {
         if (info && info.filename) fileName = info.filename;
         const chunks = [];
@@ -43,8 +43,15 @@ module.exports = async function dividendsExtractHandler(req, res) {
         stream.on('end',   ()  => { fileBuffer = Buffer.concat(chunks); });
         stream.on('error', reject);
       });
-      bb.on('finish', resolve);
-      bb.on('error',  reject);
+
+      bb.on('finish', () => {
+        // Assign fields after finish so we have everything regardless of arrival order
+        if (fields.password != null) password    = fields.password;
+        if (fields.date     != null) paymentDate = fields.date;
+        if (fields.filename != null) fileName    = fields.filename;
+        resolve();
+      });
+      bb.on('error', reject);
       req.pipe(bb);
     });
   } catch (err) {

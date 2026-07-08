@@ -318,14 +318,30 @@
     }
 
     /* ── File picking ───────────────────────────────────────────────────────── */
+    function parseDateFromFilename(name) {
+      // Try YYYY-MM-DD anywhere in filename
+      const m1 = name.match(/(\d{4})[.\-_](\d{2})[.\-_](\d{2})/);
+      if (m1) return `${m1[1]}-${m1[2]}-${m1[3]}`;
+      // Try DD-MM-YYYY or DD/MM/YYYY
+      const m2 = name.match(/(\d{2})[.\-_\/](\d{2})[.\-_\/](\d{4})/);
+      if (m2) return `${m2[3]}-${m2[2]}-${m2[1]}`;
+      return null;
+    }
+
     function attachFile(f) {
       _file = f; hasFile = true;
       fileName.textContent = f.name;
       dzInner.style.display = 'none';
       fileRow.style.display = 'flex';
-      const today = new Date();
-      paymentDate.value = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
-      autoBadge.style.display = 'inline-flex';
+      // Parse payment date from filename — only auto-fill if we found one
+      const detected = parseDateFromFilename(f.name);
+      if (detected) {
+        paymentDate.value = detected;
+        autoBadge.style.display = 'inline-flex';
+      } else {
+        paymentDate.value = '';
+        autoBadge.style.display = 'none';
+      }
     }
     function clearFile() {
       _file = null; hasFile = false;
@@ -489,9 +505,11 @@
       setLoading(true, 'Decrypting file…');
 
       const fd = new FormData();
-      fd.append('file', _file);
+      // Fields MUST come before the file so busboy receives them
+      // before the file stream begins processing
       fd.append('password', pwInput.value || '');
       fd.append('date', paymentDate.value || '');
+      fd.append('file', _file);
 
       try {
         const res  = await fetch('/api/dividends/extract', { method: 'POST', body: fd });
