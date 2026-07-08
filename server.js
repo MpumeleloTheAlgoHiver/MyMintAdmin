@@ -12,6 +12,7 @@ const cyberComplianceHandler = require('./api/cyber-compliance');
 const sendEftEmailHandler = require('./api/send-eft-email');
 const orderbookUpdatePriceHandler = require('./api/orderbook/update-price');
 const orderbookSendCsvHandler = require('./api/orderbook/send-csv');
+const dividendsExtractHandler = require('./api/dividends-extract');
 const { runHealthCheck } = require('./api/monitor/_health-check');
 // Return-alerts was merged into mint-mornings to stay under Vercel's 12-function limit.
 const { handleReturnAlertsNotify: returnAlertsHandler } = require('./api/mint-mornings');
@@ -2126,6 +2127,19 @@ const server = http.createServer((req, res) => {
   }
 
   // Team management routes
+  if (req.url.startsWith('/api/dividends/extract') && req.method === 'POST') {
+    (async () => {
+      try {
+        await dividendsExtractHandler(req, res);
+      } catch (err) {
+        if (!res.headersSent) {
+          sendJson(res, 500, { error: err.message });
+        }
+      }
+    })();
+    return;
+  }
+
   if (req.url.startsWith('/api/team')) {
     (async () => {
       try {
