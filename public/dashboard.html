@@ -2179,13 +2179,6 @@
         const sym = activeSym ? activeSym.replace('.JO', '') : null;
         const articles = sym
           ? all.filter(a => {
-              // Primary: check Alliance News tickers array (e.g. "ASA.SOL=ABOUT", "ASA.SOL")
-              const tickerMatch = Array.isArray(a.tickers) && a.tickers.some(t =>
-                t.replace('=ABOUT','').replace('=','') === 'ASA.' + sym ||
-                t.replace('=ABOUT','').replace('=','') === sym
-              );
-              if (tickerMatch) return true;
-              // Fallback: text search in title / body
               const symLow = sym.toLowerCase();
               return (a.title || '').toLowerCase().includes(symLow) ||
                      (a.body_text || '').toLowerCase().includes(symLow);
@@ -2340,7 +2333,7 @@
         try {
           const { data: newsData, error } = await supabaseClient
             .from('News_articles')
-            .select('id, title, source, channel, published_at, body_text, author, tickers')
+            .select('id, title, source, channel, published_at, body_text, author')
             .order('published_at', { ascending: false })
             .limit(60);
           if (error) { console.error('News fetch error:', error); }
@@ -5964,16 +5957,12 @@
         try {
           let query = supabaseClient
             .from('News_articles')
-            .select('id, title, source, channel, published_at, body_text, author, tickers')
+            .select('id, title, source, channel, published_at, body_text, author')
             .order('published_at', { ascending: false });
 
           if (activeTicker) {
             const sym = activeTicker.replace('.JO', '');
-            // Use tickers array containment (Alliance News SA format: ASA.SYM or ASA.SYM=ABOUT)
-            // combined with text search as fallback via OR
-            query = query.or(
-              `tickers.cs.{"ASA.${sym}"},tickers.cs.{"ASA.${sym}=ABOUT"},title.ilike.%${sym}%,body_text.ilike.%${sym}%`
-            );
+            query = query.or(`title.ilike.%${sym}%,body_text.ilike.%${sym}%`);
           }
 
           query = query.limit(15);
