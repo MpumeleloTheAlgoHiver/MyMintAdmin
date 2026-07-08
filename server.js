@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const sumsubArchiveHandler = require('./api/sumsub/archive');
 const teamHandler = require('./api/team');
+const { requirePermission } = require('./api/_team');
 const mintMorningsHandler = require('./api/mint-mornings');
 const webhooksHandler = require('./api/webhooks');
 const cyberComplianceHandler = require('./api/cyber-compliance');
@@ -662,15 +663,9 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.url.startsWith('/api/orderbook/reverse-investor') && req.method === 'POST') {
-    const token = parseBearerToken(req.headers.authorization);
-    if (!token) {
-      sendJson(res, 401, { error: 'Missing Authorization bearer token' });
-      return;
-    }
-
     (async () => {
       try {
-        await fetchSupabaseJson('/auth/v1/user', token, false);
+        if (!(await requirePermission(req, res, 'orderbook', 'refund_investor'))) return;
         const body = await readJsonBody(req);
         await runReverseInvestor(res, body);
       } catch (error) {
