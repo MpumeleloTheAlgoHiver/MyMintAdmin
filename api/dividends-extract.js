@@ -172,7 +172,7 @@ module.exports = async function dividendsExtractHandler(req, res) {
   }
 
   totalNetCash = Math.round(totalNetCash * 100) / 100;
-  const previewRows = rows.slice(0, 20);
+  const previewRows = extractedRows.map(r => r.raw_row).slice(0, 20);
 
   // ── 4. Save metadata + staging rows ─────────────────────────────────────────
   let savedRun = null;

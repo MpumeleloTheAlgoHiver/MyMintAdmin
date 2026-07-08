@@ -29,6 +29,8 @@
       @keyframes ov-ticker-scroll { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
       .ov-ticker-anim { animation: ov-ticker-scroll 300s linear infinite; }
       .ov-ticker-anim:hover { animation-play-state: paused; }
+      [data-ticker-sym] { cursor:pointer; transition:background 0.15s; }
+      [data-ticker-sym]:hover { background:#e8e4f3 !important; }
       @keyframes strat-drop-in { from { opacity:0; transform:translateY(-10px) scale(0.96); } to { opacity:1; transform:translateY(0) scale(1); } }
       @keyframes strat-drop-out { from { opacity:1; transform:translateY(0) scale(1); } to { opacity:0; transform:translateY(-6px) scale(0.96); } }
       @keyframes strat-item-in { from { opacity:0; transform:translateX(-5px); } to { opacity:1; transform:translateX(0); } }
@@ -5858,6 +5860,15 @@
       };
 
       /* ── Bottom Section Tab Switching Logic ── */
+      /* ── Ticker chip click — capture phase so animation/stopPropagation can't block it ── */
+      document.addEventListener('click', function _tickerCapture(e) {
+        const chip = e.target.closest('[data-ticker-sym]');
+        if (!chip) return;
+        const sym = chip.dataset.tickerSym;
+        if (!sym) return;
+        window.ovTickerClick(sym);
+      }, true /* capture */);
+
       window.switchBottomTab = (tab) => {
         const btnComp = document.getElementById('btnTabComposition');
         const btnNews = document.getElementById('btnTabNews');
@@ -6045,26 +6056,6 @@
           </div>`;
         };
         track.innerHTML = [...items, ...items].map(renderTickerItem).join('');
-        /* Attach click delegation once on the track element itself.
-           The track's innerHTML is replaced on each interval tick but the
-           element reference persists, so this listener survives refreshes. */
-        if (!track._tickerClickBound) {
-          track._tickerClickBound = true;
-          track.addEventListener('click', (e) => {
-            const chip = e.target.closest('[data-ticker-sym]');
-            if (!chip) return;
-            e.stopPropagation();
-            window.ovTickerClick(chip.dataset.tickerSym);
-          });
-          track.addEventListener('mouseover', (e) => {
-            const chip = e.target.closest('[data-ticker-sym]');
-            if (chip) chip.style.background = '#e8e4f3';
-          });
-          track.addEventListener('mouseout', (e) => {
-            const chip = e.target.closest('[data-ticker-sym]');
-            if (chip) chip.style.background = '';
-          });
-        }
         requestAnimationFrame(() => {
           const halfWidth = track.scrollWidth / 2;
           const pxPerSec = 30;
