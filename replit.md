@@ -76,13 +76,23 @@ Internal admin dashboard for the Mint investment platform. Provides client manag
 1. **Commit (dashboard Rebalancing tab)**: writes a `PENDING` `rebalance_batch` + per-client `rebalance_event` rows. Does NOT touch `stock_holdings_c`.
 2. **Settle (orderbook Pending Rebalances tab)**: admin enters actual fill prices → closes/reduces old sell positions in `stock_holdings_c`, creates new buy positions, marks batch `SETTLED`.
 
+## Running on Replit
+- **Start command**: `node server.js` (configured in the "Start application" workflow)
+- **Port**: 5000 (set via `PORT` env var in `.replit`)
+- **Dependencies**: install with `npm install` (no build step required)
+
 ## Environment Variables Required
+All sensitive values must be stored as **Replit Secrets** (not in `.replit`):
 - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` - Database access
 - `RESEND_API_KEY` - Email sending
 - `SUMSUB_APP_TOKEN` / `SUMSUB_APP_SECRET` - KYC verification
 - `ORDERBOOK_EMAIL_FROM` / `ORDERBOOK_EMAIL_TO` - Report emails
 - `CRON_SECRET` - Cron endpoint protection
-- `PORT` - Server port (set to 5000)
+
+Non-secret env vars set in `.replit [userenv.shared]`:
+- `PORT=5000`
+- `MINT_APP_URL_DEV` / `MINT_APP_URL_LIVE`
+- `ORDERBOOK_ENABLE_INTERVAL_SCHEDULER=false`
 
 ## Linked App
 Connected to the Mint client-facing investment platform which shares the same Supabase backend. Strategies created here appear in Mint's OpenStrategies page when `status: 'active'` and `is_public: true`.
