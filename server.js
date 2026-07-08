@@ -2191,7 +2191,7 @@ const server = http.createServer((req, res) => {
 
     const ext = path.extname(filePath).toLowerCase();
     const contentType = mimeTypes[ext] || 'application/octet-stream';
-    const cacheControl = ext === '.html'
+    const cacheControl = (ext === '.html' || ext === '.js' || ext === '.css')
       ? 'no-cache, no-store, must-revalidate'
       : 'public, max-age=86400';
     res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': cacheControl });
