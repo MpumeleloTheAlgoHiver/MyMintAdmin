@@ -2177,11 +2177,31 @@
         if (!listEl) return;
         const all = window._stratBrowseNewsData || [];
         const sym = activeSym ? activeSym.replace('.JO', '') : null;
+
+        // Resolve company name from securities map (e.g. "ABG" → "Absa")
+        let companyWord = null;
+        if (sym && typeof globalSecuritiesMap !== 'undefined' && globalSecuritiesMap) {
+          const sec = globalSecuritiesMap.get(activeSym) ||
+                      globalSecuritiesMap.get(sym + '.JO') ||
+                      globalSecuritiesMap.get(sym);
+          if (sec && sec.name) {
+            const first = sec.name.split(/\s+/)[0];
+            if (first && first.length > 2 && first.toLowerCase() !== sym.toLowerCase()) {
+              companyWord = first; // e.g. "Absa" from "Absa Group Limited"
+            }
+          }
+        }
+
         const articles = sym
           ? all.filter(a => {
-              const symLow = sym.toLowerCase();
-              return (a.title || '').toLowerCase().includes(symLow) ||
-                     (a.body_text || '').toLowerCase().includes(symLow);
+              const title = (a.title || '').toLowerCase();
+              const body  = (a.body_text || '').toLowerCase();
+              if (title.includes(sym.toLowerCase()) || body.includes(sym.toLowerCase())) return true;
+              if (companyWord) {
+                const cLow = companyWord.toLowerCase();
+                return title.includes(cLow) || body.includes(cLow);
+              }
+              return false;
             })
           : all;
 
@@ -5962,7 +5982,20 @@
 
           if (activeTicker) {
             const sym = activeTicker.replace('.JO', '');
-            query = query.or(`title.ilike.%${sym}%,body_text.ilike.%${sym}%`);
+            // Look up company name for better matching (e.g. "ABG" → "Absa")
+            const orParts = [`title.ilike.%${sym}%`, `body_text.ilike.%${sym}%`];
+            if (typeof globalSecuritiesMap !== 'undefined' && globalSecuritiesMap) {
+              const sec = globalSecuritiesMap.get(activeTicker) ||
+                          globalSecuritiesMap.get(sym + '.JO') ||
+                          globalSecuritiesMap.get(sym);
+              if (sec && sec.name) {
+                const first = sec.name.split(/\s+/)[0];
+                if (first && first.length > 2 && first.toLowerCase() !== sym.toLowerCase()) {
+                  orParts.push(`title.ilike.%${first}%`, `body_text.ilike.%${first}%`);
+                }
+              }
+            }
+            query = query.or(orParts.join(','));
           }
 
           query = query.limit(15);
