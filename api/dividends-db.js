@@ -129,4 +129,20 @@ async function getStats() {
   return rows[0];
 }
 
-module.exports = { saveRun, getRuns, getStats };
+/**
+ * Fetch staged payout rows for a specific run.
+ */
+async function getPayouts(runId, limit = 2000) {
+  await ensureSetup();
+  const { rows } = await pool().query(
+    `SELECT id, security_code, net_cash, raw_row, created_at
+     FROM dividend_payouts_staging
+     WHERE run_id = $1
+     ORDER BY id
+     LIMIT $2`,
+    [runId, limit]
+  );
+  return rows;
+}
+
+module.exports = { saveRun, getRuns, getStats, getPayouts };

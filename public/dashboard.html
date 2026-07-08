@@ -2179,9 +2179,16 @@
         const sym = activeSym ? activeSym.replace('.JO', '') : null;
         const articles = sym
           ? all.filter(a => {
-              const t = (a.title || '').toLowerCase();
-              const b = (a.body_text || '').toLowerCase();
-              return t.includes(sym.toLowerCase()) || b.includes(sym.toLowerCase());
+              // Primary: check Alliance News tickers array (e.g. "ASA.SOL=ABOUT", "ASA.SOL")
+              const tickerMatch = Array.isArray(a.tickers) && a.tickers.some(t =>
+                t.replace('=ABOUT','').replace('=','') === 'ASA.' + sym ||
+                t.replace('=ABOUT','').replace('=','') === sym
+              );
+              if (tickerMatch) return true;
+              // Fallback: text search in title / body
+              const symLow = sym.toLowerCase();
+              return (a.title || '').toLowerCase().includes(symLow) ||
+                     (a.body_text || '').toLowerCase().includes(symLow);
             })
           : all;
 
@@ -2333,9 +2340,9 @@
         try {
           const { data: newsData, error } = await supabaseClient
             .from('News_articles')
-            .select('id, title, source, channel, published_at, body_text, author')
+            .select('id, title, source, channel, published_at, body_text, author, tickers')
             .order('published_at', { ascending: false })
-            .limit(30);
+            .limit(60);
           if (error) { console.error('News fetch error:', error); }
           if (error || !newsData || !newsData.length) {
             listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No news available</div>';
@@ -5957,16 +5964,19 @@
         try {
           let query = supabaseClient
             .from('News_articles')
-            .select('id, title, source, channel, published_at, body_text, author')
+            .select('id, title, source, channel, published_at, body_text, author, tickers')
             .order('published_at', { ascending: false });
 
           if (activeTicker) {
-            // Filter articles mentioning this ticker in title or body
             const sym = activeTicker.replace('.JO', '');
-            query = query.or(`title.ilike.%${sym}%,body_text.ilike.%${sym}%`);
+            // Use tickers array containment (Alliance News SA format: ASA.SYM or ASA.SYM=ABOUT)
+            // combined with text search as fallback via OR
+            query = query.or(
+              `tickers.cs.{"ASA.${sym}"},tickers.cs.{"ASA.${sym}=ABOUT"},title.ilike.%${sym}%,body_text.ilike.%${sym}%`
+            );
           }
 
-          query = query.limit(10);
+          query = query.limit(15);
 
           const { data: newsData, error } = await query;
 

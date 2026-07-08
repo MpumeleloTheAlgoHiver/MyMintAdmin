@@ -13,8 +13,10 @@ const cyberComplianceHandler = require('./api/cyber-compliance');
 const sendEftEmailHandler = require('./api/send-eft-email');
 const orderbookUpdatePriceHandler = require('./api/orderbook/update-price');
 const orderbookSendCsvHandler = require('./api/orderbook/send-csv');
-const dividendsExtractHandler = require('./api/dividends-extract');
-const dividendsRunsHandler    = require('./api/dividends-runs');
+const dividendsExtractHandler  = require('./api/dividends-extract');
+const dividendsRunsHandler     = require('./api/dividends-runs');
+const dividendsPayoutsHandler  = require('./api/dividends-payouts');
+const allianceNewsHandler      = require('./api/alliance-news');
 const { runHealthCheck } = require('./api/monitor/_health-check');
 // Return-alerts was merged into mint-mornings to stay under Vercel's 12-function limit.
 const { handleReturnAlertsNotify: returnAlertsHandler } = require('./api/mint-mornings');
@@ -2123,6 +2125,16 @@ const server = http.createServer((req, res) => {
   }
 
   // Team management routes
+  if (req.url.startsWith('/api/alliance-news')) {
+    (async () => { try { await allianceNewsHandler(req, res); } catch(e) { sendJson(res, 500, { error: e.message }); } })();
+    return;
+  }
+
+  if (req.url.startsWith('/api/dividends/payouts') && req.method === 'GET') {
+    (async () => { try { await dividendsPayoutsHandler(req, res); } catch(e) { sendJson(res, 500, { error: e.message }); } })();
+    return;
+  }
+
   if (req.url.startsWith('/api/dividends/extract') && req.method === 'POST') {
     (async () => {
       try {
@@ -2237,6 +2249,10 @@ const startServer = (portToUse) => {
     startMarketDataScheduler();
     startMintMorningsScheduler();
     startHealthCheckScheduler();
+    // Seed Alliance News codes table from bundled Excel (no-op if already seeded)
+    require('./api/alliance-news-db').importCodes().then(r => {
+      if (!r.skipped) console.log(`[AllianceNews] Seeded ${r.imported} codes into alliance_news_codes`);
+    }).catch(e => console.warn('[AllianceNews] Seed failed (non-fatal):', e.message));
   });
 };
 
