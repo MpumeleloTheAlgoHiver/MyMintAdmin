@@ -13,8 +13,8 @@ const cyberComplianceHandler = require('./api/cyber-compliance');
 const sendEftEmailHandler = require('./api/send-eft-email');
 const orderbookUpdatePriceHandler = require('./api/orderbook/update-price');
 const orderbookSendCsvHandler = require('./api/orderbook/send-csv');
-const dividendsExtractHandler  = require('./api/dividends-extract');
-const dividendsRunsHandler     = require('./api/dividends-runs'); // also handles /payouts + /alliance-news
+const dividendsExtractHandler  = require('./api/_dividends-extract');
+const dividendsRunsHandler     = require('./api/_dividends-runs'); // also handles /payouts + /alliance-news
 const { runHealthCheck } = require('./api/monitor/_health-check');
 // Return-alerts was merged into mint-mornings to stay under Vercel's 12-function limit.
 const { handleReturnAlertsNotify: returnAlertsHandler } = require('./api/mint-mornings');
@@ -2233,7 +2233,7 @@ const startServer = (portToUse) => {
     startMintMorningsScheduler();
     startHealthCheckScheduler();
     // Seed Alliance News codes table from bundled Excel (no-op if already seeded)
-    require('./api/alliance-news-db').importCodes().then(r => {
+    require('./api/_alliance-news-db').importCodes().then(r => {
       if (!r.skipped) console.log(`[AllianceNews] Seeded ${r.imported} codes into alliance_news_codes`);
     }).catch(e => console.warn('[AllianceNews] Seed failed (non-fatal):', e.message));
   });

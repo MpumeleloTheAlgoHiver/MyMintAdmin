@@ -37,6 +37,9 @@ if (req.url.startsWith('/api/something')) {
 - `SUPABASE_SERVICE_ROLE_KEY` — service role key for admin operations (secret)
 - Auth user listing requires service role: `GET /auth/v1/admin/users`
 
+## File naming
+- `api/_*.js` (leading underscore) are internal/helper modules — still required from `server.js`, but the underscore must be included in the `require()` path or it 404s at startup with MODULE_NOT_FOUND.
+
 ## Schedulers
 All schedulers started in `startServer()` callback after server.listen:
 - `startDailyOrderbookScheduler()` — daily CSV email
