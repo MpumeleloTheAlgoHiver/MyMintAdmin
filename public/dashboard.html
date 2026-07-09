@@ -2178,19 +2178,8 @@
         const all = window._stratBrowseNewsData || [];
         const sym = activeSym ? activeSym.replace('.JO', '') : null;
 
-        // Resolve company name from securities map (e.g. "ABG" → "Absa")
-        let companyWord = null;
-        if (sym && typeof globalSecuritiesMap !== 'undefined' && globalSecuritiesMap) {
-          const sec = globalSecuritiesMap.get(activeSym) ||
-                      globalSecuritiesMap.get(sym + '.JO') ||
-                      globalSecuritiesMap.get(sym);
-          if (sec && sec.name) {
-            const first = sec.name.split(/\s+/)[0];
-            if (first && first.length > 2 && first.toLowerCase() !== sym.toLowerCase()) {
-              companyWord = first; // e.g. "Absa" from "Absa Group Limited"
-            }
-          }
-        }
+        // Company word pre-fetched async by filterStratBrowseNews → resolveCompanyWord
+        const companyWord = window._stratBrowseCompanyWord || null;
 
         const articles = sym
           ? all.filter(a => {
@@ -2241,8 +2230,43 @@
         }).join('');
       };
 
-      window.filterStratBrowseNews = function(sym) {
+      // Shared helper: resolve company name for a ticker (fast from map, else Supabase)
+      window._secNameCache = window._secNameCache || {};
+      async function resolveCompanyWord(sym) {
+        if (!sym) return null;
+        const clean = sym.replace('.JO', '');
+        // Fast path: securities map already loaded
+        if (typeof globalSecuritiesMap !== 'undefined' && globalSecuritiesMap.size > 0) {
+          const sec = globalSecuritiesMap.get(sym) ||
+                      globalSecuritiesMap.get(clean + '.JO') ||
+                      globalSecuritiesMap.get(clean);
+          if (sec && sec.name) {
+            const first = sec.name.split(/\s+/)[0];
+            if (first && first.length > 2 && first.toLowerCase() !== clean.toLowerCase()) return first;
+          }
+        }
+        // Fallback: cache-backed Supabase lookup (use .in() to avoid dot-in-value issues)
+        if (!window._secNameCache[clean]) {
+          try {
+            const { data } = await supabaseClient.from('securities_c')
+              .select('name')
+              .in('symbol', [clean + '.JO', clean])
+              .limit(1);
+            const name = Array.isArray(data) && data[0] && data[0].name;
+            if (name) window._secNameCache[clean] = name;
+          } catch (_) {}
+        }
+        if (window._secNameCache[clean]) {
+          const first = window._secNameCache[clean].split(/\s+/)[0];
+          if (first && first.length > 2 && first.toLowerCase() !== clean.toLowerCase()) return first;
+        }
+        return null;
+      }
+
+      window.filterStratBrowseNews = async function(sym) {
         window._stratBrowseNewsFilter = sym || null;
+        const companyWord = sym ? await resolveCompanyWord(sym) : null;
+        window._stratBrowseCompanyWord = companyWord;
         window.renderStratBrowseNews(window._stratBrowseNewsFilter);
       };
 
@@ -5982,18 +6006,11 @@
 
           if (activeTicker) {
             const sym = activeTicker.replace('.JO', '');
-            // Look up company name for better matching (e.g. "ABG" → "Absa")
             const orParts = [`title.ilike.%${sym}%`, `body_text.ilike.%${sym}%`];
-            if (typeof globalSecuritiesMap !== 'undefined' && globalSecuritiesMap) {
-              const sec = globalSecuritiesMap.get(activeTicker) ||
-                          globalSecuritiesMap.get(sym + '.JO') ||
-                          globalSecuritiesMap.get(sym);
-              if (sec && sec.name) {
-                const first = sec.name.split(/\s+/)[0];
-                if (first && first.length > 2 && first.toLowerCase() !== sym.toLowerCase()) {
-                  orParts.push(`title.ilike.%${first}%`, `body_text.ilike.%${first}%`);
-                }
-              }
+            // Look up company name (e.g. "ABG" → "Absa") — fast from map, else Supabase
+            const companyWord = await resolveCompanyWord(activeTicker);
+            if (companyWord) {
+              orParts.push(`title.ilike.%${companyWord}%`, `body_text.ilike.%${companyWord}%`);
             }
             query = query.or(orParts.join(','));
           }

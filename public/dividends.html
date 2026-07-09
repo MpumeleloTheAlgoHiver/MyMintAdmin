@@ -557,6 +557,9 @@
       const existing = document.getElementById('payoutsCard');
       if (existing) existing.remove();
 
+      // Hide the welcome placeholder while showing payouts
+      welcomeCard.style.display = 'none';
+
       const dateLabel = paymentDate ? ` · ${fmtDate(paymentDate)}` : '';
       const card = document.createElement('div');
       card.id = 'payoutsCard';
