@@ -9,7 +9,7 @@ const { requirePermission } = require('../_team');
  * trade-confirmation shell as the buy-fill email, reused via _orderbook.js.
  * Never throws; a failed/unconfigured email must not block settlement.
  */
-async function sendSellSettledEmail({ userId, reference, lines, reserveRefundCents = 0 }) {
+async function sendSellSettledEmail({ userId, reference, lines, reserveRefundCents = 0, sellFeeCents = 0 }) {
   try {
     const [profileRows, securities] = await Promise.all([
       fetchSupabaseJson(`/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=first_name,email`),
@@ -38,13 +38,16 @@ async function sendSellSettledEmail({ userId, reference, lines, reserveRefundCen
     }).join('');
 
     const refund = Math.max(0, Math.round(reserveRefundCents || 0));
-    const totalCents = proceedsCents + refund;
+    const fees = Math.max(0, Math.round(sellFeeCents || 0));
+    const totalCents = proceedsCents - fees + refund;
 
     // Breakdown panel so every cent the client receives is itemised: proceeds at
-    // the price they saw, plus any unused 8% execution reserve returned on exit.
+    // the price they saw, minus trading fees, plus any unused 8% execution
+    // reserve returned on exit.
     const breakdownHtml = `
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top:4px;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
         <tr><td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;font-size:12px;color:#475569;">Sale proceeds</td><td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;font-size:13px;font-weight:700;color:#0f172a;text-align:right;">${fmtR(proceedsCents)}</td></tr>
+        ${fees > 0 ? `<tr><td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;font-size:12px;color:#475569;">Trading fees (broker, custody, transaction)</td><td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;font-size:13px;font-weight:700;color:#b42318;text-align:right;">− ${fmtR(fees)}</td></tr>` : ''}
         ${refund > 0 ? `<tr><td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;font-size:12px;color:#475569;">Unused execution reserve returned</td><td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;font-size:13px;font-weight:700;color:#059669;text-align:right;">+ ${fmtR(refund)}</td></tr>` : ''}
         <tr><td style="padding:12px 20px;font-size:12px;font-weight:700;color:#0f172a;">Credited to your wallet</td><td style="padding:12px 20px;font-size:15px;font-weight:800;color:#0f172a;text-align:right;">${fmtR(totalCents)}</td></tr>
       </table>`;
@@ -201,6 +204,42 @@ async function reconcileBufferDrawdowns(holdingIds) {
  * is_active=false — a re-fill/price correction never double-credits.
  * Never throws — a settlement hiccup must not fail the admin's price update.
  */
+// ── Sell fees ────────────────────────────────────────────────────────────────
+// A sale carries the SAME fees as a buy (broker + custody/ISIN-per-asset +
+// transaction), computed from the same app_settings('fees') rates — with two
+// differences: the 8% execution reserve is RETURNED (handled separately) rather
+// than charged, and there is NO AUM fee on a withdrawal. Fees are computed on
+// the sale proceeds and deducted from what's credited to the wallet / child.
+const _num = (v, d) => (v == null || v === '' || isNaN(Number(v)) ? d : Number(v));
+
+async function getSellFeeConfig() {
+  const defaults = { BROKER_FEE_RATE: 0.0025, ISIN_FEE_PER_ASSET: 69, TRANSACTION_FEE_RATE: 0.038 };
+  try {
+    const rows = await fetchSupabaseJson('/rest/v1/app_settings?key=eq.fees&select=value&limit=1');
+    const v = rows && rows[0] && rows[0].value;
+    if (!v) return defaults;
+    return {
+      BROKER_FEE_RATE:      _num(v.brokerFeeRate,      defaults.BROKER_FEE_RATE),
+      ISIN_FEE_PER_ASSET:   _num(v.isinFeePerAsset,    defaults.ISIN_FEE_PER_ASSET),
+      TRANSACTION_FEE_RATE: _num(v.transactionFeeRate, defaults.TRANSACTION_FEE_RATE),
+    };
+  } catch { return defaults; }
+}
+
+// proceedsRands = gross sale value; numAssets = distinct securities in the sale.
+// No buffer, no AUM. Never lets fees exceed the proceeds.
+function computeSellFeeCents(proceedsRands, numAssets, c) {
+  const base = Math.max(0, Number(proceedsRands) || 0);
+  const n = Math.max(1, Math.floor(Number(numAssets) || 1));
+  const brokerCents      = Math.round(base * c.BROKER_FEE_RATE * 100);
+  const isinCents        = Math.round(c.ISIN_FEE_PER_ASSET * n * 100);
+  const transactionCents = Math.round(base * c.TRANSACTION_FEE_RATE * 100);
+  let totalCents = brokerCents + isinCents + transactionCents;
+  const proceedsCents = Math.round(base * 100);
+  if (totalCents > proceedsCents) totalCents = proceedsCents; // safety clamp
+  return { brokerCents, isinCents, transactionCents, totalCents };
+}
+
 async function settleSellFills(holdingIds) {
   try {
     if (!holdingIds || !holdingIds.length) return;
@@ -300,6 +339,35 @@ async function settleSellFills(holdingIds) {
       console.error('[settle-sell] reserve refund skipped:', refundErr?.message || refundErr);
     }
 
+    // ── Sell fees (broker + custody + transaction) — same as a buy, minus the
+    // returned 8% reserve and no AUM. Computed per sale (grouped by
+    // sell_transaction_id; legacy sells grouped per owner), deducted from the
+    // credited proceeds, and stashed for recording on the sell transaction.
+    const sellFeeByKey = {}; // key -> { brokerCents, isinCents, transactionCents, totalCents, proceedsCents, numAssets }
+    try {
+      const feeCfg = await getSellFeeConfig();
+      const byKey = {};
+      for (const h of toSettle) {
+        const key = h.sell_transaction_id || `legacy:${h.family_member_id || h.user_id}`;
+        (byKey[key] = byKey[key] || []).push(h);
+      }
+      for (const [key, group] of Object.entries(byKey)) {
+        const proceedsCents = group.reduce((s, h) => s + Math.round(creditPerShareOf(h) * (Number(h.quantity) || 0)), 0);
+        if (proceedsCents <= 0) continue;
+        const numAssets = new Set(group.map((h) => h.security_id).filter(Boolean)).size || 1;
+        const fee = computeSellFeeCents(proceedsCents / 100, numAssets, feeCfg);
+        sellFeeByKey[key] = { ...fee, proceedsCents, numAssets };
+        const h0 = group[0];
+        if (h0.family_member_id) {
+          netCentsByChild[h0.family_member_id] = (netCentsByChild[h0.family_member_id] || 0) - fee.totalCents;
+        } else {
+          netRandsByUser[h0.user_id] = (netRandsByUser[h0.user_id] || 0) - fee.totalCents / 100;
+        }
+      }
+    } catch (feeErr) {
+      console.error('[settle-sell] sell-fee computation skipped:', feeErr?.message || feeErr);
+    }
+
     // Credit own wallets (rands).
     for (const [uid, addRands] of Object.entries(netRandsByUser)) {
       const wRows = await fetchSupabaseJson(`/rest/v1/wallets?user_id=eq.${encodeURIComponent(uid)}&select=balance`);
@@ -339,9 +407,22 @@ async function settleSellFills(holdingIds) {
         const allSettled = all.every((h) => h.is_active === false);
         const txn = txnRows && txnRows[0];
         const wasPending = txn?.status === 'pending';
+        // Sell fees for this sale (same broker/custody/transaction as a buy).
+        // amount = NET the client received (gross proceeds − fees); the fee
+        // columns feed the CRM fee cards / Finances just like a buy.
+        const fee = sellFeeByKey[txnId] || { brokerCents: 0, isinCents: 0, transactionCents: 0, totalCents: 0 };
+        const netAmountCents = Math.max(0, realizedCents - fee.totalCents);
         await requestSupabaseJson(`/rest/v1/transactions?id=eq.${encodeURIComponent(txnId)}`, {
           method: 'PATCH',
-          body: { amount: realizedCents, status: allSettled ? 'posted' : 'pending', updated_at: nowIso },
+          body: {
+            amount: netAmountCents,
+            base_amount_cents: realizedCents,
+            broker_fee_cents: fee.brokerCents,
+            isin_fee_cents: fee.isinCents,
+            transaction_fee_cents: fee.transactionCents,
+            status: allSettled ? 'posted' : 'pending',
+            updated_at: nowIso,
+          },
         });
         // Email once, exactly on the pending -> fully-settled transition.
         if (allSettled && wasPending && txn?.user_id) {
@@ -354,6 +435,7 @@ async function settleSellFills(holdingIds) {
               amountCents: Math.round(creditPerShareOf(h) * (Number(h.quantity) || 0)),
             })),
             reserveRefundCents: Math.round(reserveRefundByUser[txn.user_id] || 0),
+            sellFeeCents: fee.totalCents,
           });
         }
       } catch (txErr) {
@@ -379,8 +461,17 @@ async function settleSellFills(holdingIds) {
       );
       const tx = txns && txns[0];
       if (tx) {
+        const fee = sellFeeByKey[`legacy:${uid}`] || { brokerCents: 0, isinCents: 0, transactionCents: 0, totalCents: 0 };
         await requestSupabaseJson(`/rest/v1/transactions?id=eq.${encodeURIComponent(tx.id)}`, {
-          method: 'PATCH', body: { status: 'posted', amount: netCents, updated_at: nowIso },
+          method: 'PATCH', body: {
+            status: 'posted',
+            amount: Math.max(0, netCents - fee.totalCents),
+            base_amount_cents: netCents,
+            broker_fee_cents: fee.brokerCents,
+            isin_fee_cents: fee.isinCents,
+            transaction_fee_cents: fee.transactionCents,
+            updated_at: nowIso,
+          },
         });
         // status=eq.pending in the query above means this match-and-flip only
         // ever happens once per transaction — safe to email unconditionally here.
@@ -393,6 +484,7 @@ async function settleSellFills(holdingIds) {
             amountCents: Math.round(creditPerShareOf(h) * (Number(h.quantity) || 0)),
           })),
           reserveRefundCents: Math.round(reserveRefundByUser[uid] || 0),
+          sellFeeCents: (sellFeeByKey[`legacy:${uid}`] || {}).totalCents || 0,
         });
       }
     }
