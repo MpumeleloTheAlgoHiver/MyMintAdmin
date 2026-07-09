@@ -6,10 +6,10 @@
     { "source": "/api/orderbook/archive-upsert", "destination": "/api/orderbook/archive" },
     { "source": "/api/eft/pending-transactions", "destination": "/api/send-eft-email?action=pending-transactions" },
     { "source": "/api/return-alerts/notify", "destination": "/api/mint-mornings?action=return-alerts" },
-    { "source": "/api/dividends/extract", "destination": "/api/team" },
-    { "source": "/api/dividends/runs", "destination": "/api/team" },
-    { "source": "/api/dividends/payouts", "destination": "/api/team" },
-    { "source": "/api/alliance-news", "destination": "/api/team" },
+    { "source": "/api/dividends/extract", "destination": "/api/team?fwd=dividends-extract" },
+    { "source": "/api/dividends/runs", "destination": "/api/team?fwd=dividends-runs" },
+    { "source": "/api/dividends/payouts", "destination": "/api/team?fwd=dividends-payouts" },
+    { "source": "/api/alliance-news", "destination": "/api/team?fwd=alliance-news" },
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ],
   "crons": [

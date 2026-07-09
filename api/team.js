@@ -42,16 +42,24 @@ module.exports = async (req, res) => {
   try {
     const url = new URL(req.url, 'http://x');
     const action = url.searchParams.get('action') || req.body?.action;
-    const path = url.pathname;
-
-    // Route for dividends extraction
-    if (path === '/api/dividends/extract') {
-      return await dividendsExtractHandler(req, res);
-    }
-
-    // Route for dividends runs/payouts and alliance news
-    if (path === '/api/dividends/runs' || path === '/api/dividends/payouts' || path === '/api/alliance-news') {
-      return await dividendsDataHandler(req, res);
+    const fwd = url.searchParams.get('fwd');
+    if (fwd) {
+      if (fwd === 'dividends-extract') {
+        req.url = '/api/dividends/extract' + url.search;
+        return await dividendsExtractHandler(req, res);
+      }
+      if (fwd === 'dividends-runs') {
+        req.url = '/api/dividends/runs' + url.search;
+        return await dividendsDataHandler(req, res);
+      }
+      if (fwd === 'dividends-payouts') {
+        req.url = '/api/dividends/payouts' + url.search;
+        return await dividendsDataHandler(req, res);
+      }
+      if (fwd === 'alliance-news') {
+        req.url = '/api/alliance-news' + url.search;
+        return await dividendsDataHandler(req, res);
+      }
     }
 
     // ME — current user's role + page access
