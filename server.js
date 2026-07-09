@@ -14,9 +14,7 @@ const sendEftEmailHandler = require('./api/send-eft-email');
 const orderbookUpdatePriceHandler = require('./api/orderbook/update-price');
 const orderbookSendCsvHandler = require('./api/orderbook/send-csv');
 const dividendsExtractHandler  = require('./api/dividends-extract');
-const dividendsRunsHandler     = require('./api/dividends-runs');
-const dividendsPayoutsHandler  = require('./api/dividends-payouts');
-const allianceNewsHandler      = require('./api/alliance-news');
+const dividendsRunsHandler     = require('./api/dividends-runs'); // also handles /payouts + /alliance-news
 const { runHealthCheck } = require('./api/monitor/_health-check');
 // Return-alerts was merged into mint-mornings to stay under Vercel's 12-function limit.
 const { handleReturnAlertsNotify: returnAlertsHandler } = require('./api/mint-mornings');
@@ -2124,14 +2122,10 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Team management routes
-  if (req.url.startsWith('/api/alliance-news')) {
-    (async () => { try { await allianceNewsHandler(req, res); } catch(e) { sendJson(res, 500, { error: e.message }); } })();
-    return;
-  }
-
-  if (req.url.startsWith('/api/dividends/payouts') && req.method === 'GET') {
-    (async () => { try { await dividendsPayoutsHandler(req, res); } catch(e) { sendJson(res, 500, { error: e.message }); } })();
+  if (req.url.startsWith('/api/alliance-news') ||
+      req.url.startsWith('/api/dividends/payouts') ||
+      req.url.startsWith('/api/dividends/runs')) {
+    (async () => { try { await dividendsRunsHandler(req, res); } catch(e) { if (!res.headersSent) sendJson(res, 500, { error: e.message }); } })();
     return;
   }
 
@@ -2139,17 +2133,6 @@ const server = http.createServer((req, res) => {
     (async () => {
       try {
         await dividendsExtractHandler(req, res);
-      } catch (err) {
-        if (!res.headersSent) sendJson(res, 500, { error: err.message });
-      }
-    })();
-    return;
-  }
-
-  if (req.url.startsWith('/api/dividends/runs') && req.method === 'GET') {
-    (async () => {
-      try {
-        await dividendsRunsHandler(req, res);
       } catch (err) {
         if (!res.headersSent) sendJson(res, 500, { error: err.message });
       }

@@ -397,7 +397,7 @@
         // Auto-load latest successful run's payouts on first visit
         const latest = (d.runs || []).find(r => r.status === 'success');
         if (latest && !document.getElementById('payoutsCard') && !document.getElementById('resultCard')) {
-          loadRunPayouts(latest.id, latest.file_name, latest.payment_date);
+          loadRunPayouts(latest);
         }
       } catch (_) {}
     }
@@ -431,7 +431,7 @@
           li.title = 'Click to view payout records';
           li.addEventListener('mouseenter', () => { li.style.background = '#f5f3ff'; });
           li.addEventListener('mouseleave', () => { li.style.background = ''; });
-          li.addEventListener('click', () => loadRunPayouts(run.id, run.file_name, run.payment_date));
+          li.addEventListener('click', () => loadRunPayouts(run));
         }
         activityList.appendChild(li);
       });
@@ -546,16 +546,21 @@
     /* ── Payout detail ─────────────────────────────────────────────────────── */
     let _activeRunId = null;
 
-    async function loadRunPayouts(runId, fileName, paymentDate) {
+    async function loadRunPayouts(run) {
+      if (!run || !run.id) return;
+      const runId      = run.id;
+      const fileName   = run.file_name;
+      const paymentDate = run.payment_date;
+
       if (_activeRunId === runId) return;
       _activeRunId = runId;
 
-      // Highlight the active row
-      activityList.querySelectorAll('li').forEach(li => { li.style.outline = ''; });
-
-      // Remove any previous payouts card (keep resultCard if present from extraction)
+      // Remove any previous payouts card
       const existing = document.getElementById('payoutsCard');
       if (existing) existing.remove();
+
+      // Hide the welcome placeholder
+      welcomeCard.style.display = 'none';
 
       const dateLabel = paymentDate ? ` · ${fmtDate(paymentDate)}` : '';
       const card = document.createElement('div');
@@ -563,16 +568,29 @@
       card.innerHTML = `
         <div class="card" style="margin-bottom:16px;">
           <div class="card-label" style="display:flex;align-items:center;justify-content:space-between;">
-            <span>Payout Records</span>
-            <span id="payoutsFileMeta" style="font-size:10px;color:#94a3b8;font-weight:400;text-transform:none;letter-spacing:0;">${fileName}${dateLabel}</span>
+            <span>Extraction Result</span>
+            <span style="font-size:10px;color:#94a3b8;font-weight:400;text-transform:none;letter-spacing:0;">${fileName}${dateLabel}</span>
           </div>
-          <div id="payoutsCountRow" style="font-size:11px;color:#94a3b8;margin-bottom:14px;">Loading…</div>
+          <div class="sanity-strip">
+            <div class="sanity-tile">
+              <div class="sanity-tile-label">Holdings</div>
+              <div class="sanity-tile-val">${fmtN(run.records)}</div>
+            </div>
+            <div class="sanity-tile">
+              <div class="sanity-tile-label">Net Cash</div>
+              <div class="sanity-tile-val">${fmtR(run.total_net_cash)}</div>
+            </div>
+            <div class="sanity-tile">
+              <div class="sanity-tile-label">Unmatched</div>
+              <div class="sanity-tile-val ${(run.unmatched_count ?? 0) === 0 ? 'ok' : 'bad'}">${run.unmatched_count ?? 0}</div>
+            </div>
+          </div>
+          ${run.net_cash_col ? `<p style="font-size:11px;color:#94a3b8;margin-bottom:14px;">Net cash column: <strong style="color:#475569;">${run.net_cash_col}</strong></p>` : ''}
           <div id="payoutsContent">
             <div class="skel" style="height:180px;border-radius:10px;"></div>
           </div>
         </div>`;
 
-      // Prepend before welcome/result card
       rightPanel.prepend(card);
       card.style.opacity = '0'; card.style.transform = 'translateY(8px)';
       requestAnimationFrame(() => {
@@ -586,8 +604,6 @@
         if (!d.ok) throw new Error(d.error);
 
         const payouts = d.payouts || [];
-        document.getElementById('payoutsCountRow').textContent =
-          `${fmtN(payouts.length)} records · Total: ${fmtR(payouts.reduce((s, p) => s + Number(p.net_cash || 0), 0))}`;
 
         if (!payouts.length) {
           document.getElementById('payoutsContent').innerHTML =
@@ -595,42 +611,26 @@
           return;
         }
 
-        // Build columns from raw_row — show security + net_cash + up to 5 other cols
-        const sampleRaw = payouts[0].raw_row || {};
-        const allCols   = Object.keys(sampleRaw);
-        const skipPat   = /security|code|isin|ticker|symbol|cash|amount|payout|dividend/i;
-        const extraCols = allCols.filter(c => !skipPat.test(c)).slice(0, 5);
+        // Use all columns from raw_row (same as renderResult) — cap at 6 visible, rest hidden
+        const sampleRaw  = payouts[0].raw_row || {};
+        const allCols    = Object.keys(sampleRaw);
+        const maxCols    = 6;
+        const showCols   = allCols.slice(0, maxCols);
+        const hiddenCols = Math.max(0, allCols.length - maxCols);
 
-        // Summary by security
-        const byCode = {};
-        payouts.forEach(p => {
-          const k = p.security_code || '—';
-          byCode[k] = (byCode[k] || 0) + Number(p.net_cash || 0);
-        });
-        const summaryRows = Object.entries(byCode)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 5)
-          .map(([code, total]) => `<span style="display:inline-flex;align-items:center;gap:5px;background:#f5f3ff;border:1px solid #e9d5ff;border-radius:8px;padding:3px 10px;font-size:11px;"><strong style="color:#0f172a;">${code}</strong><span style="color:#7c3aed;">${fmtR(total)}</span></span>`)
-          .join('');
-
-        let html = payouts.length > 1
-          ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">${summaryRows}${Object.keys(byCode).length > 5 ? `<span style="font-size:11px;color:#94a3b8;align-self:center;">+${Object.keys(byCode).length - 5} more</span>` : ''}</div>`
-          : '';
-
-        html += '<div class="preview-wrap"><table class="preview-table"><thead><tr>';
-        html += '<th>Security</th><th>Net Cash</th>';
-        extraCols.forEach(c => { html += `<th>${c}</th>`; });
+        let html = '<div class="preview-wrap"><table class="preview-table"><thead><tr>';
+        showCols.forEach(c => { html += `<th>${c}</th>`; });
+        if (hiddenCols > 0) html += `<th>+${hiddenCols} more</th>`;
         html += '</tr></thead><tbody>';
 
         payouts.slice(0, 150).forEach(p => {
           const raw = p.raw_row || {};
           html += '<tr>';
-          html += `<td><strong>${p.security_code || '—'}</strong></td>`;
-          html += `<td>${p.net_cash != null ? fmtR(Number(p.net_cash)) : '—'}</td>`;
-          extraCols.forEach(c => {
+          showCols.forEach(c => {
             const v = raw[c] != null ? String(raw[c]) : '';
             html += `<td title="${v.replace(/"/g,'&quot;')}">${v.slice(0, 40)}</td>`;
           });
+          if (hiddenCols > 0) html += '<td style="color:#94a3b8;font-style:italic;">…</td>';
           html += '</tr>';
         });
 
