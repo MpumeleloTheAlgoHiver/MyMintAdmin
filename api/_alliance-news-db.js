@@ -1,44 +1,38 @@
 'use strict';
 
-const { Pool } = require('pg');
+// Supabase REST API access (same pattern as _team.js) — replaces the raw
+// Postgres pool. Avoids DATABASE_URL / SSL / network issues entirely and
+// keeps everything on the same Supabase project as the rest of the app.
+
 const XLSX = require('xlsx');
 const path = require('path');
 
-let _pool = null;
-function pool() {
-  if (!_pool) {
-    _pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('supabase.com')
-        ? { rejectUnauthorized: false }
-        : undefined,
-    });
-  }
-  return _pool;
+function getSupabaseCreds() {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) throw new Error('Supabase credentials not configured');
+  return { supabaseUrl, serviceRoleKey };
 }
 
-const SETUP_SQL = `
-  CREATE TABLE IF NOT EXISTS alliance_news_codes (
-    id                SERIAL PRIMARY KEY,
-    category          TEXT,
-    region            TEXT,
-    public_identifier TEXT,
-    parent_code       TEXT,
-    child_code_1      TEXT,
-    child_code_2      TEXT,
-    child_code_3      TEXT,
-    description       TEXT,
-    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-  CREATE INDEX IF NOT EXISTS idx_alliance_news_codes_category ON alliance_news_codes(category);
-  CREATE INDEX IF NOT EXISTS idx_alliance_news_codes_parent   ON alliance_news_codes(parent_code);
-`;
-
-let _setupDone = false;
-async function ensureSetup() {
-  if (_setupDone) return;
-  await pool().query(SETUP_SQL);
-  _setupDone = true;
+async function sbFetch(pathAndQuery, { method = 'GET', body, headers = {} } = {}) {
+  const { supabaseUrl, serviceRoleKey } = getSupabaseCreds();
+  const res = await fetch(`${supabaseUrl}/rest/v1/${pathAndQuery}`, {
+    method,
+    headers: {
+      'apikey': serviceRoleKey,
+      'Authorization': `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json',
+      ...headers,
+    },
+    body: body != null ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Supabase REST ${method} ${pathAndQuery} failed (${res.status}): ${text}`);
+  }
+  if (res.status === 204) return null;
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 function parseExcelData() {
@@ -96,62 +90,57 @@ function parseExcelData() {
 }
 
 async function importCodes(force = false) {
-  await ensureSetup();
-
   if (!force) {
-    const { rows } = await pool().query('SELECT COUNT(*) AS cnt FROM alliance_news_codes');
-    if (Number(rows[0].cnt) > 0) {
-      return { skipped: true, count: Number(rows[0].cnt) };
+    const rows = await sbFetch('alliance_news_codes?select=id&limit=1');
+    if (Array.isArray(rows) && rows.length > 0) {
+      const countRows = await sbFetch('alliance_news_codes?select=id');
+      return { skipped: true, count: countRows.length };
     }
   } else {
-    await pool().query('TRUNCATE alliance_news_codes RESTART IDENTITY');
+    // Delete all existing rows
+    await sbFetch('alliance_news_codes?id=gte.0', { method: 'DELETE' });
   }
 
   const records = parseExcelData();
   if (!records.length) return { imported: 0 };
 
-  const chunk = 50;
+  const chunk = 200;
   for (let i = 0; i < records.length; i += chunk) {
     const batch = records.slice(i, i + chunk);
-    const placeholders = [];
-    const vals = [];
-    let pi = 1;
-    for (const r of batch) {
-      placeholders.push(`($${pi++},$${pi++},$${pi++},$${pi++},$${pi++},$${pi++},$${pi++},$${pi++})`);
-      vals.push(r.category, r.region, r.public_identifier, r.parent_code,
-                r.child_code_1, r.child_code_2, r.child_code_3, r.description);
-    }
-    await pool().query(
-      `INSERT INTO alliance_news_codes
-         (category,region,public_identifier,parent_code,child_code_1,child_code_2,child_code_3,description)
-       VALUES ${placeholders.join(',')}`,
-      vals
-    );
+    await sbFetch('alliance_news_codes', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal' },
+      body: batch,
+    });
   }
 
   return { imported: records.length };
 }
 
 async function getCodes(filter = {}) {
-  await ensureSetup();
-  let q = 'SELECT * FROM alliance_news_codes WHERE 1=1';
-  const vals = [];
-  let pi = 1;
-  if (filter.category) { q += ` AND category = $${pi++}`;          vals.push(filter.category); }
-  if (filter.region)   { q += ` AND region = $${pi++}`;             vals.push(filter.region); }
-  if (filter.search)   { q += ` AND (public_identifier ILIKE $${pi} OR description ILIKE $${pi} OR parent_code ILIKE $${pi} OR child_code_1 ILIKE $${pi} OR child_code_2 ILIKE $${pi} OR child_code_3 ILIKE $${pi})`; vals.push('%' + filter.search + '%'); pi++; }
-  q += ' ORDER BY id';
-  if (filter.limit) { q += ` LIMIT $${pi++}`; vals.push(filter.limit); }
-  const { rows } = await pool().query(q, vals);
-  return rows;
+  const params = ['select=*'];
+  if (filter.category) params.push(`category=eq.${encodeURIComponent(filter.category)}`);
+  if (filter.region)   params.push(`region=eq.${encodeURIComponent(filter.region)}`);
+  if (filter.search) {
+    const term = `*${filter.search}*`;
+    const cols = ['public_identifier', 'description', 'parent_code', 'child_code_1', 'child_code_2', 'child_code_3'];
+    const orExpr = cols.map(c => `${c}.ilike.${term}`).join(',');
+    params.push(`or=(${encodeURIComponent(orExpr)})`);
+  }
+  params.push('order=id.asc');
+  if (filter.limit) params.push(`limit=${filter.limit}`);
+  return sbFetch(`alliance_news_codes?${params.join('&')}`);
 }
 
 async function getCategories() {
-  await ensureSetup();
-  const { rows } = await pool().query(
-    `SELECT DISTINCT category FROM alliance_news_codes WHERE category IS NOT NULL ORDER BY category`
-  );
-  return rows.map(r => r.category);
+  const rows = await sbFetch('alliance_news_codes?select=category&category=not.is.null&order=category.asc');
+  return [...new Set(rows.map(r => r.category))];
+}
+
+async function ensureSetup() {
+  // Tables are created once via the setup SQL script run in the Supabase
+  // SQL editor (see sql/ directory) — the REST API cannot create tables.
+  return Promise.resolve();
 }
 
 module.exports = { importCodes, getCodes, getCategories, ensureSetup };
