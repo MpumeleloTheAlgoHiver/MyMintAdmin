@@ -20,6 +20,9 @@ const {
   isDev
 } = require('./_team');
 
+const dividendsExtractHandler = require('./_dividends-extract');
+const dividendsDataHandler = require('./_dividends-runs');
+
 const normEmail = (e) => String(e || '').trim().toLowerCase();
 
 // Best-effort audit log writer. Failures must NOT break the underlying action.
@@ -39,6 +42,17 @@ module.exports = async (req, res) => {
   try {
     const url = new URL(req.url, 'http://x');
     const action = url.searchParams.get('action') || req.body?.action;
+    const path = url.pathname;
+
+    // Route for dividends extraction
+    if (path === '/api/dividends/extract') {
+      return await dividendsExtractHandler(req, res);
+    }
+
+    // Route for dividends runs/payouts and alliance news
+    if (path === '/api/dividends/runs' || path === '/api/dividends/payouts' || path === '/api/alliance-news') {
+      return await dividendsDataHandler(req, res);
+    }
 
     // ME — current user's role + page access
     if (action === 'me') {
