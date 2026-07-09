@@ -3,7 +3,7 @@
 const Busboy = require('busboy');
 const XLSX   = require('xlsx');
 const { OfficeFile, DecryptionError, FileFormatError } = require('office-crypto');
-const { saveRun } = require('./dividends-db');
+const { saveRun } = require('./_dividends-db');
 
 /**
  * POST /api/dividends/extract

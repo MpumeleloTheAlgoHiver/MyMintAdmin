@@ -1,7 +1,7 @@
 'use strict';
 
-const { getRuns, getStats, getPayouts } = require('./dividends-db');
-const { importCodes, getCodes, getCategories } = require('./alliance-news-db');
+const { getRuns, getStats, getPayouts } = require('./_dividends-db');
+const { importCodes, getCodes, getCategories } = require('./_alliance-news-db');
 
 const json = (res, status, body) => {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
