@@ -2232,7 +2232,7 @@
 
       // Shared helper: resolve company name for a ticker (fast from map, else Supabase)
       window._secNameCache = window._secNameCache || {};
-      async function resolveCompanyWord(sym) {
+      window.resolveCompanyWord = async function resolveCompanyWord(sym) {
         if (!sym) return null;
         const clean = sym.replace('.JO', '');
         // Fast path: securities map already loaded
@@ -2261,11 +2261,15 @@
           if (first && first.length > 2 && first.toLowerCase() !== clean.toLowerCase()) return first;
         }
         return null;
-      }
+      };
 
+      let _filterSeq = 0;
       window.filterStratBrowseNews = async function(sym) {
+        const seq = ++_filterSeq;
         window._stratBrowseNewsFilter = sym || null;
-        const companyWord = sym ? await resolveCompanyWord(sym) : null;
+        const companyWord = sym ? await window.resolveCompanyWord(sym) : null;
+        // Discard if a newer call already ran
+        if (seq !== _filterSeq) return;
         window._stratBrowseCompanyWord = companyWord;
         window.renderStratBrowseNews(window._stratBrowseNewsFilter);
       };
@@ -5986,10 +5990,12 @@
         window.fetchNewsInsights();
       };
 
+      let _newsInsightsSeq = 0;
       window.fetchNewsInsights = async function(tickerSym) {
         // Allow caller to override the stored filter (e.g. ovTickerClick already set it)
         if (tickerSym !== undefined) window._newsTickerFilter = tickerSym || null;
         const activeTicker = window._newsTickerFilter;
+        const seq = ++_newsInsightsSeq;
 
         const listEl = document.getElementById('ovNewsList');
         if (!listEl) return;
@@ -6008,7 +6014,7 @@
             const sym = activeTicker.replace('.JO', '');
             const orParts = [`title.ilike.%${sym}%`, `body_text.ilike.%${sym}%`];
             // Look up company name (e.g. "ABG" → "Absa") — fast from map, else Supabase
-            const companyWord = await resolveCompanyWord(activeTicker);
+            const companyWord = await window.resolveCompanyWord(activeTicker);
             if (companyWord) {
               orParts.push(`title.ilike.%${companyWord}%`, `body_text.ilike.%${companyWord}%`);
             }
@@ -6018,6 +6024,8 @@
           query = query.limit(15);
 
           const { data: newsData, error } = await query;
+          // Discard if a newer fetch already ran
+          if (seq !== _newsInsightsSeq) return;
 
           if (error) { console.error('News insights fetch error:', error); }
 
