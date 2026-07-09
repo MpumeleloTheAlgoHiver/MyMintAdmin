@@ -80,6 +80,7 @@ Internal admin dashboard for the Mint investment platform. Provides client manag
 - **Start command**: `node server.js` (configured in the "Start application" workflow)
 - **Port**: 5000 (set via `PORT` env var in `.replit`)
 - **Dependencies**: install with `npm install` (no build step required)
+- **Status**: running on Replit; all required secrets are configured. `server.js` requires `./api/dividends-extract`, `./api/dividends-runs`, and `./api/alliance-news-db`, but those files are actually named with a leading underscore (`_dividends-extract.js`, etc.) — the requires were fixed to match. If new `api/_*.js` files are added, make sure any `require()` of them includes the underscore.
 
 ## Environment Variables Required
 All sensitive values must be stored as **Replit Secrets** (not in `.replit`):
