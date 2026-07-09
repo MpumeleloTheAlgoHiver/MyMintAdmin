@@ -5,7 +5,12 @@ const { Pool } = require('pg');
 let _pool = null;
 function pool() {
   if (!_pool) {
-    _pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    _pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('supabase.com')
+        ? { rejectUnauthorized: false }
+        : undefined,
+    });
   }
   return _pool;
 }
