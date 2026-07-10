@@ -9,7 +9,7 @@ const { requirePermission } = require('../_team');
  * trade-confirmation shell as the buy-fill email, reused via _orderbook.js.
  * Never throws; a failed/unconfigured email must not block settlement.
  */
-async function sendSellSettledEmail({ userId, reference, lines, reserveRefundCents = 0, sellFeeCents = 0 }) {
+async function sendSellSettledEmail({ userId, reference, lines, breakdown = null }) {
   try {
     const [profileRows, securities] = await Promise.all([
       fetchSupabaseJson(`/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=first_name,email`),
@@ -37,20 +37,22 @@ async function sendSellSettledEmail({ userId, reference, lines, reserveRefundCen
       });
     }).join('');
 
-    const refund = Math.max(0, Math.round(reserveRefundCents || 0));
-    const fees = Math.max(0, Math.round(sellFeeCents || 0));
-    const totalCents = proceedsCents - fees + refund;
-
-    // Breakdown panel so every cent the client receives is itemised: proceeds at
-    // the price they saw, minus trading fees, plus any unused 8% execution
-    // reserve returned on exit.
+    // Full itemisation so every cent reconciles: proceeds − broker − custody
+    // + returned 8% reserve + returned rebalance residual = credited.
+    const bd = breakdown || { proceedsCents, brokerCents: 0, custodyCents: 0, reserveCents: 0, residualCents: 0, netCents: proceedsCents };
+    const totalCents = bd.netCents;
+    const row = (label, cents, colour, sign) =>
+      `<tr><td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;font-size:12px;color:#475569;">${label}</td><td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;font-size:13px;font-weight:700;color:${colour};text-align:right;">${sign}${fmtR(cents)}</td></tr>`;
     const breakdownHtml = `
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top:4px;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
-        <tr><td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;font-size:12px;color:#475569;">Sale proceeds</td><td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;font-size:13px;font-weight:700;color:#0f172a;text-align:right;">${fmtR(proceedsCents)}</td></tr>
-        ${fees > 0 ? `<tr><td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;font-size:12px;color:#475569;">Trading fees (broker, custody, transaction)</td><td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;font-size:13px;font-weight:700;color:#b42318;text-align:right;">− ${fmtR(fees)}</td></tr>` : ''}
-        ${refund > 0 ? `<tr><td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;font-size:12px;color:#475569;">Unused execution reserve returned</td><td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;font-size:13px;font-weight:700;color:#059669;text-align:right;">+ ${fmtR(refund)}</td></tr>` : ''}
+        ${row('Sale proceeds', bd.proceedsCents, '#0f172a', '')}
+        ${bd.brokerCents > 0 ? row('Broker fee', bd.brokerCents, '#b42318', '− ') : ''}
+        ${bd.reserveCents > 0 ? row('Execution reserve returned (8%)', bd.reserveCents, '#059669', '+ ') : ''}
+        ${bd.custodyCents > 0 ? row('Custody fee (from reserve)', bd.custodyCents, '#b42318', '− ') : ''}
+        ${bd.residualCents > 0 ? row('Rebalance residual returned', bd.residualCents, '#059669', '+ ') : ''}
         <tr><td style="padding:12px 20px;font-size:12px;font-weight:700;color:#0f172a;">Credited to your wallet</td><td style="padding:12px 20px;font-size:15px;font-weight:800;color:#0f172a;text-align:right;">${fmtR(totalCents)}</td></tr>
       </table>`;
+    const refund = bd.reserveCents;
 
     const html = buildEmailHtml({
       firstName: profile.first_name || 'Investor',
@@ -205,46 +207,31 @@ async function reconcileBufferDrawdowns(holdingIds) {
  * Never throws — a settlement hiccup must not fail the admin's price update.
  */
 // ── Sell fees ────────────────────────────────────────────────────────────────
-// A sale carries the SAME fees as a buy (broker + custody/ISIN-per-asset +
-// transaction), computed from the same app_settings('fees') rates — with two
-// differences: the 8% execution reserve is RETURNED (handled separately) rather
-// than charged, and there is NO AUM fee on a withdrawal. Fees are computed on
-// the sale proceeds and deducted from what's credited to the wallet / child.
+// A withdrawal is charged: BROKER fee (% of proceeds) + CUSTODY fee (per asset,
+// the CRM-set isinFeePerAsset). NO transaction fee, NO AUM fee. The custody fee
+// is charged AGAINST the returned 8% execution reserve (so the reserve returned
+// is reduced by it). Any rebalance residual is also returned. Rates come from
+// app_settings('fees') — nothing is hardcoded.
 const _num = (v, d) => (v == null || v === '' || isNaN(Number(v)) ? d : Number(v));
 
 async function getSellFeeConfig() {
-  const defaults = { BROKER_FEE_RATE: 0.0025, ISIN_FEE_PER_ASSET: 69, TRANSACTION_FEE_RATE: 0.038 };
+  const defaults = { BROKER_FEE_RATE: 0.0025, CUSTODY_FEE_PER_ASSET: 25 };
   try {
     const rows = await fetchSupabaseJson('/rest/v1/app_settings?key=eq.fees&select=value&limit=1');
     const v = rows && rows[0] && rows[0].value;
     if (!v) return defaults;
     return {
-      BROKER_FEE_RATE:      _num(v.brokerFeeRate,      defaults.BROKER_FEE_RATE),
-      ISIN_FEE_PER_ASSET:   _num(v.isinFeePerAsset,    defaults.ISIN_FEE_PER_ASSET),
-      TRANSACTION_FEE_RATE: _num(v.transactionFeeRate, defaults.TRANSACTION_FEE_RATE),
+      BROKER_FEE_RATE:       _num(v.brokerFeeRate,   defaults.BROKER_FEE_RATE),
+      CUSTODY_FEE_PER_ASSET: _num(v.isinFeePerAsset, defaults.CUSTODY_FEE_PER_ASSET),
     };
   } catch { return defaults; }
-}
-
-// proceedsRands = gross sale value; numAssets = distinct securities in the sale.
-// No buffer, no AUM. Never lets fees exceed the proceeds.
-function computeSellFeeCents(proceedsRands, numAssets, c) {
-  const base = Math.max(0, Number(proceedsRands) || 0);
-  const n = Math.max(1, Math.floor(Number(numAssets) || 1));
-  const brokerCents      = Math.round(base * c.BROKER_FEE_RATE * 100);
-  const isinCents        = Math.round(c.ISIN_FEE_PER_ASSET * n * 100);
-  const transactionCents = Math.round(base * c.TRANSACTION_FEE_RATE * 100);
-  let totalCents = brokerCents + isinCents + transactionCents;
-  const proceedsCents = Math.round(base * 100);
-  if (totalCents > proceedsCents) totalCents = proceedsCents; // safety clamp
-  return { brokerCents, isinCents, transactionCents, totalCents };
 }
 
 async function settleSellFills(holdingIds) {
   try {
     if (!holdingIds || !holdingIds.length) return;
     const holdings = await fetchSupabaseJson(
-      `/rest/v1/stock_holdings_c?id=in.(${buildInFilter(holdingIds)})&select=id,user_id,family_member_id,security_id,quantity,avg_exit,expected_exit,trade_side,is_active,sell_transaction_id,transaction_id`
+      `/rest/v1/stock_holdings_c?id=in.(${buildInFilter(holdingIds)})&select=id,user_id,family_member_id,security_id,strategy_id,quantity,avg_exit,expected_exit,trade_side,is_active,sell_transaction_id,transaction_id`
     );
     const toSettle = (holdings || []).filter((h) =>
       String(h.trade_side || '').toUpperCase() === 'SELL' &&
@@ -261,111 +248,89 @@ async function settleSellFills(holdingIds) {
     // broker's avg_exit only if it was never captured.
     const creditPerShareOf = (h) => (Number(h.expected_exit) > 0 ? Number(h.expected_exit) : Number(h.avg_exit) || 0);
 
+    // 1. Close every sold position first (also the idempotency guard) so the
+    //    "full exit" checks below see the up-to-date state.
     for (const h of toSettle) {
-      const qty = Number(h.quantity) || 0;
-      const netCents = Math.round(creditPerShareOf(h) * qty);
-      if (h.family_member_id) {
-        netCentsByChild[h.family_member_id] = (netCentsByChild[h.family_member_id] || 0) + netCents;
-      } else {
-        netRandsByUser[h.user_id] = (netRandsByUser[h.user_id] || 0) + netCents / 100;
-      }
-      // Close the position (also the idempotency guard).
       await requestSupabaseJson(`/rest/v1/stock_holdings_c?id=eq.${encodeURIComponent(h.id)}`, {
         method: 'PATCH',
         body: { is_active: false, Status: 'closed', closed_at: nowIso, closed_reason: 'sold', updated_at: nowIso },
       });
     }
 
-    // ── Refund unused 8% execution reserve on a FULL exit ────────────────────
-    // The 8% reserve was charged on the BUY (held on that buy transaction). When
-    // every holding funded by a buy transaction is now closed, the part of the
-    // reserve NOT consumed by slippage (buffer_cents − buffer_consumed_cents) is
-    // returned to the client. Idempotent via transactions.buffer_refunded.
-    // Accumulated into the same wallet-credit maps so the client gets proceeds +
-    // refund in one balance update; also recorded as its own ledger line.
-    const reserveRefundByUser = {};  // userId → rands (own)
+    // 2. Per-sale breakdown. Each sale (grouped by sell_transaction_id; legacy
+    //    sells per owner) itemises: gross proceeds − broker fee − custody fee
+    //    + unused 8% reserve returned + rebalance residual returned = net.
+    //    Custody is charged against the reserve (shown as reducing the reserve
+    //    line). No transaction fee, no AUM.
+    const reserveRefundByUser = {};  // userId → rands (own) — for the email panel
     const reserveRefundByChild = {}; // familyMemberId → cents (child)
-    try {
-      const buyTxnIds = [...new Set(toSettle.map((h) => h.transaction_id).filter(Boolean))];
-      for (const buyTxnId of buyTxnIds) {
-        const funded = await fetchSupabaseJson(
-          `/rest/v1/stock_holdings_c?transaction_id=eq.${encodeURIComponent(buyTxnId)}&select=is_active`
-        );
-        if (!funded || !funded.length) continue;
-        // Only refund once the WHOLE buy is exited (shared reserve pool).
-        if (!funded.every((h) => h.is_active === false)) continue;
+    const breakdownByKey = {};       // key → full itemisation for the sell txn + email
+    const feeCfg = await getSellFeeConfig();
 
-        const txRows = await fetchSupabaseJson(
-          `/rest/v1/transactions?id=eq.${encodeURIComponent(buyTxnId)}&select=id,user_id,family_member_id,name,buffer_cents,buffer_consumed_cents,buffer_refunded`
-        );
-        const buyTx = txRows && txRows[0];
-        if (!buyTx || buyTx.buffer_refunded) continue; // already refunded → skip
-
-        const unusedCents = Math.max(0, Math.round(Number(buyTx.buffer_cents || 0) - Number(buyTx.buffer_consumed_cents || 0)));
-        // Mark refunded regardless (even if 0) so we don't re-check every fill.
-        await requestSupabaseJson(`/rest/v1/transactions?id=eq.${encodeURIComponent(buyTxnId)}`, {
-          method: 'PATCH', body: { buffer_refunded: true, updated_at: nowIso },
-        });
-        if (unusedCents <= 0) continue;
-
-        const label = String(buyTx.name || '').replace(/^Strategy Investment:\s*/i, '').replace(/^Purchased\s*/i, '').trim() || 'holdings';
-        if (buyTx.family_member_id) {
-          reserveRefundByChild[buyTx.family_member_id] = (reserveRefundByChild[buyTx.family_member_id] || 0) + unusedCents;
-          netCentsByChild[buyTx.family_member_id] = (netCentsByChild[buyTx.family_member_id] || 0) + unusedCents;
-        } else {
-          reserveRefundByUser[buyTx.user_id] = (reserveRefundByUser[buyTx.user_id] || 0) + unusedCents;
-          netRandsByUser[buyTx.user_id] = (netRandsByUser[buyTx.user_id] || 0) + unusedCents / 100;
-        }
-        // Ledger line so the refund is visible in transaction history.
-        await requestSupabaseJson('/rest/v1/transactions', {
-          method: 'POST',
-          body: {
-            user_id: buyTx.user_id,
-            family_member_id: buyTx.family_member_id || null,
-            direction: 'credit',
-            name: `Execution reserve refund: ${label}`,
-            description: `Unused 8% execution reserve returned on full exit of ${label}`,
-            amount: unusedCents,
-            currency: 'ZAR',
-            status: 'posted',
-            transaction_date: nowIso,
-            created_at: nowIso,
-          },
-        });
-      }
-    } catch (refundErr) {
-      // Most likely the buffer_refunded column isn't present yet — never let a
-      // refund hiccup block the core settlement (proceeds were already computed).
-      console.error('[settle-sell] reserve refund skipped:', refundErr?.message || refundErr);
+    const byKey = {};
+    for (const h of toSettle) {
+      const key = h.sell_transaction_id || `legacy:${h.family_member_id || h.user_id}`;
+      (byKey[key] = byKey[key] || []).push(h);
     }
 
-    // ── Sell fees (broker + custody + transaction) — same as a buy, minus the
-    // returned 8% reserve and no AUM. Computed per sale (grouped by
-    // sell_transaction_id; legacy sells grouped per owner), deducted from the
-    // credited proceeds, and stashed for recording on the sell transaction.
-    const sellFeeByKey = {}; // key -> { brokerCents, isinCents, transactionCents, totalCents, proceedsCents, numAssets }
-    try {
-      const feeCfg = await getSellFeeConfig();
-      const byKey = {};
-      for (const h of toSettle) {
-        const key = h.sell_transaction_id || `legacy:${h.family_member_id || h.user_id}`;
-        (byKey[key] = byKey[key] || []).push(h);
-      }
-      for (const [key, group] of Object.entries(byKey)) {
-        const proceedsCents = group.reduce((s, h) => s + Math.round(creditPerShareOf(h) * (Number(h.quantity) || 0)), 0);
-        if (proceedsCents <= 0) continue;
-        const numAssets = new Set(group.map((h) => h.security_id).filter(Boolean)).size || 1;
-        const fee = computeSellFeeCents(proceedsCents / 100, numAssets, feeCfg);
-        sellFeeByKey[key] = { ...fee, proceedsCents, numAssets };
-        const h0 = group[0];
-        if (h0.family_member_id) {
-          netCentsByChild[h0.family_member_id] = (netCentsByChild[h0.family_member_id] || 0) - fee.totalCents;
-        } else {
-          netRandsByUser[h0.user_id] = (netRandsByUser[h0.user_id] || 0) - fee.totalCents / 100;
+    for (const [key, group] of Object.entries(byKey)) {
+      const h0 = group[0];
+      const isChild = !!h0.family_member_id;
+      const proceedsCents = group.reduce((s, h) => s + Math.round(creditPerShareOf(h) * (Number(h.quantity) || 0)), 0);
+      const numAssets = new Set(group.map((h) => h.security_id).filter(Boolean)).size || 1;
+
+      // Fees: broker (% of proceeds) + custody (per asset). No transaction fee.
+      const brokerCents  = Math.round((proceedsCents / 100) * feeCfg.BROKER_FEE_RATE * 100);
+      const custodyCents = Math.round(feeCfg.CUSTODY_FEE_PER_ASSET * numAssets * 100);
+
+      // Reserve: unused 8% on each buy transaction fully exited by this sale.
+      let reserveCents = 0;
+      try {
+        const buyTxnIds = [...new Set(group.map((h) => h.transaction_id).filter(Boolean))];
+        for (const buyTxnId of buyTxnIds) {
+          const funded = await fetchSupabaseJson(`/rest/v1/stock_holdings_c?transaction_id=eq.${encodeURIComponent(buyTxnId)}&select=is_active`);
+          if (!funded || !funded.length || !funded.every((h) => h.is_active === false)) continue; // only on FULL exit
+          const txRows = await fetchSupabaseJson(`/rest/v1/transactions?id=eq.${encodeURIComponent(buyTxnId)}&select=buffer_cents,buffer_consumed_cents,buffer_refunded`);
+          const buyTx = txRows && txRows[0];
+          if (!buyTx || buyTx.buffer_refunded) continue; // idempotent
+          const unused = Math.max(0, Math.round(Number(buyTx.buffer_cents || 0) - Number(buyTx.buffer_consumed_cents || 0)));
+          await requestSupabaseJson(`/rest/v1/transactions?id=eq.${encodeURIComponent(buyTxnId)}`, { method: 'PATCH', body: { buffer_refunded: true, updated_at: nowIso } });
+          reserveCents += unused;
         }
+      } catch (e) { console.error('[settle-sell] reserve calc:', e?.message || e); }
+
+      // Residual: return the strategy's rebalance residual on a FULL strategy exit.
+      let residualCents = 0;
+      try {
+        const stratIds = [...new Set(group.map((h) => h.strategy_id).filter(Boolean))];
+        for (const sid of stratIds) {
+          const scope = isChild
+            ? `family_member_id=eq.${encodeURIComponent(h0.family_member_id)}`
+            : `user_id=eq.${encodeURIComponent(h0.user_id)}&family_member_id=is.null`;
+          // Any active holdings left in this strategy for this owner? If so, not a full exit.
+          const remaining = await fetchSupabaseJson(`/rest/v1/stock_holdings_c?strategy_id=eq.${encodeURIComponent(sid)}&${scope}&is_active=eq.true&trade_side=eq.BUY&select=id&limit=1`);
+          if (remaining && remaining.length) continue;
+          const resRows = await fetchSupabaseJson(`/rest/v1/strategy_rebalance_residuals?strategy_id=eq.${encodeURIComponent(sid)}&${scope}&select=id,balance_cents`);
+          for (const r of (resRows || [])) {
+            const bal = Math.max(0, Math.round(Number(r.balance_cents) || 0));
+            if (bal <= 0) continue;
+            residualCents += bal;
+            await requestSupabaseJson(`/rest/v1/strategy_rebalance_residuals?id=eq.${encodeURIComponent(r.id)}`, { method: 'PATCH', body: { balance_cents: 0 } });
+          }
+        }
+      } catch (e) { console.error('[settle-sell] residual calc:', e?.message || e); }
+
+      // Net = proceeds − broker − custody + reserve + residual (never below 0).
+      const netCents = Math.max(0, proceedsCents - brokerCents - custodyCents + reserveCents + residualCents);
+      breakdownByKey[key] = { proceedsCents, brokerCents, custodyCents, reserveCents, residualCents, netCents, numAssets };
+
+      if (isChild) {
+        netCentsByChild[h0.family_member_id] = (netCentsByChild[h0.family_member_id] || 0) + netCents;
+        reserveRefundByChild[h0.family_member_id] = (reserveRefundByChild[h0.family_member_id] || 0) + reserveCents;
+      } else {
+        netRandsByUser[h0.user_id] = (netRandsByUser[h0.user_id] || 0) + netCents / 100;
+        reserveRefundByUser[h0.user_id] = (reserveRefundByUser[h0.user_id] || 0) + reserveCents;
       }
-    } catch (feeErr) {
-      console.error('[settle-sell] sell-fee computation skipped:', feeErr?.message || feeErr);
     }
 
     // Credit own wallets (rands).
@@ -407,19 +372,18 @@ async function settleSellFills(holdingIds) {
         const allSettled = all.every((h) => h.is_active === false);
         const txn = txnRows && txnRows[0];
         const wasPending = txn?.status === 'pending';
-        // Sell fees for this sale (same broker/custody/transaction as a buy).
-        // amount = NET the client received (gross proceeds − fees); the fee
-        // columns feed the CRM fee cards / Finances just like a buy.
-        const fee = sellFeeByKey[txnId] || { brokerCents: 0, isinCents: 0, transactionCents: 0, totalCents: 0 };
-        const netAmountCents = Math.max(0, realizedCents - fee.totalCents);
+        // Withdrawal breakdown for this sale. amount = NET credited (proceeds −
+        // broker − custody + reserve + residual); the fee columns feed the CRM
+        // fee cards / Finances. transaction fee is always 0 on a sell.
+        const bd = breakdownByKey[txnId] || { proceedsCents: realizedCents, brokerCents: 0, custodyCents: 0, reserveCents: 0, residualCents: 0, netCents: realizedCents };
         await requestSupabaseJson(`/rest/v1/transactions?id=eq.${encodeURIComponent(txnId)}`, {
           method: 'PATCH',
           body: {
-            amount: netAmountCents,
-            base_amount_cents: realizedCents,
-            broker_fee_cents: fee.brokerCents,
-            isin_fee_cents: fee.isinCents,
-            transaction_fee_cents: fee.transactionCents,
+            amount: bd.netCents,
+            base_amount_cents: bd.proceedsCents,
+            broker_fee_cents: bd.brokerCents,
+            isin_fee_cents: bd.custodyCents,
+            transaction_fee_cents: 0,
             status: allSettled ? 'posted' : 'pending',
             updated_at: nowIso,
           },
@@ -434,8 +398,7 @@ async function settleSellFills(holdingIds) {
               quantity: Number(h.quantity) || 0,
               amountCents: Math.round(creditPerShareOf(h) * (Number(h.quantity) || 0)),
             })),
-            reserveRefundCents: Math.round(reserveRefundByUser[txn.user_id] || 0),
-            sellFeeCents: fee.totalCents,
+            breakdown: bd,
           });
         }
       } catch (txErr) {
@@ -461,15 +424,15 @@ async function settleSellFills(holdingIds) {
       );
       const tx = txns && txns[0];
       if (tx) {
-        const fee = sellFeeByKey[`legacy:${uid}`] || { brokerCents: 0, isinCents: 0, transactionCents: 0, totalCents: 0 };
+        const bd = breakdownByKey[`legacy:${uid}`] || { proceedsCents: netCents, brokerCents: 0, custodyCents: 0, reserveCents: 0, residualCents: 0, netCents };
         await requestSupabaseJson(`/rest/v1/transactions?id=eq.${encodeURIComponent(tx.id)}`, {
           method: 'PATCH', body: {
             status: 'posted',
-            amount: Math.max(0, netCents - fee.totalCents),
-            base_amount_cents: netCents,
-            broker_fee_cents: fee.brokerCents,
-            isin_fee_cents: fee.isinCents,
-            transaction_fee_cents: fee.transactionCents,
+            amount: bd.netCents,
+            base_amount_cents: bd.proceedsCents,
+            broker_fee_cents: bd.brokerCents,
+            isin_fee_cents: bd.custodyCents,
+            transaction_fee_cents: 0,
             updated_at: nowIso,
           },
         });
@@ -483,8 +446,7 @@ async function settleSellFills(holdingIds) {
             quantity: Number(h.quantity) || 0,
             amountCents: Math.round(creditPerShareOf(h) * (Number(h.quantity) || 0)),
           })),
-          reserveRefundCents: Math.round(reserveRefundByUser[uid] || 0),
-          sellFeeCents: (sellFeeByKey[`legacy:${uid}`] || {}).totalCents || 0,
+          breakdown: bd,
         });
       }
     }
