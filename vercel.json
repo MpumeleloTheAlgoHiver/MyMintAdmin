@@ -9,6 +9,7 @@
     { "source": "/api/dividends/extract", "destination": "/api/team?fwd=dividends-extract" },
     { "source": "/api/dividends/runs", "destination": "/api/team?fwd=dividends-runs" },
     { "source": "/api/dividends/payouts", "destination": "/api/team?fwd=dividends-payouts" },
+    { "source": "/api/dividends/email", "destination": "/api/team?fwd=dividends-email" },
     { "source": "/api/alliance-news", "destination": "/api/team?fwd=alliance-news" },
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ],

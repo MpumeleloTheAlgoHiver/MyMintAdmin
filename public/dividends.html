@@ -131,6 +131,16 @@
     .skel { background: linear-gradient(90deg, #f1f0f8 25%, #e8e5f3 50%, #f1f0f8 75%); background-size: 200% 100%; animation: sk 1.4s ease infinite; border-radius: 8px; }
     @keyframes sk { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
+    /* ── Tabs & Email ──────────────────────────────────────────────────────── */
+    .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 16px; gap: 24px; }
+    .tab { padding: 0 0 10px 0; background: none; border: none; border-bottom: 2px solid transparent; color: #64748b; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; font-family: var(--font); }
+    .tab:hover { color: #0f172a; }
+    .tab.active { color: var(--purple); border-bottom-color: var(--purple); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .email-controls { display: flex; gap: 12px; margin-bottom: 16px; align-items: flex-end; background: #f8f7ff; padding: 16px; border-radius: 12px; border: 1px solid #e4deff; }
+    .email-preview-frame { width: 100%; height: 600px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+
     /* ── Util ──────────────────────────────────────────────────────────────── */
     .hidden { display: none !important; }
     @media (max-width: 1024px) {
@@ -571,23 +581,42 @@
             <span>Extraction Result</span>
             <span style="font-size:10px;color:#94a3b8;font-weight:400;text-transform:none;letter-spacing:0;">${fileName}${dateLabel}</span>
           </div>
-          <div class="sanity-strip">
-            <div class="sanity-tile">
-              <div class="sanity-tile-label">Holdings</div>
-              <div class="sanity-tile-val">${fmtN(run.records)}</div>
+          <div class="tabs">
+            <button class="tab active" onclick="switchTab('results')">Results</button>
+            <button class="tab" onclick="switchTab('email')">Email Preview</button>
+          </div>
+          <div id="tab-results" class="tab-content active">
+            <div class="sanity-strip">
+              <div class="sanity-tile">
+                <div class="sanity-tile-label">Holdings</div>
+                <div class="sanity-tile-val">${fmtN(run.records)}</div>
+              </div>
+              <div class="sanity-tile">
+                <div class="sanity-tile-label">Net Cash</div>
+                <div class="sanity-tile-val">${fmtR(run.total_net_cash)}</div>
+              </div>
+              <div class="sanity-tile">
+                <div class="sanity-tile-label">Unmatched</div>
+                <div class="sanity-tile-val ${(run.unmatched_count ?? 0) === 0 ? 'ok' : 'bad'}">${run.unmatched_count ?? 0}</div>
+              </div>
             </div>
-            <div class="sanity-tile">
-              <div class="sanity-tile-label">Net Cash</div>
-              <div class="sanity-tile-val">${fmtR(run.total_net_cash)}</div>
-            </div>
-            <div class="sanity-tile">
-              <div class="sanity-tile-label">Unmatched</div>
-              <div class="sanity-tile-val ${(run.unmatched_count ?? 0) === 0 ? 'ok' : 'bad'}">${run.unmatched_count ?? 0}</div>
+            ${run.net_cash_col ? `<p style="font-size:11px;color:#94a3b8;margin-bottom:14px;">Net cash column: <strong style="color:#475569;">${run.net_cash_col}</strong></p>` : ''}
+            <div id="payoutsContent">
+              <div class="skel" style="height:180px;border-radius:10px;"></div>
             </div>
           </div>
-          ${run.net_cash_col ? `<p style="font-size:11px;color:#94a3b8;margin-bottom:14px;">Net cash column: <strong style="color:#475569;">${run.net_cash_col}</strong></p>` : ''}
-          <div id="payoutsContent">
-            <div class="skel" style="height:180px;border-radius:10px;"></div>
+          <div id="tab-email" class="tab-content">
+            <div class="email-controls">
+              <div class="field" style="margin-bottom:0; flex: 1;">
+                <label class="field-label" for="testEmail">Test Email Address</label>
+                <input type="email" id="testEmail" class="field-input" placeholder="Enter test email">
+              </div>
+              <button class="extract-btn" id="sendTestBtn" type="button" style="width:auto; padding:9px 16px;">Send Test</button>
+              <button class="extract-btn" id="sendAllBtn" type="button" style="width:auto; padding:9px 16px; background:#059669;">Send All Emails</button>
+            </div>
+            <div id="emailPreviewContent">
+              <div class="skel" style="height:400px;border-radius:10px;"></div>
+            </div>
           </div>
         </div>`;
 
@@ -644,7 +673,88 @@
         document.getElementById('payoutsContent').innerHTML =
           `<div style="text-align:center;padding:24px;color:#dc2626;font-size:12px;">Failed to load payouts: ${err.message}</div>`;
       }
+
+      // Load email preview
+      try {
+        const previewRes = await fetch(`/api/dividends/email?run_id=${runId}`);
+        const previewData = await previewRes.json();
+        
+        if (!previewData.ok) {
+          document.getElementById('emailPreviewContent').innerHTML = 
+            `<div style="text-align:center;padding:24px;color:#dc2626;font-size:12px;">Failed to load email preview: ${previewData.error}</div>`;
+        } else {
+          const iframe = document.createElement('iframe');
+          iframe.className = 'email-preview-frame';
+          document.getElementById('emailPreviewContent').innerHTML = '';
+          document.getElementById('emailPreviewContent').appendChild(iframe);
+          
+          iframe.contentWindow.document.open();
+          iframe.contentWindow.document.write(previewData.html);
+          iframe.contentWindow.document.close();
+
+          // Bind buttons
+          const testEmailInput = document.getElementById('testEmail');
+          const sendTestBtn = document.getElementById('sendTestBtn');
+          const sendAllBtn = document.getElementById('sendAllBtn');
+
+          sendTestBtn.onclick = async () => {
+            const email = testEmailInput.value;
+            if (!email) return showToast('warning', 'Please enter a test email');
+            sendTestBtn.disabled = true;
+            sendTestBtn.textContent = 'Sending...';
+            try {
+              const res = await fetch('/api/dividends/email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ run_id: runId, testEmail: email })
+              });
+              const data = await res.json();
+              if (data.ok) showToast('success', 'Test email sent successfully');
+              else showToast('error', data.error || 'Failed to send test email');
+            } catch (e) {
+              showToast('error', 'Network error');
+            }
+            sendTestBtn.disabled = false;
+            sendTestBtn.textContent = 'Send Test';
+          };
+
+          sendAllBtn.onclick = async () => {
+            if (!confirm(`Are you sure you want to send emails to all matched clients for run ${fileName}?`)) return;
+            sendAllBtn.disabled = true;
+            sendAllBtn.textContent = 'Sending...';
+            try {
+              const res = await fetch('/api/dividends/email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ run_id: runId, sendAll: true })
+              });
+              const data = await res.json();
+              if (data.ok) showToast('success', `Sent ${data.sent} emails. Failed: ${data.failed}`);
+              else showToast('error', data.error || 'Failed to send bulk emails');
+            } catch (e) {
+              showToast('error', 'Network error');
+            }
+            sendAllBtn.disabled = false;
+            sendAllBtn.textContent = 'Send All Emails';
+          };
+        }
+      } catch (err) {
+        document.getElementById('emailPreviewContent').innerHTML =
+          `<div style="text-align:center;padding:24px;color:#dc2626;font-size:12px;">Failed to load preview: ${err.message}</div>`;
+      }
     }
+
+    window.switchTab = function(tabName) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      const tabBtns = document.querySelectorAll('.tab');
+      for (const btn of tabBtns) {
+        if (btn.textContent.toLowerCase().includes(tabName)) btn.classList.add('active');
+      }
+      
+      document.getElementById('tab-' + tabName).classList.add('active');
+    };
 
     /* ── Init ────────────────────────────────────────────────────────────────── */
     loadStats();
