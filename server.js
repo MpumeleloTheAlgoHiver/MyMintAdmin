@@ -17,7 +17,7 @@ const dividendsExtractHandler  = require('./api/_dividends-extract');
 const dividendsRunsHandler     = require('./api/_dividends-runs'); // also handles /payouts + /alliance-news
 const { runHealthCheck } = require('./api/monitor/_health-check');
 // Return-alerts was merged into mint-mornings to stay under Vercel's 12-function limit.
-const { handleReturnAlertsNotify: returnAlertsHandler } = require('./api/mint-mornings');
+const { handleReturnAlertsNotify: returnAlertsHandler, handleSpikeAlertsNotify: spikeAlertsHandler } = require('./api/mint-mornings');
 
 const port = process.env.PORT || 5000;
 const publicDir = path.join(__dirname, 'public');
@@ -643,6 +643,18 @@ const server = http.createServer((req, res) => {
       try {
         req.body = await readJsonBody(req).catch(() => ({}));
         await returnAlertsHandler(req, res);
+      } catch (err) {
+        if (!res.headersSent) sendJson(res, 500, { error: err.message });
+      }
+    })();
+    return;
+  }
+
+  if (req.url.startsWith('/api/spike-alerts/notify') && req.method === 'POST') {
+    (async () => {
+      try {
+        req.body = await readJsonBody(req).catch(() => ({}));
+        await spikeAlertsHandler(req, res);
       } catch (err) {
         if (!res.headersSent) sendJson(res, 500, { error: err.message });
       }

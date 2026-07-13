@@ -1732,7 +1732,9 @@
       let _returnInsightsData = []; /* cached asset return data */
       let _riIntradayMap = {};      /* security_id &rarr; latest stock_intraday_c row */
       let _activeReturnTab = '1d';
-      const ALERT_THRESHOLD = -4; /* alert when daily change <= -4% */
+      const ALERT_THRESHOLD = -4;  /* alert when daily change <= -4% */
+      const SPIKE_THRESHOLD = 13;  /* spike alert when daily change >= +13% */
+      let _alertsSubTab = 'drop';  /* 'drop' | 'spike' — active sub-tab on the Alerts tab */
 
       /* Build a map: symbol &rarr; [strategy names] from the loaded strategies */
       const _getSymbolStrategyMap = () => {
@@ -1770,45 +1772,84 @@
           const _alertBase = (_riViewMode === 'strategy' && _riFilterSymbols)
             ? (_returnInsightsData || []).filter(a => _riFilterSymbols.has(a.symbol))
             : (_returnInsightsData || []);
-          const alerts = _alertBase
-            .map(a => ({ ...a, _live1d: (_riIntradayMap[a.id]?.['1d_pct'] != null ? Number(_riIntradayMap[a.id]['1d_pct']) : (a.change_percent != null ? Number(a.change_percent) : null)) }))
-            .filter(a => a._live1d != null && a._live1d <= ALERT_THRESHOLD)
-            .sort((a, b) => a._live1d - b._live1d);
+          const withLive = _alertBase.map(a => ({
+            ...a,
+            _live1d: (_riIntradayMap[a.id]?.['1d_pct'] != null
+              ? Number(_riIntradayMap[a.id]['1d_pct'])
+              : (a.change_percent != null ? Number(a.change_percent) : null))
+          }));
+          const dropAlerts  = withLive.filter(a => a._live1d != null && a._live1d <= ALERT_THRESHOLD).sort((a, b) => a._live1d - b._live1d);
+          const spikeAlerts = withLive.filter(a => a._live1d != null && a._live1d >= SPIKE_THRESHOLD).sort((a, b) => b._live1d - a._live1d);
 
-          if (!alerts.length) {
-            listEl.innerHTML = `
-              <div style="text-align:center;padding:32px 16px;">
-                <div style="font-size:28px;margin-bottom:8px;">✅</div>
-                <div style="font-size:12px;font-weight:700;color:#16a34a;margin-bottom:4px;">No alerts</div>
-                <div style="font-size:11px;color:#94a3b8;">All strategy assets are above the &minus;4% threshold.</div>
+          /* Sub-tab dropdown selector */
+          const dropLabel  = `Drop Alerts${dropAlerts.length  ? ' (' + dropAlerts.length  + ')' : ''}`;
+          const spikeLabel = `Spike Alerts${spikeAlerts.length ? ' (' + spikeAlerts.length + ')' : ''}`;
+          const activeItems = _alertsSubTab === 'spike' ? spikeAlerts : dropAlerts;
+          const isSpike     = _alertsSubTab === 'spike';
+
+          const subTabDropdown = `
+            <div style="display:flex;align-items:center;justify-content:flex-end;padding:8px 10px 4px;gap:6px;">
+              <div style="position:relative;">
+                <button id="riAlertSubBtn" onclick="window.toggleRiAlertSubMenu(event)"
+                  style="display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:8px;border:1.5px solid ${isSpike ? '#bbf7d0' : '#fecaca'};background:${isSpike ? '#f0fdf4' : '#fff7f7'};font-size:11px;font-weight:700;color:${isSpike ? '#16a34a' : '#dc2626'};cursor:pointer;transition:all 0.15s;">
+                  <span>${isSpike ? '🚀 ' + spikeLabel : '⚠️ ' + dropLabel}</span>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div id="riAlertSubMenu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:white;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.10);z-index:300;min-width:160px;overflow:hidden;">
+                  <button onclick="window.setRiAlertSubTab('drop')" style="width:100%;text-align:left;padding:9px 14px;font-size:12px;font-weight:600;color:#dc2626;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:8px;" onmouseenter="this.style.background='#fff7f7'" onmouseleave="this.style.background='none'">
+                    ⚠️ ${dropLabel}
+                  </button>
+                  <div style="height:1px;background:#f1f5f9;margin:2px 0;"></div>
+                  <button onclick="window.setRiAlertSubTab('spike')" style="width:100%;text-align:left;padding:9px 14px;font-size:12px;font-weight:600;color:#16a34a;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:8px;" onmouseenter="this.style.background='#f0fdf4'" onmouseleave="this.style.background='none'">
+                    🚀 ${spikeLabel}
+                  </button>
+                </div>
+              </div>
+            </div>`;
+
+          if (!activeItems.length) {
+            listEl.innerHTML = subTabDropdown + `
+              <div style="text-align:center;padding:24px 16px;">
+                <div style="font-size:28px;margin-bottom:8px;">${isSpike ? '📊' : '✅'}</div>
+                <div style="font-size:12px;font-weight:700;color:${isSpike ? '#16a34a' : '#16a34a'};margin-bottom:4px;">No ${isSpike ? 'spike' : ''} alerts</div>
+                <div style="font-size:11px;color:#94a3b8;">${isSpike ? 'No strategy assets have spiked above +13% today.' : 'All strategy assets are above the &minus;4% threshold.'}</div>
               </div>`;
             return;
           }
 
-          listEl.innerHTML = alerts.map(a => {
+          const rowBg     = isSpike ? '#f0fdf4' : '#fff7f7';
+          const rowBorder = isSpike ? '#bbf7d0' : '#fecaca';
+          const dotColor  = isSpike ? '#16a34a' : '#ef4444';
+          const chgColor  = isSpike ? '#16a34a' : '#dc2626';
+          const badgeBg   = isSpike ? '#dcfce7' : '#fee2e2';
+          const badgeText = isSpike ? 'SPIKE' : 'ALERT';
+          const logoBorder  = isSpike ? '#bbf7d0' : '#fecaca';
+          const logoFallBg  = isSpike ? '#dcfce7' : '#fee2e2';
+
+          listEl.innerHTML = subTabDropdown + activeItems.map(a => {
             const chg = a._live1d;
             const chgStr = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
             const sym = (a.symbol || '').replace('.JO', '');
             const init = sym.slice(0, 2).toUpperCase();
             const logoEl = a.logo_url
-              ? `<img src="${a.logo_url}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid #fecaca;flex-shrink:0;" onerror="this.outerHTML='<div style=\\'width:32px;height:32px;border-radius:50%;background:#fee2e2;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#dc2626;\\'>${init}</div>'">`
-              : `<div style="width:32px;height:32px;border-radius:50%;background:#fee2e2;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#dc2626;flex-shrink:0;">${init}</div>`;
+              ? `<img src="${a.logo_url}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid ${logoBorder};flex-shrink:0;" onerror="this.outerHTML='<div style=\\'width:32px;height:32px;border-radius:50%;background:${logoFallBg};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${chgColor};\\'>${init}</div>'">`
+              : `<div style="width:32px;height:32px;border-radius:50%;background:${logoFallBg};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${chgColor};flex-shrink:0;">${init}</div>`;
             const strategies = (symStratMap[a.symbol] || []);
             const stratLabel = strategies.length
               ? strategies.slice(0, 2).join(', ') + (strategies.length > 2 ? ` +${strategies.length - 2}` : '')
               : 'Strategy asset';
             return `
-              <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;background:#fff7f7;border:1px solid #fecaca;margin-bottom:6px;">
-                <div style="width:6px;height:6px;border-radius:50%;background:#ef4444;flex-shrink:0;animation:alertPulse 1.8s infinite;"></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;background:${rowBg};border:1px solid ${rowBorder};margin-bottom:6px;">
+                <div style="width:6px;height:6px;border-radius:50%;background:${dotColor};flex-shrink:0;animation:alertPulse 1.8s infinite;"></div>
                 ${logoEl}
                 <div style="flex:1;min-width:0;">
                   <div style="display:flex;align-items:center;gap:6px;">
                     <span style="font-size:12px;font-weight:800;color:#0f172a;">${sym}</span>
-                    <span style="font-size:11px;font-weight:800;color:#dc2626;">${chgStr}</span>
+                    <span style="font-size:11px;font-weight:800;color:${chgColor};">${chgStr}</span>
                   </div>
                   <div style="font-size:10px;color:#94a3b8;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${stratLabel}</div>
                 </div>
-                <div style="font-size:9px;font-weight:700;color:#dc2626;background:#fee2e2;padding:2px 7px;border-radius:6px;flex-shrink:0;">ALERT</div>
+                <div style="font-size:9px;font-weight:700;color:${chgColor};background:${badgeBg};padding:2px 7px;border-radius:6px;flex-shrink:0;">${badgeText}</div>
               </div>`;
           }).join('');
           return;
@@ -2097,6 +2138,25 @@
       let _riFilterSymbols = null;    /* Set<string> of symbols when mode = strategy */
       let _riSelectedStratId = null;  /* selected strategy id when in strategy mode */
 
+      window.toggleRiAlertSubMenu = (e) => {
+        e.stopPropagation();
+        const menu = document.getElementById('riAlertSubMenu');
+        if (!menu) return;
+        const open = menu.style.display !== 'none';
+        menu.style.display = open ? 'none' : 'block';
+        if (!open) {
+          const close = (ev) => { if (!ev.target.closest('#riAlertSubMenu') && ev.target.id !== 'riAlertSubBtn') { menu.style.display = 'none'; } document.removeEventListener('click', close); };
+          setTimeout(() => document.addEventListener('click', close), 0);
+        }
+      };
+
+      window.setRiAlertSubTab = (subTab) => {
+        _alertsSubTab = subTab;
+        const menu = document.getElementById('riAlertSubMenu');
+        if (menu) menu.style.display = 'none';
+        _renderReturnInsights('alerts');
+      };
+
       window.toggleRiViewMenu = (e) => {
         e.stopPropagation();
         const menu = document.getElementById('riViewMenu');
@@ -2331,6 +2391,14 @@
           _renderReturnInsights(_activeReturnTab);
 
           /* ── Email alert notification (once per day per symbol set) ── */
+          const _getToken = () => {
+            try {
+              const k = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+              return k ? JSON.parse(localStorage.getItem(k))?.access_token || null : null;
+            } catch { return null; }
+          };
+
+          /* ── Drop alert email (≤ -4%) ── */
           if (alertingAssets.length > 0) {
             try {
               const symStratMap = _getSymbolStrategyMap();
@@ -2339,12 +2407,7 @@
               const storageKey = `mint_alert_sent_${todayKey}`;
               const alreadySent = localStorage.getItem(storageKey) === alertSymbols;
               if (!alreadySent) {
-                const token = (() => {
-                  try {
-                    const k = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
-                    return k ? JSON.parse(localStorage.getItem(k))?.access_token || null : null;
-                  } catch { return null; }
-                })();
+                const token = _getToken();
                 if (token) {
                   const alertPayload = alertingAssets.map(a => ({
                     symbol: a.symbol,
@@ -2368,6 +2431,46 @@
               }
             } catch (notifyErr) {
               console.warn('[ReturnAlerts] Notification error:', notifyErr.message);
+            }
+          }
+
+          /* ── Spike alert email (≥ +13%) ── */
+          const spikeAssets = _returnInsightsData.filter(a => {
+            const live = _riIntradayMap[a.id]?.['1d_pct'] != null ? Number(_riIntradayMap[a.id]['1d_pct']) : (a.change_percent != null ? Number(a.change_percent) : null);
+            return live != null && live >= SPIKE_THRESHOLD;
+          });
+          if (spikeAssets.length > 0) {
+            try {
+              const symStratMap = _getSymbolStrategyMap();
+              const todayKey = new Date().toISOString().slice(0, 10);
+              const spikeSymbols = spikeAssets.map(a => a.symbol).sort().join(',');
+              const spikeStorageKey = `mint_spike_alert_sent_${todayKey}`;
+              const alreadySent = localStorage.getItem(spikeStorageKey) === spikeSymbols;
+              if (!alreadySent) {
+                const token = _getToken();
+                if (token) {
+                  const spikePayload = spikeAssets.map(a => ({
+                    symbol: a.symbol,
+                    name: a.name || '',
+                    change: _riIntradayMap[a.id]?.['1d_pct'] != null ? Number(_riIntradayMap[a.id]['1d_pct']) : Number(a.change_percent),
+                    strategies: symStratMap[a.symbol] || []
+                  }));
+                  fetch('/api/spike-alerts/notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                    body: JSON.stringify({ alerts: spikePayload, dateKey: todayKey })
+                  }).then(r => r.json()).then(data => {
+                    if (data.ok) {
+                      localStorage.setItem(spikeStorageKey, spikeSymbols);
+                      console.log('[SpikeAlerts] Spike alert email sent to', data.recipients, 'recipient(s)');
+                    } else {
+                      console.warn('[SpikeAlerts] Email send failed:', data.error);
+                    }
+                  }).catch(err => console.warn('[SpikeAlerts] Notify error:', err.message));
+                }
+              }
+            } catch (notifyErr) {
+              console.warn('[SpikeAlerts] Notification error:', notifyErr.message);
             }
           }
         } catch(e) {
