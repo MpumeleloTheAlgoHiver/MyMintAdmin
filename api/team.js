@@ -22,6 +22,7 @@ const {
 
 const dividendsExtractHandler = require('./_dividends-extract');
 const dividendsDataHandler = require('./_dividends-runs');
+const dividendsEmailHandler = require('./_dividends-email');
 
 const normEmail = (e) => String(e || '').trim().toLowerCase();
 
@@ -59,6 +60,10 @@ module.exports = async (req, res) => {
       if (fwd === 'alliance-news') {
         req.url = '/api/alliance-news' + url.search;
         return await dividendsDataHandler(req, res);
+      }
+      if (fwd === 'dividends-email') {
+        req.url = '/api/dividends/email' + url.search;
+        return await dividendsEmailHandler(req, res);
       }
     }
 
