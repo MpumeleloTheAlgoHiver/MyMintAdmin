@@ -676,7 +676,15 @@
 
       // Load email preview
       try {
-        const previewRes = await fetch(`/api/dividends/email?run_id=${runId}`);
+        const getToken = () => {
+          try {
+            const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+            return key ? (JSON.parse(localStorage.getItem(key))?.access_token || '') : '';
+          } catch { return ''; }
+        };
+        const authHeaders = { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' };
+
+        const previewRes = await fetch(`/api/dividends/email?run_id=${runId}`, { headers: authHeaders });
         const previewData = await previewRes.json();
         
         if (!previewData.ok) {
@@ -705,7 +713,7 @@
             try {
               const res = await fetch('/api/dividends/email', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: authHeaders,
                 body: JSON.stringify({ run_id: runId, testEmail: email })
               });
               const data = await res.json();
@@ -725,7 +733,7 @@
             try {
               const res = await fetch('/api/dividends/email', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: authHeaders,
                 body: JSON.stringify({ run_id: runId, sendAll: true })
               });
               const data = await res.json();

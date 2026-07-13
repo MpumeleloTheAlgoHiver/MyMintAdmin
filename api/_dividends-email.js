@@ -65,62 +65,44 @@ function buildEmailHtml(profile, payouts, logosMap) {
     const amount = Number(p.net_cash) || 0;
     totalCash += amount;
     
-    rowsHtml += `
+    rowsHtml += \`
       <tr>
-        <td style="padding: 12px; border-bottom: 1px solid #e8e4f3;">
-          <img src="${logo}" alt="${symbol}" style="width: 24px; height: 24px; border-radius: 50%; vertical-align: middle; margin-right: 8px;">
-          <strong style="color: #0f172a; font-size: 14px;">${symbol}</strong>
+        <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;">
+          <div style="display:flex;align-items:center;">
+            <img src="\${logo}" alt="\${symbol}" style="width:20px;height:20px;border-radius:50%;margin-right:8px;vertical-align:middle;">
+            <strong style="font-size:13px;color:#1e293b;">\${symbol}</strong>
+          </div>
         </td>
-        <td style="padding: 12px; border-bottom: 1px solid #e8e4f3; text-align: right; color: #059669; font-weight: 600; font-size: 14px;">
-          ${formatMoney(amount)}
+        <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;text-align:right;font-size:14px;font-weight:700;color:#059669;">
+          \${formatMoney(amount)}
         </td>
       </tr>
-    `;
+    \`;
   });
 
-  return `
-  <!DOCTYPE html>
-  <html>
-  <head>
-    <meta charset="utf-8">
-    <title>Dividend Notification</title>
-  </head>
-  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #F5F4F9; padding: 40px 20px; margin: 0;">
-    <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(80,38,157,0.07);">
-      <div style="background: #7c3aed; padding: 32px 24px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700;">Dividend Payout Processed</h1>
-      </div>
-      <div style="padding: 32px 24px;">
-        <p style="color: #475569; font-size: 16px; line-height: 1.5; margin-top: 0;">Hi ${name},</p>
-        <p style="color: #475569; font-size: 16px; line-height: 1.5;">We have successfully processed dividend payouts for your portfolio. The following amounts have been allocated to your Mint account.</p>
-        
-        <table style="width: 100%; border-collapse: collapse; margin: 24px 0; background: #f8f7ff; border-radius: 12px; overflow: hidden;">
-          <thead>
-            <tr>
-              <th style="padding: 12px; text-align: left; background: #ede9fe; color: #5b21b6; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Asset</th>
-              <th style="padding: 12px; text-align: right; background: #ede9fe; color: #5b21b6; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Net Payout</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td style="padding: 16px 12px; font-weight: 700; color: #0f172a; border-top: 2px solid #e8e4f3;">Total Net Cash</td>
-              <td style="padding: 16px 12px; text-align: right; font-weight: 700; color: #059669; border-top: 2px solid #e8e4f3;">${formatMoney(totalCash)}</td>
-            </tr>
-          </tfoot>
-        </table>
-
-        <p style="color: #475569; font-size: 16px; line-height: 1.5; margin-bottom: 0;">You can view these transactions in your Mint app under the Wallet section.</p>
-      </div>
-      <div style="background: #faf8ff; padding: 24px; text-align: center; border-top: 1px solid #e8e4f3;">
-        <p style="color: #94a3b8; font-size: 12px; margin: 0;">© ${new Date().getFullYear()} Mint. All rights reserved.</p>
-      </div>
+  return \`<!DOCTYPE html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f6fa;margin:0;padding:32px 16px;">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:520px;margin:0 auto;">
+  <tr><td style="background:#fff;border-radius:16px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,0.07);border:1px solid #ede9fe;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px;">
+      <span style="font-size:16px;font-weight:700;color:#0f172a;">Mint</span>
     </div>
-  </body>
-  </html>
-  `;
+    <h2 style="font-size:18px;font-weight:700;color:#1e293b;margin:0 0 8px 0;">Dividend Payout Processed</h2>
+    <p style="font-size:14px;color:#64748b;margin:0 0 20px 0;">Hi \${name},<br><br>We have successfully processed dividend payouts for your portfolio. The following amounts have been allocated to your Mint account.</p>
+    
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:#f8fafc;border-radius:10px;padding:16px;margin-bottom:24px;">
+      \${rowsHtml}
+      <tr>
+        <td style="padding:12px 0 0 0;font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;">Total Net Cash</td>
+        <td style="padding:12px 0 0 0;font-size:16px;font-weight:800;color:#059669;text-align:right;">\${formatMoney(totalCash)}</td>
+      </tr>
+    </table>
+    
+    <p style="font-size:13px;color:#64748b;margin:0 0 20px 0;">You can view these transactions in your Mint app under the Wallet section.</p>
+    <a href="https://app.mymint.co.za" style="display:inline-block;background:#7c3aed;color:#fff;font-size:13px;font-weight:600;padding:12px 24px;border-radius:8px;text-decoration:none;">Open Mint App</a>
+    <p style="font-size:11px;color:#94a3b8;margin:24px 0 0 0;">&copy; \${new Date().getFullYear()} MINT (Pty) Ltd. This is an automated notification.</p>
+  </td></tr>
+</table>
+</body></html>\`;
 }
 
 module.exports = async function dividendsEmailHandler(req, res) {
