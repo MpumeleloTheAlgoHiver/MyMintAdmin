@@ -2,7 +2,6 @@
 
 const { getPayouts } = require('./_dividends-db');
 const { requireAuth, supabaseRequest, sendJson } = require('./_team');
-const fetch = require('node-fetch'); // or use native fetch if available
 
 // Simple helper to log email, using the same pattern as _team.js
 const writeAudit = async (entry) => {
