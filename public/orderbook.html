@@ -6955,14 +6955,14 @@
           const [uid, fm] = key.split('|');
           if (!balancesByScope.has(fm)) balancesByScope.set(fm, {});
           const priorRands = Number(snapshot[uid] || 0);
-          balancesByScope.get(fm)[uid] = Math.round(priorRands * 100 + creditCents) / 100;
+          balancesByScope.get(fm)[uid] = Math.round(priorRands * 100 + creditCents);
         });
 
-        for (const [fm, balancesByUser] of balancesByScope.entries()) {
+        for (const [fm, balancesCentsByUser] of balancesByScope.entries()) {
           const response = await fetch('/api/orderbook/send-csv?action=rebalance-upsert-residuals', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ strategyId: batch.strategy_id, familyMemberId: fm || null, balancesByUser }),
+            body: JSON.stringify({ strategyId: batch.strategy_id, familyMemberId: fm || null, balancesCentsByUser }),
           });
           if (!response.ok) {
             const details = await response.json().catch(() => ({}));

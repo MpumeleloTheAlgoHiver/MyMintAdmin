@@ -322,9 +322,12 @@ module.exports = async (req, res) => {
       const fmFilter = familyMemberId
         ? `&family_member_id=eq.${encodeURIComponent(familyMemberId)}`
         : `&family_member_id=is.null`;
-      const balancesByUser = body.balancesByUser && typeof body.balancesByUser === 'object'
-        ? body.balancesByUser
-        : {};
+      // New callers should send integer cents explicitly. balancesByUser is
+      // retained for older dashboard/reversal callers whose values are rands.
+      const hasExplicitCents = body.balancesCentsByUser && typeof body.balancesCentsByUser === 'object';
+      const balancesByUser = hasExplicitCents
+        ? body.balancesCentsByUser
+        : (body.balancesByUser && typeof body.balancesByUser === 'object' ? body.balancesByUser : {});
       const entries = Object.entries(balancesByUser).filter(([uid]) => uid);
       if (!entries.length) return sendJson(res, 200, { ok: true, upserted: 0 });
 
@@ -333,7 +336,9 @@ module.exports = async (req, res) => {
       // Manual read-then-update-or-insert per user — PostgREST on_conflict can't
       // target the COALESCE(family_member_id, sentinel) unique index.
       for (const [userId, balance] of entries) {
-        const balanceCents = Math.round((Number(balance) || 0) * 100);
+        const balanceCents = hasExplicitCents
+          ? Math.round(Number(balance) || 0)
+          : Math.round((Number(balance) || 0) * 100);
         const scope = `user_id=eq.${encodeURIComponent(userId)}&strategy_id=eq.${encodeURIComponent(strategyId)}${fmFilter}`;
         const updated = await requestSupabaseJson(
           `/rest/v1/strategy_rebalance_residuals?${scope}&select=user_id`,
