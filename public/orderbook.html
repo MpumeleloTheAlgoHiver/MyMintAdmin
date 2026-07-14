@@ -746,6 +746,62 @@
       margin-bottom: 0;
     }
 
+    .rebalance-heading-row {
+      width: 100%;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      margin-bottom: 14px;
+    }
+    .rebalance-heading-copy {
+      min-width: 0;
+    }
+    .rebalance-heading-copy .closed-books-subtitle {
+      margin-bottom: 0;
+    }
+    #rebalanceUatToggle {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 132px;
+      height: 34px;
+      margin-left: auto;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 1px solid #dbe3ee;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: .045em;
+      text-transform: uppercase;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
+    }
+    #rebalanceUatToggle::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      margin-right: 8px;
+      border-radius: 50%;
+      background: #16a34a;
+      box-shadow: 0 0 0 3px rgba(22, 163, 74, .10);
+    }
+    #rebalanceUatToggle:hover {
+      border-color: #c4b5fd;
+      background: #f5f3ff;
+      color: #5b21b6;
+    }
+    #rebalanceUatToggle.is-uat {
+      border-color: #fcd34d;
+      background: #fffbeb;
+      color: #92400e;
+    }
+    #rebalanceUatToggle.is-uat::before {
+      background: #f59e0b;
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, .14);
+    }
+
     .ob-sort-btn {
       display: inline-flex;
       align-items: center;
@@ -1429,12 +1485,12 @@
 
       <div class="orderbook-tab-panel" id="pendingRebalancesPanel" role="tabpanel" aria-labelledby="pendingRebalancesTab">
         <div class="closed-books-card">
-          <div class="filled-orderbooks-heading-row">
-            <div>
+          <div class="filled-orderbooks-heading-row rebalance-heading-row">
+            <div class="rebalance-heading-copy">
               <h2 class="closed-books-title">Rebalances</h2>
               <p class="closed-books-subtitle">Standalone rebalance batches. These do not count as active or closed orderbook records.</p>
             </div>
-            <button class="orderbook-export-btn" id="rebalanceUatToggle" type="button" title="Toggle between LIVE and UAT rebalance batches">Live rebalances</button>
+            <button class="orderbook-export-btn" id="rebalanceUatToggle" type="button" title="Toggle between LIVE and UAT rebalance batches">Environment: LIVE</button>
           </div>
           <div class="filled-orderbooks-list" id="rebalanceBooksList">
             <div class="filled-orderbook-empty">No rebalance batches yet.</div>
@@ -8317,10 +8373,8 @@
           : 'Toggle to view orders placed using test wallets';
       }
       if (rebalanceUatToggle) {
-        rebalanceUatToggle.textContent = orderbookUatMode ? 'UAT rebalances' : 'Live rebalances';
-        rebalanceUatToggle.style.background = orderbookUatMode ? '#f59e0b' : '';
-        rebalanceUatToggle.style.color = orderbookUatMode ? '#fff' : '';
-        rebalanceUatToggle.style.borderColor = orderbookUatMode ? '#f59e0b' : '';
+        rebalanceUatToggle.textContent = orderbookUatMode ? 'Environment: UAT' : 'Environment: LIVE';
+        rebalanceUatToggle.classList.toggle('is-uat', orderbookUatMode);
         rebalanceUatToggle.title = orderbookUatMode
           ? 'Showing UAT strategy rebalance batches only — click to return to LIVE'
           : 'Showing LIVE strategy rebalance batches — click to view UAT';
