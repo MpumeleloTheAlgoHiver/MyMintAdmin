@@ -7132,6 +7132,20 @@
         const fillDateStr = nowIso.split('T')[0];
         const strategyId = batch.strategy_id;
 
+        const settlementInsert = async (table, rows) => {
+          const { data: sessionData } = await supabaseClient.auth.getSession();
+          const token = sessionData?.session?.access_token;
+          if (!token) throw new Error('Session expired before settlement write.');
+          const response = await fetch('/api/orderbook/send-csv?action=rebalance-settlement-insert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ table, rows }),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.details || result.error || `Could not insert ${table}.`);
+          return Array.isArray(result.rows) ? result.rows : [];
+        };
+
         /* ── Idempotency guard (atomic claim) ──────────────────────────────────
            Settlement is NOT idempotent — it inserts BUY holdings and SELL audit
            rows unconditionally. A double-click or a retry under a slow DB would
@@ -7219,7 +7233,7 @@
 
             if (remaining > 0) {
               // Reissue the leftover shares as a fresh leg — original entry preserved.
-              const { error: remErr } = await supabaseClient.from('stock_holdings_c').insert({
+              try { await settlementInsert('stock_holdings_c', {
                 user_id: evt.user_id,
                 family_member_id: evt.family_member_id || null,
                 security_id: evt.security_id,
@@ -7238,8 +7252,7 @@
                 Status: 'active',
                 closed_reason: 'REBALANCE_PARTIAL_REMAINDER',
                 as_of_date: fillDateStr,
-              });
-              if (remErr) errors.push(`SELL remainder reissue ${evt.user_id}: ${remErr.message}`);
+              }); } catch (remErr) { errors.push(`SELL remainder reissue ${evt.user_id}: ${remErr.message}`); }
             }
           } else {
             // No existing stock_holdings_c row (position only in strategy JSON).
@@ -7265,7 +7278,7 @@
             const remaining = originalQty - soldQty;
             if (remaining > 0) {
               // Materialise the leftover shares as an active BUY in stock_holdings_c
-              const { error: matErr } = await supabaseClient.from('stock_holdings_c').insert({
+              try { await settlementInsert('stock_holdings_c', {
                 user_id: evt.user_id,
                 family_member_id: evt.family_member_id || null,
                 security_id: evt.security_id,
@@ -7282,13 +7295,12 @@
                 Status: 'active',
                 closed_reason: 'REBALANCE_MATERIALISED_REMAINDER',
                 as_of_date: fillDateStr,
-              });
-              if (matErr) errors.push(`SELL materialise remainder ${evt.user_id}: ${matErr.message}`);
+              }); } catch (matErr) { errors.push(`SELL materialise remainder ${evt.user_id}: ${matErr.message}`); }
             }
           }
 
           // Insert SELL audit row into stock_holdings_c
-          const { error: sellInsertErr } = await supabaseClient.from('stock_holdings_c').insert({
+          try { await settlementInsert('stock_holdings_c', {
             user_id: evt.user_id,
             family_member_id: evt.family_member_id || null,
             security_id: evt.security_id,
@@ -7308,8 +7320,7 @@
             avg_exit: fillBySecId[evt.security_id],
             "Exit_date": fillDateStr,
             as_of_date: fillDateStr,
-          });
-          if (sellInsertErr) errors.push(`SELL audit ${evt.user_id}: ${sellInsertErr.message}`);
+          }); } catch (sellInsertErr) { errors.push(`SELL audit ${evt.user_id}: ${sellInsertErr.message}`); }
 
           // Update rebalance_event with fill info
           const { error: evtUpErr } = await supabaseClient
@@ -7336,9 +7347,9 @@
                proxy for "what price was shown" on a rebalance buy, so PnL cost
                basis works correctly just like a regular purchase. */
             const expectedFillRands = evt.price_at_commit ? Number(evt.price_at_commit) / 100 : null;
-            const { data: insertedBuy, error: buyInsertErr } = await supabaseClient
-              .from('stock_holdings_c')
-              .insert({
+            let insertedBuy = null;
+            try {
+              const insertedRows = await settlementInsert('stock_holdings_c', {
                 user_id: evt.user_id,
                 family_member_id: evt.family_member_id || null,
                 security_id: evt.security_id,
@@ -7356,11 +7367,9 @@
                 Status: 'active',
                 closed_reason: evt.closed_reason || 'REBALANCE_EVENT_BUY',
                 as_of_date: fillDateStr,
-              })
-              .select('id')
-              .single();
-
-            if (buyInsertErr) {
+              });
+              insertedBuy = insertedRows[0] || null;
+            } catch (buyInsertErr) {
               errors.push(`${label} insert ${evt.user_id}: ${buyInsertErr.message}`);
               continue;
             }
@@ -7441,8 +7450,8 @@
             };
           });
           if (txnRows.length) {
-            const { error: txnErr } = await supabaseClient.from('transactions').insert(txnRows);
-            if (txnErr) errors.push(`Rebalance txn insert: ${txnErr.message}`);
+            try { await settlementInsert('transactions', txnRows); }
+            catch (txnErr) { errors.push(`Rebalance txn insert: ${txnErr.message}`); }
           }
         } catch (txnCatchErr) {
           errors.push(`Rebalance txn step failed: ${txnCatchErr?.message || txnCatchErr}`);

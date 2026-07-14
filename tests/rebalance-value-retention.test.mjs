@@ -26,6 +26,11 @@ const replaceHoldingFn = dashboard.slice(
 assert.match(replaceHoldingFn, /rebalance-update-strategy-holdings/, 'ordinary rebalances must update composition through the service endpoint');
 assert.doesNotMatch(replaceHoldingFn, /\.from\("strategies_c"\)[\s\S]*?\.update\(/, 'ordinary rebalance composition must not write through browser RLS');
 assert.match(endpoint, /action === 'rebalance-update-strategy-holdings'[\s\S]*?requirePermission\(req, res, 'dashboard', 'commit_rebalance'\)/, 'composition endpoint must retain the rebalance permission gate');
+assert.match(endpoint, /action === 'rebalance-settlement-insert'[\s\S]*?allowedTables = new Set\(\['stock_holdings_c', 'transactions'\]\)/, 'settlement inserts must use a strict server whitelist');
+assert.match(endpoint, /action === 'rebalance-settlement-insert'[\s\S]*?requirePermission\(req, res, 'dashboard', 'commit_rebalance'\)/, 'settlement insert endpoint must retain the rebalance permission gate');
+assert.match(orderbook, /const settlementInsert = async \(table, rows\)/, 'settlement must use the service-role insert bridge');
+assert.match(orderbook, /settlementInsert\('stock_holdings_c'/, 'holding settlement inserts must bypass browser RLS safely');
+assert.match(orderbook, /settlementInsert\('transactions', txnRows\)/, 'rebalance activity inserts must bypass browser RLS safely');
 
 // Workbook switch example: proceeds are recycled; only fees/residual alter cash.
 const sellGross = 1_000_00;
@@ -36,4 +41,4 @@ const delta = sellGross - Math.round(sellGross * brokerageRate) - custody
   - buyGross - Math.round(buyGross * brokerageRate) - custody;
 assert.equal(delta, 275);
 
-console.log('18 rebalance value-retention assertions passed');
+console.log('23 rebalance value-retention assertions passed');
