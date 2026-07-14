@@ -14,6 +14,10 @@ assert.match(dashboard, /_investorEnv === 'UAT' \? _testUids\.has\(r\.user_id\) 
 assert.match(dashboard, /investorEnv === 'UAT' \? isTest : !isTest/);
 assert.match(dashboard, /scopedHoldRows\.forEach/);
 assert.match(dashboard, /rebLoadWalletBalances\(strategy\.id, scopedUserIds\)/);
+assert.match(dashboard, /const isUatStrategy = strat && String\(strat\.investor_environment \|\| 'LIVE'\)\.toUpperCase\(\) === 'UAT'/);
+assert.match(dashboard, /const showRebalance = showLiveRebalance \|\| isUatStrategy/);
+assert.match(dashboard, /showRebalance && !window\._rebPermBlocked/);
+assert.match(dashboard, /id="rebalanceNavBtn" onclick="window\.openRebalancingModal\(\)"/);
 
 const scope = (environment, rows, testIds) => rows.filter((row) =>
   environment === 'UAT' ? testIds.has(row.user_id) : !testIds.has(row.user_id));
@@ -22,4 +26,4 @@ const testIds = new Set(['test']);
 assert.deepEqual(scope('LIVE', rows, testIds), [{ user_id: 'live' }]);
 assert.deepEqual(scope('UAT', rows, testIds), [{ user_id: 'test' }]);
 
-console.log('12 strategy investor-environment assertions passed');
+console.log('16 strategy investor-environment assertions passed');

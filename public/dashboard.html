@@ -1719,7 +1719,8 @@
          Pass `strat` when a strategy is selected to apply the correct button logic:
            - live strategy WITH active investors  &rarr; Rebalance only (Edit hidden)
            - live strategy WITHOUT investors      &rarr; Edit only     (Rebalance hidden)
-           - non-live strategy (any)              &rarr; Edit only     (Rebalance hidden) */
+           - UAT strategy                          &rarr; Edit + quick Rebalance
+           - other non-live strategy              &rarr; Edit only     (Rebalance hidden) */
       const _setStratBtnsVisible = (show, strat = null) => {
         const factsheetsBtn = document.getElementById("factsheetsNavBtn");
         const editBtn       = document.getElementById("editStrategyNavBtn");
@@ -1731,8 +1732,10 @@
           return;
         }
         if (factsheetsBtn) factsheetsBtn.style.display = "flex";
-        const showRebalance = strat && !!strat.is_public && strategyInvestedIds.has(String(strat.id));
-        if (editBtn) editBtn.style.display = showRebalance ? "none" : "flex";
+        const isUatStrategy = strat && String(strat.investor_environment || 'LIVE').toUpperCase() === 'UAT';
+        const showLiveRebalance = strat && !!strat.is_public && strategyInvestedIds.has(String(strat.id));
+        const showRebalance = showLiveRebalance || isUatStrategy;
+        if (editBtn) editBtn.style.display = showLiveRebalance ? "none" : "flex";
         if (rebBtn)  rebBtn.style.display  = (showRebalance && !window._rebPermBlocked) ? "flex" : "none";
       };
 
