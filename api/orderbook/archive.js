@@ -51,15 +51,22 @@ module.exports = async (req, res) => {
       const rows = Array.isArray(snapshot.rows) ? snapshot.rows : [];
 
       /* ── Server-side backstop: NEVER archive unfilled orders ────────────────
-         An order may only land in an Active Order Book once it is FILLED (avg or
-         actual fill set, or a fill date stamped). This guards against stale
-         browser tabs running old client code that would otherwise sweep a
-         just-entered, unfilled order into a snapshot every timer tick. Any
-         unfilled rows are stripped; if nothing filled remains, no book is
-         written at all. */
+         An order may only land in an Active Order Book once its AVERAGE FILL is
+         set (the executed price) or a fill date is stamped. This guards against
+         stale browser tabs running old client code that would sweep a just-
+         entered, unfilled order into a snapshot every timer tick. Any unfilled
+         rows are stripped; if nothing filled remains, no book is written.
+
+         IMPORTANT: do NOT use `actualFill` here. That field holds the EXPECTED /
+         target fill (e.g. "R 2 356,32"), which is populated at order entry even
+         when nothing has executed — so avgFill is still "R 0,00". Using it made
+         the guard treat unfilled baskets as filled and archive them. Only
+         avgFill / avgFillNumber (0 until executed) and fillDate are reliable.
+         Money strings are SA-formatted ("R 0,00") — parseMoney only needs the
+         >0 distinction, so comma/space handling doesn't matter. */
       const parseMoney = (v) => parseFloat(String(v == null ? '' : v).replace(/[^\d.]/g, '')) || 0;
       const rowIsFilled = (r) =>
-        !!r?.fillDate || parseMoney(r?.avgFill) > 0 || parseMoney(r?.actualFill) > 0;
+        !!r?.fillDate || Number(r?.avgFillNumber) > 0 || parseMoney(r?.avgFill) > 0;
       const filledRows = rows.filter(rowIsFilled).map((r, i) => ({ ...r, line: i + 1 }));
       if (filledRows.length === 0) {
         return sendJson(res, 200, { ok: true, skipped: 'no filled rows — nothing archived' });
