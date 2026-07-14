@@ -5507,12 +5507,15 @@
       }
     };
 
-    // A row is archive-eligible only once it is FILLED — an avg/actual fill is
-    // set, or a fill date has been stamped. Unfilled orders (all zero, no fill
-    // date) must stay in the live/working book, never captured into an Active
-    // Order Book snapshot.
+    // A row is archive-eligible only once it is FILLED — the AVERAGE (executed)
+    // fill is set, or a fill date has been stamped. Unfilled orders stay in the
+    // live/working book, never captured into an Active Order Book snapshot.
+    // NOTE: never use actualFillNumber here — that field holds the EXPECTED /
+    // target fill (populated at order entry, e.g. R2 356,32) even when nothing
+    // has executed and avgFill is still R0. Using it classified unfilled orders
+    // as filled and auto-archived them (matches the server guard in archive.js).
     const orderbookRowIsFilled = (r) =>
-      Number(r?.avgFillNumber) > 0 || Number(r?.actualFillNumber) > 0 || !!r?.fillDate;
+      Number(r?.avgFillNumber) > 0 || !!r?.fillDate;
 
     const captureFilledOrderbook = async () => {
       if (!allOrderbookRows.length) return;
@@ -5613,8 +5616,8 @@
         timerHighlightUntil = Date.now() + 5000;
       }
       orderbookTimer.classList.toggle('is-hit', Date.now() <= timerHighlightUntil);
-
-      maybeCaptureFilledOrderbook();
+      // Timer is display-only. Auto-capture on the tick was removed — books are
+      // never created automatically; only a manual action archives (filled) rows.
     };
 
     const startOrderbookTimer = () => {
@@ -6651,9 +6654,9 @@
         // if it couldn't load, the live set is unfiltered, and capturing/reconciling
         // would bake test orders into a real archived book (and into broker CSVs).
         if (!orderbookUatMode && _testUserIdSet !== null) {
-          maybeCaptureFilledOrderbook();
-
-          // Run reconciliation tasks after initial render (non-blocking)
+          // Auto-capture on load removed — orders are never archived automatically.
+          // Reconciliation (which only updates EXISTING archived books, never
+          // creates new ones) still runs so archived rows track live holdings.
           reconcileArchivedBooksWithLiveHoldings()
             .then(() => maybeBackfillLegacyArchiveSnapshots())
             .catch((err) => console.error('Post-render reconciliation error:', err?.message || err));
