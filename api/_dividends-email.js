@@ -18,7 +18,7 @@ async function sendViaResend({ to, subject, html, metadata = {} }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error('Email service not configured');
   
-  const fromEmail = process.env.ORDERBOOK_EMAIL_FROM || 'noreply@mymint.co.za';
+  const fromEmail = 'investors@mymint.co.za';
 
   const resp = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -48,7 +48,10 @@ async function getSecuritiesLogos() {
   const secs = await supabaseRequest('/rest/v1/securities_c?select=symbol,logo_url&limit=1000');
   const map = {};
   (secs || []).forEach(s => {
-    if (s.symbol && s.logo_url) map[s.symbol.toUpperCase()] = s.logo_url;
+    if (s.symbol && s.logo_url) {
+      map[s.symbol.toUpperCase()] = s.logo_url;
+      map[s.symbol.toUpperCase().replace(/\.JO$/, '')] = s.logo_url;
+    }
   });
   return map;
 }
@@ -60,8 +63,9 @@ function buildEmailHtml(profile, payouts, logosMap) {
   let totalCash = 0;
 
   payouts.forEach(p => {
-    const symbol = (p.security_code || '').toUpperCase();
-    const logo = logosMap[symbol] || 'https://app.mymint.co.za/icon.png';
+    let symbol = (p.security_code || '').toUpperCase();
+    const logo = logosMap[symbol] || logosMap[symbol.replace(/\.JO$/, '')] || 'https://app.mymint.co.za/icon.png';
+    symbol = symbol.replace(/\.JO$/, '');
     const amount = Number(p.net_cash) || 0;
     totalCash += amount;
     
