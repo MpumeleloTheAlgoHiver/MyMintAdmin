@@ -324,8 +324,11 @@ module.exports = async (req, res) => {
         : `&family_member_id=is.null`;
       // New callers should send integer cents explicitly. balancesByUser is
       // retained for older dashboard/reversal callers whose values are rands.
-      const hasExplicitCents = body.balancesCentsByUser && typeof body.balancesCentsByUser === 'object';
-      const balancesByUser = hasExplicitCents
+      const hasDeltasCents = body.residualDeltasCentsByUser && typeof body.residualDeltasCentsByUser === 'object';
+      const hasExplicitCents = !hasDeltasCents && body.balancesCentsByUser && typeof body.balancesCentsByUser === 'object';
+      const balancesByUser = hasDeltasCents
+        ? body.residualDeltasCentsByUser
+        : hasExplicitCents
         ? body.balancesCentsByUser
         : (body.balancesByUser && typeof body.balancesByUser === 'object' ? body.balancesByUser : {});
       const entries = Object.entries(balancesByUser).filter(([uid]) => uid);
@@ -336,10 +339,17 @@ module.exports = async (req, res) => {
       // Manual read-then-update-or-insert per user — PostgREST on_conflict can't
       // target the COALESCE(family_member_id, sentinel) unique index.
       for (const [userId, balance] of entries) {
-        const balanceCents = hasExplicitCents
+        const requestedCents = (hasExplicitCents || hasDeltasCents)
           ? Math.round(Number(balance) || 0)
           : Math.round((Number(balance) || 0) * 100);
         const scope = `user_id=eq.${encodeURIComponent(userId)}&strategy_id=eq.${encodeURIComponent(strategyId)}${fmFilter}`;
+        let balanceCents = requestedCents;
+        if (hasDeltasCents) {
+          const existing = await requestSupabaseJson(
+            `/rest/v1/strategy_rebalance_residuals?${scope}&select=balance_cents&limit=1`
+          );
+          balanceCents = Math.round(Number(existing?.[0]?.balance_cents || 0) + requestedCents);
+        }
         const updated = await requestSupabaseJson(
           `/rest/v1/strategy_rebalance_residuals?${scope}&select=user_id`,
           { method: 'PATCH', body: { balance_cents: balanceCents, updated_at: nowIso }, extraHeaders: { Prefer: 'return=representation' } }

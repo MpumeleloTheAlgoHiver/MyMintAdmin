@@ -6944,25 +6944,22 @@
           allocatedCents += cents;
         });
 
-        let snapshot = batch.wallet_snapshot_before;
-        if (typeof snapshot === 'string') {
-          try { snapshot = JSON.parse(snapshot); } catch (_) { snapshot = {}; }
-        }
-        if (!snapshot || typeof snapshot !== 'object') snapshot = {};
-
-        const balancesByScope = new Map();
+        /* Send DELTAS, not replacement balances. wallet_snapshot_before is an
+           audit/reversal snapshot and may be stale or empty if the dashboard
+           had not loaded residuals when the batch was created. Settlement must
+           add the actual proceeds to the live DB balance. */
+        const deltasByScope = new Map();
         creditByOwner.forEach((creditCents, key) => {
           const [uid, fm] = key.split('|');
-          if (!balancesByScope.has(fm)) balancesByScope.set(fm, {});
-          const priorRands = Number(snapshot[uid] || 0);
-          balancesByScope.get(fm)[uid] = Math.round(priorRands * 100 + creditCents);
+          if (!deltasByScope.has(fm)) deltasByScope.set(fm, {});
+          deltasByScope.get(fm)[uid] = Math.round(creditCents);
         });
 
-        for (const [fm, balancesCentsByUser] of balancesByScope.entries()) {
+        for (const [fm, residualDeltasCentsByUser] of deltasByScope.entries()) {
           const response = await fetch('/api/orderbook/send-csv?action=rebalance-upsert-residuals', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ strategyId: batch.strategy_id, familyMemberId: fm || null, balancesCentsByUser }),
+            body: JSON.stringify({ strategyId: batch.strategy_id, familyMemberId: fm || null, residualDeltasCentsByUser }),
           });
           if (!response.ok) {
             const details = await response.json().catch(() => ({}));
