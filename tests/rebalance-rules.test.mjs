@@ -150,6 +150,55 @@ section("Structural — migration file exists");
         fs.existsSync(path.join(ROOT, "sql/rebalance_effective_date.sql")));
 }
 
+/* ── #9 Funding reconciliation — pure mirror of rebReconcileSwitch (dashboard.html):
+   money in must equal money out on a rebalance switch, to the cent. */
+function rebReconcileSwitch({ grossProceeds, sellFees, buyGrossCost, buyFees, residualParked, walletIn = 0, toleranceCents = 1 }) {
+  const cashIn  = Number(grossProceeds || 0) + Number(walletIn || 0);
+  const cashOut = Number(sellFees || 0) + Number(buyGrossCost || 0) + Number(buyFees || 0) + Number(residualParked || 0);
+  const diffCents = Math.round((cashIn - cashOut) * 100);
+  return { ok: Math.abs(diffCents) <= toleranceCents, diffCents, cashIn, cashOut };
+}
+
+section("Focus #9 — funding reconciliation (FSR→NED switch)");
+{
+  // Balanced, no fees: sell 8 FSR @ R407.05 → buy 55 NED @ R58.58, R34.50 residual.
+  const a = rebReconcileSwitch({ grossProceeds: 3256.40, sellFees: 0, buyGrossCost: 3221.90, buyFees: 0, residualParked: 34.50 });
+  check("balanced switch reconciles (diff 0)", a.ok && a.diffCents === 0, `diff ${a.diffCents}`);
+
+  // Balanced WITH fees.
+  const b = rebReconcileSwitch({ grossProceeds: 3256.40, sellFees: 8.00, buyGrossCost: 3180.00, buyFees: 5.00, residualParked: 63.40 });
+  check("balanced switch with fees reconciles", b.ok && b.diffCents === 0, `diff ${b.diffCents}`);
+
+  // Overspend: bought 56 shares (R3,280.48) but residual clamped to 0 — the bug
+  // the max(0,…) guard hides. Must FAIL with a negative gap.
+  const c = rebReconcileSwitch({ grossProceeds: 3256.40, sellFees: 0, buyGrossCost: 3280.48, buyFees: 0, residualParked: 0 });
+  check("overspend is caught (blocked)", !c.ok && c.diffCents < 0, `diff ${c.diffCents}`);
+
+  // Save ≠ verify: bought 54 shares (R3,162.32) but residual still stored as the
+  // intended R34.50 → R59.58 floats unaccounted. Must FAIL.
+  const d = rebReconcileSwitch({ grossProceeds: 3256.40, sellFees: 0, buyGrossCost: 3162.32, buyFees: 0, residualParked: 34.50 });
+  check("stale/wrong residual is caught (R59.58 gap)", !d.ok && d.diffCents === 5958, `diff ${d.diffCents}`);
+
+  // Wallet-funded top-up buy (no sale): R500 wallet → R480 shares + R5 fee + R15 residual.
+  const e = rebReconcileSwitch({ grossProceeds: 0, sellFees: 0, buyGrossCost: 480, buyFees: 5, residualParked: 15, walletIn: 500 });
+  check("wallet-funded buy reconciles", e.ok && e.diffCents === 0, `diff ${e.diffCents}`);
+
+  // Tolerance: a 1-cent rounding gap passes, 2 cents fails.
+  const f1 = rebReconcileSwitch({ grossProceeds: 100.00, buyGrossCost: 99.99, residualParked: 0 });
+  const f2 = rebReconcileSwitch({ grossProceeds: 100.00, buyGrossCost: 99.98, residualParked: 0 });
+  check("1-cent rounding gap tolerated", f1.ok, `diff ${f1.diffCents}`);
+  check("2-cent gap rejected", !f2.ok, `diff ${f2.diffCents}`);
+}
+
+section("Structural — dashboard.html (#9 reconciliation wired + hard-blocks)");
+{
+  const db = read("public/dashboard.html");
+  check("rebReconcileSwitch helper defined", /function rebReconcileSwitch\(/.test(db));
+  check("execute-time reconciliation called", /rebReconcileSwitch\(\{[\s\S]*?residualParked:/.test(db));
+  check("failure hard-blocks the rebalance", /Funding reconciliation failed/.test(db));
+  check("uses atomic sell terms (grossProceeds)", /grossProceeds:\s*Number\(sellExecData\.grossProceeds/.test(db));
+}
+
 /* ── Report ───────────────────────────────────────────────────────────────── */
 console.log(results.join("\n"));
 console.log(`\n${"=".repeat(48)}`);
