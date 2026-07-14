@@ -136,10 +136,10 @@ module.exports = async function dividendsEmailHandler(req, res) {
     }
 
     // 3. Fetch profiles
-    const profilesData = await supabaseRequest('/rest/v1/profiles?select=id,mint_number,email,first_name&mint_number=in.(' + clientCodes.map(c => `"${c}"`).join(',') + ')');
+    const profilesData = await supabaseRequest('/rest/v1/profiles?select=id,computershare_number,email,first_name&computershare_number=in.(' + clientCodes.map(c => `"${c}"`).join(',') + ')');
     const profileMap = {};
     (profilesData || []).forEach(p => {
-      if (p.mint_number) profileMap[p.mint_number] = p;
+      if (p.computershare_number) profileMap[p.computershare_number] = p;
     });
 
     // 4. Fetch logos
