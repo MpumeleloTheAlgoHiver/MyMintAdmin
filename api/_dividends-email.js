@@ -18,7 +18,7 @@ async function sendViaResend({ to, subject, html, metadata = {} }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error('Email service not configured');
 
-  const fromEmail = 'investors@mymint.co.za';
+  const fromEmail = 'Investors at MINT <Investors@mymint.co.za>';
 
   const resp = await fetch('https://api.resend.com/emails', {
     method: 'POST',
