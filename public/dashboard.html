@@ -788,7 +788,10 @@
                       <span id="ovInvestorsTotalAUM" style="font-size:11px;color:#94a3b8;font-weight:500;">Direct & Institutional</span>
                     </div>
                   </div>
-                  <div id="ovInvestorCountBadge" style="font-size:11px;font-weight:600;color:#64748b;background:#f1f5f9;padding:2px 8px;border-radius:12px;">0</div>
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <button id="ovInvestorEnvironmentBadge" type="button" disabled title="Strategy investor environment" style="font-size:10px;font-weight:800;color:#166534;background:#dcfce7;border:0;padding:3px 8px;border-radius:12px;letter-spacing:.04em;">LIVE</button>
+                    <div id="ovInvestorCountBadge" style="font-size:11px;font-weight:600;color:#64748b;background:#f1f5f9;padding:2px 8px;border-radius:12px;">0</div>
+                  </div>
                 </div>
                 
                 <!-- Column headers -->
@@ -5071,7 +5074,7 @@
         const { data: strategy, error: stratError } = await supabaseClient
           .from("strategies_c")
           .select(
-            "id, slug, name, short_name, description, risk_level, sector, tags, base_currency, icon_url, image_url, holdings, min_investment, is_public, is_featured, status, created_at",
+            "id, slug, name, short_name, description, risk_level, sector, tags, base_currency, icon_url, image_url, holdings, min_investment, is_public, is_featured, investor_environment, status, created_at",
           )
           .eq("id", strategyId)
           .maybeSingle();
@@ -5376,7 +5379,7 @@
         const { data, error } = await supabaseClient
           .from("strategies_c")
           .select(
-            "id, slug, name, short_name, description, objective, risk_level, sector, min_investment, base_currency, is_featured, is_public, status, created_at, holdings, provider_name, tags",
+            "id, slug, name, short_name, description, objective, risk_level, sector, min_investment, base_currency, is_featured, is_public, investor_environment, status, created_at, holdings, provider_name, tags",
           )
           .order("created_at", { ascending: false });
 
@@ -5607,13 +5610,18 @@
                 Private
               </span>`;
 
+          const investorEnvironment = String(s.investor_environment || 'LIVE').toUpperCase() === 'UAT' ? 'UAT' : 'LIVE';
+          const environmentBadge = investorEnvironment === 'UAT'
+            ? `<span title="UAT strategy — test investors only" style="padding:2px 5px;border-radius:5px;background:#fef3c7;color:#92400e;font-size:9.5px;font-weight:800;flex-shrink:0;">UAT</span>`
+            : `<span title="Live strategy — real investors only" style="padding:2px 5px;border-radius:5px;background:#dcfce7;color:#166534;font-size:9.5px;font-weight:800;flex-shrink:0;">LIVE</span>`;
+
 
           return `<div data-ov-idx="${idx}" class="strat-drop-item${selClass}"
             style="animation:strat-item-in 0.18s ease both;animation-delay:${delay}s;flex-wrap:nowrap;">
             ${dot}
             <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;">${label}</span>
             <div style="display:flex;align-items:center;gap:3px;flex-shrink:0;">
-              ${usersBadge}${publicBadge}
+              ${environmentBadge}${usersBadge}${publicBadge}
               ${isSel ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2.5" stroke-linecap="round" style="margin-left:2px;"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
             </div>
             <button type="button" class="strat-drop-dots ov-drop-dots" data-ov-idx="${idx}">
@@ -5824,9 +5832,13 @@
           ];
           const [{ data: profs }, { data: txnRows }, { data: fmRows }] = await Promise.all(fetches);
           if (profs) profs.forEach(p => { profiles[p.id] = p; });
-          /* Remove holdings that belong to test accounts */
+          /* Environment boundary: LIVE strategies include only real users;
+             UAT strategies include only explicit profiles.is_test users. */
           const _testUids = new Set((profs || []).filter(p => p.is_test).map(p => p.id));
-          if (_testUids.size) investRows.splice(0, investRows.length, ...investRows.filter(r => !_testUids.has(r.user_id)));
+          const _investorEnv = String(strat?.investor_environment || 'LIVE').toUpperCase();
+          investRows.splice(0, investRows.length, ...investRows.filter(r =>
+            _investorEnv === 'UAT' ? _testUids.has(r.user_id) : !_testUids.has(r.user_id)
+          ));
           (fmRows || []).forEach((fm) => { familyMembers[fm.id] = fm; });
           (txnRows || []).forEach(t => {
             const d = t.transaction_date ? t.transaction_date.split('T')[0] : null;
@@ -6556,7 +6568,19 @@
         const el = document.getElementById('ovInvestorsTable');
         const badge = document.getElementById('ovInvestorCountBadge');
         const aumLabel = document.getElementById('ovInvestorsTotalAUM');
+        const envBadge = document.getElementById('ovInvestorEnvironmentBadge');
         if (!el || !investRows) return;
+
+        const investorEnv = String(strat?.investor_environment || 'LIVE').toUpperCase() === 'UAT' ? 'UAT' : 'LIVE';
+        if (envBadge) {
+          envBadge.textContent = investorEnv;
+          envBadge.style.background = investorEnv === 'UAT' ? '#fef3c7' : '#dcfce7';
+          envBadge.style.color = investorEnv === 'UAT' ? '#92400e' : '#166534';
+          envBadge.title = investorEnv === 'UAT'
+            ? 'UAT strategy — only test investors are included'
+            : 'Live strategy — test investors are excluded';
+        }
+        if (aumLabel) aumLabel.textContent = investorEnv === 'UAT' ? 'Test investors only' : 'Direct & Institutional';
 
         if (investRows.length === 0) {
           el.innerHTML = '<div style="font-size:12px;color:#94a3b8;padding:12px;text-align:center;">No active investors found</div>';
@@ -7317,6 +7341,16 @@
                 </div>
               </div>
 
+              <!-- Investor environment -->
+              <div style="margin-bottom:16px;">
+                <label style="display:block;font-size:11px;font-weight:700;color:#64748b;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:6px;">Investor Environment</label>
+                <select id="_sdInvestorEnvironment" style="width:100%;border:1.5px solid #e2e8f0;border-radius:9px;padding:9px 13px;font-size:13.5px;color:#1e293b;outline:none;background:#f8fafc;cursor:pointer;box-sizing:border-box;">
+                  <option value="LIVE" ${String(strategy.investor_environment || 'LIVE').toUpperCase()==='LIVE'?'selected':''}>LIVE — real investors only</option>
+                  <option value="UAT" ${String(strategy.investor_environment || 'LIVE').toUpperCase()==='UAT'?'selected':''}>UAT — test investors only</option>
+                </select>
+                <div style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.45;">This boundary also controls which holdings the rebalance engine may touch.</div>
+              </div>
+
               <!-- Sector display order (category ordering in the app) -->
               <div style="margin-bottom:16px;">
                 <label style="display:block;font-size:11px;font-weight:700;color:#64748b;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:6px;">Category order in app</label>
@@ -7443,6 +7477,7 @@
             description: (overlay.querySelector("#_sdDesc").value.trim())      || null,
             risk_level:  overlay.querySelector("#_sdRisk").value               || null,
             sector:      sdSector.value                                        || null,
+            investor_environment: overlay.querySelector("#_sdInvestorEnvironment").value || 'LIVE',
             is_public:   overlay.querySelector("#_sdIsPublic").checked,
             is_featured: overlay.querySelector("#_sdIsFeatured").checked,
           };
@@ -9189,7 +9224,7 @@
 
               const { data: holdRows } = await holdingsQuery;
               const userIds = [...new Set((holdRows || []).filter(r => r.user_id).map(r => String(r.user_id)))];
-              rebWalletByClient = await rebLoadWalletBalances(strategy.id, userIds);
+              let scopedHoldRows = holdRows || [];
               let nameById = {};
               if (userIds.length) {
                 const pickFirstNonEmpty = (...values) => {
@@ -9240,7 +9275,13 @@
                   }
                 };
 
-                const { data: profRows } = await supabaseClient.from("profiles").select("id, first_name, last_name, email").in("id", userIds);
+                const { data: profRows } = await supabaseClient.from("profiles").select("id, first_name, last_name, email, is_test").in("id", userIds);
+                const profileById = new Map((profRows || []).map(p => [String(p.id), p]));
+                const investorEnv = String(strategy.investor_environment || 'LIVE').toUpperCase();
+                scopedHoldRows = (holdRows || []).filter((row) => {
+                  const isTest = profileById.get(String(row.user_id))?.is_test === true;
+                  return investorEnv === 'UAT' ? isTest : !isTest;
+                });
                 nameById = (profRows || []).reduce((acc, p) => {
                   acc[String(p.id)] = [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || p.email || String(p.id);
                   return acc;
@@ -9264,10 +9305,12 @@
                   });
                 }
               }
+              const scopedUserIds = [...new Set(scopedHoldRows.map(r => String(r.user_id)).filter(Boolean))];
+              rebWalletByClient = await rebLoadWalletBalances(strategy.id, scopedUserIds);
               /* First pass: collect distinct family_member_ids present in
                  this strategy so we can offer them as a scope choice. */
               const fmIdsInStrategy = new Set();
-              (holdRows || []).forEach(r => {
+              scopedHoldRows.forEach(r => {
                 if (r.family_member_id) fmIdsInStrategy.add(String(r.family_member_id));
               });
               /* Look up names for any family members found. */
@@ -9287,7 +9330,7 @@
                 label: fmLabelsById[id] || `Child ${id.slice(0, 8)}`,
               }));
 
-              (holdRows || []).forEach(r => {
+              scopedHoldRows.forEach(r => {
                 if (!r.user_id || !r.security_id) return;
                 if (strategy?.id && String(r.strategy_id) !== String(strategy.id)) return;
                 /* Effective-date eligibility gate (workbook 05/08): a client is
