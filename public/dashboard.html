@@ -10997,9 +10997,6 @@
         const netProceeds = Number(sellExec.netProceeds || 0);
         if (netProceeds <= 0) throw new Error("No net proceeds available.");
 
-        /* Distribute net proceeds to wallets by lots (uniformity by lot count) */
-        const residualByClient = rebDistributeMoneyByLots(netProceeds, clients);
-
         /* Snapshots for reversal */
         const strategyRef = (allStrategiesFullData || []).find((s) => String(s.id) === String(strategyId));
         const holdingsSnapshotBefore = strategyRef?.holdings ? JSON.parse(JSON.stringify(strategyRef.holdings)) : null;
@@ -11118,16 +11115,9 @@
           if (eventsErr) throw new Error(eventsErr.message || "Failed to insert rebalance events.");
         }
 
-        /* Wallet: add residual to each user's existing rebalance_residual */
-        const finalWalletByClient = {};
-        Object.entries(residualByClient).forEach(([userId, addAmount]) => {
-          const currentBalance = Number(rebWalletByClient[userId] || 0);
-          finalWalletByClient[userId] = rebRoundMoney(currentBalance + Number(addAmount || 0));
-        });
-        if (Object.keys(finalWalletByClient).length) {
-          await rebUpsertWalletBalances(strategyId, finalWalletByClient, rebSelectedFamilyMemberId || null);
-          rebWalletByClient = { ...rebWalletByClient, ...finalWalletByClient };
-        }
+        /* Do not credit estimated proceeds yet. The batch keeps the pre-trade
+           residual snapshot; Confirm Fill & Settle replaces it with the actual
+           Excel-fill proceeds after brokerage and custody fees. */
 
         rebSelectedStrategyId = String(strategyId);
         await rebLoadStrategy(strategyId);

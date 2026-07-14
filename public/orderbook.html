@@ -6900,6 +6900,79 @@
 
       // fillBySecId: { [security_id]: fillCents } — per-security broker fill prices
       // from the uploaded sheet (covers both the SELL side and the BUY side).
+      const creditLiquidationResiduals = async (batch, sellEvts, fillBySecId) => {
+        if (!batch?.strategy_id || !sellEvts.length) return 0;
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (!token) throw new Error('Session expired before residual credit.');
+
+        let brokerageRate = 0.005;
+        let custodyFee = 69;
+        try {
+          const feeResp = await fetch('/api/team?action=app-settings-get&key=fees', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const feeJson = feeResp.ok ? await feeResp.json() : null;
+          const fees = feeJson?.value || {};
+          if (Number.isFinite(Number(fees.rebBrokerageRate))) brokerageRate = Math.max(0, Number(fees.rebBrokerageRate));
+          if (Number.isFinite(Number(fees.rebCustodyFee))) custodyFee = Math.max(0, Number(fees.rebCustodyFee));
+        } catch (_) { /* use dashboard engine defaults */ }
+
+        const grossByOwner = new Map();
+        sellEvts.forEach((evt) => {
+          const uid = String(evt.user_id || '');
+          if (!uid) return;
+          const fm = evt.family_member_id ? String(evt.family_member_id) : '';
+          const fillRands = Number(fillBySecId[evt.security_id]) / 100;
+          const gross = Math.max(0, Number(evt.quantity) || 0) * Math.max(0, fillRands || 0);
+          const key = `${uid}|${fm}`;
+          grossByOwner.set(key, (grossByOwner.get(key) || 0) + gross);
+        });
+        if (!grossByOwner.size) throw new Error('No liquidation owners were available for residual credit.');
+
+        const totalGross = [...grossByOwner.values()].reduce((sum, value) => sum + value, 0);
+        const actualNetCents = Math.max(0, Math.round((totalGross * (1 - brokerageRate) - custodyFee * grossByOwner.size) * 100));
+        if (actualNetCents <= 0) throw new Error('Actual liquidation proceeds are not positive after fees.');
+
+        const ownerEntries = [...grossByOwner.entries()];
+        let allocatedCents = 0;
+        const creditByOwner = new Map();
+        ownerEntries.forEach(([key, gross], index) => {
+          const cents = index === ownerEntries.length - 1
+            ? actualNetCents - allocatedCents
+            : Math.round(actualNetCents * (totalGross > 0 ? gross / totalGross : 0));
+          creditByOwner.set(key, cents);
+          allocatedCents += cents;
+        });
+
+        let snapshot = batch.wallet_snapshot_before;
+        if (typeof snapshot === 'string') {
+          try { snapshot = JSON.parse(snapshot); } catch (_) { snapshot = {}; }
+        }
+        if (!snapshot || typeof snapshot !== 'object') snapshot = {};
+
+        const balancesByScope = new Map();
+        creditByOwner.forEach((creditCents, key) => {
+          const [uid, fm] = key.split('|');
+          if (!balancesByScope.has(fm)) balancesByScope.set(fm, {});
+          const priorRands = Number(snapshot[uid] || 0);
+          balancesByScope.get(fm)[uid] = Math.round(priorRands * 100 + creditCents) / 100;
+        });
+
+        for (const [fm, balancesByUser] of balancesByScope.entries()) {
+          const response = await fetch('/api/orderbook/send-csv?action=rebalance-upsert-residuals', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ strategyId: batch.strategy_id, familyMemberId: fm || null, balancesByUser }),
+          });
+          if (!response.ok) {
+            const details = await response.json().catch(() => ({}));
+            throw new Error(details.details || details.error || `Residual credit failed (${response.status}).`);
+          }
+        }
+        return actualNetCents / 100;
+      };
+
       const executeFillAndSettle = async (batch, events, fillBySecId) => {
         const nowIso = new Date().toISOString();
         const fillDateStr = nowIso.split('T')[0];
@@ -6926,12 +6999,15 @@
         const sellEvts = events.filter((e) => e.trade_side === 'SELL');
         const buyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY');
         const walletBuyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY_WALLET');
+        const isLiquidationOnly = sellEvts.length > 0 && buyEvts.length === 0 && walletBuyEvts.length === 0;
+        let actualLiquidationNetProceeds = null;
 
         const errors = [];
 
         /* Cost basis carryover was removed in favour of clean per-trade
            recording: each new BUY lands at its actual market fill price.
-           Realized gain from the SELL flows into wallets.rebalance_residual.
+           Liquidation net proceeds flow into the strategy residual only after
+           the actual Excel fill is confirmed.
            See docs/rebalance-cost-basis-carryover.md for the rationale and
            how to reinstate carryover if the decision changes. */
 
@@ -7151,8 +7227,8 @@
 
         // No cost basis carryover: both primary and wallet-funded buys land
         // at their actual market fill price (see docs/rebalance-cost-basis-
-        // carryover.md for the rationale). Realized gain from the sell side
-        // flows into wallets.rebalance_residual via the commit handler.
+        // carryover.md for the rationale). Liquidation cash is credited from
+        // the actual broker fill after all holding writes succeed below.
         await applyBuySettlement(buyEvts, 'BUY');
         if (walletBuyEvts.length) {
           await applyBuySettlement(walletBuyEvts, 'WALLET_BUY');
@@ -7218,10 +7294,21 @@
           errors.push(`Rebalance txn step failed: ${txnCatchErr?.message || txnCatchErr}`);
         }
 
+        // Liquidate-to-cash credits no estimate at commit time. Only after all
+        // holding/event writes succeed do we replace the pre-trade residual
+        // snapshot with proceeds calculated from the actual broker fill.
+        if (isLiquidationOnly && errors.length === 0) {
+          try {
+            actualLiquidationNetProceeds = await creditLiquidationResiduals(batch, sellEvts, fillBySecId);
+          } catch (creditErr) {
+            errors.push(`Liquidation residual credit: ${creditErr?.message || creditErr}`);
+          }
+        }
+
         // Ã¢&rdquo;â¬Ã¢&rdquo;â¬ 3. Mark batch SETTLED Ã¢&rdquo;â¬Ã¢&rdquo;â¬
-        const { error: settleErr } = await supabaseClient.from('rebalance_batch').update({
-          status: 'SETTLED', settled_at: nowIso, updated_at: nowIso,
-        }).eq('id', batch.id);
+        const settledBatchPatch = { status: 'SETTLED', settled_at: nowIso, updated_at: nowIso };
+        if (actualLiquidationNetProceeds != null) settledBatchPatch.net_proceeds = actualLiquidationNetProceeds;
+        const { error: settleErr } = await supabaseClient.from('rebalance_batch').update(settledBatchPatch).eq('id', batch.id);
         if (settleErr) throw new Error(settleErr.message);
 
         // Report any non-fatal errors that occurred during settlement
