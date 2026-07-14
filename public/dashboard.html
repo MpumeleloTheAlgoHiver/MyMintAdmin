@@ -1125,6 +1125,11 @@
                   <option value="">Parent only (family_member_id IS NULL)</option>
                 </select>
               </div>
+              <!-- Effective date: clients are affected only if they held the strategy on or before this date (workbook rule). Defaults to today. -->
+              <div class="flex-1 min-w-[160px]">
+                <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Effective date</label>
+                <input id="rebEffectiveDateInput" type="date" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white" title="Only clients who held this strategy on or before this date are affected by the rebalance. Defaults to today." />
+              </div>
               <div id="rebNegativeBadge" class="hidden items-center gap-1.5 text-red-600 text-xs font-semibold">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>
                 Negative holdings detected
@@ -8480,6 +8485,21 @@
         return Number(Number(value || 0).toFixed(2));
       }
 
+      /* ── #9 Funding-reconciliation (workbook tab 13 "switch funded by sale") ──
+         Money in must equal money out on a rebalance switch, to the cent:
+             grossProceeds  ==  sellFees + buyGrossCost + buyFees + residualParked
+         residualCash is stored as max(0, netCapital − totalCost), so an OVERSPEND
+         (buying more than the sale funds) silently clamps residual to 0 and hides
+         the shortfall — the pre-existing `residualCash < 0` guard can never catch
+         it. This recomputes from atomic terms and returns the exact cent gap.
+         Pure + side-effect-free so it also drops into the #11 checks harness. */
+      function rebReconcileSwitch({ grossProceeds, sellFees, buyGrossCost, buyFees, residualParked, walletIn = 0, toleranceCents = 1 }) {
+        const cashIn  = Number(grossProceeds || 0) + Number(walletIn || 0);
+        const cashOut = Number(sellFees || 0) + Number(buyGrossCost || 0) + Number(buyFees || 0) + Number(residualParked || 0);
+        const diffCents = Math.round((cashIn - cashOut) * 100);
+        return { ok: Math.abs(diffCents) <= toleranceCents, diffCents, cashIn, cashOut };
+      }
+
       function rebDistributeMoneyByLots(totalAmount, clients) {
         const totalLots = clients.reduce((sum, c) => sum + (Number(c.lots) || 0), 0);
         const totalCents = Math.max(0, Math.round(Number(totalAmount || 0) * 100));
@@ -8932,6 +8952,11 @@
          the right rows. */
       let rebSelectedFamilyMemberId = null;
       let rebFamilyMembersForStrategy = []; // [{id, label}] populated per strategy
+      /* Effective date of the rebalance (workbook 05_Rebalance_Events col C).
+         Eligibility is gated on "bought on/before this date" — a client who
+         entered the strategy AFTER the effective date is NOT affected. Defaults
+         to today (same-day rebalance); the admin can back-date it. */
+      let rebEffectiveDate = new Date().toISOString().slice(0, 10);
 
       /* ── Helpers ── */
       const rebFmtZAR = n => `R\u00A0${Number(n).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -9085,6 +9110,23 @@
         });
       })();
 
+      /* Effective-date change handler: reload the strategy so rebRawHoldings is
+         rebuilt gated to holders who bought on/before the chosen date. */
+      (function bindEffectiveDateHandler() {
+        const dInput = document.getElementById("rebEffectiveDateInput");
+        if (!dInput || dInput._bound) return;
+        dInput._bound = true;
+        if (!dInput.value) dInput.value = rebEffectiveDate;   // default = today
+        dInput.max = rebEffectiveDate;                        // no future effective dates
+        dInput.addEventListener("change", () => {
+          rebEffectiveDate = dInput.value || new Date().toISOString().slice(0, 10);
+          if (rebSelectedStrategyId) {
+            rebLoadStrategy(rebSelectedStrategyId).catch(err =>
+              console.warn("Effective-date reload failed:", err?.message || err));
+          }
+        });
+      })();
+
       /* ── Load strategy holdings into ISINs (+ fetch live client holdings) ── */
       async function rebLoadStrategy(strategyId) {
         rebSelectedIsin = null;
@@ -9136,7 +9178,7 @@
             if (secIds.length) {
               let holdingsQuery = supabaseClient
                 .from("stock_holdings_c")
-                .select("id, security_id, user_id, family_member_id, quantity, avg_fill, expected_fill:\"Expected_fill\", strategy_id")
+                .select("id, security_id, user_id, family_member_id, quantity, avg_fill, expected_fill:\"Expected_fill\", fill_date:\"Fill_date\", strategy_id")
                 .eq("is_active", true)
                 .eq("trade_side", "BUY")
                 .in("security_id", secIds);
@@ -9248,6 +9290,12 @@
               (holdRows || []).forEach(r => {
                 if (!r.user_id || !r.security_id) return;
                 if (strategy?.id && String(r.strategy_id) !== String(strategy.id)) return;
+                /* Effective-date eligibility gate (workbook 05/08): a client is
+                   affected only if they held the strategy on or before the
+                   effective date. Skip anyone who bought AFTER it. Rows with no
+                   Fill_date (legacy) are treated as always-held (kept). */
+                const fillDate = r.fill_date ? String(r.fill_date).slice(0, 10) : null;
+                if (fillDate && fillDate > rebEffectiveDate) return;
                 const code = codeBySecId[r.security_id];
                 if (!code) return;
                 const fmId = r.family_member_id ? String(r.family_member_id) : null;
@@ -10446,7 +10494,7 @@
         /* ── Read existing active positions (read-only &mdash; to compute sell quantities) ── */
         const { data: existingRows, error: existingErr } = await supabaseClient
           .from("stock_holdings_c")
-          .select("id, user_id, security_id, quantity, trade_side, is_active, avg_fill")
+          .select("id, user_id, security_id, quantity, trade_side, is_active, avg_fill, fill_date:\"Fill_date\"")
           .eq("strategy_id", strategyId)
           .eq("is_active", true)
           .eq("trade_side", "BUY")
@@ -10455,16 +10503,25 @@
         if (existingErr) throw new Error(existingErr.message || "Failed to load existing holdings.");
 
         const nowIso = new Date().toISOString();
+        const effectiveDateStr = rebEffectiveDate || nowIso.slice(0, 10);
         /* Only FILLED rows (avg_fill > 0) are sold by the engine. Unfilled
-           orders are handled by the swap step below — never via SELL events. */
+           orders are handled by the swap step below — never via SELL events.
+           Effective-date gate (workbook 05/08): a position bought AFTER the
+           effective date is not eligible to be rebalanced (null date = legacy,
+           treated as always-held). */
+        const isEligibleByDate = (row) => {
+          const fd = row.fill_date ? String(row.fill_date).slice(0, 10) : null;
+          return !fd || fd <= effectiveDateStr;
+        };
         const activeSellRows = (existingRows || []).filter((row) => {
           return String(row.security_id) === String(sellSecurityId)
             && Number(row.quantity || 0) > 0
-            && Number(row.avg_fill || 0) > 0;
+            && Number(row.avg_fill || 0) > 0
+            && isEligibleByDate(row);
         });
 
         if (!activeSellRows.length) {
-          throw new Error("No active position found for selected sell instrument.");
+          throw new Error("No active position found for the selected sell instrument that is eligible on the effective date (" + effectiveDateStr + ").");
         }
 
         const reductionUnits = Number(rebSelectedStep.reductionUnits || 0);
@@ -10481,8 +10538,20 @@
         const _sellRowMeta = activeSellRows.map((row) => {
           const totalQty = Math.abs(Number(row.quantity || 0));
           const soldQty = isFullExit ? totalQty : Math.max(0, Math.round(totalQty * sellFraction));
-          return { holdingId: row.id, userId: row.user_id, soldQty, remaining: totalQty - soldQty };
+          return { holdingId: row.id, userId: row.user_id, soldQty, remaining: totalQty - soldQty, heldQty: totalQty };
         });
+
+        /* Sellability guard (workbook 05_Rebalance_Events col M, "Can_Execute").
+           You can never sell more than a client holds. If any row fails this,
+           block the whole rebalance rather than commit a bad SELL event. */
+        const oversold = _sellRowMeta.filter((m) => m.soldQty > m.heldQty || m.remaining < 0);
+        if (oversold.length) {
+          throw new Error(
+            "Cannot execute: sell quantity exceeds held quantity for " +
+            oversold.length + " client(s) (e.g. user " + oversold[0].userId +
+            " sell " + oversold[0].soldQty + " of " + oversold[0].heldQty + ")."
+          );
+        }
 
         /* The active owner scope is captured once here. Every event row
            inserted by this rebalance carries the same family_member_id, so
@@ -10554,7 +10623,30 @@
         const totalBuyQty = buyEventRows.reduce((s, r) => s + Number(r.quantity || 0), 0);
         const totalExtraBuyQty = extraBuyEventRows.reduce((s, r) => s + Number(r.quantity || 0), 0);
         const sellModal = document.getElementById("rebSellModal");
-        const netProceeds = sellModal?._execData?.netProceeds || 0;
+        const sellExecData = sellModal?._execData || {};
+        const netProceeds = sellExecData.netProceeds || 0;
+
+        /* ── #9 Funding reconciliation — HARD BLOCK ────────────────────────────
+           Prove the sell fully funds the buy + fees + residual before we write
+           anything. Catches overspend (residual clamped to 0), wrong prices, and
+           any future decoupling of residual from the actual trade. */
+        {
+          const recon = rebReconcileSwitch({
+            grossProceeds:  Number(sellExecData.grossProceeds || 0),
+            sellFees:       Number(sellExecData.brokerage || 0) + Number(sellExecData.offCustodyFee || 0),
+            buyGrossCost:   Number(buyExec.grossCost || 0),
+            buyFees:        Number(buyExec.brokerage || 0) + Number(buyExec.custodyFee || 0),
+            residualParked: Number(buyExec.residualCash || 0),
+          });
+          if (!recon.ok) {
+            const r = (c) => 'R' + (c / 100).toFixed(2);
+            throw new Error(
+              `Funding reconciliation failed — the switch does not balance by ${r(recon.diffCents)} ` +
+              `(money in ${r(Math.round(recon.cashIn * 100))} vs out ${r(Math.round(recon.cashOut * 100))}). ` +
+              `This rebalance was blocked to protect client + firm money; check prices, fees and buy quantity.`
+            );
+          }
+        }
 
         /* ── Get current admin user ID ── */
         const { data: sessionData } = await supabaseClient.auth.getSession();
@@ -10567,6 +10659,7 @@
             id: rebalanceBatchId,
             strategy_id: strategyId,
             status: "PENDING",
+            effective_date: effectiveDateStr,
             holdings_snapshot_before: holdingsSnapshotBefore,
             wallet_snapshot_before: walletSnapshotBefore,
             sell_security_id: sellSecurityId,
@@ -10843,11 +10936,23 @@
         }
 
         const { holdings, minInvestment } = await rebMergeAndRevalueStrategyHoldings(nextHoldings);
-        const { error: strategyUpdateErr } = await supabaseClient
-          .from("strategies_c")
-          .update({ holdings: holdings.length ? holdings : null, min_investment: minInvestment })
-          .eq("id", strategyId);
-        if (strategyUpdateErr) throw new Error(strategyUpdateErr.message || "Failed to update strategy holdings.");
+        const token = await rebApiToken();
+        const response = await fetch("/api/orderbook/send-csv?action=rebalance-update-strategy-holdings", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            strategyId,
+            holdings: holdings.length ? holdings : null,
+            minInvestment,
+          }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(result.details || result.error || "Failed to update strategy holdings.");
+        }
 
         allStrategiesFullData = (allStrategiesFullData || []).map((item) => {
           if (String(item.id) !== String(strategyId)) return item;
@@ -10900,9 +11005,6 @@
         const holdingsSnapshotBefore = strategyRef?.holdings ? JSON.parse(JSON.stringify(strategyRef.holdings)) : null;
         const walletSnapshotBefore = { ...rebWalletByClient };
 
-        /* Update strategy holdings: remove/reduce SBK */
-        await rebRemoveStrategyHoldingForLiquidation({ strategyId, soldIsin: rebSelectedIsin, sellStep: rebSelectedStep });
-
         const rebalanceBatchId = (window.crypto && typeof window.crypto.randomUUID === "function")
           ? window.crypto.randomUUID()
           : ("10000000-1000-4000-8000-100000000000".replace(/[018]/g, c =>
@@ -10910,12 +11012,13 @@
             ));
         const strategyNameSnapshot = strategyRef?.short_name || strategyRef?.name || "";
         const nowIso = new Date().toISOString();
+        const effectiveDateStr = rebEffectiveDate || nowIso.slice(0, 10);
 
         /* Read existing active positions for the sell security */
         const userIds = [...new Set(clients.map((c) => String(c.id)))];
         const { data: existingRows, error: existingErr } = await supabaseClient
           .from("stock_holdings_c")
-          .select("id, user_id, security_id, quantity, trade_side, is_active")
+          .select("id, user_id, security_id, quantity, trade_side, is_active, fill_date:\"Fill_date\"")
           .eq("strategy_id", strategyId)
           .eq("is_active", true)
           .eq("trade_side", "BUY")
@@ -10923,8 +11026,14 @@
           .eq("security_id", sellSecurityId);
         if (existingErr) throw new Error(existingErr.message || "Failed to load existing holdings.");
 
-        const activeSellRows = (existingRows || []).filter((row) => Number(row.quantity || 0) > 0);
-        if (!activeSellRows.length) throw new Error("No active position found for selected sell instrument.");
+        /* Effective-date eligibility gate (workbook 05/08): skip positions
+           bought after the effective date; null Fill_date = legacy, kept. */
+        const activeSellRows = (existingRows || []).filter((row) => {
+          if (Number(row.quantity || 0) <= 0) return false;
+          const fd = row.fill_date ? String(row.fill_date).slice(0, 10) : null;
+          return !fd || fd <= effectiveDateStr;
+        });
+        if (!activeSellRows.length) throw new Error("No active position found for the selected sell instrument that is eligible on the effective date (" + effectiveDateStr + ").");
 
         const reductionUnits = Number(rebSelectedStep.reductionUnits || 0);
         const unitsPerLot = Math.max(1, Number(rebSelectedIsin.unitsPerLot || 1));
@@ -10935,8 +11044,18 @@
         const _sellRowMeta = activeSellRows.map((row) => {
           const totalQty = Math.abs(Number(row.quantity || 0));
           const soldQty = isFullExit ? totalQty : Math.max(0, Math.round(totalQty * sellFraction));
-          return { holdingId: row.id, userId: row.user_id, soldQty };
+          return { holdingId: row.id, userId: row.user_id, soldQty, heldQty: totalQty };
         });
+
+        /* Sellability guard (workbook col M "Can_Execute") — never sell more than held. */
+        const oversold = _sellRowMeta.filter((m) => m.soldQty > m.heldQty);
+        if (oversold.length) {
+          throw new Error(
+            "Cannot execute: sell quantity exceeds held quantity for " +
+            oversold.length + " client(s) (e.g. user " + oversold[0].userId +
+            " sell " + oversold[0].soldQty + " of " + oversold[0].heldQty + ")."
+          );
+        }
 
         const familyMemberIdForLiquidateEvents = rebSelectedFamilyMemberId || null;
         const sellEventRows = _sellRowMeta
@@ -10957,6 +11076,10 @@
             updated_at: nowIso,
           }));
         const totalSellQty = sellEventRows.reduce((s, r) => s + Number(r.quantity || 0), 0);
+        if (totalSellQty <= 0) throw new Error("No eligible units are available to liquidate.");
+
+        /* Only change the strategy after all holding/effective-date checks pass. */
+        await rebRemoveStrategyHoldingForLiquidation({ strategyId, soldIsin: rebSelectedIsin, sellStep: rebSelectedStep });
 
         const { data: sessionData } = await supabaseClient.auth.getSession();
         const currentUserId = sessionData?.session?.user?.id || null;
@@ -10968,6 +11091,7 @@
             id: rebalanceBatchId,
             strategy_id: strategyId,
             status: "PENDING",
+            effective_date: effectiveDateStr,
             holdings_snapshot_before: holdingsSnapshotBefore,
             wallet_snapshot_before: walletSnapshotBefore,
             sell_security_id: sellSecurityId,
@@ -11266,6 +11390,7 @@
             ));
         const strategyNameSnapshot = strategyRef?.short_name || strategyRef?.name || "";
         const nowIso = new Date().toISOString();
+        const effectiveDateStr = rebEffectiveDate || nowIso.slice(0, 10);
 
         /* Build BUY events (wallet-funded) &mdash; uses REBALANCE_EVENT_BUY_WALLET so
            settlement applies the actual fill price (no carryover concept here). */
@@ -11295,6 +11420,7 @@
             id: rebalanceBatchId,
             strategy_id: strategyId,
             status: "PENDING",
+            effective_date: effectiveDateStr,
             holdings_snapshot_before: holdingsSnapshotBefore,
             wallet_snapshot_before: walletSnapshotBefore,
             sell_security_id: null,

@@ -5502,13 +5502,24 @@
       }
     };
 
+    // A row is archive-eligible only once it is FILLED — an avg/actual fill is
+    // set, or a fill date has been stamped. Unfilled orders (all zero, no fill
+    // date) must stay in the live/working book, never captured into an Active
+    // Order Book snapshot.
+    const orderbookRowIsFilled = (r) =>
+      Number(r?.avgFillNumber) > 0 || Number(r?.actualFillNumber) > 0 || !!r?.fillDate;
+
     const captureFilledOrderbook = async () => {
       if (!allOrderbookRows.length) return;
 
-      // Separate pending rebalance rows &mdash; they must NOT be archived
-      const settledRows = allOrderbookRows.filter(r => !r.isPendingRebalance);
+      // Pending rebalance rows are never archived (kept alive below).
       const pendingRows = allOrderbookRows.filter(r => r.isPendingRebalance);
-      if (!settledRows.length) return;
+      const settledRows = allOrderbookRows.filter(r => !r.isPendingRebalance);
+
+      // Only FILLED rows drop into the snapshot; unfilled rows stay live.
+      const filledRows   = settledRows.filter(orderbookRowIsFilled);
+      const unfilledRows = settledRows.filter(r => !orderbookRowIsFilled(r));
+      if (!filledRows.length) return; // nothing filled yet — no book to create
 
       const now = new Date();
       const dateKey = getArchiveDateKey(now);
@@ -5521,7 +5532,7 @@
         title: `Order Book ${sequence}: ${now.toLocaleString()}`,
         dateLabel: now.toLocaleString(),
         createdAt: now.toISOString(),
-        rows: settledRows.map((row, index) => ({
+        rows: filledRows.map((row, index) => ({
           ...row,
           orderbookSequence: sequence,
           line: index + 1
@@ -5546,15 +5557,16 @@
       persistFilledArchive();
       renderFilledOrderbooks();
       updateOrderbookHeaderSequence();
-      // Keep pending rows alive in the active orderbook
-      allOrderbookRows = pendingRows;
+      // Keep pending AND still-unfilled rows alive in the working orderbook.
+      allOrderbookRows = [...unfilledRows, ...pendingRows];
       applySearchFilter();
     };
 
     const maybeCaptureFilledOrderbook = async () => {
-      // Exclude pending rebalance rows from capture consideration
-      const settledRows = (allOrderbookRows || []).filter(r => !r.isPendingRebalance);
-      if (!settledRows.length) return;
+      // Only FILLED, non-pending rows are archive-eligible; unfilled orders keep
+      // piling up on the working book until their fill is captured.
+      const filledRows = (allOrderbookRows || []).filter(r => !r.isPendingRebalance && orderbookRowIsFilled(r));
+      if (!filledRows.length) return;
       if (isCapturingFilledOrderbook) return;
 
       const now = new Date();
@@ -5563,10 +5575,10 @@
       // One capture per day
       if (hasFilledOrderbookForDate(todayKey)) return;
 
-      // Only capture once a new day has started and there are rows from
-      // before today. This lets records pile up visibly on the active
-      // orderbook throughout the day before being archived.
-      const hasOlderRows = settledRows.some((row) => {
+      // Only capture once a new day has started and there are FILLED rows from
+      // before today. This lets filled records pile up visibly on the active
+      // orderbook through the day before being archived.
+      const hasOlderRows = filledRows.some((row) => {
         if (!row.timestamp) return true;
         return getArchiveDateKey(new Date(row.timestamp)) < todayKey;
       });
@@ -6892,7 +6904,7 @@
              events and a uuid for per-child events. */
           let activeQuery = supabaseClient
             .from('stock_holdings_c')
-            .select('id, quantity')
+            .select('id, quantity, avg_fill, expected_fill:"Expected_fill", fill_date:"Fill_date", transaction_id')
             .eq('strategy_id', strategyId)
             .eq('user_id', evt.user_id)
             .eq('security_id', evt.security_id)
@@ -6909,26 +6921,54 @@
           const soldQty = Number(evt.quantity) || 0;
 
           if (activePos) {
-            const remaining = Math.max(0, Number(activePos.quantity) - soldQty);
-            if (remaining <= 0) {
-              // Full close &mdash; mark position inactive
-              const { error: closeErr } = await supabaseClient.from('stock_holdings_c').update({
-                is_active: false,
-                closed_reason: 'REBALANCE_SELL',
-                closed_at: nowIso,
-                updated_at: nowIso,
-                avg_exit: fillBySecId[evt.security_id],
-                "Exit_date": fillDateStr,
-                Status: 'inactive',
-              }).eq('id', activePos.id);
-              if (closeErr) errors.push(`SELL close ${evt.user_id}: ${closeErr.message}`);
-            } else {
-              // Partial reduce &mdash; keep position active with reduced qty
-              const { error: reduceErr } = await supabaseClient.from('stock_holdings_c').update({
+            /* ── Leg immutability (workbook 06_Strategy_Ledger) ──────────────
+               A sell NEVER rewrites a live leg. Close the ORIGINAL leg as the
+               "sold sub-leg": it keeps its original avg_fill, so realised P&L =
+               (exit − entry) × sold qty is correct. For a PARTIAL sell, reissue
+               the leftover shares as a NEW leg that carries the original entry
+               price/date (Expected_fill, Fill_date) and lot linkage — so cost
+               basis and entry timing are preserved instead of being flattened
+               to the fill price. A full exit leaves remaining=0 → no reissue,
+               which is byte-for-byte the previous full-close behaviour. */
+            const origQty = Math.abs(Number(activePos.quantity) || 0);
+            const closedQty = Math.min(soldQty, origQty);
+            const remaining = Math.max(0, origQty - soldQty);
+
+            const { error: closeErr } = await supabaseClient.from('stock_holdings_c').update({
+              is_active: false,
+              closed_reason: 'REBALANCE_SELL',
+              closed_at: nowIso,
+              updated_at: nowIso,
+              avg_exit: fillBySecId[evt.security_id],
+              "Exit_date": fillDateStr,
+              quantity: closedQty,
+              Status: 'inactive',
+            }).eq('id', activePos.id);
+            if (closeErr) errors.push(`SELL close ${evt.user_id}: ${closeErr.message}`);
+
+            if (remaining > 0) {
+              // Reissue the leftover shares as a fresh leg — original entry preserved.
+              const { error: remErr } = await supabaseClient.from('stock_holdings_c').insert({
+                user_id: evt.user_id,
+                family_member_id: evt.family_member_id || null,
+                security_id: evt.security_id,
                 quantity: remaining,
+                strategy_id: strategyId,
+                trade_side: 'BUY',
+                is_active: true,
+                avg_fill: activePos.avg_fill,                       // ORIGINAL entry price (cents)
+                "Expected_fill": activePos.expected_fill ?? null,   // ORIGINAL client cost basis (rands)
+                "Fill_date": activePos.fill_date || fillDateStr,    // ORIGINAL entry date
+                transaction_id: activePos.transaction_id || null,   // keep lot linkage
+                rebalance_batch_id: batch.id,
+                strategy_name_snapshot: batch.strategy_name_snapshot,
+                created_at: nowIso,
                 updated_at: nowIso,
-              }).eq('id', activePos.id);
-              if (reduceErr) errors.push(`SELL reduce ${evt.user_id}: ${reduceErr.message}`);
+                Status: 'active',
+                closed_reason: 'REBALANCE_PARTIAL_REMAINDER',
+                as_of_date: fillDateStr,
+              });
+              if (remErr) errors.push(`SELL remainder reissue ${evt.user_id}: ${remErr.message}`);
             }
           } else {
             // No existing stock_holdings_c row (position only in strategy JSON).

@@ -312,32 +312,44 @@ const syncAllSecuritiesFromYahoo = async () => {
 
       const rawChangePct = price.regularMarketChangePercent?.raw ?? null;
       const rawDivYield = summary.dividendYield?.raw ?? null;
-      const rawYtd = keyStats.ytdReturn?.raw ?? null;  // do NOT fall back to 52WeekChange (1-year, not YTD)
-
-      // If YTD not returned by quoteSummary, calculate it from the chart API
+      // quoteSummary.regularMarketPrice is stale/mixed-unit for a significant
+      // subset of .JO symbols. Use the chart quote for the current price, then
+      // normalize its scale against our repaired daily-close spine. Calculate
+      // YTD from the spine's Dec-31 anchor; Yahoo sometimes changes units within
+      // its own historical series, so its first YTD close is not a safe anchor.
+      let trustedCurrentPrice = null;
       let calculatedYtd = null;
-      if (rawYtd == null) {
-        try {
-          const chartRes = await fetch(
-            `https://query1.finance.yahoo.com/v8/finance/chart/${encodedSymbol}?interval=1d&range=ytd`,
-            { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } }
-          );
-          if (chartRes.ok) {
-            const chartData = await chartRes.json();
-            const chartResult = chartData?.chart?.result?.[0];
-            const currentPrice = chartResult?.meta?.regularMarketPrice;
-            const closes = chartResult?.indicators?.quote?.[0]?.close;
-            const firstClose = closes?.find(c => c != null);
-            if (firstClose && currentPrice) {
-              calculatedYtd = ((currentPrice - firstClose) / firstClose) * 100;
+      try {
+        const chartRes = await fetch(
+          `https://query1.finance.yahoo.com/v8/finance/chart/${encodedSymbol}?interval=1d&range=ytd`,
+          { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } }
+        );
+        if (chartRes.ok) {
+          const chartData = await chartRes.json();
+          const chartCurrent = Number(chartData?.chart?.result?.[0]?.meta?.regularMarketPrice);
+          if (chartCurrent > 0) {
+            const secId = encodeURIComponent(sec.id);
+            const [latestRows, anchorRows] = await Promise.all([
+              fetchSupabaseJson(`/rest/v1/stock_returns_c?select=current_price&security_id=eq.${secId}&order=as_of_date.desc&limit=1`, null),
+              fetchSupabaseJson(`/rest/v1/stock_returns_c?select=current_price&security_id=eq.${secId}&as_of_date=lte.2025-12-31&order=as_of_date.desc&limit=1`, null),
+            ]);
+            const reference = Number(latestRows?.[0]?.current_price);
+            const scale = [1, 100, 0.01].find(k => reference > 0 && (chartCurrent * k) / reference > 0.4 && (chartCurrent * k) / reference < 2.5);
+            if (scale != null) {
+              trustedCurrentPrice = Math.round(chartCurrent * scale);
+              const anchor = Number(anchorRows?.[0]?.current_price);
+              if (anchor > 0) calculatedYtd = ((trustedCurrentPrice / anchor) - 1) * 100;
+            } else {
+              console.warn(`[MarketSync] ${sec.symbol}: ambiguous Yahoo scale (${chartCurrent}, ref ${reference}); price skipped`);
             }
           }
-        } catch { /* ignore */ }
+        }
+      } catch (err) {
+        console.warn(`[MarketSync] ${sec.symbol}: chart/spine validation failed: ${err?.message || err}`);
       }
 
       const updatePayload = {};
-      const lp = price.regularMarketPrice?.raw;
-      if (lp != null) updatePayload.last_price = Math.round(lp);
+      if (trustedCurrentPrice != null) updatePayload.last_price = trustedCurrentPrice;
       if (rawChangePct != null) updatePayload.change_percent = rawChangePct * 100;
       const mc = price.marketCap?.raw;
       if (mc != null) updatePayload.market_cap = Math.round(mc);
@@ -346,8 +358,7 @@ const syncAllSecuritiesFromYahoo = async () => {
       const dr = summary.dividendRate?.raw;
       if (dr != null) updatePayload.dividend_per_share = dr;
       if (rawDivYield != null) updatePayload.dividend_yield = rawDivYield * 100;
-      const ytdFinal = rawYtd != null ? rawYtd * 100 : calculatedYtd;
-      if (ytdFinal != null) updatePayload.ytd_performance = ytdFinal;
+      if (calculatedYtd != null) updatePayload.ytd_performance = calculatedYtd;
 
       if (Object.keys(updatePayload).length > 0) {
         await mutateSupabaseJson(

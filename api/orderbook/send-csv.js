@@ -350,6 +350,35 @@ module.exports = async (req, res) => {
       return sendJson(res, 200, { ok: true, upserted });
     }
 
+    // Strategy composition changes are admin writes. Keep them behind the same
+    // permission gate as the rebalance commit instead of relying on browser RLS.
+    if (action === 'rebalance-update-strategy-holdings') {
+      if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const strategyId = String(body.strategyId || '').trim();
+      if (!strategyId) return sendJson(res, 400, { error: 'strategyId required' });
+      if (body.holdings !== null && !Array.isArray(body.holdings)) {
+        return sendJson(res, 400, { error: 'holdings must be an array or null' });
+      }
+      const minInvestment = Number(body.minInvestment);
+      if (!Number.isFinite(minInvestment) || minInvestment < 0) {
+        return sendJson(res, 400, { error: 'minInvestment must be a non-negative number' });
+      }
+
+      const updated = await requestSupabaseJson(
+        `/rest/v1/strategies_c?id=eq.${encodeURIComponent(strategyId)}&select=id`,
+        {
+          method: 'PATCH',
+          body: { holdings: body.holdings, min_investment: minInvestment },
+          extraHeaders: { Prefer: 'return=representation' },
+        }
+      );
+      if (!Array.isArray(updated) || !updated.length) {
+        return sendJson(res, 404, { error: 'Strategy not found' });
+      }
+      return sendJson(res, 200, { ok: true, strategyId });
+    }
+
     // Fetch confirmation statuses using service-role key (bypasses RLS)
     if (action === 'get-confirmation-statuses') {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
