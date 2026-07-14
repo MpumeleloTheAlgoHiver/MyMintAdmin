@@ -44,19 +44,19 @@ function formatMoney(amount) {
   return 'R ' + num.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-async function getSecuritiesLogos() {
-  const secs = await supabaseRequest('/rest/v1/securities_c?select=symbol,logo_url&limit=1000');
+async function getSecuritiesData() {
+  const secs = await supabaseRequest('/rest/v1/securities_c?select=symbol,name,logo_url&limit=1000');
   const map = {};
   (secs || []).forEach(s => {
-    if (s.symbol && s.logo_url) {
-      map[s.symbol.toUpperCase()] = s.logo_url;
-      map[s.symbol.toUpperCase().replace(/\.JO$/, '')] = s.logo_url;
+    if (s.symbol) {
+      map[s.symbol.toUpperCase()] = s;
+      map[s.symbol.toUpperCase().replace(/\.JO$/, '')] = s;
     }
   });
   return map;
 }
 
-function buildEmailHtml(profile, payouts, logosMap) {
+function buildEmailHtml(profile, payouts, securitiesMap) {
   const name = profile.first_name || 'Valued Client';
   let rowsHtml = '';
 
@@ -64,21 +64,21 @@ function buildEmailHtml(profile, payouts, logosMap) {
 
   payouts.forEach(p => {
     let symbol = (p.security_code || '').toUpperCase();
-    const logo = logosMap[symbol] || logosMap[symbol.replace(/\.JO$/, '')] || 'https://app.mymint.co.za/icon.png';
-    symbol = symbol.replace(/\.JO$/, '');
+    const sec = securitiesMap[symbol] || securitiesMap[symbol.replace(/\.JO$/, '')] || {};
+    const logo = sec.logo_url || 'https://app.mymint.co.za/icon.png';
+    const secName = sec.name ? `${sec.name} (${symbol.replace(/\.JO$/, '')})` : symbol.replace(/\.JO$/, '');
     const amount = Number(p.net_cash) || 0;
     totalCash += amount;
-
+    
     rowsHtml += `
           <tr>
             <td class="label">
               <div style="display:flex;align-items:center;">
                 <img src="${logo}" alt="${symbol}" style="width:20px;height:20px;border-radius:50%;margin-right:8px;vertical-align:middle;">
-                ${symbol}
+                ${secName}
               </div>
             </td>
             <td class="num r pos">${formatMoney(amount)}</td>
-            <td class="ctx">Dividend payout processed</td>
           </tr>
     `;
   });
@@ -181,32 +181,31 @@ function buildEmailHtml(profile, payouts, logosMap) {
   <!-- HEADER -->
   <div class="header">
     <div class="header-logo">MINT Platforms</div>
-    <h1>Dividend Payout Processed</h1>
+    <h1>Your investments are paying you</h1>
     <p class="header-sub">We have successfully processed dividend payouts for your portfolio.</p>
-    <div class="header-meta">MINT Baskets &middot; ${new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' })}</div>
+    <div class="header-meta">MINT BASKETS &middot; INVESTOR STATEMENT &middot; ${new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()}</div>
   </div>
 
   <!-- BODY -->
   <div class="body">
 
-    <p class="lead">Hi ${name},<br><br>The following amounts have been allocated to your MINT account.</p>
+    <p class="lead">Hi ${name},<br><br>When you invested with MINT, you became a shareholder in real companies. And shareholders get paid.<br><br>Since you started investing, the companies in your basket have shared their profits with you:</p>
 
     <!-- TABLE -->
     <div class="section">
+      <h2>COMPANY DIVIDENDS EARNED</h2>
       <table class="snap">
         <thead>
           <tr>
-            <th>Security</th>
+            <th>COMPANY</th>
             <th class="r">Amount</th>
-            <th>Notes</th>
           </tr>
         </thead>
         <tbody>
           ${rowsHtml}
           <tr>
-            <td class="label" style="padding-top:20px; font-weight:700;">Total Net Cash</td>
+            <td class="label" style="padding-top:20px; font-weight:700;">Total earned since investing</td>
             <td class="num r pos" style="padding-top:20px; font-size: 16px; font-weight:800; color:#31005E;">${formatMoney(totalCash)}</td>
-            <td class="ctx" style="padding-top:20px;"></td>
           </tr>
         </tbody>
       </table>
@@ -215,13 +214,8 @@ function buildEmailHtml(profile, payouts, logosMap) {
 
   <!-- CLOSE -->
   <div class="close">
-    <p>You can view these transactions in your MINT app under the Wallet section.</p>
-    <a href="https://app.mymint.co.za">Open MINT App &rarr;</a>
-    <p style="margin-top:24px;">Thank you for trusting us with your money. We do not take it lightly.</p>
-    <div class="sign">
-      <div class="name">The MINT Investment Team</div>
-      <div class="meta">MINT Platforms (Pty) Ltd &middot; ${new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' })}</div>
-    </div>
+    <p>Every cent has been credited to your MINT account. No forms, no waiting, no admin. That’s what ownership looks like: your money working while you live your life.<br><br>And this is just the beginning. The more you invest, the bigger your slice of the profits next time these companies pay out.</p>
+    <a href="https://app.mymint.co.za">Grow my portfolio &rarr;</a>
   </div>
 
   <!-- FOOTER -->
@@ -280,7 +274,7 @@ module.exports = async function dividendsEmailHandler(req, res) {
     });
 
     // 4. Fetch logos
-    const logosMap = await getSecuritiesLogos();
+    const securitiesMap = await getSecuritiesData();
 
     // 5. Fetch sent_client_codes
     let sentCodes = [];
@@ -326,7 +320,7 @@ module.exports = async function dividendsEmailHandler(req, res) {
         }
         const profile = profileMap[clientCode];
         const userPayouts = grouped[clientCode];
-        const html = buildEmailHtml(profile, userPayouts, logosMap);
+        const html = buildEmailHtml(profile, userPayouts, securitiesMap);
         return sendJson(res, 200, { ok: true, html, profile, count: userPayouts.length, allClients });
       }
 
@@ -338,7 +332,7 @@ module.exports = async function dividendsEmailHandler(req, res) {
 
       const profile = profileMap[previewCode];
       const userPayouts = grouped[previewCode];
-      const html = buildEmailHtml(profile, userPayouts, logosMap);
+      const html = buildEmailHtml(profile, userPayouts, securitiesMap);
 
       return sendJson(res, 200, { ok: true, html, profile, count: userPayouts.length, allClients, previewCode });
     }
@@ -353,8 +347,8 @@ module.exports = async function dividendsEmailHandler(req, res) {
         const profile = targetCode ? profileMap[targetCode] : { first_name: 'Test', email: testEmail };
         const userPayouts = targetCode ? grouped[targetCode] : payouts.slice(0, 3);
 
-        const html = buildEmailHtml(profile, userPayouts, logosMap);
-        await sendViaResend({ to: testEmail, subject: 'Dividend Payout Processed', html });
+        const html = buildEmailHtml(profile, userPayouts, securitiesMap);
+        await sendViaResend({ to: testEmail, subject: 'Your investments are paying you', html });
         return sendJson(res, 200, { ok: true, message: 'Test email sent successfully' });
       }
 
@@ -365,9 +359,9 @@ module.exports = async function dividendsEmailHandler(req, res) {
         if (sentCodes.includes(clientCode)) return sendJson(res, 400, { ok: false, error: 'Email already sent to this user for this run' });
 
         const userPayouts = grouped[clientCode];
-        const html = buildEmailHtml(profile, userPayouts, logosMap);
+        const html = buildEmailHtml(profile, userPayouts, securitiesMap);
         try {
-          await sendViaResend({ to: profile.email, subject: 'Dividend Payout Processed', html });
+          await sendViaResend({ to: profile.email, subject: 'Your investments are paying you', html });
           await appendSentClientCodes([clientCode]);
           await writeAudit({
             action: 'send_dividend_emails_single',
@@ -399,10 +393,10 @@ module.exports = async function dividendsEmailHandler(req, res) {
           }
 
           const userPayouts = grouped[code];
-          const html = buildEmailHtml(profile, userPayouts, logosMap);
+          const html = buildEmailHtml(profile, userPayouts, securitiesMap);
 
           try {
-            await sendViaResend({ to: profile.email, subject: 'Dividend Payout Processed', html });
+            await sendViaResend({ to: profile.email, subject: 'Your investments are paying you', html });
             sent++;
             newlySentCodes.push(code);
           } catch (e) {
