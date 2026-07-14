@@ -2,7 +2,7 @@ const {
   sendJson, fetchSupabaseJson, requestSupabaseJson, buildInFilter,
   loadSecuritiesByIds, buildTradeRow, buildEmailHtml, sendTransactionalEmail
 } = require('../_orderbook');
-const { requirePermission } = require('../_team');
+const { requirePermission, isMasterOrDev } = require('../_team');
 
 /**
  * Emails the client once their sell has fully settled — same branded
@@ -474,9 +474,9 @@ module.exports = async (req, res) => {
     const authResult = await requirePermission(req, res, 'orderbook', 'edit_fill_price');
     if (!authResult) return;
     
-    // Only devs can hit this directly. Master Admins and Staff must use the approval queue.
-    if (authResult.member?.approver_tier !== 'dev') {
-      return sendJson(res, 403, { error: 'Direct edits require Dev tier. Please submit an approval request.' });
+    // Master ★ and Dev accounts bypass the approval queue.
+    if (!isMasterOrDev(authResult.member)) {
+      return sendJson(res, 403, { error: 'Direct edits require Master ★ or Dev. Please submit an approval request.' });
     }
     
     const email = (authUser?.email || '').toLowerCase();
@@ -525,6 +525,16 @@ module.exports = async (req, res) => {
       });
     }
 
+    // Legacy SELL rows can predate expected_exit. Use the confirmed exit as a
+    // neutral baseline only where no quote exists, so the Expected and Actual
+    // columns show values (R0 spread) instead of remaining as dashes.
+    if (Object.prototype.hasOwnProperty.call(payload, 'avg_exit')) {
+      await requestSupabaseJson(
+        `/rest/v1/stock_holdings_c?id=in.(${buildInFilter(ids)})&expected_exit=is.null`,
+        { method: 'PATCH', useServiceRoleAuth: true, body: { expected_exit: payload.avg_exit } }
+      );
+    }
+
     // If a fill price was set, reconcile the execution-reserve (8% buffer)
     // ledger for the affected transactions. Awaited so buffer_consumed_cents is
     // already up to date by the time the orderbook refreshes, but it can never
@@ -550,4 +560,37 @@ module.exports = async (req, res) => {
       details: error?.message || 'Unknown error'
     });
   }
+};
+
+// Used only after a Master ★ approves a queued fill-price request. The stored
+// request is applied with service-role access and runs the same reconciliation
+// side effects as a direct Master edit.
+module.exports.applyApprovedPriceUpdate = async ({ ids, payload, email }) => {
+  const cleanIds = Array.isArray(ids) ? ids.map((v) => String(v || '').trim()).filter(Boolean) : [];
+  if (!cleanIds.length) throw new Error('Approved fill request has no holding ids.');
+  const src = payload && typeof payload === 'object' ? payload : {};
+  const allowed = ['avg_fill', 'avg_exit', 'Fill_date', 'Exit_date', 'updated_at', 'as_of_date'];
+  const cleanPayload = {};
+  allowed.forEach((key) => { if (Object.prototype.hasOwnProperty.call(src, key)) cleanPayload[key] = src[key]; });
+  if (!Object.prototype.hasOwnProperty.call(cleanPayload, 'avg_fill') && !Object.prototype.hasOwnProperty.call(cleanPayload, 'avg_exit')) {
+    throw new Error('Approved request contains no fill or exit price.');
+  }
+  if (Object.prototype.hasOwnProperty.call(cleanPayload, 'avg_fill')) {
+    cleanPayload.fill_set_by = String(email || '').toLowerCase();
+    cleanPayload.fill_set_at = new Date().toISOString();
+  }
+  const rows = await requestSupabaseJson(
+    `/rest/v1/stock_holdings_c?id=in.(${buildInFilter(cleanIds)})&select=id`,
+    { method: 'PATCH', useServiceRoleAuth: true, body: cleanPayload, extraHeaders: { Prefer: 'return=representation' } }
+  );
+  if (!Array.isArray(rows) || !rows.length) throw new Error('Approved fill request updated no holdings.');
+  if (Object.prototype.hasOwnProperty.call(cleanPayload, 'avg_exit')) {
+    await requestSupabaseJson(
+      `/rest/v1/stock_holdings_c?id=in.(${buildInFilter(cleanIds)})&expected_exit=is.null`,
+      { method: 'PATCH', useServiceRoleAuth: true, body: { expected_exit: cleanPayload.avg_exit } }
+    );
+    await settleSellFills(cleanIds);
+  }
+  if (Object.prototype.hasOwnProperty.call(cleanPayload, 'avg_fill')) await reconcileBufferDrawdowns(cleanIds);
+  return rows;
 };

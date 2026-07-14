@@ -23,6 +23,7 @@ const {
 const dividendsExtractHandler = require('./_dividends-extract');
 const dividendsDataHandler = require('./_dividends-runs');
 const dividendsEmailHandler = require('./_dividends-email');
+const { applyApprovedPriceUpdate } = require('./orderbook/update-price');
 
 const normEmail = (e) => String(e || '').trim().toLowerCase();
 
@@ -912,15 +913,10 @@ module.exports = async (req, res) => {
           if (isTestUser) {
             console.log(`[Submit Approval] Skipping pending approval email for ${row.type} because target is a test user`);
           } else {
-            const masterRows = await supabaseRequest('/rest/v1/admin_team?approver_tier=eq.master&select=email,permissions');
+            const masterRows = await supabaseRequest('/rest/v1/admin_team?select=email,permissions&or=(approver_tier.eq.master,role.eq.master_admin)');
 
           const masterEmails = (masterRows || [])
-            .filter(r => {
-              if (!r.email) return false;
-              const perms = r.permissions || {};
-              const notifs = perms.notifications || {};
-              return notifs[row.type] === true; // Opt-in only
-            })
+            .filter(r => !!r.email)
             .map(r => r.email);
           if (masterEmails.length > 0) {
             let subject = '';
@@ -985,6 +981,22 @@ module.exports = async (req, res) => {
       const approval = rows && rows[0];
       if (!approval) return sendJson(res, 404, { error: 'Approval not found' });
       if (approval.status !== 'pending') return sendJson(res, 400, { error: `Approval is already ${approval.status}` });
+
+      // Apply an approved fill before marking the request complete. If the
+      // ledger update fails, the request remains pending for another Master to
+      // retry instead of becoming a false-positive approval.
+      if (decision === 'approved' && approval.type === 'fill_price') {
+        try {
+          const ep = approval.payload || {};
+          await applyApprovedPriceUpdate({
+            ids: ep.ids,
+            payload: ep.dbPayload,
+            email: result.user.email,
+          });
+        } catch (err) {
+          return sendJson(res, 500, { error: `Approved fill could not be applied: ${err.message}` });
+        }
+      }
 
       let updated;
       try {

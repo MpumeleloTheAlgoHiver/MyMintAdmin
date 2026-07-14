@@ -1924,7 +1924,6 @@
     const encodeEditSourceIds = (ids) => encodeURIComponent(JSON.stringify(ids || []));
 
     const renderEditPriceButton = (row, label = 'Edit avg fill') => {
-      if (window.mintCan && !window.mintCan('orderbook', 'edit_fill_price')) return '';
       const sourceIds = getEditableSourceIds(row);
       if (!sourceIds.length) return '';
 
@@ -8631,9 +8630,7 @@
             ? window.mintCan('orderbook', 'edit_fill_price')
             : true;
 
-          if (fillPricePerm === false) {
-            throw new Error('You do not have permission to edit fill prices. Contact your admin.');
-          }
+          if (fillPricePerm === false) fillPricePerm = 'pending';
 
           priceModalConfirm.textContent = 'Updating...';
 
@@ -8818,8 +8815,9 @@
       if (!ids.length) return [];
       const { data: holdings, error } = await supabaseClient
         .from('stock_holdings_c')
-        .select('id, quantity, avg_fill, trade_side, security_id')
-        .in('id', ids);
+        .select('id, quantity, avg_fill, trade_side, security_id, is_active')
+        .in('id', ids)
+        .eq('is_active', true);
       if (error) throw new Error(error.message || 'Could not load this investor\'s holdings.');
       const secIds = [...new Set((holdings || []).map((h) => h.security_id).filter(Boolean))];
       const secMap = {};
@@ -9001,9 +8999,9 @@
       try {
         await verifyModalPassword(password ? password.value : '');
 
-        const fillPricePerm = (typeof window.mintCan === 'function')
+        let fillPricePerm = (typeof window.mintCan === 'function')
           ? window.mintCan('orderbook', 'edit_fill_price') : true;
-        if (fillPricePerm === false) throw new Error('You do not have permission to edit fill prices. Contact your admin.');
+        if (fillPricePerm === false) fillPricePerm = 'pending';
 
         const { data: sessionData } = await supabaseClient.auth.getSession();
         const accessToken = sessionData?.session?.access_token;
