@@ -6520,6 +6520,11 @@
           rebalanceBatchId: evt.batch_id || null,
           isPendingRebalance: true,
           rebalanceBatchStatus: batchStatus,
+          // A sell-only batch is a real broker SELL order as well as a
+          // rebalance workflow item, so it belongs in both tabs.
+          isLiquidationSell: side === 'SELL'
+            && !batch.buy_isin_code
+            && !batch.extra_buy_isin_code,
         };
       }).filter((row) => {
         // Show only PENDING rebalance events &mdash; SETTLED ones are covered by stock_holdings_c audit rows, REVERSED are no longer actionable
@@ -6529,10 +6534,14 @@
       // Number pending rows starting after settled rows
       rebEventRows.forEach((row, i) => { row.line = rawRows.length + i + 1; });
 
-      // Keep pending rebalance rows out of the orderbook record set. They are
-      // rendered in the standalone Rebalances tab so they never affect counts,
-      // export, archive snapshots, Strate BIR, or orderbook email payloads.
-      const settledRows = filteredRows.filter(r => !r.isPendingRebalance);
+      // Ordinary pending rebalances stay in the standalone Rebalances tab.
+      // Liquidate-to-cash is different: it creates an executable SELL with no
+      // matching BUY, so expose that SELL in the Active Orderbook as well.
+      const liquidationSellRows = rebEventRows.filter((row) => row.isLiquidationSell);
+      const settledRows = [
+        ...filteredRows.filter(r => !r.isPendingRebalance),
+        ...liquidationSellRows,
+      ];
 
       allBirSourceRows = rawRows;
       allOrderbookRawRows = settledRows;
@@ -8995,15 +9004,16 @@
       /* ââ Realtime live-price refresh ââââââââââââââââââââââââââââââââââââââââ
          Subscribe to intraday price ticks (and holding changes from fills) so
          Live Price / Client PnL / MINT PnL update on their own. Guards:
-           &bull; debounced (2s) + in-flight guarded  &rarr; no request storms
+           &bull; throttled to 10 minutes + in-flight guarded &rarr; no request storms
            &bull; skipped while an input is focused    &rarr; never wipes a value mid-edit
            &bull; skipped unless the admin has been idle ~12s &rarr; never collapses an
              expanded panel or interrupts active work; prices catch up once they
-             pause. A 60s poll is the fallback if realtime isn't enabled on the
+             pause. A 10-minute poll is the fallback if realtime isn't enabled on the
              table (see docs/enable-realtime-prices.sql). */
       (() => {
         let rtTimer = null, rtInFlight = false, rtQueued = false, lastInteraction = 0;
         const IDLE_MS = 12000;
+        const AUTO_REFRESH_MS = 10 * 60 * 1000;
         ['mousedown', 'keydown', 'input', 'focusin', 'touchstart'].forEach((ev) =>
           document.addEventListener(ev, () => { lastInteraction = Date.now(); }, true));
         const isEditing = () => {
@@ -9023,7 +9033,7 @@
         };
         const scheduleRt = () => {
           if (rtTimer) clearTimeout(rtTimer);
-          rtTimer = setTimeout(doRtRefresh, 2000);
+          rtTimer = setTimeout(doRtRefresh, AUTO_REFRESH_MS);
         };
         try {
           ['stock_intraday_c', 'stock_holdings_c'].forEach((t) => {
@@ -9032,7 +9042,7 @@
               .subscribe();
           });
         } catch (e) { console.warn('[orderbook] realtime subscribe failed:', e?.message || e); }
-        setInterval(scheduleRt, 60000);
+        setInterval(doRtRefresh, AUTO_REFRESH_MS);
       })();
     });
 
