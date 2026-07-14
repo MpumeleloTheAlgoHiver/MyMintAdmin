@@ -19,6 +19,21 @@ assert.match(orderbook, /eventType: 'REBALANCE_RESIDUAL'/);
 assert.match(orderbook, /sellGrossCents - sellBrokerCents - sellCustodyCents/);
 assert.match(orderbook, /buyGrossCents - buyBrokerCents - buyCustodyCents/);
 assert.match(dashboard, /Workbook rule:[\s\S]{0,300}do not move client cash yet[\s\S]{0,300}rebWalletByClient/);
+const replaceHoldingFn = dashboard.slice(
+  dashboard.indexOf('async function rebReplaceStrategyHoldingAfterBuy'),
+  dashboard.indexOf('async function rebPersistCommittedTradeSequence'),
+);
+assert.match(replaceHoldingFn, /rebalance-update-strategy-holdings/, 'ordinary rebalances must update composition through the service endpoint');
+assert.doesNotMatch(replaceHoldingFn, /\.from\("strategies_c"\)[\s\S]*?\.update\(/, 'ordinary rebalance composition must not write through browser RLS');
+assert.match(endpoint, /action === 'rebalance-update-strategy-holdings'[\s\S]*?requirePermission\(req, res, 'dashboard', 'commit_rebalance'\)/, 'composition endpoint must retain the rebalance permission gate');
+assert.match(endpoint, /action === 'rebalance-settlement-insert'[\s\S]*?allowedTables = new Set\(\['stock_holdings_c', 'transactions'\]\)/, 'settlement inserts must use a strict server whitelist');
+assert.match(endpoint, /action === 'rebalance-settlement-insert'[\s\S]*?requirePermission\(req, res, 'dashboard', 'commit_rebalance'\)/, 'settlement insert endpoint must retain the rebalance permission gate');
+assert.match(orderbook, /const settlementInsert = async \(table, rows\)/, 'settlement must use the service-role insert bridge');
+assert.match(orderbook, /settlementInsert\('stock_holdings_c'/, 'holding settlement inserts must bypass browser RLS safely');
+assert.match(orderbook, /settlementInsert\('transactions', txnRows\)/, 'rebalance activity inserts must bypass browser RLS safely');
+assert.match(endpoint, /action === 'rebalance-settlement-update-holding'[\s\S]*?allowedFields = new Set/, 'settlement holding updates must use a strict server field whitelist');
+assert.match(orderbook, /settlementUpdateHolding\(activePos\.id/, 'sold positions must be closed through the service-role bridge');
+assert.doesNotMatch(replaceHoldingFn, /pending: true/, 'new strategy composition must not retain a pending marker after settlement');
 
 // Workbook switch example: proceeds are recycled; only fees/residual alter cash.
 const sellGross = 1_000_00;
@@ -29,4 +44,4 @@ const delta = sellGross - Math.round(sellGross * brokerageRate) - custody
   - buyGross - Math.round(buyGross * brokerageRate) - custody;
 assert.equal(delta, 275);
 
-console.log('15 rebalance value-retention assertions passed');
+console.log('26 rebalance value-retention assertions passed');

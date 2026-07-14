@@ -420,6 +420,48 @@ module.exports = async (req, res) => {
       return sendJson(res, 200, { ok: true, strategyId });
     }
 
+    // Rebalance settlement creates immutable holding/audit rows and an activity
+    // transaction. Browser INSERT policies intentionally deny these writes, so
+    // perform only these tightly-whitelisted inserts behind the existing Master
+    // rebalance permission. Updates/claims remain scoped in the settlement UI.
+    if (action === 'rebalance-settlement-insert') {
+      if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const table = String(body.table || '');
+      const allowedTables = new Set(['stock_holdings_c', 'transactions']);
+      if (!allowedTables.has(table)) return sendJson(res, 400, { error: 'Settlement table is not allowed' });
+      const rows = Array.isArray(body.rows) ? body.rows : [body.rows];
+      if (!rows.length || rows.some((row) => !row || typeof row !== 'object' || Array.isArray(row))) {
+        return sendJson(res, 400, { error: 'rows must contain one or more objects' });
+      }
+      const inserted = await requestSupabaseJson(`/rest/v1/${table}?select=id`, {
+        method: 'POST',
+        body: Array.isArray(body.rows) ? rows : rows[0],
+        extraHeaders: { Prefer: 'return=representation' },
+      });
+      return sendJson(res, 200, { ok: true, rows: Array.isArray(inserted) ? inserted : [] });
+    }
+
+    if (action === 'rebalance-settlement-update-holding') {
+      if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const holdingId = String(body.holdingId || '').trim();
+      if (!holdingId) return sendJson(res, 400, { error: 'holdingId required' });
+      const allowedFields = new Set([
+        'is_active', 'closed_reason', 'closed_at', 'updated_at', 'avg_exit',
+        'Exit_date', 'quantity', 'Status',
+      ]);
+      const requestedPatch = body.patch && typeof body.patch === 'object' ? body.patch : {};
+      const patch = Object.fromEntries(Object.entries(requestedPatch).filter(([key]) => allowedFields.has(key)));
+      if (!Object.keys(patch).length) return sendJson(res, 400, { error: 'No allowed holding fields supplied' });
+      const updated = await requestSupabaseJson(
+        `/rest/v1/stock_holdings_c?id=eq.${encodeURIComponent(holdingId)}&select=id`,
+        { method: 'PATCH', body: patch, extraHeaders: { Prefer: 'return=representation' } }
+      );
+      if (!Array.isArray(updated) || !updated.length) return sendJson(res, 404, { error: 'Holding not found' });
+      return sendJson(res, 200, { ok: true, holdingId });
+    }
+
     // Fetch confirmation statuses using service-role key (bypasses RLS)
     if (action === 'get-confirmation-statuses') {
       const body = req.body && typeof req.body === 'object' ? req.body : {};

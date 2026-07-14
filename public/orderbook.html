@@ -746,6 +746,62 @@
       margin-bottom: 0;
     }
 
+    .rebalance-heading-row {
+      width: 100%;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      margin-bottom: 14px;
+    }
+    .rebalance-heading-copy {
+      min-width: 0;
+    }
+    .rebalance-heading-copy .closed-books-subtitle {
+      margin-bottom: 0;
+    }
+    #rebalanceUatToggle {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 132px;
+      height: 34px;
+      margin-left: auto;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 1px solid #dbe3ee;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: .045em;
+      text-transform: uppercase;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
+    }
+    #rebalanceUatToggle::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      margin-right: 8px;
+      border-radius: 50%;
+      background: #16a34a;
+      box-shadow: 0 0 0 3px rgba(22, 163, 74, .10);
+    }
+    #rebalanceUatToggle:hover {
+      border-color: #c4b5fd;
+      background: #f5f3ff;
+      color: #5b21b6;
+    }
+    #rebalanceUatToggle.is-uat {
+      border-color: #fcd34d;
+      background: #fffbeb;
+      color: #92400e;
+    }
+    #rebalanceUatToggle.is-uat::before {
+      background: #f59e0b;
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, .14);
+    }
+
     .ob-sort-btn {
       display: inline-flex;
       align-items: center;
@@ -1429,8 +1485,13 @@
 
       <div class="orderbook-tab-panel" id="pendingRebalancesPanel" role="tabpanel" aria-labelledby="pendingRebalancesTab">
         <div class="closed-books-card">
-          <h2 class="closed-books-title">Rebalances</h2>
-          <p class="closed-books-subtitle">Standalone rebalance batches. These do not count as active or closed orderbook records.</p>
+          <div class="filled-orderbooks-heading-row rebalance-heading-row">
+            <div class="rebalance-heading-copy">
+              <h2 class="closed-books-title">Rebalances</h2>
+              <p class="closed-books-subtitle">Standalone rebalance batches. These do not count as active or closed orderbook records.</p>
+            </div>
+            <button class="orderbook-export-btn" id="rebalanceUatToggle" type="button" title="Toggle between LIVE and UAT rebalance batches">Environment: LIVE</button>
+          </div>
           <div class="filled-orderbooks-list" id="rebalanceBooksList">
             <div class="filled-orderbook-empty">No rebalance batches yet.</div>
           </div>
@@ -1501,6 +1562,7 @@
     const pendingRebalancesPanel = document.getElementById('pendingRebalancesPanel');
     const closedBooksList = document.getElementById('closedBooksList');
     const rebalanceBooksList = document.getElementById('rebalanceBooksList');
+    const rebalanceUatToggle = document.getElementById('rebalanceUatToggle');
     const strateBirCount = document.getElementById('strateBirCount');
     const exportStrateBirBtn = document.getElementById('exportStrateBirBtn');
     const toggleStrateBirViewBtn = document.getElementById('toggleStrateBirViewBtn');
@@ -5186,6 +5248,9 @@
       rebalanceBooksList.innerHTML = batches.map((sb) => {
         const dateValue = sb.displayAt || sb.createdAt || null;
         const dateLabel = dateValue ? new Date(dateValue).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+        const isLiquidation = !!sb.isLiquidation;
+        const operationLabel = isLiquidation ? 'Liquidation' : 'Rebalance';
+        const destinationLabel = isLiquidation ? 'Cash' : sb.buyIsin;
         const isPending = String(sb.batchStatus || '').toUpperCase() === 'PENDING';
         const actionHtml = isPending
           ? `<span style="display:inline-flex;gap:6px;align-items:center;">
@@ -5212,7 +5277,7 @@
         return `
           <details class="filled-orderbook-item">
             <summary class="filled-orderbook-summary">
-              <span>Rebalance &mdash; ${escapeHtml(sb.strategyName)} (${escapeHtml(sb.sellIsin)} &rarr; ${escapeHtml(sb.buyIsin)}${sb.extraBuyIsin ? ' + ' + escapeHtml(sb.extraBuyIsin) : ''})</span>
+              <span>${operationLabel} &mdash; ${escapeHtml(sb.strategyName)} (${escapeHtml(sb.sellIsin)} &rarr; ${escapeHtml(destinationLabel)}${sb.extraBuyIsin ? ' + ' + escapeHtml(sb.extraBuyIsin) : ''})</span>
               <span class="filled-orderbook-meta">
                 ${rebalanceStatusPill(sb.batchStatus)}
                 <span>${sb.clientCount} client${sb.clientCount !== 1 ? 's' : ''}</span>
@@ -6195,7 +6260,7 @@
           parallelQueries.push(
             supabaseClient
               .from('strategies_c')
-              .select('id, name, short_name, slug')
+              .select('id, name, short_name, slug, investor_environment')
               .in('id', chunk)
               .then(({ data, error }) => {
                 if (error) { console.error('Strategies load error:', error); return; }
@@ -6580,6 +6645,11 @@
       // Ã¢&rdquo;â‚¬Ã¢&rdquo;â‚¬ Build standalone rebalance batches Ã¢&rdquo;â‚¬Ã¢&rdquo;â‚¬
       rebalanceBatchesForStandaloneList = rebBatches
         .filter((b) => ['PENDING', 'SETTLED', 'REVERSED'].includes(String(b.status || '').toUpperCase()))
+        .filter((b) => {
+          const strategy = b.strategy_id ? (strategiesMap[b.strategy_id] || null) : null;
+          const environment = String(strategy?.investor_environment || 'LIVE').toUpperCase();
+          return orderbookUatMode ? environment === 'UAT' : environment !== 'UAT';
+        })
         .map((b) => {
           const batchEvents = rebEvents.filter((e) => e.batch_id === b.id);
           const strategy = b.strategy_id ? (strategiesMap[b.strategy_id] || null) : null;
@@ -6608,6 +6678,7 @@
             sellIsin: b.sell_isin_code || '-',
             buyIsin: b.buy_isin_code || '-',
             extraBuyIsin: b.extra_buy_isin_code || null,
+            isLiquidation: !b.buy_isin_code && !b.extra_buy_isin_code,
             events: evtRows,
             clientCount: [...new Set(batchEvents.map((e) => e.user_id))].length,
           };
@@ -7061,6 +7132,32 @@
         const fillDateStr = nowIso.split('T')[0];
         const strategyId = batch.strategy_id;
 
+        const settlementInsert = async (table, rows) => {
+          const { data: sessionData } = await supabaseClient.auth.getSession();
+          const token = sessionData?.session?.access_token;
+          if (!token) throw new Error('Session expired before settlement write.');
+          const response = await fetch('/api/orderbook/send-csv?action=rebalance-settlement-insert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ table, rows }),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.details || result.error || `Could not insert ${table}.`);
+          return Array.isArray(result.rows) ? result.rows : [];
+        };
+        const settlementUpdateHolding = async (holdingId, patch) => {
+          const { data: sessionData } = await supabaseClient.auth.getSession();
+          const token = sessionData?.session?.access_token;
+          if (!token) throw new Error('Session expired before settlement update.');
+          const response = await fetch('/api/orderbook/send-csv?action=rebalance-settlement-update-holding', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ holdingId, patch }),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.details || result.error || 'Could not update holding.');
+        };
+
         /* ── Idempotency guard (atomic claim) ──────────────────────────────────
            Settlement is NOT idempotent — it inserts BUY holdings and SELL audit
            rows unconditionally. A double-click or a retry under a slow DB would
@@ -7134,21 +7231,24 @@
             const closedQty = Math.min(soldQty, origQty);
             const remaining = Math.max(0, origQty - soldQty);
 
-            const { error: closeErr } = await supabaseClient.from('stock_holdings_c').update({
-              is_active: false,
-              closed_reason: 'REBALANCE_SELL',
-              closed_at: nowIso,
-              updated_at: nowIso,
-              avg_exit: fillBySecId[evt.security_id],
-              "Exit_date": fillDateStr,
-              quantity: closedQty,
-              Status: 'inactive',
-            }).eq('id', activePos.id);
-            if (closeErr) errors.push(`SELL close ${evt.user_id}: ${closeErr.message}`);
+            try {
+              await settlementUpdateHolding(activePos.id, {
+                is_active: false,
+                closed_reason: 'REBALANCE_SELL',
+                closed_at: nowIso,
+                updated_at: nowIso,
+                avg_exit: fillBySecId[evt.security_id],
+                "Exit_date": fillDateStr,
+                quantity: closedQty,
+                Status: 'inactive',
+              });
+            } catch (closeErr) {
+              errors.push(`SELL close ${evt.user_id}: ${closeErr.message}`);
+            }
 
             if (remaining > 0) {
               // Reissue the leftover shares as a fresh leg — original entry preserved.
-              const { error: remErr } = await supabaseClient.from('stock_holdings_c').insert({
+              try { await settlementInsert('stock_holdings_c', {
                 user_id: evt.user_id,
                 family_member_id: evt.family_member_id || null,
                 security_id: evt.security_id,
@@ -7167,8 +7267,7 @@
                 Status: 'active',
                 closed_reason: 'REBALANCE_PARTIAL_REMAINDER',
                 as_of_date: fillDateStr,
-              });
-              if (remErr) errors.push(`SELL remainder reissue ${evt.user_id}: ${remErr.message}`);
+              }); } catch (remErr) { errors.push(`SELL remainder reissue ${evt.user_id}: ${remErr.message}`); }
             }
           } else {
             // No existing stock_holdings_c row (position only in strategy JSON).
@@ -7194,7 +7293,7 @@
             const remaining = originalQty - soldQty;
             if (remaining > 0) {
               // Materialise the leftover shares as an active BUY in stock_holdings_c
-              const { error: matErr } = await supabaseClient.from('stock_holdings_c').insert({
+              try { await settlementInsert('stock_holdings_c', {
                 user_id: evt.user_id,
                 family_member_id: evt.family_member_id || null,
                 security_id: evt.security_id,
@@ -7211,13 +7310,12 @@
                 Status: 'active',
                 closed_reason: 'REBALANCE_MATERIALISED_REMAINDER',
                 as_of_date: fillDateStr,
-              });
-              if (matErr) errors.push(`SELL materialise remainder ${evt.user_id}: ${matErr.message}`);
+              }); } catch (matErr) { errors.push(`SELL materialise remainder ${evt.user_id}: ${matErr.message}`); }
             }
           }
 
           // Insert SELL audit row into stock_holdings_c
-          const { error: sellInsertErr } = await supabaseClient.from('stock_holdings_c').insert({
+          try { await settlementInsert('stock_holdings_c', {
             user_id: evt.user_id,
             family_member_id: evt.family_member_id || null,
             security_id: evt.security_id,
@@ -7237,8 +7335,7 @@
             avg_exit: fillBySecId[evt.security_id],
             "Exit_date": fillDateStr,
             as_of_date: fillDateStr,
-          });
-          if (sellInsertErr) errors.push(`SELL audit ${evt.user_id}: ${sellInsertErr.message}`);
+          }); } catch (sellInsertErr) { errors.push(`SELL audit ${evt.user_id}: ${sellInsertErr.message}`); }
 
           // Update rebalance_event with fill info
           const { error: evtUpErr } = await supabaseClient
@@ -7265,9 +7362,9 @@
                proxy for "what price was shown" on a rebalance buy, so PnL cost
                basis works correctly just like a regular purchase. */
             const expectedFillRands = evt.price_at_commit ? Number(evt.price_at_commit) / 100 : null;
-            const { data: insertedBuy, error: buyInsertErr } = await supabaseClient
-              .from('stock_holdings_c')
-              .insert({
+            let insertedBuy = null;
+            try {
+              const insertedRows = await settlementInsert('stock_holdings_c', {
                 user_id: evt.user_id,
                 family_member_id: evt.family_member_id || null,
                 security_id: evt.security_id,
@@ -7285,11 +7382,9 @@
                 Status: 'active',
                 closed_reason: evt.closed_reason || 'REBALANCE_EVENT_BUY',
                 as_of_date: fillDateStr,
-              })
-              .select('id')
-              .single();
-
-            if (buyInsertErr) {
+              });
+              insertedBuy = insertedRows[0] || null;
+            } catch (buyInsertErr) {
               errors.push(`${label} insert ${evt.user_id}: ${buyInsertErr.message}`);
               continue;
             }
@@ -7370,8 +7465,8 @@
             };
           });
           if (txnRows.length) {
-            const { error: txnErr } = await supabaseClient.from('transactions').insert(txnRows);
-            if (txnErr) errors.push(`Rebalance txn insert: ${txnErr.message}`);
+            try { await settlementInsert('transactions', txnRows); }
+            catch (txnErr) { errors.push(`Rebalance txn insert: ${txnErr.message}`); }
           }
         } catch (txnCatchErr) {
           errors.push(`Rebalance txn step failed: ${txnCatchErr?.message || txnCatchErr}`);
@@ -8295,8 +8390,8 @@
       });
     }
 
-    if (orderbookUatToggle) {
-      const paintUatToggle = () => {
+    const paintUatToggles = () => {
+      if (orderbookUatToggle) {
         orderbookUatToggle.textContent = orderbookUatMode ? 'Test Wallet Orders' : 'Live orders';
         orderbookUatToggle.style.background = orderbookUatMode ? '#f59e0b' : '';
         orderbookUatToggle.style.color = orderbookUatMode ? '#fff' : '';
@@ -8304,14 +8399,23 @@
         orderbookUatToggle.title = orderbookUatMode
           ? 'Showing test wallet orders only (users with a test wallet) — click to return to the live book'
           : 'Toggle to view orders placed using test wallets';
-      };
-      paintUatToggle();
-      orderbookUatToggle.addEventListener('click', () => {
-        orderbookUatMode = !orderbookUatMode;
-        paintUatToggle();
-        loadOrderbook().catch((err) => console.error('UAT toggle reload failed:', err?.message || err));
-      });
-    }
+      }
+      if (rebalanceUatToggle) {
+        rebalanceUatToggle.textContent = orderbookUatMode ? 'Environment: UAT' : 'Environment: LIVE';
+        rebalanceUatToggle.classList.toggle('is-uat', orderbookUatMode);
+        rebalanceUatToggle.title = orderbookUatMode
+          ? 'Showing UAT strategy rebalance batches only — click to return to LIVE'
+          : 'Showing LIVE strategy rebalance batches — click to view UAT';
+      }
+    };
+    const toggleOrderbookEnvironment = () => {
+      orderbookUatMode = !orderbookUatMode;
+      paintUatToggles();
+      loadOrderbook().catch((err) => console.error('UAT toggle reload failed:', err?.message || err));
+    };
+    paintUatToggles();
+    if (orderbookUatToggle) orderbookUatToggle.addEventListener('click', toggleOrderbookEnvironment);
+    if (rebalanceUatToggle) rebalanceUatToggle.addEventListener('click', toggleOrderbookEnvironment);
 
     if (exportStrateBirBtn) {
       exportStrateBirBtn.addEventListener('click', () => {
