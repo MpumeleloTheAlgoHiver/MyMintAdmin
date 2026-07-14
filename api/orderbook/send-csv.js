@@ -338,6 +338,9 @@ module.exports = async (req, res) => {
       const batchId = String(body.batchId || '').trim() || null;
       const eventType = String(body.eventType || '').trim() || null;
       const effectiveAt = String(body.effectiveAt || '').trim() || nowIso;
+      const metadataByUser = body.metadataByUser && typeof body.metadataByUser === 'object'
+        ? body.metadataByUser
+        : {};
       let upserted = 0;
       // Manual read-then-update-or-insert per user — PostgREST on_conflict can't
       // target the COALESCE(family_member_id, sentinel) unique index.
@@ -357,7 +360,9 @@ module.exports = async (req, res) => {
               p_event_type: eventType,
               p_amount_cents: requestedCents,
               p_effective_at: effectiveAt,
-              p_metadata: {},
+              p_metadata: metadataByUser[userId] && typeof metadataByUser[userId] === 'object'
+                ? metadataByUser[userId]
+                : {},
             },
           });
           upserted += 1;

@@ -6976,6 +6976,86 @@
         return actualNetCents / 100;
       };
 
+      /* Apply an ordinary sell→buy rebalance to each owner's residual using
+         actual broker fills. Recycled sell proceeds are internal capital, not
+         a contribution: net cash movement = sell gross − sell fees − buy gross
+         − buy fees. The SQL RPC records opening/movement/closing atomically. */
+      const settleRebalanceCashBridge = async (batch, sellEvts, buyEvts, fillBySecId) => {
+        if (!batch?.strategy_id || (!sellEvts.length && !buyEvts.length)) return;
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (!token) throw new Error('Session expired before rebalance cash settlement.');
+
+        let brokerageRate = 0.005;
+        let custodyFeeRands = 69;
+        try {
+          const feeResp = await fetch('/api/team?action=app-settings-get&key=fees', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const feeJson = feeResp.ok ? await feeResp.json() : null;
+          const fees = feeJson?.value || {};
+          if (Number.isFinite(Number(fees.rebBrokerageRate))) brokerageRate = Math.max(0, Number(fees.rebBrokerageRate));
+          if (Number.isFinite(Number(fees.rebCustodyFee))) custodyFeeRands = Math.max(0, Number(fees.rebCustodyFee));
+        } catch (_) { /* use the same defaults as the dashboard engine */ }
+
+        const owners = new Map();
+        const addLeg = (evt, side) => {
+          const uid = String(evt.user_id || '');
+          if (!uid) return;
+          const fm = evt.family_member_id ? String(evt.family_member_id) : '';
+          const key = `${uid}|${fm}`;
+          if (!owners.has(key)) owners.set(key, { uid, fm, sellGrossCents: 0, buyGrossCents: 0, hasSell: false, hasBuy: false });
+          const owner = owners.get(key);
+          const grossCents = Math.round(Math.max(0, Number(evt.quantity) || 0) * Math.max(0, Number(fillBySecId[evt.security_id]) || 0));
+          if (side === 'SELL') { owner.sellGrossCents += grossCents; owner.hasSell = true; }
+          else { owner.buyGrossCents += grossCents; owner.hasBuy = true; }
+        };
+        sellEvts.forEach((evt) => addLeg(evt, 'SELL'));
+        buyEvts.forEach((evt) => addLeg(evt, 'BUY'));
+
+        const custodyCents = Math.round(custodyFeeRands * 100);
+        const byScope = new Map();
+        owners.forEach((owner) => {
+          const sellBrokerCents = Math.round(owner.sellGrossCents * brokerageRate);
+          const buyBrokerCents = Math.round(owner.buyGrossCents * brokerageRate);
+          const sellCustodyCents = owner.hasSell ? custodyCents : 0;
+          const buyCustodyCents = owner.hasBuy ? custodyCents : 0;
+          const deltaCents = owner.sellGrossCents - sellBrokerCents - sellCustodyCents
+            - owner.buyGrossCents - buyBrokerCents - buyCustodyCents;
+          if (!byScope.has(owner.fm)) byScope.set(owner.fm, { deltas: {}, metadata: {} });
+          const scope = byScope.get(owner.fm);
+          scope.deltas[owner.uid] = deltaCents;
+          scope.metadata[owner.uid] = {
+            sell_gross_cents: owner.sellGrossCents,
+            sell_brokerage_cents: sellBrokerCents,
+            sell_custody_cents: sellCustodyCents,
+            buy_gross_cents: owner.buyGrossCents,
+            buy_brokerage_cents: buyBrokerCents,
+            buy_custody_cents: buyCustodyCents,
+          };
+        });
+
+        for (const [fm, scope] of byScope.entries()) {
+          const response = await fetch('/api/orderbook/send-csv?action=rebalance-upsert-residuals', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              strategyId: batch.strategy_id,
+              familyMemberId: fm || null,
+              residualDeltasCentsByUser: scope.deltas,
+              metadataByUser: scope.metadata,
+              batchId: batch.id,
+              eventType: 'REBALANCE_RESIDUAL',
+              effectiveAt: new Date().toISOString(),
+            }),
+          });
+          if (!response.ok) {
+            const details = await response.json().catch(() => ({}));
+            throw new Error(details.details || details.error || `Rebalance cash settlement failed (${response.status}).`);
+          }
+        }
+      };
+
       const executeFillAndSettle = async (batch, events, fillBySecId) => {
         const nowIso = new Date().toISOString();
         const fillDateStr = nowIso.split('T')[0];
@@ -7305,6 +7385,12 @@
             actualLiquidationNetProceeds = await creditLiquidationResiduals(batch, sellEvts, fillBySecId);
           } catch (creditErr) {
             errors.push(`Liquidation residual credit: ${creditErr?.message || creditErr}`);
+          }
+        } else if (!isLiquidationOnly && errors.length === 0) {
+          try {
+            await settleRebalanceCashBridge(batch, sellEvts, [...buyEvts, ...walletBuyEvts], fillBySecId);
+          } catch (cashBridgeErr) {
+            errors.push(`Rebalance cash bridge: ${cashBridgeErr?.message || cashBridgeErr}`);
           }
         }
 

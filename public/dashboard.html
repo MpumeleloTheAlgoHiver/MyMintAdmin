@@ -10870,7 +10870,9 @@
             );
           }
         });
-        await rebUpsertWalletBalances(strategyId, finalWalletByClient, rebSelectedFamilyMemberId || null);
+        /* Workbook rule: keep the execute-time residual calculation for funding
+           reconciliation and the plan, but do not move client cash yet. The
+           orderbook applies the ACTUAL sell/buy fills and fees at settlement. */
         rebWalletByClient = { ...rebWalletByClient, ...finalWalletByClient };
 
         rebSelectedStrategyId = String(strategyId);
