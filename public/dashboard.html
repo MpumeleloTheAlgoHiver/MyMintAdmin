@@ -10387,7 +10387,6 @@
             name: existingBuy.name || buySelection.instrument.description || buySelection.instrument.code || buyFullSymbol,
             shares: updatedBuyShares,
             quantity: updatedBuyShares,
-            pending: true,
           };
         } else {
           nextHoldings.push({
@@ -10396,7 +10395,6 @@
             name: buySelection.instrument.description || buySelection.instrument.code || buyFullSymbol,
             shares: buyShares,
             quantity: buyShares,
-            pending: true,
           });
         }
 

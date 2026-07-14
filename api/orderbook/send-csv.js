@@ -442,6 +442,26 @@ module.exports = async (req, res) => {
       return sendJson(res, 200, { ok: true, rows: Array.isArray(inserted) ? inserted : [] });
     }
 
+    if (action === 'rebalance-settlement-update-holding') {
+      if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const holdingId = String(body.holdingId || '').trim();
+      if (!holdingId) return sendJson(res, 400, { error: 'holdingId required' });
+      const allowedFields = new Set([
+        'is_active', 'closed_reason', 'closed_at', 'updated_at', 'avg_exit',
+        'Exit_date', 'quantity', 'Status',
+      ]);
+      const requestedPatch = body.patch && typeof body.patch === 'object' ? body.patch : {};
+      const patch = Object.fromEntries(Object.entries(requestedPatch).filter(([key]) => allowedFields.has(key)));
+      if (!Object.keys(patch).length) return sendJson(res, 400, { error: 'No allowed holding fields supplied' });
+      const updated = await requestSupabaseJson(
+        `/rest/v1/stock_holdings_c?id=eq.${encodeURIComponent(holdingId)}&select=id`,
+        { method: 'PATCH', body: patch, extraHeaders: { Prefer: 'return=representation' } }
+      );
+      if (!Array.isArray(updated) || !updated.length) return sendJson(res, 404, { error: 'Holding not found' });
+      return sendJson(res, 200, { ok: true, holdingId });
+    }
+
     // Fetch confirmation statuses using service-role key (bypasses RLS)
     if (action === 'get-confirmation-statuses') {
       const body = req.body && typeof req.body === 'object' ? req.body : {};

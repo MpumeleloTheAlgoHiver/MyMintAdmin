@@ -7145,6 +7145,18 @@
           if (!response.ok) throw new Error(result.details || result.error || `Could not insert ${table}.`);
           return Array.isArray(result.rows) ? result.rows : [];
         };
+        const settlementUpdateHolding = async (holdingId, patch) => {
+          const { data: sessionData } = await supabaseClient.auth.getSession();
+          const token = sessionData?.session?.access_token;
+          if (!token) throw new Error('Session expired before settlement update.');
+          const response = await fetch('/api/orderbook/send-csv?action=rebalance-settlement-update-holding', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ holdingId, patch }),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.details || result.error || 'Could not update holding.');
+        };
 
         /* ── Idempotency guard (atomic claim) ──────────────────────────────────
            Settlement is NOT idempotent — it inserts BUY holdings and SELL audit
@@ -7219,17 +7231,20 @@
             const closedQty = Math.min(soldQty, origQty);
             const remaining = Math.max(0, origQty - soldQty);
 
-            const { error: closeErr } = await supabaseClient.from('stock_holdings_c').update({
-              is_active: false,
-              closed_reason: 'REBALANCE_SELL',
-              closed_at: nowIso,
-              updated_at: nowIso,
-              avg_exit: fillBySecId[evt.security_id],
-              "Exit_date": fillDateStr,
-              quantity: closedQty,
-              Status: 'inactive',
-            }).eq('id', activePos.id);
-            if (closeErr) errors.push(`SELL close ${evt.user_id}: ${closeErr.message}`);
+            try {
+              await settlementUpdateHolding(activePos.id, {
+                is_active: false,
+                closed_reason: 'REBALANCE_SELL',
+                closed_at: nowIso,
+                updated_at: nowIso,
+                avg_exit: fillBySecId[evt.security_id],
+                "Exit_date": fillDateStr,
+                quantity: closedQty,
+                Status: 'inactive',
+              });
+            } catch (closeErr) {
+              errors.push(`SELL close ${evt.user_id}: ${closeErr.message}`);
+            }
 
             if (remaining > 0) {
               // Reissue the leftover shares as a fresh leg — original entry preserved.
