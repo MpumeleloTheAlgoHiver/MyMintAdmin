@@ -2759,6 +2759,10 @@
       let usersHtml = '';
       if (users.length) {
         const allowReverse = allowReverseOpt && editable && !cleanup && !!row.strategyId;
+        // Pending rebalances (including liquidate-to-cash) must use the batch-level
+        // Fill & Settle flow. The investor uploader only writes holding prices and
+        // would leave the rebalance batch pending, so hide it for these rows.
+        const showUploadFills = editable && !cleanup && !!row.strategyId && !row.isPendingRebalance;
         // The blue pin (per investor row) pins the WHOLE order book to the top of
         // the Snapshots list — keyed by the book id, not the investor.
         const bookIdForPin = options.bookId != null ? String(options.bookId) : '';
@@ -2787,7 +2791,7 @@
              holding's ticker/qty/current fill from the DB and apply the
              broker's per-security prices to exactly this client's rows.
              Shown only on editable (open) books, never on closed snapshots. */
-          const uploadFillsCell = (editable && !cleanup && !!row.strategyId)
+          const uploadFillsCell = showUploadFills
             ? `<td class="upload-fills-col">
                 <button type="button" class="upload-fills-btn" data-upload-fills
                   data-strategy-id="${escapeHtml(String(row.strategyId || ''))}"
@@ -2841,7 +2845,7 @@
         `;
         }).join('');
 
-        const uploadHeader = (editable && !cleanup && !!row.strategyId) ? '<th class="upload-fills-col" title="Upload broker fills">Fills</th>' : '';
+        const uploadHeader = showUploadFills ? '<th class="upload-fills-col" title="Upload broker fills">Fills</th>' : '';
         const pinHeader = (bookIdForPin && !options.hidePin) ? '<th class="pin-investor-col" aria-label="Pin"></th>' : '';
         const deleteHeader = cleanup ? '<th class="cleanup-delete-col" aria-label="Remove"></th>' : '';
         const reverseHeader = allowReverse ? '<th class="reverse-investor-col" aria-label="Reverse"></th>' : '';
