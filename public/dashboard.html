@@ -8573,8 +8573,12 @@
             remaining -= 1;
           });
 
+        /* Keep cent-perfect largest-remainder allocation internally, but expose
+           RANDS to callers. All rebalance execution, wallet and UI values are
+           rand-denominated; returning cents here caused R96.50 to display as
+           R9,650.00 and made per-client custody fees 100x too large. */
         return weighted.reduce((acc, item) => {
-          acc[item.userId] = item.floorCents;
+          acc[item.userId] = item.floorCents / 100;
           return acc;
         }, {});
       }
@@ -9784,10 +9788,15 @@
           setChangeHeaders();
           const totalLots = clients.reduce((sum, c) => sum + (Number(c.lots) || 0), 0);
           const sellExec = rebComputeSellExecution(rebSelectedIsin, rebSelectedStep.reductionUnits, totalLots, clients.length, clients);
-          const residualByClient = rebDistributeMoneyByLots(sellExec.netProceeds, residualClients);
+          /* Sale proceeds belong to the holders of the SELECTED instrument,
+             weighted by their selected-instrument lots. Using strategy-wide
+             holdings made a one-share sale show five weight units and could
+             allocate another client's proceeds to someone who sold nothing. */
+          const affectedClients = clients;
+          const residualByClient = rebDistributeMoneyByLots(sellExec.netProceeds, affectedClients);
           const totalResidual = Object.values(residualByClient).reduce((sum, v) => sum + Number(v || 0), 0);
-          const totalWallet = residualClients.reduce((sum, c) => sum + Number(rebWalletByClient[String(c.id)] || 0), 0);
-          const totalAvailable = residualClients.reduce((sum, c) => {
+          const totalWallet = affectedClients.reduce((sum, c) => sum + Number(rebWalletByClient[String(c.id)] || 0), 0);
+          const totalAvailable = affectedClients.reduce((sum, c) => {
             const userId = String(c.id);
             const wallet = Number(rebWalletByClient[userId] || 0);
             const residual = Number(residualByClient[userId] || 0);
@@ -9797,7 +9806,7 @@
             metaEl.textContent = `${rebSelectedIsin.code} &middot; total residual ${rebFmtZAR(totalResidual)} &middot; wallet ${rebFmtZAR(totalWallet)} &middot; available ${rebFmtZAR(totalAvailable)}`;
           }
 
-          tbody.innerHTML = residualClients.map((client) => {
+          tbody.innerHTML = affectedClients.map((client) => {
             const userId = String(client.id);
             const soldQty = (rebRawHoldings[rebSelectedIsin.code] || [])
               .filter((row) => String(row.userId) === userId)
@@ -9983,10 +9992,7 @@
 
           const walletAfterMainByClient = residualClients.reduce((acc, c) => {
             const userId = String(c.id);
-            /* rebDistributeMoneyByLots returns CENTS &mdash; divide by 100 to get rands
-               so this stays consistent with walletBeforeByClient (rands) and
-               rebFmtZAR (rands). Without /100 the display showed &times;100 too large. */
-            const mainResidual = (Number(residualSplitAfterMain[userId] || 0)) / 100;
+            const mainResidual = Number(residualSplitAfterMain[userId] || 0);
             acc[userId] = rebRoundMoney(Number(walletBeforeByClient[userId] || 0) + mainResidual);
             return acc;
           }, {});

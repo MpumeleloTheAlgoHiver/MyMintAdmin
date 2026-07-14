@@ -5248,6 +5248,9 @@
       rebalanceBooksList.innerHTML = batches.map((sb) => {
         const dateValue = sb.displayAt || sb.createdAt || null;
         const dateLabel = dateValue ? new Date(dateValue).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+        const isLiquidation = !!sb.isLiquidation;
+        const operationLabel = isLiquidation ? 'Liquidation' : 'Rebalance';
+        const destinationLabel = isLiquidation ? 'Cash' : sb.buyIsin;
         const isPending = String(sb.batchStatus || '').toUpperCase() === 'PENDING';
         const actionHtml = isPending
           ? `<span style="display:inline-flex;gap:6px;align-items:center;">
@@ -5274,7 +5277,7 @@
         return `
           <details class="filled-orderbook-item">
             <summary class="filled-orderbook-summary">
-              <span>Rebalance &mdash; ${escapeHtml(sb.strategyName)} (${escapeHtml(sb.sellIsin)} &rarr; ${escapeHtml(sb.buyIsin)}${sb.extraBuyIsin ? ' + ' + escapeHtml(sb.extraBuyIsin) : ''})</span>
+              <span>${operationLabel} &mdash; ${escapeHtml(sb.strategyName)} (${escapeHtml(sb.sellIsin)} &rarr; ${escapeHtml(destinationLabel)}${sb.extraBuyIsin ? ' + ' + escapeHtml(sb.extraBuyIsin) : ''})</span>
               <span class="filled-orderbook-meta">
                 ${rebalanceStatusPill(sb.batchStatus)}
                 <span>${sb.clientCount} client${sb.clientCount !== 1 ? 's' : ''}</span>
@@ -6675,6 +6678,7 @@
             sellIsin: b.sell_isin_code || '-',
             buyIsin: b.buy_isin_code || '-',
             extraBuyIsin: b.extra_buy_isin_code || null,
+            isLiquidation: !b.buy_isin_code && !b.extra_buy_isin_code,
             events: evtRows,
             clientCount: [...new Set(batchEvents.map((e) => e.user_id))].length,
           };
