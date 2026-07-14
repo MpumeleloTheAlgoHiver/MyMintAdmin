@@ -1429,8 +1429,13 @@
 
       <div class="orderbook-tab-panel" id="pendingRebalancesPanel" role="tabpanel" aria-labelledby="pendingRebalancesTab">
         <div class="closed-books-card">
-          <h2 class="closed-books-title">Rebalances</h2>
-          <p class="closed-books-subtitle">Standalone rebalance batches. These do not count as active or closed orderbook records.</p>
+          <div class="filled-orderbooks-heading-row">
+            <div>
+              <h2 class="closed-books-title">Rebalances</h2>
+              <p class="closed-books-subtitle">Standalone rebalance batches. These do not count as active or closed orderbook records.</p>
+            </div>
+            <button class="orderbook-export-btn" id="rebalanceUatToggle" type="button" title="Toggle between LIVE and UAT rebalance batches">Live rebalances</button>
+          </div>
           <div class="filled-orderbooks-list" id="rebalanceBooksList">
             <div class="filled-orderbook-empty">No rebalance batches yet.</div>
           </div>
@@ -1501,6 +1506,7 @@
     const pendingRebalancesPanel = document.getElementById('pendingRebalancesPanel');
     const closedBooksList = document.getElementById('closedBooksList');
     const rebalanceBooksList = document.getElementById('rebalanceBooksList');
+    const rebalanceUatToggle = document.getElementById('rebalanceUatToggle');
     const strateBirCount = document.getElementById('strateBirCount');
     const exportStrateBirBtn = document.getElementById('exportStrateBirBtn');
     const toggleStrateBirViewBtn = document.getElementById('toggleStrateBirViewBtn');
@@ -6195,7 +6201,7 @@
           parallelQueries.push(
             supabaseClient
               .from('strategies_c')
-              .select('id, name, short_name, slug')
+              .select('id, name, short_name, slug, investor_environment')
               .in('id', chunk)
               .then(({ data, error }) => {
                 if (error) { console.error('Strategies load error:', error); return; }
@@ -6580,6 +6586,11 @@
       // Ã¢&rdquo;â‚¬Ã¢&rdquo;â‚¬ Build standalone rebalance batches Ã¢&rdquo;â‚¬Ã¢&rdquo;â‚¬
       rebalanceBatchesForStandaloneList = rebBatches
         .filter((b) => ['PENDING', 'SETTLED', 'REVERSED'].includes(String(b.status || '').toUpperCase()))
+        .filter((b) => {
+          const strategy = b.strategy_id ? (strategiesMap[b.strategy_id] || null) : null;
+          const environment = String(strategy?.investor_environment || 'LIVE').toUpperCase();
+          return orderbookUatMode ? environment === 'UAT' : environment !== 'UAT';
+        })
         .map((b) => {
           const batchEvents = rebEvents.filter((e) => e.batch_id === b.id);
           const strategy = b.strategy_id ? (strategiesMap[b.strategy_id] || null) : null;
@@ -8295,8 +8306,8 @@
       });
     }
 
-    if (orderbookUatToggle) {
-      const paintUatToggle = () => {
+    const paintUatToggles = () => {
+      if (orderbookUatToggle) {
         orderbookUatToggle.textContent = orderbookUatMode ? 'Test Wallet Orders' : 'Live orders';
         orderbookUatToggle.style.background = orderbookUatMode ? '#f59e0b' : '';
         orderbookUatToggle.style.color = orderbookUatMode ? '#fff' : '';
@@ -8304,14 +8315,25 @@
         orderbookUatToggle.title = orderbookUatMode
           ? 'Showing test wallet orders only (users with a test wallet) — click to return to the live book'
           : 'Toggle to view orders placed using test wallets';
-      };
-      paintUatToggle();
-      orderbookUatToggle.addEventListener('click', () => {
-        orderbookUatMode = !orderbookUatMode;
-        paintUatToggle();
-        loadOrderbook().catch((err) => console.error('UAT toggle reload failed:', err?.message || err));
-      });
-    }
+      }
+      if (rebalanceUatToggle) {
+        rebalanceUatToggle.textContent = orderbookUatMode ? 'UAT rebalances' : 'Live rebalances';
+        rebalanceUatToggle.style.background = orderbookUatMode ? '#f59e0b' : '';
+        rebalanceUatToggle.style.color = orderbookUatMode ? '#fff' : '';
+        rebalanceUatToggle.style.borderColor = orderbookUatMode ? '#f59e0b' : '';
+        rebalanceUatToggle.title = orderbookUatMode
+          ? 'Showing UAT strategy rebalance batches only — click to return to LIVE'
+          : 'Showing LIVE strategy rebalance batches — click to view UAT';
+      }
+    };
+    const toggleOrderbookEnvironment = () => {
+      orderbookUatMode = !orderbookUatMode;
+      paintUatToggles();
+      loadOrderbook().catch((err) => console.error('UAT toggle reload failed:', err?.message || err));
+    };
+    paintUatToggles();
+    if (orderbookUatToggle) orderbookUatToggle.addEventListener('click', toggleOrderbookEnvironment);
+    if (rebalanceUatToggle) rebalanceUatToggle.addEventListener('click', toggleOrderbookEnvironment);
 
     if (exportStrateBirBtn) {
       exportStrateBirBtn.addEventListener('click', () => {

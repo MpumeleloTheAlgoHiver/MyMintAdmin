@@ -3,6 +3,7 @@ import fs from 'node:fs';
 
 const migration = fs.readFileSync('sql/strategy_investor_environment.sql', 'utf8');
 const dashboard = fs.readFileSync('public/dashboard.html', 'utf8');
+const orderbook = fs.readFileSync('public/orderbook.html', 'utf8');
 
 assert.match(migration, /investor_environment text not null default 'LIVE'/);
 assert.match(migration, /check \(investor_environment in \('LIVE', 'UAT'\)\)/);
@@ -18,6 +19,10 @@ assert.match(dashboard, /const isUatStrategy = strat && String\(strat\.investor_
 assert.match(dashboard, /const showRebalance = showLiveRebalance \|\| isUatStrategy/);
 assert.match(dashboard, /showRebalance && !window\._rebPermBlocked/);
 assert.match(dashboard, /id="rebalanceNavBtn" onclick="window\.openRebalancingModal\(\)"/);
+assert.match(orderbook, /id="rebalanceUatToggle"/);
+assert.match(orderbook, /select\('id, name, short_name, slug, investor_environment'\)/);
+assert.match(orderbook, /return orderbookUatMode \? environment === 'UAT' : environment !== 'UAT'/);
+assert.match(orderbook, /rebalanceUatToggle\.addEventListener\('click', toggleOrderbookEnvironment\)/);
 
 const scope = (environment, rows, testIds) => rows.filter((row) =>
   environment === 'UAT' ? testIds.has(row.user_id) : !testIds.has(row.user_id));
@@ -26,4 +31,4 @@ const testIds = new Set(['test']);
 assert.deepEqual(scope('LIVE', rows, testIds), [{ user_id: 'live' }]);
 assert.deepEqual(scope('UAT', rows, testIds), [{ user_id: 'test' }]);
 
-console.log('16 strategy investor-environment assertions passed');
+console.log('20 strategy investor-environment assertions passed');
