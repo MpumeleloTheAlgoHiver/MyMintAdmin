@@ -2266,6 +2266,7 @@
         const isLive = (h) => {
           const sd = String(h.tradeSide || h.side || '').toUpperCase();
           if (sd !== 'SELL') return h.isActive !== false;
+          if (h.isLiquidationSell && h.isPendingRebalance) return true;
           return h.isActive !== false && !h.rebalanceBatchId && !!h.isPendingSell;
         };
         const liveHoldings = holdings.filter(isLive);
@@ -2371,7 +2372,11 @@
              portfolio — counting it would inflate Live Price and Holdings. A
              client-requested pending sell hasn't left yet, so it still counts. */
           const rSide = String(r.tradeSide || r.side || '').toUpperCase();
-          const rLive = r.isActive !== false && (rSide !== 'SELL' || (!r.rebalanceBatchId && !!r.isPendingSell));
+          const rLive = r.isActive !== false && (
+            rSide !== 'SELL'
+            || (r.isLiquidationSell && r.isPendingRebalance)
+            || (!r.rebalanceBatchId && !!r.isPendingSell)
+          );
           if (rLive) {
             u.totalMarketValue += r.marketValueNumber || 0;
             u.holdingsCount += 1;
@@ -6470,6 +6475,16 @@
         const commitCents = evt.price_at_commit != null ? Number(evt.price_at_commit) : null;
         const displayFillCents = fillCents ?? commitCents;
         const avgFillValue = displayFillCents != null ? displayFillCents / 100 : null;
+        const intradayLivePrice = Number(intradayPriceMap[evt.security_id]);
+        const securityLastPrice = Number(security.last_price);
+        const livePriceValue = Number.isFinite(intradayLivePrice) && intradayLivePrice > 0
+          ? intradayLivePrice
+          : (Number.isFinite(securityLastPrice) && securityLastPrice > 0
+            ? securityLastPrice
+            : avgFillValue);
+        const liveValue = Number.isFinite(livePriceValue)
+          ? Math.abs(quantityValue) * livePriceValue
+          : 0;
         const profileName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
         const clientName = profileName || extractNameFromPackDetails(packDetails) || 'Unknown Client';
         const profileMintNumber = String(profile.mint_number || '').trim();
@@ -6497,8 +6512,18 @@
           totalQuantity: quantityValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 }),
           avgFillNumber: avgFillValue,
           avgFill: avgFillValue != null ? `R ${avgFillValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-',
-          marketValueNumber: 0,
-          marketValue: '-',
+          expectedExitNumber: side === 'SELL' ? avgFillValue : null,
+          expectedExitTotalNum: side === 'SELL' && avgFillValue != null
+            ? avgFillValue * Math.abs(quantityValue)
+            : null,
+          avgExitNumber: fillCents != null ? fillCents / 100 : null,
+          avgExitTotalNum: fillCents != null
+            ? (fillCents / 100) * Math.abs(quantityValue)
+            : null,
+          marketValueNumber: liveValue,
+          marketValue: Number.isFinite(livePriceValue)
+            ? `R ${liveValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : '-',
           unrealizedPnlNumber: 0,
           unrealizedPnl: '-',
           orderType: 'Market',
