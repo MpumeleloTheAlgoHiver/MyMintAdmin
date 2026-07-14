@@ -49,11 +49,27 @@ module.exports = async (req, res) => {
       if (!runDate) return sendJson(res, 400, { error: 'Invalid snapshot date' });
       const sequence = Number(snapshot.sequence || 0) || 1;
       const rows = Array.isArray(snapshot.rows) ? snapshot.rows : [];
+
+      /* ── Server-side backstop: NEVER archive unfilled orders ────────────────
+         An order may only land in an Active Order Book once it is FILLED (avg or
+         actual fill set, or a fill date stamped). This guards against stale
+         browser tabs running old client code that would otherwise sweep a
+         just-entered, unfilled order into a snapshot every timer tick. Any
+         unfilled rows are stripped; if nothing filled remains, no book is
+         written at all. */
+      const parseMoney = (v) => parseFloat(String(v == null ? '' : v).replace(/[^\d.]/g, '')) || 0;
+      const rowIsFilled = (r) =>
+        !!r?.fillDate || parseMoney(r?.avgFill) > 0 || parseMoney(r?.actualFill) > 0;
+      const filledRows = rows.filter(rowIsFilled).map((r, i) => ({ ...r, line: i + 1 }));
+      if (filledRows.length === 0) {
+        return sendJson(res, 200, { ok: true, skipped: 'no filled rows — nothing archived' });
+      }
+
       const status = snapshot.emailStatus === 'sent' ? 'sent' : (snapshot.emailStatus === 'failed' ? 'failed' : 'pending');
       const upsertBody = {
-        run_date: runDate, status, row_count: rows.length, sequence_number: sequence,
+        run_date: runDate, status, row_count: filledRows.length, sequence_number: sequence,
         title: snapshot.title || `Order Book ${sequence}`, date_label: snapshot.dateLabel || null,
-        snapshot_rows: rows, error_message: snapshot.emailError || null,
+        snapshot_rows: filledRows, error_message: snapshot.emailError || null,
         last_attempt_at: new Date().toISOString(),
         ...(status === 'sent' ? { sent_at: new Date().toISOString() } : {})
       };
