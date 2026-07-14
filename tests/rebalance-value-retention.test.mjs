@@ -19,6 +19,13 @@ assert.match(orderbook, /eventType: 'REBALANCE_RESIDUAL'/);
 assert.match(orderbook, /sellGrossCents - sellBrokerCents - sellCustodyCents/);
 assert.match(orderbook, /buyGrossCents - buyBrokerCents - buyCustodyCents/);
 assert.match(dashboard, /Workbook rule:[\s\S]{0,300}do not move client cash yet[\s\S]{0,300}rebWalletByClient/);
+const replaceHoldingFn = dashboard.slice(
+  dashboard.indexOf('async function rebReplaceStrategyHoldingAfterBuy'),
+  dashboard.indexOf('async function rebPersistCommittedTradeSequence'),
+);
+assert.match(replaceHoldingFn, /rebalance-update-strategy-holdings/, 'ordinary rebalances must update composition through the service endpoint');
+assert.doesNotMatch(replaceHoldingFn, /\.from\("strategies_c"\)[\s\S]*?\.update\(/, 'ordinary rebalance composition must not write through browser RLS');
+assert.match(endpoint, /action === 'rebalance-update-strategy-holdings'[\s\S]*?requirePermission\(req, res, 'dashboard', 'commit_rebalance'\)/, 'composition endpoint must retain the rebalance permission gate');
 
 // Workbook switch example: proceeds are recycled; only fees/residual alter cash.
 const sellGross = 1_000_00;
@@ -29,4 +36,4 @@ const delta = sellGross - Math.round(sellGross * brokerageRate) - custody
   - buyGross - Math.round(buyGross * brokerageRate) - custody;
 assert.equal(delta, 275);
 
-console.log('15 rebalance value-retention assertions passed');
+console.log('18 rebalance value-retention assertions passed');

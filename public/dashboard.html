@@ -10401,16 +10401,27 @@
         }
 
         const { holdings, minInvestment } = await rebMergeAndRevalueStrategyHoldings(nextHoldings);
-        const { error: strategyUpdateErr } = await supabaseClient
-          .from("strategies_c")
-          .update({
+        /* Use the permission-checked service-role endpoint. A direct browser
+           update fires the composition-history trigger as the logged-in user;
+           its insert into strategy_composition_log_c is correctly blocked by
+           RLS, causing the entire rebalance commit to fail. */
+        const token = await rebApiToken();
+        if (!token) throw new Error("No session token for strategy composition update.");
+        const response = await fetch("/api/orderbook/send-csv?action=rebalance-update-strategy-holdings", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            strategyId,
             holdings: holdings.length ? holdings : null,
-            min_investment: minInvestment,
-          })
-          .eq("id", strategyId);
-
-        if (strategyUpdateErr) {
-          throw new Error(strategyUpdateErr.message || "Failed to update strategy holdings.");
+            minInvestment,
+          }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(result.details || result.error || "Failed to update strategy holdings.");
         }
 
         allStrategiesFullData = (allStrategiesFullData || []).map((item) => {
