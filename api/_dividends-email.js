@@ -11,13 +11,13 @@ const writeAudit = async (entry) => {
       extraHeaders: { 'Prefer': 'return=minimal' },
       body: entry
     });
-  } catch (err) {}
+  } catch (err) { }
 };
 
 async function sendViaResend({ to, subject, html, metadata = {} }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error('Email service not configured');
-  
+
   const fromEmail = 'investors@mymint.co.za';
 
   const resp = await fetch('https://api.resend.com/emails', {
@@ -27,7 +27,7 @@ async function sendViaResend({ to, subject, html, metadata = {} }) {
   });
   const payload = await resp.json().catch(() => ({}));
   const ok = resp.ok && !payload.error;
-  
+
   if (!ok) throw new Error(payload.message || payload.error || `Resend error ${resp.status}`);
   return payload;
 }
@@ -59,7 +59,7 @@ async function getSecuritiesLogos() {
 function buildEmailHtml(profile, payouts, logosMap) {
   const name = profile.first_name || 'Valued Client';
   let rowsHtml = '';
-  
+
   let totalCash = 0;
 
   payouts.forEach(p => {
@@ -68,7 +68,7 @@ function buildEmailHtml(profile, payouts, logosMap) {
     symbol = symbol.replace(/\.JO$/, '');
     const amount = Number(p.net_cash) || 0;
     totalCash += amount;
-    
+
     rowsHtml += `
           <tr>
             <td class="label">
@@ -189,7 +189,7 @@ function buildEmailHtml(profile, payouts, logosMap) {
   <!-- BODY -->
   <div class="body">
 
-    <p class="lead">Hi ${name},<br><br>The following amounts have been allocated to your Mint account.</p>
+    <p class="lead">Hi ${name},<br><br>The following amounts have been allocated to your MINT account.</p>
 
     <!-- TABLE -->
     <div class="section">
@@ -215,8 +215,8 @@ function buildEmailHtml(profile, payouts, logosMap) {
 
   <!-- CLOSE -->
   <div class="close">
-    <p>You can view these transactions in your Mint app under the Wallet section.</p>
-    <a href="https://app.mymint.co.za">Open Mint App &rarr;</a>
+    <p>You can view these transactions in your MINT app under the Wallet section.</p>
+    <a href="https://app.mymint.co.za">Open MINT App &rarr;</a>
     <p style="margin-top:24px;">Thank you for trusting us with your money. We do not take it lightly.</p>
     <div class="sign">
       <div class="name">The MINT Investment Team</div>
@@ -285,12 +285,12 @@ module.exports = async function dividendsEmailHandler(req, res) {
     // 5. Fetch sent_client_codes
     let sentCodes = [];
     try {
-       const runData = await supabaseRequest(`/rest/v1/dividend_runs?select=sent_client_codes&id=eq.${Number(runId)}`);
-       if (runData && runData[0] && runData[0].sent_client_codes) {
-          sentCodes = runData[0].sent_client_codes;
-       }
+      const runData = await supabaseRequest(`/rest/v1/dividend_runs?select=sent_client_codes&id=eq.${Number(runId)}`);
+      if (runData && runData[0] && runData[0].sent_client_codes) {
+        sentCodes = runData[0].sent_client_codes;
+      }
     } catch (e) {
-       // column might not exist yet, ignore
+      // column might not exist yet, ignore
     }
 
     async function appendSentClientCodes(codesArray) {
@@ -298,8 +298,8 @@ module.exports = async function dividendsEmailHandler(req, res) {
       const newSent = Array.from(new Set([...sentCodes, ...codesArray]));
       try {
         await supabaseRequest(`/rest/v1/dividend_runs?id=eq.${Number(runId)}`, {
-           method: 'PATCH',
-           body: { sent_client_codes: newSent }
+          method: 'PATCH',
+          body: { sent_client_codes: newSent }
         });
       } catch (e) {
         console.error('Failed to update sent_client_codes', e.message);
@@ -322,7 +322,7 @@ module.exports = async function dividendsEmailHandler(req, res) {
       // Specific client HTML preview
       if (clientCode) {
         if (!profileMap[clientCode]) {
-           return sendJson(res, 400, { ok: false, error: 'Profile not found for this code' });
+          return sendJson(res, 400, { ok: false, error: 'Profile not found for this code' });
         }
         const profile = profileMap[clientCode];
         const userPayouts = grouped[clientCode];
@@ -333,54 +333,54 @@ module.exports = async function dividendsEmailHandler(req, res) {
       // Default: Find the first mapped profile to use for preview, but return allClients
       const previewCode = clientCodes.find(c => profileMap[c]);
       if (!previewCode) {
-         return sendJson(res, 400, { ok: false, error: 'Could not match any Client Code to a profile. Ensure client codes exist in the Mint database.', allClients });
+        return sendJson(res, 400, { ok: false, error: 'Could not match any Client Code to a profile. Ensure client codes exist in the Mint database.', allClients });
       }
-      
+
       const profile = profileMap[previewCode];
       const userPayouts = grouped[previewCode];
       const html = buildEmailHtml(profile, userPayouts, logosMap);
-      
+
       return sendJson(res, 200, { ok: true, html, profile, count: userPayouts.length, allClients, previewCode });
     }
 
     // ── POST: Send Emails ─────────────────────────────────────────────
     if (req.method === 'POST') {
       let { testEmail, sendAll } = req.body || {};
-      
+
       if (testEmail) {
         // Send a single test email
         const targetCode = clientCode || clientCodes.find(c => profileMap[c]);
         const profile = targetCode ? profileMap[targetCode] : { first_name: 'Test', email: testEmail };
         const userPayouts = targetCode ? grouped[targetCode] : payouts.slice(0, 3);
-        
+
         const html = buildEmailHtml(profile, userPayouts, logosMap);
         await sendViaResend({ to: testEmail, subject: 'Dividend Payout Processed', html });
         return sendJson(res, 200, { ok: true, message: 'Test email sent successfully' });
       }
 
       if (clientCode && !sendAll) {
-         // Send to specific user
-         const profile = profileMap[clientCode];
-         if (!profile || !profile.email) return sendJson(res, 400, { ok: false, error: 'No email found for this client code' });
-         if (sentCodes.includes(clientCode)) return sendJson(res, 400, { ok: false, error: 'Email already sent to this user for this run' });
+        // Send to specific user
+        const profile = profileMap[clientCode];
+        if (!profile || !profile.email) return sendJson(res, 400, { ok: false, error: 'No email found for this client code' });
+        if (sentCodes.includes(clientCode)) return sendJson(res, 400, { ok: false, error: 'Email already sent to this user for this run' });
 
-         const userPayouts = grouped[clientCode];
-         const html = buildEmailHtml(profile, userPayouts, logosMap);
-         try {
-            await sendViaResend({ to: profile.email, subject: 'Dividend Payout Processed', html });
-            await appendSentClientCodes([clientCode]);
-            await writeAudit({
-              action: 'send_dividend_emails_single',
-              target_email: profile.email,
-              target_member_id: clientCode,
-              actor_email: auth.user.email,
-              actor_user_id: auth.user.id,
-              details: { run_id: runId, client_code: clientCode }
-            });
-            return sendJson(res, 200, { ok: true, message: 'Email sent successfully' });
-         } catch (e) {
-            return sendJson(res, 500, { ok: false, error: e.message });
-         }
+        const userPayouts = grouped[clientCode];
+        const html = buildEmailHtml(profile, userPayouts, logosMap);
+        try {
+          await sendViaResend({ to: profile.email, subject: 'Dividend Payout Processed', html });
+          await appendSentClientCodes([clientCode]);
+          await writeAudit({
+            action: 'send_dividend_emails_single',
+            target_email: profile.email,
+            target_member_id: clientCode,
+            actor_email: auth.user.email,
+            actor_user_id: auth.user.id,
+            details: { run_id: runId, client_code: clientCode }
+          });
+          return sendJson(res, 200, { ok: true, message: 'Email sent successfully' });
+        } catch (e) {
+          return sendJson(res, 500, { ok: false, error: e.message });
+        }
       }
 
       if (sendAll) {
@@ -400,7 +400,7 @@ module.exports = async function dividendsEmailHandler(req, res) {
 
           const userPayouts = grouped[code];
           const html = buildEmailHtml(profile, userPayouts, logosMap);
-          
+
           try {
             await sendViaResend({ to: profile.email, subject: 'Dividend Payout Processed', html });
             sent++;
@@ -409,9 +409,9 @@ module.exports = async function dividendsEmailHandler(req, res) {
             failed++;
           }
         }
-        
+
         if (newlySentCodes.length > 0) {
-           await appendSentClientCodes(newlySentCodes);
+          await appendSentClientCodes(newlySentCodes);
         }
 
         await writeAudit({
