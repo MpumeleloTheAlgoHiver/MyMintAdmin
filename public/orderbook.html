@@ -6959,7 +6959,14 @@
           const response = await fetch('/api/orderbook/send-csv?action=rebalance-upsert-residuals', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ strategyId: batch.strategy_id, familyMemberId: fm || null, residualDeltasCentsByUser }),
+            body: JSON.stringify({
+              strategyId: batch.strategy_id,
+              familyMemberId: fm || null,
+              residualDeltasCentsByUser,
+              batchId: batch.id,
+              eventType: 'LIQUIDATION_PROCEEDS',
+              effectiveAt: new Date().toISOString(),
+            }),
           });
           if (!response.ok) {
             const details = await response.json().catch(() => ({}));
@@ -7302,7 +7309,20 @@
         }
 
         // Ã¢&rdquo;â¬Ã¢&rdquo;â¬ 3. Mark batch SETTLED Ã¢&rdquo;â¬Ã¢&rdquo;â¬
-        const settledBatchPatch = { status: 'SETTLED', settled_at: nowIso, updated_at: nowIso };
+        const { data: settledStrategy, error: settledStrategyErr } = await supabaseClient
+          .from('strategies_c')
+          .select('holdings')
+          .eq('id', strategyId)
+          .single();
+        if (settledStrategyErr) errors.push(`Post-settlement composition snapshot: ${settledStrategyErr.message}`);
+
+        const settledBatchPatch = {
+          status: 'SETTLED',
+          settled_at: nowIso,
+          settlement_effective_at: nowIso,
+          holdings_snapshot_after: settledStrategy?.holdings || null,
+          updated_at: nowIso,
+        };
         if (actualLiquidationNetProceeds != null) settledBatchPatch.net_proceeds = actualLiquidationNetProceeds;
         const { error: settleErr } = await supabaseClient.from('rebalance_batch').update(settledBatchPatch).eq('id', batch.id);
         if (settleErr) throw new Error(settleErr.message);

@@ -8,7 +8,7 @@ assert.match(orderbook, /residualDeltasCentsByUser/, 'settlement must send expli
 assert.doesNotMatch(orderbook, /priorRands \* 100 \+ creditCents/, 'settlement must not replace from a stale batch snapshot');
 assert.match(endpoint, /hasExplicitCents/, 'endpoint must distinguish cents from legacy rands');
 assert.match(endpoint, /\(hasExplicitCents \|\| hasDeltasCents\)\s*\?\s*Math\.round\(Number\(balance\)/, 'explicit cents must not be multiplied by 100');
-assert.match(endpoint, /existing\?\.\[0\]\?\.balance_cents \|\| 0\) \+ requestedCents/, 'delta endpoint must add to the live balance');
+assert.match(endpoint, /rpc\/apply_strategy_rebalance_cash_event/, 'settlement must apply the delta through the atomic cash-ledger RPC');
 
 const fillRands = 215.51;
 const totalGross = fillRands * 3;

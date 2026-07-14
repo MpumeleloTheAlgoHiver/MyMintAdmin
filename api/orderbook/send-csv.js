@@ -335,6 +335,9 @@ module.exports = async (req, res) => {
       if (!entries.length) return sendJson(res, 200, { ok: true, upserted: 0 });
 
       const nowIso = new Date().toISOString();
+      const batchId = String(body.batchId || '').trim() || null;
+      const eventType = String(body.eventType || '').trim() || null;
+      const effectiveAt = String(body.effectiveAt || '').trim() || nowIso;
       let upserted = 0;
       // Manual read-then-update-or-insert per user — PostgREST on_conflict can't
       // target the COALESCE(family_member_id, sentinel) unique index.
@@ -343,12 +346,30 @@ module.exports = async (req, res) => {
           ? Math.round(Number(balance) || 0)
           : Math.round((Number(balance) || 0) * 100);
         const scope = `user_id=eq.${encodeURIComponent(userId)}&strategy_id=eq.${encodeURIComponent(strategyId)}${fmFilter}`;
+        if (hasDeltasCents && batchId && eventType) {
+          await requestSupabaseJson('/rest/v1/rpc/apply_strategy_rebalance_cash_event', {
+            method: 'POST',
+            body: {
+              p_batch_id: batchId,
+              p_strategy_id: strategyId,
+              p_user_id: userId,
+              p_family_member_id: familyMemberId || null,
+              p_event_type: eventType,
+              p_amount_cents: requestedCents,
+              p_effective_at: effectiveAt,
+              p_metadata: {},
+            },
+          });
+          upserted += 1;
+          continue;
+        }
         let balanceCents = requestedCents;
         if (hasDeltasCents) {
           const existing = await requestSupabaseJson(
             `/rest/v1/strategy_rebalance_residuals?${scope}&select=balance_cents&limit=1`
           );
-          balanceCents = Math.round(Number(existing?.[0]?.balance_cents || 0) + requestedCents);
+          const openingBalanceCents = Math.round(Number(existing?.[0]?.balance_cents || 0));
+          balanceCents = openingBalanceCents + requestedCents;
         }
         const updated = await requestSupabaseJson(
           `/rest/v1/strategy_rebalance_residuals?${scope}&select=user_id`,
