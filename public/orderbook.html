@@ -1460,7 +1460,7 @@
             </button>
             <h2 class="filled-orderbooks-title">Active Order Books</h2>
           </div>
-          <p class="filled-orderbooks-subtitle">Snapshots captured when the timer hits 15:30.</p>
+          <p class="filled-orderbooks-subtitle">Orders move here automatically once fully filled. Sending stays manual.</p>
           <div class="filled-orderbooks-list" id="filledOrderbooksList">
             <div class="filled-orderbook-empty">No active order books yet.</div>
           </div>
@@ -5585,17 +5585,24 @@
     const orderbookRowIsFilled = (r) =>
       Number(r?.avgFillNumber) > 0 || !!r?.fillDate;
 
-    const captureFilledOrderbook = async () => {
+    // isRowEligible: predicate that decides which rows drop into the snapshot.
+    //   Default = orderbookRowIsFilled (any executed avg fill / fill date).
+    //   The auto-on-full-fill path passes the STRICTER getRowFillStatus().filled
+    //   so a partially-filled basket is never relocated.
+    // autoSend: when false, the book is created + persisted but NO desk email is
+    //   sent — the row simply moves to Active Order Books and "Send Confirm"
+    //   stays available for a manual send.
+    const captureFilledOrderbook = async ({ isRowEligible = orderbookRowIsFilled, autoSend = true } = {}) => {
       if (!allOrderbookRows.length) return;
 
       // Pending rebalance rows are never archived (kept alive below).
       const pendingRows = allOrderbookRows.filter(r => r.isPendingRebalance);
       const settledRows = allOrderbookRows.filter(r => !r.isPendingRebalance);
 
-      // Only FILLED rows drop into the snapshot; unfilled rows stay live.
-      const filledRows   = settledRows.filter(orderbookRowIsFilled);
-      const unfilledRows = settledRows.filter(r => !orderbookRowIsFilled(r));
-      if (!filledRows.length) return; // nothing filled yet — no book to create
+      // Only eligible rows drop into the snapshot; the rest stay live.
+      const filledRows   = settledRows.filter(isRowEligible);
+      const unfilledRows = settledRows.filter(r => !isRowEligible(r));
+      if (!filledRows.length) return; // nothing eligible yet — no book to create
 
       const now = new Date();
       const dateKey = getArchiveDateKey(now);
@@ -5616,11 +5623,13 @@
         emailStatus: ''
       };
 
-      const emailResult = await sendFilledOrderbookEmail(snapshot);
-      snapshot.emailStatus = emailResult.status;
-      snapshot.emailError = emailResult.details || '';
-      if (emailResult.status === 'sent') {
-        snapshot.sentAt = new Date().toISOString();
+      if (autoSend) {
+        const emailResult = await sendFilledOrderbookEmail(snapshot);
+        snapshot.emailStatus = emailResult.status;
+        snapshot.emailError = emailResult.details || '';
+        if (emailResult.status === 'sent') {
+          snapshot.sentAt = new Date().toISOString();
+        }
       }
 
       try {
@@ -5666,6 +5675,29 @@
         await captureFilledOrderbook();
       } finally {
         isCapturingFilledOrderbook = false;
+      }
+    };
+
+    // ── Auto-move on FULL fill ─────────────────────────────────────────────────
+    // Rule: the moment an order is FULLY filled (every leg carries a fill date —
+    // getRowFillStatus().filled), it must leave the top/working book and drop
+    // straight into an Active Order Book. Partially-filled and unfilled orders
+    // stay on the working book. No desk email is sent here — sending stays manual
+    // via "Send Confirm" on the relocated row. Idempotent: a captured row's
+    // sourceId is excluded from the live set on the next load (getArchivedSourceIds),
+    // so it is never re-captured into a second book.
+    let isAutoCapturingFullFill = false;
+    const autoCaptureFullyFilledOrderbook = async () => {
+      if (orderbookUatMode) return;            // never relocate a filtered UAT set into real books
+      if (isAutoCapturingFullFill) return;
+      const isFullyFilled = (r) => !r.isPendingRebalance && getRowFillStatus(r).filled;
+      if (!(allOrderbookRows || []).some(isFullyFilled)) return;
+
+      isAutoCapturingFullFill = true;
+      try {
+        await captureFilledOrderbook({ isRowEligible: (r) => getRowFillStatus(r).filled, autoSend: false });
+      } finally {
+        isAutoCapturingFullFill = false;
       }
     };
 
@@ -6526,6 +6558,16 @@
         // its REB badge and exit price, and isn't double-counted.
         if (reason === 'REBALANCE_SELL' && !row.rebalanceBatchId) return false;
 
+        // Liquidation activity — a sell-to-cash batch (a SELL leg with NO buy leg)
+        // — is managed ENTIRELY on the Rebalances tab and must NOT appear on the
+        // orderbook or be auto-captured into an Active Order Book (the CEO reads it
+        // as a duplicate). Ordinary rebalance sells (part of a swap that HAS a buy
+        // leg) still show here. Identify it via the batch: no buy_isin, no extra.
+        if (reason === 'REBALANCE_SELL' && row.rebalanceBatchId) {
+          const b = batchById[row.rebalanceBatchId];
+          if (b && !b.buy_isin_code && !b.extra_buy_isin_code) return false;
+        }
+
         if (isActive) return true;
         if (side === 'SELL') return true;
         return false;
@@ -6630,14 +6672,13 @@
       // Number pending rows starting after settled rows
       rebEventRows.forEach((row, i) => { row.line = rawRows.length + i + 1; });
 
-      // Ordinary pending rebalances stay in the standalone Rebalances tab.
-      // Liquidate-to-cash is different: it creates an executable SELL with no
-      // matching BUY, so expose that SELL in the Active Orderbook as well.
-      const liquidationSellRows = rebEventRows.filter((row) => row.isLiquidationSell);
-      const settledRows = [
-        ...filteredRows.filter(r => !r.isPendingRebalance),
-        ...liquidationSellRows,
-      ];
+      // Liquidations are managed entirely on the Rebalances (rebalance) side and
+      // executed there via the batch-level Fill & Settle flow — NOT sent from the
+      // orderbook. So a liquidate-to-cash SELL must NOT be duplicated into the
+      // Active Orderbook working set. (It used to be injected here so it was also
+      // sendable from the orderbook, but that just created a confusing duplicate
+      // of something already handled cleanly on the rebalance side.)
+      const settledRows = filteredRows.filter(r => !r.isPendingRebalance);
 
       allBirSourceRows = rawRows;
       allOrderbookRawRows = settledRows;
@@ -6728,12 +6769,14 @@
         // if it couldn't load, the live set is unfiltered, and capturing/reconciling
         // would bake test orders into a real archived book (and into broker CSVs).
         if (!orderbookUatMode && _testUserIdSet !== null) {
-          // Auto-capture on load removed — orders are never archived automatically.
-          // Reconciliation (which only updates EXISTING archived books, never
-          // creates new ones) still runs so archived rows track live holdings.
-          reconcileArchivedBooksWithLiveHoldings()
+          // Auto-move FULLY-filled orders into an Active Order Book (no email —
+          // send stays manual). Then reconcile EXISTING archived books against
+          // live holdings. Capture runs first so a just-fully-filled row lands in
+          // its own book before reconciliation touches the archive.
+          autoCaptureFullyFilledOrderbook()
+            .then(() => reconcileArchivedBooksWithLiveHoldings())
             .then(() => maybeBackfillLegacyArchiveSnapshots())
-            .catch((err) => console.error('Post-render reconciliation error:', err?.message || err));
+            .catch((err) => console.error('Post-render capture/reconciliation error:', err?.message || err));
         }
       } catch (error) {
         console.error('Orderbook load error:', error);
@@ -7000,20 +7043,44 @@
         });
         if (!grossByOwner.size) throw new Error('No liquidation owners were available for residual credit.');
 
-        const totalGross = [...grossByOwner.values()].reduce((sum, value) => sum + value, 0);
-        const actualNetCents = Math.max(0, Math.round((totalGross * (1 - brokerageRate) - custodyFee * grossByOwner.size) * 100));
-        if (actualNetCents <= 0) throw new Error('Actual liquidation proceeds are not positive after fees.');
-
-        const ownerEntries = [...grossByOwner.entries()];
-        let allocatedCents = 0;
-        const creditByOwner = new Map();
-        ownerEntries.forEach(([key, gross], index) => {
-          const cents = index === ownerEntries.length - 1
-            ? actualNetCents - allocatedCents
-            : Math.round(actualNetCents * (totalGross > 0 ? gross / totalGross : 0));
-          creditByOwner.set(key, cents);
-          allocatedCents += cents;
+        /* Consume each owner's reserve before reducing liquidation proceeds.
+           Actual Excel fills drive both gross and brokerage; the batch-keyed
+           RPC makes retries idempotent. */
+        const ownerByScope = new Map();
+        grossByOwner.forEach((grossRands, key) => {
+          const [uid, fm] = key.split('|');
+          if (!ownerByScope.has(fm)) ownerByScope.set(fm, {});
+          const grossCents = Math.round(grossRands * 100);
+          ownerByScope.get(fm)[uid] = {
+            grossCents,
+            feeCents: Math.round(grossCents * brokerageRate) + Math.round(custodyFee * 100),
+          };
         });
+
+        const creditByOwner = new Map();
+        for (const [fm, ownerRows] of ownerByScope.entries()) {
+          const feesCentsByUser = Object.fromEntries(Object.entries(ownerRows).map(([uid, row]) => [uid, row.feeCents]));
+          const reserveResp = await fetch('/api/orderbook/send-csv?action=rebalance-consume-reserves', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              batchId: batch.id,
+              strategyId: batch.strategy_id,
+              familyMemberId: fm || null,
+              feesCentsByUser,
+              effectiveAt: new Date().toISOString(),
+            }),
+          });
+          const reserveJson = await reserveResp.json().catch(() => ({}));
+          if (!reserveResp.ok) throw new Error(reserveJson.details || reserveJson.error || 'Liquidation reserve settlement failed.');
+          Object.entries(ownerRows).forEach(([uid, row]) => {
+            const consumed = Math.max(0, Math.round(Number(reserveJson.resultsByUser?.[uid]?.consumed_cents || 0)));
+            const shortfall = Math.max(0, row.feeCents - consumed);
+            creditByOwner.set(`${uid}|${fm}`, Math.max(0, row.grossCents - shortfall));
+          });
+        }
+        const actualNetCents = [...creditByOwner.values()].reduce((sum, cents) => sum + cents, 0);
+        if (actualNetCents <= 0) throw new Error('Actual liquidation proceeds are not positive after reserve and fees.');
 
         /* Send DELTAS, not replacement balances. wallet_snapshot_before is an
            audit/reversal snapshot and may be stale or empty if the dashboard
@@ -7091,11 +7158,14 @@
           const buyBrokerCents = Math.round(owner.buyGrossCents * brokerageRate);
           const sellCustodyCents = owner.hasSell ? custodyCents : 0;
           const buyCustodyCents = owner.hasBuy ? custodyCents : 0;
-          const deltaCents = owner.sellGrossCents - sellBrokerCents - sellCustodyCents
-            - owner.buyGrossCents - buyBrokerCents - buyCustodyCents;
-          if (!byScope.has(owner.fm)) byScope.set(owner.fm, { deltas: {}, metadata: {} });
+          const requestedFeeCents = sellBrokerCents + sellCustodyCents + buyBrokerCents + buyCustodyCents;
+          // Legacy no-reserve bridge was:
+          // sellGrossCents - sellBrokerCents - sellCustodyCents - buyGrossCents - buyBrokerCents - buyCustodyCents.
+          // Reserve-first settlement is algebraically identical when available
+          // reserve is zero; otherwise only the uncovered fee shortfall leaves proceeds.
+          if (!byScope.has(owner.fm)) byScope.set(owner.fm, { owners: {}, deltas: {}, metadata: {} });
           const scope = byScope.get(owner.fm);
-          scope.deltas[owner.uid] = deltaCents;
+          scope.owners[owner.uid] = { ...owner, requestedFeeCents };
           scope.metadata[owner.uid] = {
             sell_gross_cents: owner.sellGrossCents,
             sell_brokerage_cents: sellBrokerCents,
@@ -7107,6 +7177,39 @@
         });
 
         for (const [fm, scope] of byScope.entries()) {
+          const feesCentsByUser = Object.fromEntries(
+            Object.entries(scope.owners).map(([uid, owner]) => [uid, owner.requestedFeeCents])
+          );
+          const reserveResp = await fetch('/api/orderbook/send-csv?action=rebalance-consume-reserves', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              batchId: batch.id,
+              strategyId: batch.strategy_id,
+              familyMemberId: fm || null,
+              feesCentsByUser,
+              metadataByUser: scope.metadata,
+              effectiveAt: new Date().toISOString(),
+            }),
+          });
+          const reserveJson = await reserveResp.json().catch(() => ({}));
+          if (!reserveResp.ok) {
+            throw new Error(reserveJson.details || reserveJson.error || `Reserve settlement failed (${reserveResp.status}).`);
+          }
+          Object.entries(scope.owners).forEach(([uid, owner]) => {
+            const reserveResult = reserveJson.resultsByUser?.[uid] || {};
+            const reserveConsumedCents = Math.max(0, Math.round(Number(reserveResult.consumed_cents || 0)));
+            const feeShortfallCents = Math.max(0, owner.requestedFeeCents - reserveConsumedCents);
+            scope.deltas[uid] = owner.sellGrossCents - owner.buyGrossCents - feeShortfallCents;
+            scope.metadata[uid] = {
+              ...scope.metadata[uid],
+              reserve_consumed_cents: reserveConsumedCents,
+              fee_shortfall_cents: feeShortfallCents,
+              reserve_before_cents: Math.round(Number(reserveResult.reserve_before_cents || 0)),
+              reserve_after_cents: Math.round(Number(reserveResult.reserve_after_cents || 0)),
+            };
+          });
+
           const response = await fetch('/api/orderbook/send-csv?action=rebalance-upsert-residuals', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
