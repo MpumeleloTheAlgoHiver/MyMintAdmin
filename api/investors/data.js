@@ -49,17 +49,6 @@ module.exports = async (req, res) => {
        which carries MINT's spread). Guards legacy Expected_fill rows that were
        stored in cents (>5Ã— avg_fill/100). Mirrors the MINT app's
        costBasisRandsPerShare so the CRM and the client app agree to the cent. */
-    const costBasisCentsPerShare = (h) => {
-      const avgCents = Number(h.avg_fill) || 0;
-      const expectedRaw = Number(h.expected_fill) || 0;
-      if (expectedRaw > 0) {
-        const avgRands = avgCents > 0 ? avgCents / 100 : 0;
-        const expectedRands = (avgRands > 0 && expectedRaw > avgRands * 5) ? expectedRaw / 100 : expectedRaw;
-        return Math.round(expectedRands * 100);
-      }
-      return avgCents > 0 ? avgCents : 0;
-    };
-
     const userIds  = [...new Set((holdings || []).map((r) => r.user_id).filter(Boolean))];
     const secIds   = [...new Set((holdings || []).map((r) => r.security_id).filter(Boolean))];
     const famIds   = [...new Set((holdings || []).map((r) => r.family_member_id).filter(Boolean))];
@@ -80,21 +69,12 @@ module.exports = async (req, res) => {
        (Expected_fill, the price the client saw), NOT avg_fill — avg_fill carries
        MINT's spread. costBasisCentsPerShare returns cents, so Ã— quantity gives
        cents directly, matching basket_value (also cents). */
-    const investedByUser = {};
-    (holdings || []).forEach(h => {
-      const uid = h.user_id;
-      const cost = costBasisCentsPerShare(h) * Number(h.quantity);
-      if (uid && cost > 0) investedByUser[uid] = (investedByUser[uid] || 0) + cost;
-    });
-    const latestRowByUser = {};
-    stratHist.forEach(r => { latestRowByUser[r.user_id] = r; });
-    Object.values(latestRowByUser).forEach(r => {
-      const invested = investedByUser[r.user_id];
-      if (invested > 0) {
-        r.inception_pnl = r.basket_value - invested;
-        r.inception_pct = (r.inception_pnl / invested) * 100;
-      }
-    });
+    /* Keep the return spine immutable in transit. A client may own multiple
+       strategies, so recomputing one row from holdings grouped by user_id mixes
+       unrelated basket cost bases (for example Yield + ETF) and fabricates an
+       inception loss. Live holdings economics are calculated separately by the
+       page; historical percentages remain exactly as stored until the
+       chain-linked complete-NAV return engine replaces them. */
 
     const [profiles, secMeta, secReturns, secIntraday, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches, closedHoldings, aumFeeState, aumFeeTxns, aumSegments, wallets] = await Promise.all([
       userIds.length
