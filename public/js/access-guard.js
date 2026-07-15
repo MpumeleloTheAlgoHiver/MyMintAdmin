@@ -42,6 +42,7 @@
 
   const applyNavVisibility = (role, pageAccess, approverTier) => {
     const isMasterAdmin = role === 'master_admin' || approverTier === 'master' || approverTier === 'dev';
+    const isAdmin = role === 'admin' || isMasterAdmin;
     document.querySelectorAll('.nav-icon, [data-nav-page]').forEach(link => {
       const href = link.getAttribute('href') || '';
       const path = href.split('?')[0].split('#')[0];
@@ -49,7 +50,7 @@
       if (!key) return;
       if (key === '__admin_only__') {
         link.style.display = isMasterAdmin ? '' : 'none';
-      } else if (!isMasterAdmin && !pageAccess.includes(key)) {
+      } else if (!isAdmin && !pageAccess.includes(key)) {
         link.style.display = 'none';
       }
     });
@@ -95,7 +96,8 @@
     const pageAccess = Array.isArray(me.page_access) ? me.page_access : [];
     const approverTier = me.approver_tier || null;
     const permissions = me.permissions || {};
-    const isMasterAdmin = role === 'master_admin' || approverTier === 'master';
+    const isMasterAdmin = role === 'master_admin' || approverTier === 'master' || approverTier === 'dev';
+    const isAdmin = role === 'admin' || isMasterAdmin;
 
     applyNavVisibility(role, pageAccess, approverTier);
 
@@ -106,8 +108,8 @@
     if (PAGE_KEY) {
       // '__admin_only__' = only master_admin or dev can access page level
       const allowed = PAGE_KEY === '__admin_only__'
-        ? isMasterAdmin || approverTier === 'dev'
-        : isMasterAdmin || approverTier === 'dev' || pageAccess.includes(PAGE_KEY);
+        ? isMasterAdmin
+        : isAdmin || pageAccess.includes(PAGE_KEY);
       if (!allowed) {
         const fallback = pageAccess[0]
           ? Object.keys(NAV_PAGE_MAP).find(p => NAV_PAGE_MAP[p] === pageAccess[0]) || '/signin.html?reason=no-access'
