@@ -1246,34 +1246,38 @@
       const rowsObj = { 0: { cells: cellsForRow(headers) } };
       rowsObj[0].cells = Object.fromEntries(Object.entries(rowsObj[0].cells).map(([c, cell]) => [c, { ...cell, style: 0 }]));
 
-      // Style indexes — format MUST live in the styles array, not on the cell
-      // directly. x-data-spreadsheet ignores a `format` key spread onto a cell;
-      // it only reads format from the style object referenced by the cell's
-      // `style` index. Styles 2-5 pair the custom 'rands' / 'pct2' formats
-      // (registered in initSpreadsheetGrid) with the appropriate weight/bg.
-      // 0: header  1: total label  2: rands  3: pct  4: total rands  5: total pct
-      const S_RANDS = 2, S_PCT = 3, S_TOTAL_RANDS = 4, S_TOTAL_PCT = 5;
+      // Style indexes: 0=header  1=total-label  2=money  3=pct  4=total-money  5=total-pct
+      // No `format` property on any style — x-data-spreadsheet's numbro formatter
+      // throws non-Error strings inside rAF callbacks (outside any try-catch) for
+      // certain values; all cells use pre-computed text to avoid the formula engine.
+      const S_MONEY = 2, S_PCT = 3, S_TOTAL_MONEY = 4, S_TOTAL_PCT = 5;
       const cents = (n) => Number(n).toFixed(2);
       const cashR = Number(i.cashComponent) || 0;
 
       rows.forEach((r, idx) => {
-        const rIdx = idx + 1;      // spreadsheet row (0-based), row 0 is header
-        const excelRow = rIdx + 1; // 1-based Excel-style row used in formula strings
+        const rIdx = idx + 1;
+        const avgFill = Number(r.avgFillR) || 0;
+        const price   = Number(r.priceR)   || 0;
+        const qty     = Number(r.qty)      || 0;
+        const cost    = qty * avgFill;           // Total Avg Fill (cost basis)
+        const mktVal  = qty * price;             // Market Value
+        const pnl     = mktVal - cost;           // Total P&L
+        const pnlPct  = cost > 0 ? (pnl / cost * 100).toFixed(2) : '0.00'; // P&L %
+        // All cells are pre-computed static text — no formulas.
+        // x-data-spreadsheet's formula engine throws non-Error strings (e.g.
+        // "#DIV/0!") inside requestAnimationFrame callbacks (outside any try-catch),
+        // crashing the page. Pre-computed values never trigger that path.
         rowsObj[rIdx] = {
           cells: {
             0: { text: r.symbol },
             1: { text: r.name },
-            2: { text: String(r.qty) },
-            3: { text: cents(r.avgFillR),          style: S_RANDS },
-            4: { text: `=C${excelRow}*D${excelRow}`, style: S_RANDS },
-            5: { text: cents(r.qty * r.priceR),    style: S_RANDS },
-            6: { text: `=F${excelRow}-E${excelRow}`, style: S_RANDS },
-            // =G*100/E yields the human-readable percentage number (e.g. 7.55);
-            // the 'pct2' format then appends "%" to produce "7.55%".
-            // Plain division — the grid's formula engine crashes when division
-            // is nested inside IF(), so no IF-guard here.
-            7: { text: `=G${excelRow}*100/E${excelRow}`, style: S_PCT },
-            8: { text: `=E${excelRow}+G${excelRow}`, style: S_RANDS },
+            2: { text: String(qty) },
+            3: { text: cents(avgFill),  style: S_MONEY },
+            4: { text: cents(cost),     style: S_MONEY },
+            5: { text: cents(mktVal),   style: S_MONEY },
+            6: { text: cents(pnl),      style: S_MONEY },
+            7: { text: String(pnlPct),  style: S_PCT   },
+            8: { text: cents(mktVal),   style: S_MONEY }, // Total Value = mktVal (= E + G = cost + pnl = mktVal)
           }
         };
       });
@@ -1286,26 +1290,28 @@
           cells: {
             0: { text: 'CASH' },
             1: { text: 'Strategy Cash' },
-            5: { text: cents(cashR), style: S_RANDS }, // Market Value = cash amount
-            6: { text: '0',          style: S_RANDS }, // P&L = 0 (no cost basis)
+            5: { text: cents(cashR), style: S_MONEY }, // Market Value = cash amount
+            6: { text: '0',          style: S_MONEY }, // P&L = 0 (no cost basis)
             7: { text: '0',          style: S_PCT   }, // P&L % = 0
-            8: { text: cents(cashR), style: S_RANDS }, // Total Value w/ P&L = cash
+            8: { text: cents(cashR), style: S_MONEY }, // Total Value w/ P&L = cash
           }
         };
       }
 
       const totalRIdx = rows.length + (hasCash ? 2 : 1);
-      const firstDataExcelRow = 2;
-      // SUM range includes cash row so F-total picks up cash Market Value
-      const lastDataExcelRow = rows.length + (hasCash ? 2 : 1);
+      // Pre-compute totals to avoid formula engine division-by-zero crashes.
+      const totalAvgFill  = rows.reduce((s, r) => s + r.qty * (Number(r.avgFillR) || 0), 0);
+      const totalMktVal   = rows.reduce((s, r) => s + r.qty * (Number(r.priceR)   || 0), 0) + cashR;
+      const totalPnl      = totalMktVal - totalAvgFill;
+      const totalPnlPct   = totalAvgFill > 0 ? (totalPnl / totalAvgFill * 100).toFixed(2) : '0.00';
       rowsObj[totalRIdx] = {
         cells: {
-          0: { text: 'Total',                                                          style: 1            },
-          4: { text: `=SUM(E${firstDataExcelRow}:E${lastDataExcelRow})`,               style: S_TOTAL_RANDS },
-          5: { text: `=SUM(F${firstDataExcelRow}:F${lastDataExcelRow})`,               style: S_TOTAL_RANDS },
-          6: { text: `=F${totalRIdx + 1}-E${totalRIdx + 1}`,                           style: S_TOTAL_RANDS },
-          7: { text: `=G${totalRIdx + 1}*100/E${totalRIdx + 1}`,                       style: S_TOTAL_PCT   },
-          8: { text: `=E${totalRIdx + 1}+G${totalRIdx + 1}`,                           style: S_TOTAL_RANDS },
+          0: { text: 'Total',                   style: 1             },
+          4: { text: cents(totalAvgFill),        style: S_TOTAL_MONEY },
+          5: { text: cents(totalMktVal),         style: S_TOTAL_MONEY },
+          6: { text: cents(totalPnl),            style: S_TOTAL_MONEY },
+          7: { text: String(totalPnlPct),        style: S_TOTAL_PCT   },
+          8: { text: cents(totalMktVal),         style: S_TOTAL_MONEY },
         }
       };
       rowsObj.len = Math.max(100, totalRIdx + 20);
@@ -1314,12 +1320,12 @@
         name: 'Portfolio',
         freeze: 'A1',
         styles: [
-          { font: { bold: true }, bgcolor: '#f1f5f9', color: '#334155' },             // 0: header
-          { font: { bold: true }, bgcolor: '#f8fafc' },                               // 1: total label
-          { format: 'rands' },                                                        // 2: rands
-          { format: 'pct2'  },                                                        // 3: percent
-          { font: { bold: true }, bgcolor: '#f8fafc', format: 'rands' },              // 4: total rands
-          { font: { bold: true }, bgcolor: '#f8fafc', format: 'pct2'  },              // 5: total percent
+          { font: { bold: true }, bgcolor: '#f1f5f9', color: '#334155' },           // 0: header
+          { font: { bold: true }, bgcolor: '#f8fafc' },                             // 1: total label
+          {},                                                                       // 2: money data — no format; numbro crashes when formula results
+          {},                                                                       // 3: pct data  — are error strings (#NAME?, #VALUE!) inside rAF,
+          { font: { bold: true }, bgcolor: '#f8fafc' },                             // 4: total money  which is outside any try-catch
+          { font: { bold: true }, bgcolor: '#f8fafc' },                             // 5: total pct
         ],
         merges: [],
         rows: rowsObj,
@@ -1390,6 +1396,7 @@
     function mountSpreadsheetGrid(data) {
       const el = document.getElementById('xs-grid');
       if (!el || typeof x_spreadsheet === 'undefined' || !currentInvestor) return;
+      try {
       el.innerHTML = '';
       xsInstance = x_spreadsheet('#xs-grid', {
         mode: 'edit',
@@ -1437,30 +1444,13 @@
         });
         inputEl.addEventListener('blur', xsCommitFormulaBar);
       }
+      } catch(e) {
+        console.error('[Spreadsheet] mountSpreadsheetGrid error:', String(e), e);
+        el.innerHTML = `<div style="padding:20px;color:#ef4444;font-size:13px;">Spreadsheet failed to load: ${String(e)}</div>`;
+      }
     }
 
     function initSpreadsheetGrid(i) {
-      // Register custom display formats once, before the first grid mount.
-      // x-data-spreadsheet stores these in its internal formatm registry via
-      // Spreadsheet.format(key, title, fn). A style with { format: 'rands' }
-      // or { format: 'pct2' } causes the library to call the function below
-      // to produce the cell's display string (formula results included).
-      if (typeof x_spreadsheet !== 'undefined' && !window._xsCustomFormats) {
-        window._xsCustomFormats = true;
-        x_spreadsheet.format('rands', 'R (ZAR)', function(v) {
-          const n = parseFloat(v);
-          if (isNaN(n)) return String(v);
-          const abs = Math.abs(n).toFixed(2);
-          const [intPart, decPart] = abs.split('.');
-          const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-          return (n < 0 ? '-' : '') + 'R\u00a0' + grouped + '.' + decPart;
-        });
-        x_spreadsheet.format('pct2', '0.00%', function(v) {
-          const n = parseFloat(v);
-          if (isNaN(n)) return String(v);
-          return n.toFixed(2) + '%';
-        });
-      }
       mountSpreadsheetGrid(spreadsheetGridData(i));
     }
 
