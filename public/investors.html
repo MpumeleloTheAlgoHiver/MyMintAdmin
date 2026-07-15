@@ -1178,7 +1178,13 @@
         card.style.flexDirection = '';
         if (btn) btn.innerHTML = '&#10021; Full screen';
       }
-      setTimeout(() => { if (xsInstance) xsInstance.reRender(); }, 60);
+      // Reinitialize (rather than just reRender) — the library bakes the
+      // measured container width/height into internal canvas sizing at
+      // mount time and doesn't re-measure it correctly on a plain re-render,
+      // which left the grid stuck at its old (half-width) size in fullscreen.
+      // Capture current cell edits first so toggling doesn't lose them.
+      const savedData = xsInstance ? xsInstance.getData() : null;
+      setTimeout(() => mountSpreadsheetGrid(savedData), 80);
     }
 
     document.addEventListener('keydown', (e) => {
@@ -1252,9 +1258,12 @@
       }];
     }
 
-    function initSpreadsheetGrid(i) {
+    /* Mounts (or re-mounts) the grid into #xs-grid. Pass explicit `data` to
+       preserve current cell edits across a remount (e.g. fullscreen toggle);
+       omit it to rebuild fresh from the investor's live holdings. */
+    function mountSpreadsheetGrid(data) {
       const el = document.getElementById('xs-grid');
-      if (!el || typeof x_spreadsheet === 'undefined') return;
+      if (!el || typeof x_spreadsheet === 'undefined' || !currentInvestor) return;
       el.innerHTML = '';
       xsInstance = x_spreadsheet('#xs-grid', {
         mode: 'edit',
@@ -1267,12 +1276,16 @@
         },
         row: { len: 100, height: 25 },
         col: { len: 26, width: 100, indexWidth: 45, minWidth: 60 },
-      }).loadData(spreadsheetGridData(i));
+      }).loadData(data || spreadsheetGridData(currentInvestor));
+    }
+
+    function initSpreadsheetGrid(i) {
+      mountSpreadsheetGrid(spreadsheetGridData(i));
     }
 
     function resetSpreadsheetGrid(i) {
       if (!i) return;
-      initSpreadsheetGrid(i);
+      mountSpreadsheetGrid(spreadsheetGridData(i));
     }
 
     /* Build and download an .xlsx with live formulas (SheetJS) for the
