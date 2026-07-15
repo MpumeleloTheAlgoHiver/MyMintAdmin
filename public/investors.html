@@ -1389,6 +1389,22 @@
       });
       xsUpdateFormulaBar(0, 0);
 
+      // Fallback for plain single clicks: the library's own 'cell-selected'
+      // event is meant to fire on every click, but a fresh click on the same
+      // cell that already has focus (e.g. right after typing in the formula
+      // bar) doesn't always re-emit it. The selector's internal `indexes`
+      // ([ri, ci]) is the one state the library itself always keeps in sync
+      // with the visible selection highlight, so reading it straight from a
+      // click listener on the grid guarantees the bar never goes stale.
+      el.addEventListener('click', () => {
+        setTimeout(() => {
+          const idx = xsInstance && xsInstance.data && xsInstance.data.selector && xsInstance.data.selector.indexes;
+          if (Array.isArray(idx) && (idx[0] !== xsSelected.ri || idx[1] !== xsSelected.ci)) {
+            xsUpdateFormulaBar(idx[0], idx[1]);
+          }
+        }, 0);
+      });
+
       const inputEl = document.getElementById('xsFormulaInput');
       if (inputEl && !inputEl._xsBound) {
         inputEl._xsBound = true;
