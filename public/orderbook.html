@@ -1652,12 +1652,13 @@
     const MANUALLY_CLOSED_BOOKS_KEY = 'orderbook-manually-closed-v1';
     const CLOSED_BOOKS_MIGRATED_KEY = 'orderbook-closed-migrated-v1';
     let filledOrderbooksArchive = [];
-    // Strategies flagged strategies_c.is_liquidating are wound down entirely on
-    // the Rebalances tab (batch-level Fill & Settle). Their rows must NEVER show
-    // on the orderbook or in an Active Order Book — only in the Rebalances tab.
-    // Repopulated each load; used to strip rows from the working set, from
-    // auto-capture, and from the archive render.
-    let liquidatingStrategyIds = new Set();
+    // Strategies flagged strategies_c.hide_from_orderbook are managed entirely on
+    // the Rebalances tab (e.g. a strategy that went through a liquidation step —
+    // the activity is shown there, and must NOT be duplicated on the orderbook
+    // side). Their rows never show in the working book, are never auto-captured,
+    // and are stripped from the Active Order Books render. Manual + reversible;
+    // repopulated each load.
+    let orderbookHiddenStrategyIds = new Set();
     // The blue pin promotes a captured snapshot into the top "live" table.
     // If any snapshot is pinned, the most recent pinned book's rows are shown
     // up top (instead of the live active rows) until it is unpinned.
@@ -5068,11 +5069,11 @@
       const _modeBooks = filledOrderbooksArchive
         .filter((b) => orderbookUatMode ? bookIsTestBook(b) : !bookIsTestBook(b))
         .map((b) => {
-          // Strip any liquidating-strategy row from the snapshot at render time —
-          // even if an older capture baked one in, it must not show here (it lives
-          // on the Rebalances tab). Non-mutating: the stored snapshot is untouched.
-          if (!liquidatingStrategyIds.size || !Array.isArray(b.rows)) return b;
-          const rows = b.rows.filter((r) => !(r?.strategyId && liquidatingStrategyIds.has(String(r.strategyId))));
+          // Strip any hide_from_orderbook-strategy row from the snapshot at render
+          // time — even if an older capture baked one in, it must not show here (it
+          // lives on the Rebalances tab). Non-mutating: the stored snapshot stands.
+          if (!orderbookHiddenStrategyIds.size || !Array.isArray(b.rows)) return b;
+          const rows = b.rows.filter((r) => !(r?.strategyId && orderbookHiddenStrategyIds.has(String(r.strategyId))));
           if (rows.length === b.rows.length) return b;
           return { ...b, rows: rows.map((r, i) => ({ ...r, line: i + 1 })) };
         })
@@ -6319,17 +6320,17 @@
         }
       }
 
-      // Liquidating strategies — fetched independently of the current holdings so
-      // the archive render can strip them even when the strategy has no live rows.
-      liquidatingStrategyIds = new Set();
+      // Orderbook-hidden strategies — fetched independently of the current holdings
+      // so the archive render can strip them even when the strategy has no live rows.
+      orderbookHiddenStrategyIds = new Set();
       parallelQueries.push(
         supabaseClient
           .from('strategies_c')
           .select('id')
-          .eq('is_liquidating', true)
+          .eq('hide_from_orderbook', true)
           .then(({ data, error }) => {
-            if (error) { console.error('Liquidating strategies load error:', error); return; }
-            (data || []).forEach((s) => liquidatingStrategyIds.add(String(s.id)));
+            if (error) { console.error('hide_from_orderbook strategies load error:', error); return; }
+            (data || []).forEach((s) => orderbookHiddenStrategyIds.add(String(s.id)));
           })
       );
 
@@ -6554,9 +6555,9 @@
       const allRawRows = rawRows;
 
       const filteredRows = allRawRows.filter((row) => {
-        // Liquidating strategies are handled ONLY on the Rebalances tab — never in
-        // the orderbook (and so never auto-captured into an Active Order Book).
-        if (row.strategyId && liquidatingStrategyIds.has(String(row.strategyId))) {
+        // hide_from_orderbook strategies are handled ONLY on the Rebalances tab —
+        // never in the orderbook (and so never auto-captured into an Active Order Book).
+        if (row.strategyId && orderbookHiddenStrategyIds.has(String(row.strategyId))) {
           return false;
         }
 
