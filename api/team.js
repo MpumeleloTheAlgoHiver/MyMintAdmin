@@ -139,7 +139,9 @@ module.exports = async (req, res) => {
       if (!result) return;
       const email = normEmail(req.body?.email);
       const full_name = (req.body?.full_name || '').trim() || null;
-      const role = req.body?.role === 'admin' ? 'admin' : (req.body?.role === 'master_admin' ? 'master_admin' : 'staff');
+      const rawRole = req.body?.role;
+      const role = rawRole === 'admin' ? 'admin' : (rawRole === 'master_admin' ? 'master_admin' : 'staff');
+      const approverTier = rawRole === 'dev' ? 'dev' : null;
       const page_access = Array.isArray(req.body?.page_access) ? req.body.page_access : [];
 
       if (!email) return sendJson(res, 400, { error: 'Email is required' });
@@ -161,7 +163,7 @@ module.exports = async (req, res) => {
         const [updated] = await supabaseRequest(`/rest/v1/admin_team?id=eq.${current.id}`, {
           method: 'PATCH',
           extraHeaders: { 'Prefer': 'return=representation' },
-          body: { full_name, role, page_access, invited_by: result.user.id, updated_at: new Date().toISOString() }
+          body: { full_name, role: role, approver_tier: approverTier || current.approver_tier, page_access, invited_by: result.user.id, updated_at: new Date().toISOString() }
         });
         member = updated;
       } else {
@@ -170,7 +172,8 @@ module.exports = async (req, res) => {
           body: {
             email,
             full_name,
-            role,
+            role: role,
+            approver_tier: approverTier,
             page_access,
             status: 'pending',
             invited_by: result.user.id
@@ -497,13 +500,21 @@ module.exports = async (req, res) => {
       const beforeRows = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}&limit=1`);
       const before = beforeRows && beforeRows[0];
 
-      const safeRole = role === 'admin' ? 'admin' : (role === 'master_admin' ? 'master_admin' : 'staff');
+      let safeRole = role === 'admin' ? 'admin' : (role === 'master_admin' ? 'master_admin' : 'staff');
+      let approverTier = role === 'dev' ? 'dev' : (before ? before.approver_tier : null);
+      
+      // Prevent Master Admin self-downgrade
+      if (String(id) === String(result.member.id) && result.member.role === 'master_admin' && safeRole !== 'master_admin') {
+        return sendJson(res, 400, { error: 'You cannot downgrade your own Master Admin role.' });
+      }
+
       const safePages = Array.isArray(page_access) ? page_access : [];
       const [updated] = await supabaseRequest(`/rest/v1/admin_team?id=eq.${id}`, {
         method: 'PATCH',
         extraHeaders: { 'Prefer': 'return=representation' },
         body: {
           role: safeRole,
+          approver_tier: approverTier,
           page_access: safePages,
           updated_at: new Date().toISOString()
         }

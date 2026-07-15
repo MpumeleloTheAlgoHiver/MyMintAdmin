@@ -232,7 +232,11 @@
     const checkSession = async () => {
       const { data } = await supabaseClient.auth.getSession();
       if (data.session) {
-        redirectToApp();
+        if (reason === 'no-access' || reason === 'not-a-member') {
+          await supabaseClient.auth.signOut();
+        } else {
+          redirectToApp();
+        }
       }
     };
 

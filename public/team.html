@@ -414,8 +414,10 @@
       <div class="form-group">
         <label>Role</label>
         <select id="inviteRole">
-          <option value="staff">Staff — restricted access</option>
-          <option value="admin">Admin — full access</option>
+          <option value="staff">Staff (Limited Access)</option>
+          <option value="dev">Dev (Developer)</option>
+          <option value="admin">Admin (Standard)</option>
+          <option value="master_admin">Master Admin (Full + Approvals)</option>
         </select>
       </div>
       <div class="form-group page-access-section" id="invitePageAccessSection">
@@ -453,8 +455,10 @@
       <div class="form-group">
         <label>Role</label>
         <select id="editRole">
-          <option value="staff">Staff — restricted access</option>
-          <option value="admin">Admin — full access</option>
+          <option value="staff">Staff (Limited Access)</option>
+          <option value="dev">Dev (Developer)</option>
+          <option value="admin">Admin (Standard)</option>
+          <option value="master_admin">Master Admin (Full + Approvals)</option>
         </select>
       </div>
       <div class="form-group page-access-section" id="editPageAccessSection">
@@ -734,7 +738,7 @@
             <td>
               <div class="td-actions">
                 ${resendBtn}
-                <button class="btn btn-sm btn-ghost" onclick='openEdit(${JSON.stringify(m.id)},${JSON.stringify(m.role)},${JSON.stringify(perms)})'>Role</button>
+                <button class="btn btn-sm btn-ghost" onclick='openEdit(${JSON.stringify(m.id)},${JSON.stringify(m.role)},${JSON.stringify(perms)},${JSON.stringify(m.approver_tier)})'>Role</button>
                 <button class="btn btn-sm" style="${permBtnStyle}" ${permBtnTitle} onclick='openPerms(${JSON.stringify(m.id)},${JSON.stringify(m.email)},${JSON.stringify(m.approver_tier||null)},${JSON.stringify(m.permissions||{})})'>${permBtnLabel}</button>
                 ${!m.email.endsWith('@mymint.co.za') ? `<button class="btn btn-sm" style="background:#fff8e1;color:#b45309;" onclick='openUpdateEmail(${JSON.stringify(m.id)},${JSON.stringify(m.email)})'>Update Email</button>` : ''}
                 ${isSelf ? '' : `<button class="btn btn-sm btn-danger" onclick='removeMember(${JSON.stringify(m.id)},${JSON.stringify(m.full_name || m.email)})'>Remove</button>`}
@@ -1409,7 +1413,7 @@
     });
 
     document.getElementById('inviteRole').addEventListener('change', (e) => {
-      document.getElementById('invitePageAccessSection').style.display = e.target.value === 'staff' ? 'block' : 'none';
+      document.getElementById('invitePageAccessSection').style.display = (e.target.value === 'staff' || e.target.value === 'dev') ? 'block' : 'none';
     });
 
     document.getElementById('inviteCancelBtn').addEventListener('click', () => {
@@ -1420,9 +1424,8 @@
       const email = document.getElementById('inviteEmail').value.trim().toLowerCase();
       const full_name = document.getElementById('inviteName').value.trim();
       const role = document.getElementById('inviteRole').value;
-      const page_access = role === 'staff' ? getCheckedPages('invitePageGrid') : [];
+      const page_access = (role === 'staff' || role === 'dev') ? getCheckedPages('invitePageGrid') : [];
       if (!email) { alert('Email is required'); return; }
-      if (!email.endsWith('@mymint.co.za')) { alert('Only @mymint.co.za email addresses can be invited.'); return; }
       const btn = document.getElementById('inviteSubmitBtn');
       btn.textContent = 'Sending…'; btn.disabled = true;
       const data = await api('POST', '/api/team?action=invite', { email, full_name, role, page_access });
@@ -1465,16 +1468,16 @@
     }
 
     // ── Edit Role Modal ───────────────────────────────────────────────────────
-    window.openEdit = (id, role, page_access) => {
+    window.openEdit = (id, role, page_access, tier) => {
       document.getElementById('editMemberId').value = id;
-      document.getElementById('editRole').value = role;
+      document.getElementById('editRole').value = tier === 'dev' ? 'dev' : role;
       buildPageGrid('editPageGrid', page_access);
-      document.getElementById('editPageAccessSection').style.display = role === 'staff' ? 'block' : 'none';
+      document.getElementById('editPageAccessSection').style.display = (role === 'staff' || tier === 'dev') ? 'block' : 'none';
       document.getElementById('editOverlay').classList.add('open');
     };
 
     document.getElementById('editRole').addEventListener('change', (e) => {
-      document.getElementById('editPageAccessSection').style.display = e.target.value === 'staff' ? 'block' : 'none';
+      document.getElementById('editPageAccessSection').style.display = (e.target.value === 'staff' || e.target.value === 'dev') ? 'block' : 'none';
     });
 
     document.getElementById('editCancelBtn').addEventListener('click', () => {
@@ -1484,7 +1487,7 @@
     document.getElementById('editSubmitBtn').addEventListener('click', async () => {
       const id = document.getElementById('editMemberId').value;
       const role = document.getElementById('editRole').value;
-      const page_access = role === 'staff' ? getCheckedPages('editPageGrid') : [];
+      const page_access = (role === 'staff' || role === 'dev') ? getCheckedPages('editPageGrid') : [];
       const btn = document.getElementById('editSubmitBtn');
       btn.textContent = 'Saving…'; btn.disabled = true;
       const data = await api('PATCH', '/api/team?action=update', { id, role, page_access });
@@ -1546,7 +1549,7 @@
         return;
       }
       
-      const data = await api('DELETE', '/api/team?action=remove', { id });
+      const data = await api('DELETE', '/api/team?action=remove&id=' + encodeURIComponent(id));
       if (data.ok) { await loadTeam(); }
       else { alert(data.error || 'Failed to remove member'); }
     };

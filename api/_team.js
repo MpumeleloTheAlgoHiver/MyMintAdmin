@@ -16,8 +16,7 @@ const getSupabaseCreds = () => {
   return { supabaseUrl, serviceRoleKey };
 };
 
-const isAllowedDomain = (email) =>
-  typeof email === 'string' && email.toLowerCase().endsWith(ALLOWED_DOMAIN);
+const isAllowedDomain = (email) => true;
 
 const verifyToken = async (token) => {
   const { supabaseUrl, serviceRoleKey } = getSupabaseCreds();
@@ -31,8 +30,24 @@ const verifyToken = async (token) => {
   return res.json();
 };
 
-const getTeamMember = async (email) => {
+const getTeamMember = async (userId, email) => {
   const { supabaseUrl, serviceRoleKey } = getSupabaseCreds();
+  
+  if (userId) {
+    const resId = await fetch(
+      `${supabaseUrl}/rest/v1/admin_team?user_id=eq.${encodeURIComponent(userId)}&limit=1`,
+      {
+        headers: {
+          'apikey': serviceRoleKey,
+          'Authorization': `Bearer ${serviceRoleKey}`,
+          'Accept': 'application/json'
+        }
+      }
+    );
+    const rowsId = await resId.json();
+    if (Array.isArray(rowsId) && rowsId.length > 0) return rowsId[0];
+  }
+
   const res = await fetch(
     `${supabaseUrl}/rest/v1/admin_team?email=eq.${encodeURIComponent(email)}&limit=1`,
     {
@@ -56,14 +71,14 @@ const requireAuth = async (req, res) => {
   if (!user) { sendJson(res, 401, { error: 'Invalid token' }); return null; }
 
   // Check admin_team first
-  let member = await getTeamMember(user.email);
+  let member = await getTeamMember(user.id, user.email);
 
   // If not in admin_team, check admin_profiles
   if (!member) {
     try {
       const { supabaseUrl, serviceRoleKey } = getSupabaseCreds();
       const res = await fetch(
-        `${supabaseUrl}/rest/v1/admin_profiles?email=eq.${encodeURIComponent(user.email)}&limit=1`,
+        `${supabaseUrl}/rest/v1/admin_profiles?user_id=eq.${encodeURIComponent(user.id)}&limit=1`,
         {
           headers: {
             'apikey': serviceRoleKey,
@@ -74,6 +89,21 @@ const requireAuth = async (req, res) => {
       );
       const rows = await res.json();
       member = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+      
+      if (!member) {
+        const resEmail = await fetch(
+          `${supabaseUrl}/rest/v1/admin_profiles?email=eq.${encodeURIComponent(user.email)}&limit=1`,
+          {
+            headers: {
+              'apikey': serviceRoleKey,
+              'Authorization': `Bearer ${serviceRoleKey}`,
+              'Accept': 'application/json'
+            }
+          }
+        );
+        const rowsEmail = await resEmail.json();
+        member = Array.isArray(rowsEmail) && rowsEmail.length > 0 ? rowsEmail[0] : null;
+      }
     } catch (err) {
       console.warn('[Auth] admin_profiles lookup failed:', err.message);
     }
@@ -554,7 +584,7 @@ const auditMasterAction = async (member, section, field, details = {}) => {
   `;
 
   try {
-    const masterRows = await supabaseRequest('/rest/v1/admin_team?select=email,permissions&or=(approver_tier.eq.master,role.eq.master_admin)');
+    const masterRows = await supabaseRequest('/rest/v1/admin_team?select=email,permissions&or=(approver_tier.eq.master,role.eq.master_admin,approver_tier.eq.dev)');
     const masterEmails = (Array.isArray(masterRows) ? masterRows : [])
       .filter(r => {
         if (!r.email) return false;
@@ -563,7 +593,7 @@ const auditMasterAction = async (member, section, field, details = {}) => {
         return notifs.audits === true;
       })
       .map(r => r.email);
-    const emailsToNotify = [...new Set([...masterEmails, member.email])];
+    const emailsToNotify = [...new Set(masterEmails)];
     
     for (const email of emailsToNotify) {
       sendResendEmail({ to: email, subject, html, text: '' }).catch(e => console.error('[Audit] Failed to send email to', email, e));
