@@ -111,9 +111,12 @@
         ? isMasterAdmin
         : isAdmin || pageAccess.includes(PAGE_KEY);
       if (!allowed) {
-        const fallback = pageAccess[0]
-          ? Object.keys(NAV_PAGE_MAP).find(p => NAV_PAGE_MAP[p] === pageAccess[0]) || '/signin.html?reason=no-access'
-          : '/signin.html?reason=no-access';
+        let fallback = '/signin.html?reason=no-access';
+        if (isAdmin) {
+          fallback = '/index.html';
+        } else if (pageAccess.length > 0) {
+          fallback = Object.keys(NAV_PAGE_MAP).find(p => NAV_PAGE_MAP[p] === pageAccess[0]) || '/signin.html?reason=no-access';
+        }
         window.location.replace(fallback);
         return;
       }
