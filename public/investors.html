@@ -1251,7 +1251,16 @@
       // throws non-Error strings inside rAF callbacks (outside any try-catch) for
       // certain values; all cells use pre-computed text to avoid the formula engine.
       const S_MONEY = 2, S_PCT = 3, S_TOTAL_MONEY = 4, S_TOTAL_PCT = 5;
-      const cents = (n) => Number(n).toFixed(2);
+      // Format a number as "R 1,234.56" (or "-R 1,234.56" for negatives).
+      const fmtRands = (n) => {
+        const v = Number(n) || 0;
+        const abs = Math.abs(v).toFixed(2);
+        const [int, dec] = abs.split('.');
+        const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return (v < 0 ? '-' : '') + 'R\u00a0' + grouped + '.' + dec;
+      };
+      // Format a pre-computed percentage number as "7.55%" (or "-5.73%").
+      const fmtPct = (n) => Number(n).toFixed(2) + '%';
       const cashR = Number(i.cashComponent) || 0;
 
       rows.forEach((r, idx) => {
@@ -1272,12 +1281,12 @@
             0: { text: r.symbol },
             1: { text: r.name },
             2: { text: String(qty) },
-            3: { text: cents(avgFill),  style: S_MONEY },
-            4: { text: cents(cost),     style: S_MONEY },
-            5: { text: cents(mktVal),   style: S_MONEY },
-            6: { text: cents(pnl),      style: S_MONEY },
-            7: { text: String(pnlPct),  style: S_PCT   },
-            8: { text: cents(mktVal),   style: S_MONEY }, // Total Value = mktVal (= E + G = cost + pnl = mktVal)
+            3: { text: fmtRands(avgFill), style: S_MONEY },
+            4: { text: fmtRands(cost),    style: S_MONEY },
+            5: { text: fmtRands(mktVal),  style: S_MONEY },
+            6: { text: fmtRands(pnl),     style: S_MONEY },
+            7: { text: fmtPct(pnlPct),    style: S_PCT   },
+            8: { text: fmtRands(mktVal),  style: S_MONEY },
           }
         };
       });
@@ -1290,10 +1299,10 @@
           cells: {
             0: { text: 'CASH' },
             1: { text: 'Strategy Cash' },
-            5: { text: cents(cashR), style: S_MONEY }, // Market Value = cash amount
-            6: { text: '0',          style: S_MONEY }, // P&L = 0 (no cost basis)
-            7: { text: '0',          style: S_PCT   }, // P&L % = 0
-            8: { text: cents(cashR), style: S_MONEY }, // Total Value w/ P&L = cash
+            5: { text: fmtRands(cashR), style: S_MONEY },
+            6: { text: fmtRands(0),     style: S_MONEY },
+            7: { text: fmtPct(0),       style: S_PCT   },
+            8: { text: fmtRands(cashR), style: S_MONEY },
           }
         };
       }
@@ -1306,12 +1315,12 @@
       const totalPnlPct   = totalAvgFill > 0 ? (totalPnl / totalAvgFill * 100).toFixed(2) : '0.00';
       rowsObj[totalRIdx] = {
         cells: {
-          0: { text: 'Total',                   style: 1             },
-          4: { text: cents(totalAvgFill),        style: S_TOTAL_MONEY },
-          5: { text: cents(totalMktVal),         style: S_TOTAL_MONEY },
-          6: { text: cents(totalPnl),            style: S_TOTAL_MONEY },
-          7: { text: String(totalPnlPct),        style: S_TOTAL_PCT   },
-          8: { text: cents(totalMktVal),         style: S_TOTAL_MONEY },
+          0: { text: 'Total',                     style: 1             },
+          4: { text: fmtRands(totalAvgFill),       style: S_TOTAL_MONEY },
+          5: { text: fmtRands(totalMktVal),        style: S_TOTAL_MONEY },
+          6: { text: fmtRands(totalPnl),           style: S_TOTAL_MONEY },
+          7: { text: fmtPct(totalPnlPct),          style: S_TOTAL_PCT   },
+          8: { text: fmtRands(totalMktVal),        style: S_TOTAL_MONEY },
         }
       };
       rowsObj.len = Math.max(100, totalRIdx + 20);
