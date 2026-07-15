@@ -81,16 +81,17 @@ Internal admin dashboard for the Mint investment platform. Provides client manag
 - **Start command**: `node server.js` (configured in the "Start application" workflow)
 - **Port**: 5000 (set via `PORT` env var in `.replit`)
 - **Dependencies**: install with `npm install` (no build step required)
-- **Status**: running on Replit; all required secrets are configured. `server.js` requires `./api/dividends-extract`, `./api/dividends-runs`, and `./api/alliance-news-db`, but those files are actually named with a leading underscore (`_dividends-extract.js`, etc.) — the requires were fixed to match. If new `api/_*.js` files are added, make sure any `require()` of them includes the underscore.
-- **Known limitation**: the connected Supabase project doesn't yet have the `securities` table (and possibly other tables), so the background market-data sync logs an error every cycle. Server and sign-in page work fine — this only affects features backed by that table. Run the SQL in `sql/` against the Supabase project to provision the schema if needed.
+- **Status (as of 2026-07-15 re-import)**: `npm install` run, server starts cleanly, sign-in page verified. `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` are configured. `RESEND_API_KEY`, `SUMSUB_APP_TOKEN`/`SUMSUB_APP_SECRET`, `ORDERBOOK_EMAIL_FROM`/`ORDERBOOK_EMAIL_TO`, and `CRON_SECRET` are NOT yet configured — email sending, KYC verification, order-book report emails, and cron-endpoint protection stay disabled until those are added. Ask the user for them (via Replit Secrets) when those features are needed.
+- **Note**: `server.js` requires `./api/dividends-extract`, `./api/dividends-runs`, and `./api/alliance-news-db`, but those files are actually named with a leading underscore (`_dividends-extract.js`, etc.) — the requires were fixed to match. If new `api/_*.js` files are added, make sure any `require()` of them includes the underscore.
+- **Known limitation**: the connected Supabase project may not have the `securities` table (and possibly other tables) provisioned, which would make the background market-data sync log an error every cycle. Server and sign-in page work fine regardless — this only affects features backed by that table. Run the SQL in `sql/` against the Supabase project to provision the schema if needed.
 
 ## Environment Variables Required
 All sensitive values must be stored as **Replit Secrets** (not in `.replit`):
-- `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` - Database access
-- `RESEND_API_KEY` - Email sending
-- `SUMSUB_APP_TOKEN` / `SUMSUB_APP_SECRET` - KYC verification
-- `ORDERBOOK_EMAIL_FROM` / `ORDERBOOK_EMAIL_TO` - Report emails
-- `CRON_SECRET` - Cron endpoint protection
+- `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` - Database access (configured)
+- `RESEND_API_KEY` - Email sending (not yet configured)
+- `SUMSUB_APP_TOKEN` / `SUMSUB_APP_SECRET` - KYC verification (not yet configured)
+- `ORDERBOOK_EMAIL_FROM` / `ORDERBOOK_EMAIL_TO` - Report emails (not yet configured)
+- `CRON_SECRET` - Cron endpoint protection (not yet configured)
 
 Non-secret env vars set in `.replit [userenv.shared]`:
 - `PORT=5000`
