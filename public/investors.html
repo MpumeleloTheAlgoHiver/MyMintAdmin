@@ -127,6 +127,9 @@
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
   <!-- SheetJS (xlsx writing) — used by the Spreadsheet tab to export a per-investor portfolio workbook with live formulas -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- x-data-spreadsheet — full in-browser Excel-like grid (toolbar, formula bar, live formulas) powering the Spreadsheet tab -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/x-data-spreadsheet@1.1.9/dist/xspreadsheet.css">
+  <script src="https://cdn.jsdelivr.net/npm/x-data-spreadsheet@1.1.9/dist/xspreadsheet.js"></script>
   <script>
     document.documentElement.style.opacity = '1';
     const SUPABASE_URL = "https://mfxnghmuccevsxwcetej.supabase.co";
@@ -620,7 +623,7 @@
       else if (currentTab === 'risk')         el.innerHTML = renderRiskTab(i);
       else if (currentTab === 'allocations')  { el.innerHTML = renderAllocationsTab(i); setTimeout(() => renderSectorChart(i), 50); }
       else if (currentTab === 'transactions') el.innerHTML = renderTxnsTab(i);
-      else if (currentTab === 'spreadsheet')  el.innerHTML = renderSpreadsheetTab(i);
+      else if (currentTab === 'spreadsheet')  { el.innerHTML = renderSpreadsheetTab(i); setTimeout(() => initSpreadsheetGrid(i), 30); }
     }
 
     /* ─── Tab: Performance (merged: user P&L chart + calendar + strategy stats + holdings) ─── */
@@ -1105,76 +1108,117 @@
       }));
     }
 
+    let xsInstance = null; // live x-data-spreadsheet instance for the current investor
+
     function renderSpreadsheetTab(i) {
       const rows = spreadsheetRows(i);
       if (!rows.length) return `<div style="background:#fff;border-radius:10px;padding:30px;text-align:center;color:#94a3b8;">No holdings to build a spreadsheet from.</div>`;
 
-      let totAvgFill = 0, totMktValue = 0;
-      const bodyRows = rows.map(r => {
-        const totalAvgFill = r.qty * r.avgFillR;   // cost basis for this holding
-        const marketValue  = r.qty * r.priceR;      // current value for this holding
-        const pnl           = marketValue - totalAvgFill;
-        const pnlPct         = totalAvgFill > 0 ? (pnl / totalAvgFill) * 100 : 0;
-        const valueWithPnl   = totalAvgFill + pnl;   // reconciliation check &mdash; equals market value
-        totAvgFill += totalAvgFill;
-        totMktValue += marketValue;
-        return { ...r, totalAvgFill, marketValue, pnl, pnlPct, valueWithPnl };
-      });
-      const totPnl = totMktValue - totAvgFill;
-      const totPnlPct = totAvgFill > 0 ? (totPnl / totAvgFill) * 100 : 0;
-
       return `
         <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">PORTFOLIO VALUE &amp; P&amp;L SPREADSHEET</div>
-            <button onclick="downloadInvestorSpreadsheet(currentInvestor)"
-              style="display:flex;align-items:center;gap:6px;background:#166534;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">
-              &#128190; Download .xlsx
-            </button>
+            <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">PORTFOLIO SPREADSHEET &mdash; ${(i.name||'').toUpperCase()}</div>
+            <div style="display:flex;gap:8px;">
+              <button onclick="resetSpreadsheetGrid(currentInvestor)"
+                style="display:flex;align-items:center;gap:6px;background:#f1f5f9;color:#334155;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">
+                &#8635; Reset from live data
+              </button>
+              <button onclick="downloadInvestorSpreadsheet(currentInvestor)"
+                style="display:flex;align-items:center;gap:6px;background:#166534;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">
+                &#128190; Download .xlsx
+              </button>
+            </div>
           </div>
-          <div style="font-size:11px;color:#64748b;margin-bottom:12px;line-height:1.5;">
-            Mirrors the workbook you'll get from "Download .xlsx" &mdash; every total column is a live formula in the downloaded file (e.g. Total Avg Fill = Quantity &times; Avg Fill), so it recalculates in Excel if you edit a cell.
+          <div style="font-size:11px;color:#64748b;margin-bottom:10px;line-height:1.5;">
+            Fully editable spreadsheet, seeded from this investor's real holdings. Every total column is a live formula (e.g. Total Avg Fill = Quantity &times; Avg Fill) &mdash; edit any input cell (Quantity, Avg Fill, Market Value) and the rest recalculates, just like Excel.
           </div>
-          <table class="ov-table">
-            <thead>
-              <tr>
-                <th>Symbol</th><th>Name</th>
-                <th class="r">Quantity</th>
-                <th class="r">Avg Fill</th>
-                <th class="r">Total Avg Fill</th>
-                <th class="r">Market Value</th>
-                <th class="r">Total P&amp;L</th>
-                <th class="r">Total P&amp;L %</th>
-                <th class="r">Total Value w/ P&amp;L</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${bodyRows.map(r => `
-                <tr>
-                  <td style="font-weight:700;">${r.symbol}</td>
-                  <td style="color:#64748b;">${r.name}</td>
-                  <td class="r ov-mono">${r.qty.toLocaleString()}</td>
-                  <td class="r ov-mono">${fmtR2(r.avgFillR)}</td>
-                  <td class="r ov-mono">${fmtR2(r.totalAvgFill)}</td>
-                  <td class="r ov-mono">${fmtR2(r.marketValue)}</td>
-                  <td class="r ov-mono" style="color:${pctClr(r.pnl)};font-weight:600;">${(r.pnl>=0?'+':'')+fmtR2(r.pnl)}</td>
-                  <td class="r ov-mono" style="color:${pctClr(r.pnlPct)};font-weight:600;">${fmtPct(r.pnlPct)}</td>
-                  <td class="r ov-mono">${fmtR2(r.valueWithPnl)}</td>
-                </tr>`).join('')}
-            </tbody>
-            <tfoot>
-              <tr style="border-top:2px solid #e2e8f0;font-weight:700;">
-                <td colspan="4">Total</td>
-                <td class="r ov-mono">${fmtR2(totAvgFill)}</td>
-                <td class="r ov-mono">${fmtR2(totMktValue)}</td>
-                <td class="r ov-mono" style="color:${pctClr(totPnl)};">${(totPnl>=0?'+':'')+fmtR2(totPnl)}</td>
-                <td class="r ov-mono" style="color:${pctClr(totPnlPct)};">${fmtPct(totPnlPct)}</td>
-                <td class="r ov-mono">${fmtR2(totAvgFill + totPnl)}</td>
-              </tr>
-            </tfoot>
-          </table>
+          <div id="xs-grid" style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;"></div>
         </div>
       `;
+    }
+
+    /* Column layout used by the live grid (and mirrored in the .xlsx export):
+       A Symbol | B Name | C Quantity | D Avg Fill | E Total Avg Fill (=C*D)
+       F Market Value (raw, priced at load time) | G Total P&L (=F-E)
+       H Total P&L % (=IF(E=0,0,G/E*100)) | I Total Value w/ P&L (=E+G) */
+    function spreadsheetGridData(i) {
+      const rows = spreadsheetRows(i);
+      const headers = ['Symbol', 'Name', 'Quantity', 'Avg Fill', 'Total Avg Fill', 'Market Value', 'Total P&L', 'Total P&L %', 'Total Value w/ P&L'];
+      const cellsForRow = (vals) => vals.reduce((acc, v, c) => {
+        if (v !== null && v !== undefined && v !== '') acc[c] = { text: String(v) };
+        return acc;
+      }, {});
+
+      const rowsObj = { 0: { cells: cellsForRow(headers) } };
+      rowsObj[0].cells = Object.fromEntries(Object.entries(rowsObj[0].cells).map(([c, cell]) => [c, { ...cell, style: 0 }]));
+
+      rows.forEach((r, idx) => {
+        const rIdx = idx + 1;      // spreadsheet row (0-based), row 0 is the header
+        const excelRow = rIdx + 1; // 1-based Excel-style row number used inside formula strings
+        rowsObj[rIdx] = {
+          cells: {
+            0: { text: r.symbol },
+            1: { text: r.name },
+            2: { text: String(r.qty) },
+            3: { text: String(r.avgFillR) },
+            4: { text: `=C${excelRow}*D${excelRow}` },
+            5: { text: String(r.qty * r.priceR) },
+            6: { text: `=F${excelRow}-E${excelRow}` },
+            7: { text: `=IF(E${excelRow}=0,0,G${excelRow}/E${excelRow}*100)` },
+            8: { text: `=E${excelRow}+G${excelRow}` },
+          }
+        };
+      });
+
+      const totalRIdx = rows.length + 1;
+      const firstDataExcelRow = 2;
+      const lastDataExcelRow = rows.length + 1;
+      rowsObj[totalRIdx] = {
+        cells: {
+          0: { text: 'Total', style: 1 },
+          4: { text: `=SUM(E${firstDataExcelRow}:E${lastDataExcelRow})`, style: 1 },
+          5: { text: `=SUM(F${firstDataExcelRow}:F${lastDataExcelRow})`, style: 1 },
+          6: { text: `=F${totalRIdx + 1}-E${totalRIdx + 1}`, style: 1 },
+          7: { text: `=IF(E${totalRIdx + 1}=0,0,G${totalRIdx + 1}/E${totalRIdx + 1}*100)`, style: 1 },
+          8: { text: `=E${totalRIdx + 1}+G${totalRIdx + 1}`, style: 1 },
+        }
+      };
+      rowsObj.len = Math.max(100, totalRIdx + 20);
+
+      return [{
+        name: 'Portfolio',
+        freeze: 'A1',
+        styles: [
+          { font: { bold: true }, bgcolor: '#f1f5f9', color: '#334155' }, // 0: header
+          { font: { bold: true }, bgcolor: '#f8fafc' },                    // 1: total row
+        ],
+        merges: [],
+        rows: rowsObj,
+        cols: { len: 26, 0: { width: 90 }, 1: { width: 170 }, 4: { width: 110 }, 5: { width: 110 }, 6: { width: 100 }, 7: { width: 100 }, 8: { width: 140 } },
+      }];
+    }
+
+    function initSpreadsheetGrid(i) {
+      const el = document.getElementById('xs-grid');
+      if (!el || typeof x_spreadsheet === 'undefined') return;
+      el.innerHTML = '';
+      xsInstance = x_spreadsheet('#xs-grid', {
+        mode: 'edit',
+        showToolbar: true,
+        showGrid: true,
+        showContextmenu: true,
+        view: {
+          height: () => 560,
+          width: () => el.clientWidth || 900,
+        },
+        row: { len: 100, height: 25 },
+        col: { len: 26, width: 100, indexWidth: 45, minWidth: 60 },
+      }).loadData(spreadsheetGridData(i));
+    }
+
+    function resetSpreadsheetGrid(i) {
+      if (!i) return;
+      initSpreadsheetGrid(i);
     }
 
     /* Build and download an .xlsx with live formulas (SheetJS) for the
