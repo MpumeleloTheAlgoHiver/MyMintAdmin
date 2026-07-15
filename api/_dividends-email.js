@@ -69,7 +69,7 @@ function buildEmailHtml(profile, payouts, securitiesMap) {
     const secName = sec.name ? `${sec.name} (${symbol.replace(/\.JO$/, '')})` : symbol.replace(/\.JO$/, '');
     const amount = Number(p.net_cash) || 0;
     totalCash += amount;
-    
+
     rowsHtml += `
           <tr>
             <td class="label">
@@ -214,7 +214,7 @@ function buildEmailHtml(profile, payouts, securitiesMap) {
 
   <!-- CLOSE -->
   <div class="close">
-    <p>Every cent has been credited to your MINT account. No forms, no waiting, no admin. That’s what ownership looks like: your money working while you live your life.<br><br>And this is just the beginning. The more you invest, the bigger your slice of the profits next time these companies pay out.</p>
+    <p>Every cent has been credited to your bank account. No forms, no waiting, no admin. That’s what ownership looks like: your money working while you live your life.<br><br>And this is just the beginning. The more you invest, the bigger your slice of the profits next time these companies pay out.</p>
     <a href="https://app.mymint.co.za">Grow my portfolio &rarr;</a>
   </div>
 
