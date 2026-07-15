@@ -125,6 +125,8 @@
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  <!-- SheetJS (xlsx writing) — used by the Spreadsheet tab to export a per-investor portfolio workbook with live formulas -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script>
     document.documentElement.style.opacity = '1';
     const SUPABASE_URL = "https://mfxnghmuccevsxwcetej.supabase.co";
@@ -561,6 +563,7 @@
         { id:'risk',         l:'Risk & Drawdown' },
         { id:'allocations',  l:'Allocations' },
         { id:'transactions', l:'Transactions' },
+        { id:'spreadsheet',  l:'Spreadsheet' },
       ];
       dp.innerHTML = `
         <div style="padding:18px 22px;border-bottom:1px solid #f1f5f9;background:linear-gradient(135deg,#faf5ff,#fff);">
@@ -617,6 +620,7 @@
       else if (currentTab === 'risk')         el.innerHTML = renderRiskTab(i);
       else if (currentTab === 'allocations')  { el.innerHTML = renderAllocationsTab(i); setTimeout(() => renderSectorChart(i), 50); }
       else if (currentTab === 'transactions') el.innerHTML = renderTxnsTab(i);
+      else if (currentTab === 'spreadsheet')  el.innerHTML = renderSpreadsheetTab(i);
     }
 
     /* ─── Tab: Performance (merged: user P&L chart + calendar + strategy stats + holdings) ─── */
@@ -1085,6 +1089,146 @@
           </table>
         </div>
       `;
+    }
+
+    /* ─── Tab: Spreadsheet ─── */
+
+    /* Per-holding numbers the spreadsheet needs, kept in one place so the
+       on-screen preview and the exported .xlsx formulas always agree. */
+    function spreadsheetRows(i) {
+      return (i.holdings || []).map(h => ({
+        symbol: h.symbol,
+        name: h.name,
+        qty: Number(h.qty) || 0,
+        avgFillR: Number(h.avgFillR) || 0,
+        priceR: Number(h.priceR) || 0,
+      }));
+    }
+
+    function renderSpreadsheetTab(i) {
+      const rows = spreadsheetRows(i);
+      if (!rows.length) return `<div style="background:#fff;border-radius:10px;padding:30px;text-align:center;color:#94a3b8;">No holdings to build a spreadsheet from.</div>`;
+
+      let totAvgFill = 0, totMktValue = 0;
+      const bodyRows = rows.map(r => {
+        const totalAvgFill = r.qty * r.avgFillR;   // cost basis for this holding
+        const marketValue  = r.qty * r.priceR;      // current value for this holding
+        const pnl           = marketValue - totalAvgFill;
+        const pnlPct         = totalAvgFill > 0 ? (pnl / totalAvgFill) * 100 : 0;
+        const valueWithPnl   = totalAvgFill + pnl;   // reconciliation check &mdash; equals market value
+        totAvgFill += totalAvgFill;
+        totMktValue += marketValue;
+        return { ...r, totalAvgFill, marketValue, pnl, pnlPct, valueWithPnl };
+      });
+      const totPnl = totMktValue - totAvgFill;
+      const totPnlPct = totAvgFill > 0 ? (totPnl / totAvgFill) * 100 : 0;
+
+      return `
+        <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">PORTFOLIO VALUE &amp; P&amp;L SPREADSHEET</div>
+            <button onclick="downloadInvestorSpreadsheet(currentInvestor)"
+              style="display:flex;align-items:center;gap:6px;background:#166534;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">
+              &#128190; Download .xlsx
+            </button>
+          </div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:12px;line-height:1.5;">
+            Mirrors the workbook you'll get from "Download .xlsx" &mdash; every total column is a live formula in the downloaded file (e.g. Total Avg Fill = Quantity &times; Avg Fill), so it recalculates in Excel if you edit a cell.
+          </div>
+          <table class="ov-table">
+            <thead>
+              <tr>
+                <th>Symbol</th><th>Name</th>
+                <th class="r">Quantity</th>
+                <th class="r">Avg Fill</th>
+                <th class="r">Total Avg Fill</th>
+                <th class="r">Market Value</th>
+                <th class="r">Total P&amp;L</th>
+                <th class="r">Total P&amp;L %</th>
+                <th class="r">Total Value w/ P&amp;L</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${bodyRows.map(r => `
+                <tr>
+                  <td style="font-weight:700;">${r.symbol}</td>
+                  <td style="color:#64748b;">${r.name}</td>
+                  <td class="r ov-mono">${r.qty.toLocaleString()}</td>
+                  <td class="r ov-mono">${fmtR2(r.avgFillR)}</td>
+                  <td class="r ov-mono">${fmtR2(r.totalAvgFill)}</td>
+                  <td class="r ov-mono">${fmtR2(r.marketValue)}</td>
+                  <td class="r ov-mono" style="color:${pctClr(r.pnl)};font-weight:600;">${(r.pnl>=0?'+':'')+fmtR2(r.pnl)}</td>
+                  <td class="r ov-mono" style="color:${pctClr(r.pnlPct)};font-weight:600;">${fmtPct(r.pnlPct)}</td>
+                  <td class="r ov-mono">${fmtR2(r.valueWithPnl)}</td>
+                </tr>`).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="border-top:2px solid #e2e8f0;font-weight:700;">
+                <td colspan="4">Total</td>
+                <td class="r ov-mono">${fmtR2(totAvgFill)}</td>
+                <td class="r ov-mono">${fmtR2(totMktValue)}</td>
+                <td class="r ov-mono" style="color:${pctClr(totPnl)};">${(totPnl>=0?'+':'')+fmtR2(totPnl)}</td>
+                <td class="r ov-mono" style="color:${pctClr(totPnlPct)};">${fmtPct(totPnlPct)}</td>
+                <td class="r ov-mono">${fmtR2(totAvgFill + totPnl)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      `;
+    }
+
+    /* Build and download an .xlsx with live formulas (SheetJS) for the
+       selected investor's holdings, sourced from the same database-backed
+       holdings array the on-screen tabs use. */
+    function downloadInvestorSpreadsheet(i) {
+      if (!i || typeof XLSX === 'undefined') return;
+      const rows = spreadsheetRows(i);
+      if (!rows.length) return;
+
+      const headers = ['Symbol', 'Name', 'Quantity', 'Avg Fill', 'Total Avg Fill', 'Market Value', 'Total P&L', 'Total P&L %', 'Total Value w/ P&L'];
+      const aoa = [headers];
+      rows.forEach(r => aoa.push([r.symbol, r.name, r.qty, r.avgFillR, null, null, null, null, null]));
+      const firstDataRow = 2;
+      const lastDataRow = 1 + rows.length;
+      aoa.push(['Total', '', null, null, null, null, null, null, null]); // totals row placeholder
+      const totalRow = lastDataRow + 1;
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+      /* Per-row formulas: C=Quantity, D=Avg Fill (both raw inputs).
+         E Total Avg Fill = C*D, F Market Value = uses current price captured
+         at export time (written as a value, since live prices aren't a
+         database-backed formula input), G Total P&L = F-E,
+         H Total P&L % = IFERROR(G/E,0)*100, I Total Value w/ P&L = E+G. */
+      rows.forEach((r, idx) => {
+        const row = firstDataRow + idx;
+        const marketValue = r.qty * r.priceR;
+        XLSX.utils.sheet_add_aoa(ws, [[marketValue]], { origin: `F${row}` });
+        ws[`E${row}`] = { t: 'n', f: `C${row}*D${row}`, v: r.qty * r.avgFillR };
+        ws[`G${row}`] = { t: 'n', f: `F${row}-E${row}`, v: marketValue - r.qty * r.avgFillR };
+        ws[`H${row}`] = { t: 'n', f: `IFERROR(G${row}/E${row},0)*100`, v: r.avgFillR > 0 && r.qty > 0 ? ((marketValue - r.qty * r.avgFillR) / (r.qty * r.avgFillR)) * 100 : 0, z: '0.00"%"' };
+        ws[`I${row}`] = { t: 'n', f: `E${row}+G${row}`, v: marketValue };
+        ws[`D${row}`].z = ws[`F${row}`].z = ws[`E${row}`].z = ws[`G${row}`].z = ws[`I${row}`].z = '"R"#,##0.00';
+      });
+
+      /* Totals row &mdash; SUM formulas over the data range above it. */
+      ws[`A${totalRow}`] = { t: 's', v: 'Total' };
+      ws[`E${totalRow}`] = { t: 'n', f: `SUM(E${firstDataRow}:E${lastDataRow})`, z: '"R"#,##0.00' };
+      ws[`F${totalRow}`] = { t: 'n', f: `SUM(F${firstDataRow}:F${lastDataRow})`, z: '"R"#,##0.00' };
+      ws[`G${totalRow}`] = { t: 'n', f: `F${totalRow}-E${totalRow}`, z: '"R"#,##0.00' };
+      ws[`H${totalRow}`] = { t: 'n', f: `IFERROR(G${totalRow}/E${totalRow},0)*100`, z: '0.00"%"' };
+      ws[`I${totalRow}`] = { t: 'n', f: `E${totalRow}+G${totalRow}`, z: '"R"#,##0.00' };
+      ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: totalRow - 1, c: headers.length - 1 } });
+
+      ws['!cols'] = [
+        { wch: 10 }, { wch: 26 }, { wch: 10 }, { wch: 12 }, { wch: 14 },
+        { wch: 14 }, { wch: 12 }, { wch: 13 }, { wch: 16 },
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Portfolio');
+      const safeName = String(i.name || 'investor').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') || 'investor';
+      XLSX.writeFile(wb, `${safeName}-portfolio-${new Date().toISOString().slice(0, 10)}.xlsx`);
     }
 
     /* ─── App fee config (rebalance fee reconciliation reads custody/brokerage

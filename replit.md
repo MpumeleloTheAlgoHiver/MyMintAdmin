@@ -15,6 +15,7 @@ Internal admin dashboard for the Mint investment platform. Provides client manag
 - `/signin.html` - Admin login (Supabase Auth)
 - `/index.html` - Client profiles / CRM..
 - `/dashboard.html` - Main dashboard with four tabs: Overview, Strategy Management, Rebalancing, Factsheets
+- `/investors.html` - Investor directory; selecting an investor opens Performance / Risk & Drawdown / Allocations / Transactions / **Spreadsheet** tabs. The Spreadsheet tab previews and lets admins download an .xlsx (via SheetJS, client-side) of that investor's holdings — Quantity, Avg Fill, Total Avg Fill, Market Value, Total P&L, Total P&L %, Total Value w/ P&L — with live Excel formulas (not just static values), sourced from the same `holdings` array `/api/investors/data` returns.
 - `/eft.html` - EFT Payments standalone page (upload bank CSV, confirm pending deposits)
 - `/orderbook.html` - Order book email runs; includes "Pending Rebalances" tab for settling trades
 - `/strategies.html` - Standalone strategies page (legacy, content now in dashboard)
