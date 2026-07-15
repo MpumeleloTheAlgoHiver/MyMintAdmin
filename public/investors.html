@@ -1252,7 +1252,12 @@
       // driving further calculations is untouched, exactly like Excel's
       // number formatting.
       const money = { format: 'number' };
+      // 'percent' format: x-spreadsheet multiplies the raw value by 100 before
+      // appending %, so a cell value of 0.125 displays as "12.50%". Formulas
+      // that feed this column must therefore yield a fraction, not a percentage.
+      const pct = { format: 'percent' };
       const cents = (n) => Number(n).toFixed(2);
+      const cashR = Number(i.cashComponent) || 0;
 
       rows.forEach((r, idx) => {
         const rIdx = idx + 1;      // spreadsheet row (0-based), row 0 is the header
@@ -1266,26 +1271,45 @@
             4: { text: `=C${excelRow}*D${excelRow}`, ...money },
             5: { text: cents(r.qty * r.priceR), ...money },
             6: { text: `=F${excelRow}-E${excelRow}`, ...money },
+            // =G/E yields a fraction (e.g. 0.125); the 'percent' format then
+            // multiplies by 100 to display "12.50%". No *100 needed here.
             // Note: this grid's formula engine crashes if a division is nested
             // inside an IF(...) argument, so this is a plain division (not
             // IF-guarded) — a zero Total Avg Fill shows Infinity/NaN, same as
             // dividing by zero in a real spreadsheet without a guard.
-            7: { text: `=G${excelRow}*100/E${excelRow}`, ...money },
+            7: { text: `=G${excelRow}/E${excelRow}`, ...pct },
             8: { text: `=E${excelRow}+G${excelRow}`, ...money },
           }
         };
       });
 
-      const totalRIdx = rows.length + 1;
+      // Cash row (residual rebalance cash + held 8% buffer for this strategy)
+      const hasCash = cashR > 0;
+      if (hasCash) {
+        const cashRIdx = rows.length + 1;
+        rowsObj[cashRIdx] = {
+          cells: {
+            0: { text: 'CASH' },
+            1: { text: 'Strategy Cash' },
+            5: { text: cents(cashR), ...money }, // Market Value = cash amount
+            6: { text: '0', ...money },           // P&L = 0 (cash has no cost basis gain/loss)
+            7: { text: '0', ...pct },             // P&L % = 0
+            8: { text: cents(cashR), ...money },  // Total Value w/ P&L = cash amount
+          }
+        };
+      }
+
+      const totalRIdx = rows.length + (hasCash ? 2 : 1);
       const firstDataExcelRow = 2;
-      const lastDataExcelRow = rows.length + 1;
+      // Include cash row in the SUM range so F-total picks up the cash Market Value
+      const lastDataExcelRow = rows.length + (hasCash ? 2 : 1);
       rowsObj[totalRIdx] = {
         cells: {
           0: { text: 'Total', style: 1 },
           4: { text: `=SUM(E${firstDataExcelRow}:E${lastDataExcelRow})`, style: 1, ...money },
           5: { text: `=SUM(F${firstDataExcelRow}:F${lastDataExcelRow})`, style: 1, ...money },
           6: { text: `=F${totalRIdx + 1}-E${totalRIdx + 1}`, style: 1, ...money },
-          7: { text: `=G${totalRIdx + 1}*100/E${totalRIdx + 1}`, style: 1, ...money },
+          7: { text: `=G${totalRIdx + 1}/E${totalRIdx + 1}`, style: 1, ...pct },
           8: { text: `=E${totalRIdx + 1}+G${totalRIdx + 1}`, style: 1, ...money },
         }
       };
@@ -1436,8 +1460,15 @@
       const headers = ['Symbol', 'Name', 'Quantity', 'Avg Fill', 'Total Avg Fill', 'Market Value', 'Total P&L', 'Total P&L %', 'Total Value w/ P&L'];
       const aoa = [headers];
       rows.forEach(r => aoa.push([r.symbol, r.name, r.qty, r.avgFillR, null, null, null, null, null]));
+      // Cash row: residual rebalance cash + held 8% buffer for this strategy
+      const xlsxCashR = Number(i.cashComponent) || 0;
+      if (xlsxCashR > 0) {
+        // C/D/E left null (no qty/fill/total-avg-fill for cash); F=market value,
+        // G=0 (no P&L on cash), H=0%, I=cash value (same as market value)
+        aoa.push(['CASH', 'Strategy Cash', null, null, null, xlsxCashR, 0, 0, xlsxCashR]);
+      }
       const firstDataRow = 2;
-      const lastDataRow = 1 + rows.length;
+      const lastDataRow = 1 + rows.length + (xlsxCashR > 0 ? 1 : 0);
       aoa.push(['Total', '', null, null, null, null, null, null, null]); // totals row placeholder
       const totalRow = lastDataRow + 1;
 
@@ -1459,7 +1490,16 @@
         ws[`D${row}`].z = ws[`F${row}`].z = ws[`E${row}`].z = ws[`G${row}`].z = ws[`I${row}`].z = '"R"#,##0.00';
       });
 
-      /* Totals row &mdash; SUM formulas over the data range above it. */
+      // Apply number formats to the cash row cells written via aoa
+      if (xlsxCashR > 0) {
+        const cashRow = firstDataRow + rows.length;
+        if (ws[`F${cashRow}`]) ws[`F${cashRow}`].z = '"R"#,##0.00';
+        if (ws[`G${cashRow}`]) ws[`G${cashRow}`].z = '"R"#,##0.00';
+        if (ws[`H${cashRow}`]) ws[`H${cashRow}`].z = '0.00"%"';
+        if (ws[`I${cashRow}`]) ws[`I${cashRow}`].z = '"R"#,##0.00';
+      }
+
+      /* Totals row — SUM formulas over the data range above it (includes cash row). */
       ws[`A${totalRow}`] = { t: 's', v: 'Total' };
       ws[`E${totalRow}`] = { t: 'n', f: `SUM(E${firstDataRow}:E${lastDataRow})`, z: '"R"#,##0.00' };
       ws[`F${totalRow}`] = { t: 'n', f: `SUM(F${firstDataRow}:F${lastDataRow})`, z: '"R"#,##0.00' };
