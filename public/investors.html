@@ -1262,6 +1262,7 @@
       // Format a pre-computed percentage number as "7.55%" (or "-5.73%").
       const fmtPct = (n) => Number(n).toFixed(2) + '%';
       const cashR = Number(i.cashComponent) || 0;
+      console.log('[Spreadsheet] cashComponent:', i.cashComponent, '→ cashR:', cashR, '| residualCash:', i.residualCash, '| bufferCash:', i.bufferCash, '| value:', i.value, '| holdingsValue:', i.holdingsValue);
 
       rows.forEach((r, idx) => {
         const rIdx = idx + 1;
