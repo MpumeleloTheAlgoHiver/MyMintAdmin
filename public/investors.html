@@ -65,6 +65,14 @@
     #xsFullscreenOverlay { display: none; position: fixed; inset: 0; background: #f8fafc; z-index: 99999; padding: 16px; box-sizing: border-box; overflow: auto; }
     body.xs-fullscreen #xsFullscreenOverlay { display: block; }
     body.xs-fullscreen { overflow: hidden; }
+
+    /* Formula bar — mirrors Excel/Sheets: cell reference box + fx + the
+       raw formula/content of the currently selected cell. */
+    #xsFormulaBar { display: flex; align-items: stretch; gap: 0; border: 1px solid #e2e8f0; border-bottom: none; border-radius: 6px 6px 0 0; background: #fff; font-size: 12px; }
+    #xsCellRef { width: 64px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #334155; background: #f8fafc; border-right: 1px solid #e2e8f0; }
+    #xsFxIcon { width: 30px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-style: italic; color: #166534; font-weight: 700; border-right: 1px solid #e2e8f0; font-size: 13px; }
+    #xsFormulaInput { flex: 1; border: none; outline: none; padding: 6px 10px; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #1e293b; background: transparent; }
+    #xsFormulaInput::placeholder { color: #cbd5e1; font-family: inherit; }
   </style>
 <script src="/js/cc-badge.js" defer></script>
 <script>
@@ -1156,7 +1164,12 @@
           <div style="font-size:11px;color:#64748b;margin-bottom:10px;line-height:1.5;">
             ${i.strategy ? `<strong>${i.strategy}</strong> only &mdash; ` : ''}fully editable spreadsheet, seeded from this basket's real holdings. Every total column is a live formula (e.g. Total Avg Fill = Quantity &times; Avg Fill) &mdash; edit any input cell (Quantity, Avg Fill, Market Value) and the rest recalculates, just like Excel.
           </div>
-          <div id="xs-grid" style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;flex:1;min-height:0;"></div>
+          <div id="xsFormulaBar">
+            <div id="xsCellRef">A1</div>
+            <div id="xsFxIcon">fx</div>
+            <input id="xsFormulaInput" type="text" placeholder="" spellcheck="false" />
+          </div>
+          <div id="xs-grid" style="border:1px solid #e2e8f0;border-radius:0 0 6px 6px;overflow:hidden;flex:1;min-height:0;"></div>
         </div>
       `;
     }
@@ -1209,7 +1222,19 @@
     /* Column layout used by the live grid (and mirrored in the .xlsx export):
        A Symbol | B Name | C Quantity | D Avg Fill | E Total Avg Fill (=C*D)
        F Market Value (raw, priced at load time) | G Total P&L (=F-E)
-       H Total P&L % (=IF(E=0,0,G/E*100)) | I Total Value w/ P&L (=E+G) */
+       H Total P&L % (=IF(E=0,0,G*100/E)) | I Total Value w/ P&L (=E+G)
+
+       Decimal handling: this grid's formula engine rounds +,-,* results to
+       max(decimalPlaces(operand1), decimalPlaces(operand2)) — so if an input
+       cell's text carries raw floating-point noise (e.g. "786.0500000001"
+       from a JS multiplication), every formula built on top of it inherits
+       that same long decimal tail. Rounding literal numeric cells to cents
+       with .toFixed(2) before they ever reach the grid keeps that tail from
+       ever appearing, on top of the 'number' cell format below (which covers
+       manually-typed values). The P&L % formula multiplies by 100 BEFORE
+       dividing (not after) because the engine's '/' operator itself rounds
+       to 2dp when the raw quotient has many decimals — dividing last avoids
+       throwing away precision partway through the calculation. */
     function spreadsheetGridData(i) {
       const rows = spreadsheetRows(i);
       const headers = ['Symbol', 'Name', 'Quantity', 'Avg Fill', 'Total Avg Fill', 'Market Value', 'Total P&L', 'Total P&L %', 'Total Value w/ P&L'];
@@ -1221,6 +1246,14 @@
       const rowsObj = { 0: { cells: cellsForRow(headers) } };
       rowsObj[0].cells = Object.fromEntries(Object.entries(rowsObj[0].cells).map(([c, cell]) => [c, { ...cell, style: 0 }]));
 
+      // Every money/quantity-derived column is rendered to the nearest cent
+      // (2 decimal places) via x-data-spreadsheet's built-in 'number' cell
+      // format — this only affects display, the underlying formula/value
+      // driving further calculations is untouched, exactly like Excel's
+      // number formatting.
+      const money = { format: 'number' };
+      const cents = (n) => Number(n).toFixed(2);
+
       rows.forEach((r, idx) => {
         const rIdx = idx + 1;      // spreadsheet row (0-based), row 0 is the header
         const excelRow = rIdx + 1; // 1-based Excel-style row number used inside formula strings
@@ -1229,16 +1262,16 @@
             0: { text: r.symbol },
             1: { text: r.name },
             2: { text: String(r.qty) },
-            3: { text: String(r.avgFillR) },
-            4: { text: `=C${excelRow}*D${excelRow}` },
-            5: { text: String(r.qty * r.priceR) },
-            6: { text: `=F${excelRow}-E${excelRow}` },
+            3: { text: cents(r.avgFillR), ...money },
+            4: { text: `=C${excelRow}*D${excelRow}`, ...money },
+            5: { text: cents(r.qty * r.priceR), ...money },
+            6: { text: `=F${excelRow}-E${excelRow}`, ...money },
             // Note: this grid's formula engine crashes if a division is nested
             // inside an IF(...) argument, so this is a plain division (not
             // IF-guarded) — a zero Total Avg Fill shows Infinity/NaN, same as
             // dividing by zero in a real spreadsheet without a guard.
-            7: { text: `=G${excelRow}/E${excelRow}*100` },
-            8: { text: `=E${excelRow}+G${excelRow}` },
+            7: { text: `=G${excelRow}*100/E${excelRow}`, ...money },
+            8: { text: `=E${excelRow}+G${excelRow}`, ...money },
           }
         };
       });
@@ -1249,11 +1282,11 @@
       rowsObj[totalRIdx] = {
         cells: {
           0: { text: 'Total', style: 1 },
-          4: { text: `=SUM(E${firstDataExcelRow}:E${lastDataExcelRow})`, style: 1 },
-          5: { text: `=SUM(F${firstDataExcelRow}:F${lastDataExcelRow})`, style: 1 },
-          6: { text: `=F${totalRIdx + 1}-E${totalRIdx + 1}`, style: 1 },
-          7: { text: `=G${totalRIdx + 1}/E${totalRIdx + 1}*100`, style: 1 },
-          8: { text: `=E${totalRIdx + 1}+G${totalRIdx + 1}`, style: 1 },
+          4: { text: `=SUM(E${firstDataExcelRow}:E${lastDataExcelRow})`, style: 1, ...money },
+          5: { text: `=SUM(F${firstDataExcelRow}:F${lastDataExcelRow})`, style: 1, ...money },
+          6: { text: `=F${totalRIdx + 1}-E${totalRIdx + 1}`, style: 1, ...money },
+          7: { text: `=G${totalRIdx + 1}*100/E${totalRIdx + 1}`, style: 1, ...money },
+          8: { text: `=E${totalRIdx + 1}+G${totalRIdx + 1}`, style: 1, ...money },
         }
       };
       rowsObj.len = Math.max(100, totalRIdx + 20);
@@ -1300,6 +1333,37 @@
       }, { capture: true, passive: false });
     }
 
+    /* Excel-style column letters: 0->A, 25->Z, 26->AA, ... */
+    function xsColLetter(ci) {
+      let n = ci, s = '';
+      do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0);
+      return s;
+    }
+
+    let xsSelected = { ri: 0, ci: 0 };
+
+    /* Formula bar: shows "<CellRef> | fx | <raw content>" for whatever cell
+       is selected in the grid, and lets typing there edit that cell —
+       mirroring the Excel/Sheets formula bar shown in the reference
+       screenshot, which the plain grid widget doesn't provide on its own. */
+    function xsUpdateFormulaBar(ri, ci) {
+      const refEl = document.getElementById('xsCellRef');
+      const inputEl = document.getElementById('xsFormulaInput');
+      if (!refEl || !inputEl || !xsInstance) return;
+      xsSelected = { ri, ci };
+      refEl.textContent = `${xsColLetter(ci)}${ri + 1}`;
+      const data = xsInstance.getData();
+      const sheet = data && data[0];
+      const cell = sheet && sheet.rows && sheet.rows[ri] && sheet.rows[ri].cells && sheet.rows[ri].cells[ci];
+      inputEl.value = cell ? String(cell.text || '') : '';
+    }
+
+    function xsCommitFormulaBar() {
+      const inputEl = document.getElementById('xsFormulaInput');
+      if (!inputEl || !xsInstance) return;
+      xsInstance.cellText(xsSelected.ri, xsSelected.ci, inputEl.value, 0);
+    }
+
     function mountSpreadsheetGrid(data) {
       const el = document.getElementById('xs-grid');
       if (!el || typeof x_spreadsheet === 'undefined' || !currentInvestor) return;
@@ -1317,6 +1381,23 @@
         col: { len: 26, width: 100, indexWidth: 45, minWidth: 60 },
       }).loadData(data || spreadsheetGridData(currentInvestor));
       attachScrollDamping(el);
+
+      xsInstance.on('cell-selected', (cell, ri, ci) => xsUpdateFormulaBar(ri, ci));
+      xsInstance.on('cells-selected', (cell, { sri, sci }) => xsUpdateFormulaBar(sri, sci));
+      xsInstance.on('cell-edited', (text, ri, ci) => {
+        if (ri === xsSelected.ri && ci === xsSelected.ci) xsUpdateFormulaBar(ri, ci);
+      });
+      xsUpdateFormulaBar(0, 0);
+
+      const inputEl = document.getElementById('xsFormulaInput');
+      if (inputEl && !inputEl._xsBound) {
+        inputEl._xsBound = true;
+        inputEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); xsCommitFormulaBar(); inputEl.blur(); }
+          else if (e.key === 'Escape') { xsUpdateFormulaBar(xsSelected.ri, xsSelected.ci); inputEl.blur(); }
+        });
+        inputEl.addEventListener('blur', xsCommitFormulaBar);
+      }
     }
 
     function initSpreadsheetGrid(i) {
