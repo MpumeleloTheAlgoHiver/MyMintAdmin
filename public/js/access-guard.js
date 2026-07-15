@@ -9,9 +9,9 @@
 (function () {
   const PAGE_KEY = window.PAGE_ACCESS_KEY || null;
 
-  // Map of href → page key, used to hide nav links the user cannot access.
   const NAV_PAGE_MAP = {
     '/index.html':      'clients',
+    '/studio.html':     'studio',
     '/dashboard.html':  'dashboard',
     '/strategies.html': 'strategies',
     '/factsheets.html': 'factsheets',
@@ -20,6 +20,7 @@
     '/eft.html':        'eft',
     '/orderbook.html':  'orderbook',
     '/gifting.html':    'gifting',
+    '/dividends.html':  'dividends',
     '/finances.html':   'finances',
     '/settings.html':    'settings',
     '/cyber-compliance.html': 'cyber-compliance',
@@ -111,13 +112,27 @@
         ? isMasterAdmin
         : isAdmin || pageAccess.includes(PAGE_KEY);
       if (!allowed) {
-        let fallback = '/signin.html?reason=no-access';
-        if (isAdmin) {
-          fallback = '/index.html';
-        } else if (pageAccess.length > 0) {
-          fallback = Object.keys(NAV_PAGE_MAP).find(p => NAV_PAGE_MAP[p] === pageAccess[0]) || '/signin.html?reason=no-access';
-        }
-        window.location.replace(fallback);
+        document.title = 'Access Restricted';
+        Array.from(document.body.children).forEach(child => {
+          if (child.tagName !== 'ASIDE' && child.tagName !== 'SCRIPT' && child.id !== 'mint-sidebar-css') {
+            child.style.display = 'none';
+          }
+        });
+        
+        const msgDiv = document.createElement('div');
+        msgDiv.style.cssText = 'position:fixed;top:0;left:220px;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:#f2f2f7;z-index:999;flex-direction:column;gap:12px;';
+        msgDiv.innerHTML = `
+          <div style="background:#fff;padding:40px;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,0.05);text-align:center;max-width:400px;">
+            <svg viewBox="0 0 24 24" style="width:48px;height:48px;fill:#ef4444;margin:0 auto 16px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8 0-1.85.63-3.55 1.69-4.9L16.9 18.31C15.55 19.37 13.85 20 12 20zm6.31-3.1L7.1 5.69C8.45 4.63 10.15 4 12 4c4.41 0 8 3.59 8 8 0 1.85-.63 3.55-1.69 4.9z"/></svg>
+            <h2 style="font-size:20px;font-weight:600;color:#1c1c1e;margin-bottom:8px;font-family:-apple-system,sans-serif;">Access Restricted</h2>
+            <p style="font-size:14px;color:#8e8e93;line-height:1.5;font-family:-apple-system,sans-serif;">You do not have access to this page. Please request access from an admin.</p>
+          </div>
+        `;
+        document.body.appendChild(msgDiv);
+        try { document.documentElement.style.opacity = '1'; } catch {}
+        window.dispatchEvent(new CustomEvent('access-guard:ready', {
+          detail: { role, page_access: pageAccess, approver_tier: approverTier, permissions, email: me.email }
+        }));
         return;
       }
     }

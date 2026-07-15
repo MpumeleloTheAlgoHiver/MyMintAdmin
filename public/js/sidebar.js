@@ -355,6 +355,18 @@
 
     window.addEventListener('access-guard:ready', function (e) {
       updateUser(e.detail.email, e.detail.role);
+      
+      // Hide sections that have no visible links
+      document.querySelectorAll('aside.sidebar .sidebar-section').forEach(function(sec) {
+        var hasVisibleLink = Array.from(sec.querySelectorAll('.nav-icon')).some(function(link) {
+          return window.getComputedStyle(link).display !== 'none';
+        });
+        var key = sec.getAttribute('data-section');
+        var lbl = document.querySelector('.sidebar-section-label[data-section="' + key + '"]');
+        if (lbl) {
+          lbl.style.display = hasVisibleLink ? '' : 'none';
+        }
+      });
     });
 
     if (window.mintMe) updateUser(window.mintMe.email, window.mintMe.role);
