@@ -37,5 +37,11 @@ assert.match(orderbook, /rebalance-consume-reserves/, 'settlement consumes actua
 assert.match(orderbook, /feeShortfallCents/, 'settlement only deducts uncovered fees from proceeds');
 assert.match(api, /apply_rebalance_reserve_charge/, 'service-role endpoint uses atomic reserve RPC');
 assert.match(sql, /uq_rebalance_reserve_event_batch_owner/, 'reserve charge is idempotent per batch owner');
+assert.match(dashboard, /id="rebBuyEffectBtn"/, 'buy execution exposes detailed-effect action beside commit');
+assert.match(dashboard, /id="rebEffectModal"/, 'full-page detailed effect modal exists');
+assert.match(dashboard, /Composition comparison/, 'detail view compares holdings before and after');
+assert.match(dashboard, /Cash and fee bridge/, 'detail view itemises the funding bridge');
+assert.match(dashboard, /Previous P&amp;L history/, 'detail view explains P&L retention');
+assert.match(dashboard, /Per-client reserve effect/, 'detail view includes owner-level reserve consequences');
 
-console.log('10 reserve-first rebalance assertions passed');
+console.log('16 reserve-first rebalance assertions passed');

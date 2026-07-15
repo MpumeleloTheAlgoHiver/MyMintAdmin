@@ -1283,8 +1283,27 @@
               </div>
               <div id="rebBuyModalBody" class="px-6 py-5 overflow-y-auto flex-1 min-h-0"></div>
               <div class="px-6 py-4 border-t border-slate-100 flex gap-3">
-                <button id="rebBuyResetBtn" class="flex-1 py-2 rounded-xl text-sm font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 transition">Start Over</button>
+                <button id="rebBuyResetBtn" class="px-5 py-2 rounded-xl text-sm font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 transition">Start Over</button>
+                <button id="rebBuyEffectBtn" class="flex-1 py-2 rounded-xl text-sm font-semibold text-violet-700 bg-violet-50 border border-violet-200 hover:bg-violet-100 transition">View Detailed Effect</button>
                 <button id="rebBuyCommitBtn" class="flex-1 py-2 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-700 transition">Commit Trade Sequence</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- DETAILED REBALANCE EFFECT -->
+          <div id="rebEffectModal" class="hidden fixed inset-0 z-[9100] bg-slate-950/45 backdrop-blur-sm p-4 md:p-7">
+            <div class="bg-slate-50 border border-white/60 shadow-2xl rounded-3xl w-full h-full max-w-7xl mx-auto overflow-hidden flex flex-col">
+              <div class="px-6 md:px-8 py-5 bg-white border-b border-slate-200 flex items-center justify-between gap-4">
+                <div>
+                  <p class="text-[11px] font-bold tracking-[0.16em] text-violet-600 uppercase">Pre-trade impact statement</p>
+                  <h2 class="text-xl font-bold text-slate-950 mt-1">Detailed Rebalance Effect</h2>
+                  <p id="rebEffectMeta" class="text-xs text-slate-500 mt-1">Estimated using current prices; Excel fills remain authoritative.</p>
+                </div>
+                <button id="rebEffectCloseBtn" class="w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Close detailed effect">&times;</button>
+              </div>
+              <div id="rebEffectBody" class="flex-1 overflow-y-auto p-5 md:p-8"></div>
+              <div class="px-6 md:px-8 py-4 bg-white border-t border-slate-200 flex justify-end">
+                <button id="rebEffectDoneBtn" class="px-6 py-2.5 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-700">Back to Execution</button>
               </div>
             </div>
           </div>
@@ -10176,6 +10195,7 @@
             </div>`;
 
           const buyCommitBtn = document.getElementById("rebBuyCommitBtn");
+          const buyEffectBtn = document.getElementById("rebBuyEffectBtn");
           const buyResetBtn = document.getElementById("rebBuyResetBtn");
           if (buyCommitBtn) {
             const notEnoughCredits = !!selectedExec && Number(selectedExec.buyPerLot) === 0;
@@ -10194,6 +10214,11 @@
               buyCommitBtn.disabled = false;
               buyCommitBtn.textContent = "Commit Trade Sequence";
               buyCommitBtn.className = "flex-1 py-2 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-700 transition";
+            }
+            if (buyEffectBtn) {
+              buyEffectBtn.disabled = !selectedExec;
+              buyEffectBtn.classList.toggle('opacity-40', !selectedExec);
+              buyEffectBtn.classList.toggle('cursor-not-allowed', !selectedExec);
             }
 
             if (buyResetBtn) {
@@ -10281,6 +10306,118 @@
 
         render();
         modal.classList.remove("hidden");
+      }
+
+      function rebOpenDetailedEffect(selection) {
+        const modal = document.getElementById('rebEffectModal');
+        const body = document.getElementById('rebEffectBody');
+        const meta = document.getElementById('rebEffectMeta');
+        if (!modal || !body || !selection?.exec || !selection?.instrument) return;
+        const exec = selection.exec;
+        const sellExec = document.getElementById('rebSellModal')?._execData || {};
+        const strategy = (allStrategiesFullData || []).find(s => String(s.id) === String(selection.strategyId || rebSelectedStrategyId));
+        const strategyName = strategy?.name || 'Strategy';
+        const sellCode = String(rebSelectedIsin?.code || 'SELL');
+        const buyCode = String(selection.instrument.code || 'BUY').replace(/\.[A-Z]+$/i, '');
+        const currentResidual = Object.values(rebWalletByClient || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+
+        const rowsByCode = new Map();
+        (rebIsins || []).forEach((isin) => {
+          const qty = (rebRawHoldings[isin.code] || []).reduce((sum, row) => sum + Number(row.quantity || 0), 0);
+          rowsByCode.set(isin.code, {
+            code: isin.code,
+            name: isin.description || isin.code,
+            price: Number(isin.currentPrice || 0),
+            beforeQty: qty,
+            afterQty: qty,
+          });
+        });
+        if (!rowsByCode.has(buyCode)) rowsByCode.set(buyCode, {
+          code: buyCode,
+          name: selection.instrument.description || buyCode,
+          price: Number(exec.pricePerShare || 0),
+          beforeQty: 0,
+          afterQty: 0,
+        });
+        if (rowsByCode.has(sellCode)) rowsByCode.get(sellCode).afterQty = Math.max(0, rowsByCode.get(sellCode).beforeQty - Number(sellExec.totalShares || 0));
+        rowsByCode.get(buyCode).afterQty += Number(exec.totalShares || 0);
+
+        const compositionRows = [...rowsByCode.values()];
+        const beforeSecurities = compositionRows.reduce((sum, row) => sum + row.beforeQty * row.price, 0);
+        const afterSecurities = compositionRows.reduce((sum, row) => sum + row.afterQty * row.price, 0);
+        const beforeInvested = beforeSecurities + currentResidual;
+        const afterResidual = currentResidual + Number(exec.residualCash || 0);
+        const afterInvested = afterSecurities + afterResidual;
+        const investedDelta = afterInvested - beforeInvested;
+        const beforeEconomic = beforeInvested + Number(exec.reserveAvailable || 0);
+        const afterEconomic = afterInvested + Number(exec.reserveAfter || 0);
+
+        const clients = rebClientsForIsin(rebSelectedIsin);
+        const totalLots = clients.reduce((sum, c) => sum + Number(c.lots || 0), 0) || 1;
+        const allocationById = Object.fromEntries((exec.clientAllocations || []).map(a => [String(a.clientId), a]));
+        const clientRows = clients.map((client) => {
+          const uid = String(client.id);
+          const weight = Number(client.lots || 0) / totalLots;
+          const alloc = allocationById[uid] || {};
+          const reserveBefore = Number(rebReserveByClient[uid] || 0);
+          const sellGross = Number(sellExec.grossProceeds || 0) * weight;
+          const sellFees = sellGross * REB_BROKERAGE_RATE + (sellGross > 0 ? REB_OFF_CUSTODY_FEE : 0);
+          const buyGross = Number(alloc.shares || 0) * Number(exec.bufferedPrice || exec.pricePerShare || 0);
+          const buyFees = buyGross * REB_BROKERAGE_RATE + (buyGross > 0 ? REB_OFF_CUSTODY_FEE : 0);
+          const reserveUsed = Math.min(reserveBefore, sellFees + buyFees);
+          return { ...client, alloc, reserveBefore, reserveUsed, reserveAfter: reserveBefore - reserveUsed, shortfall: Math.max(0, sellFees + buyFees - reserveUsed) };
+        });
+
+        if (meta) meta.textContent = `${strategyName} · ${sellCode} → ${buyCode} · preview only; broker Excel controls settlement`;
+        const money = (n) => rebFmtZAR(Number(n || 0));
+        const deltaText = (n) => `${Number(n) >= 0 ? '+' : '−'}${money(Math.abs(Number(n || 0)))}`;
+        body.innerHTML = `
+          <div class="space-y-6">
+            <div class="grid grid-cols-[1fr_auto_1fr] items-stretch gap-3 md:gap-5">
+              <div class="rounded-2xl border border-slate-200 bg-white p-5">
+                <p class="text-[10px] font-bold tracking-[.14em] text-slate-400 uppercase">Strategy before</p>
+                <p class="text-lg font-bold text-slate-950 mt-2">${strategyName}</p>
+                <p class="text-3xl font-bold text-slate-950 mt-5">${money(beforeInvested)}</p>
+                <div class="mt-4 text-xs text-slate-500 space-y-1"><p>Securities ${money(beforeSecurities)}</p><p>Strategy cash ${money(currentResidual)}</p><p>Execution reserve ${money(exec.reserveAvailable)}</p></div>
+              </div>
+              <div class="flex items-center justify-center text-violet-500 text-2xl font-bold">→</div>
+              <div class="rounded-2xl border ${exec.feeShortfall > 0 ? 'border-red-200' : 'border-emerald-200'} bg-white p-5">
+                <p class="text-[10px] font-bold tracking-[.14em] ${exec.feeShortfall > 0 ? 'text-red-500' : 'text-emerald-600'} uppercase">Strategy after</p>
+                <p class="text-lg font-bold text-slate-950 mt-2">${strategyName}</p>
+                <p class="text-3xl font-bold text-slate-950 mt-5">${money(afterInvested)}</p>
+                <div class="mt-4 text-xs text-slate-500 space-y-1"><p>Securities ${money(afterSecurities)}</p><p>Strategy cash ${money(afterResidual)}</p><p>Execution reserve ${money(exec.reserveAfter)}</p></div>
+              </div>
+            </div>
+
+            <div class="grid md:grid-cols-4 gap-3">
+              ${[
+                ['Invested value change', deltaText(investedDelta), investedDelta < -0.005 ? 'text-red-600' : 'text-emerald-600'],
+                ['Reserve consumed', `−${money(exec.reserveUsed)}`, 'text-amber-600'],
+                ['Portfolio shortfall', exec.feeShortfall > 0 ? `−${money(exec.feeShortfall)}` : money(0), exec.feeShortfall > 0 ? 'text-red-600' : 'text-emerald-600'],
+                ['Total economic value', `${money(beforeEconomic)} → ${money(afterEconomic)}`, 'text-slate-900'],
+              ].map(([label,value,colour]) => `<div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">${label}</p><p class="mt-2 text-sm font-bold font-mono ${colour}">${value}</p></div>`).join('')}
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+              <div class="px-5 py-4 border-b border-slate-200"><h3 class="font-bold text-slate-900">Composition comparison</h3><p class="text-xs text-slate-500 mt-1">Quantities and market values across all affected client holdings.</p></div>
+              <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500"><tr><th class="text-left px-5 py-3">Asset</th><th class="text-right px-4 py-3">Before qty</th><th class="text-right px-4 py-3">Before value</th><th class="text-center px-3 py-3">Change</th><th class="text-right px-4 py-3">After qty</th><th class="text-right px-5 py-3">After value</th></tr></thead><tbody class="divide-y divide-slate-100">
+                ${compositionRows.map(row => `<tr><td class="px-5 py-3"><p class="font-semibold text-slate-900">${row.code}</p><p class="text-[11px] text-slate-400">${row.name}</p></td><td class="px-4 py-3 text-right font-mono">${row.beforeQty}</td><td class="px-4 py-3 text-right font-mono">${money(row.beforeQty * row.price)}</td><td class="px-3 py-3 text-center font-mono ${row.afterQty-row.beforeQty < 0 ? 'text-red-600' : row.afterQty-row.beforeQty > 0 ? 'text-emerald-600' : 'text-slate-400'}">${row.afterQty-row.beforeQty > 0 ? '+' : ''}${row.afterQty-row.beforeQty}</td><td class="px-4 py-3 text-right font-mono font-semibold">${row.afterQty}</td><td class="px-5 py-3 text-right font-mono font-semibold">${money(row.afterQty * row.price)}</td></tr>`).join('')}
+                <tr class="bg-violet-50/60"><td class="px-5 py-3 font-semibold text-violet-800">Strategy residual cash</td><td colspan="2" class="px-4 py-3 text-right font-mono text-violet-700">${money(currentResidual)}</td><td class="px-3 py-3 text-center text-violet-600">→</td><td colspan="2" class="px-5 py-3 text-right font-mono font-semibold text-violet-800">${money(afterResidual)}</td></tr>
+              </tbody></table></div>
+            </div>
+
+            <div class="grid lg:grid-cols-2 gap-5">
+              <div class="rounded-2xl border border-slate-200 bg-white p-5"><h3 class="font-bold text-slate-900">Cash and fee bridge</h3><div class="mt-4 space-y-2 text-sm">
+                ${[['Gross sale proceeds', sellExec.grossProceeds],['Sell fees', -((sellExec.brokerage||0)+(sellExec.offCustodyFee||0))],['Buy gross cost', -exec.grossCost],['Buy fees', -((exec.brokerage||0)+(exec.custodyFee||0))],['Reserve contribution', exec.reserveUsed],['Residual after trade', exec.residualCash]].map(([label,value]) => `<div class="flex justify-between"><span class="text-slate-500">${label}</span><span class="font-mono ${value < 0 ? 'text-red-600' : 'text-slate-900'}">${value < 0 ? '−' : ''}${money(Math.abs(value||0))}</span></div>`).join('')}
+              </div></div>
+              <div class="rounded-2xl border border-slate-200 bg-white p-5"><h3 class="font-bold text-slate-900">Performance treatment</h3><div class="mt-4 space-y-3 text-sm"><div class="flex justify-between"><span class="text-slate-500">Previous P&amp;L history</span><span class="font-semibold text-emerald-700">Retained</span></div><div class="flex justify-between"><span class="text-slate-500">Sold asset tracking</span><span class="font-semibold text-slate-800">Stops at settlement</span></div><div class="flex justify-between"><span class="text-slate-500">New asset tracking</span><span class="font-semibold text-slate-800">Starts at settlement</span></div><div class="flex justify-between"><span class="text-slate-500">Gross strategy YTD</span><span class="font-semibold text-emerald-700">Not changed by reserve usage</span></div><div class="flex justify-between"><span class="text-slate-500">Net economic cost</span><span class="font-semibold text-amber-700">${money(exec.totalRebalanceFees)}</span></div></div></div>
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 bg-white overflow-hidden"><div class="px-5 py-4 border-b border-slate-200"><h3 class="font-bold text-slate-900">Per-client reserve effect</h3></div><div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500"><tr><th class="text-left px-5 py-3">Client</th><th class="text-right px-4 py-3">Buy shares</th><th class="text-right px-4 py-3">Reserve before</th><th class="text-right px-4 py-3">Reserve used</th><th class="text-right px-4 py-3">Reserve after</th><th class="text-right px-5 py-3">Shortfall</th></tr></thead><tbody class="divide-y divide-slate-100">${clientRows.map(row => `<tr><td class="px-5 py-3"><p class="font-semibold text-slate-900">${row.name}</p><p class="text-[10px] font-mono text-slate-400">${row.id}</p></td><td class="px-4 py-3 text-right font-mono">${Number(row.alloc.shares||0)}</td><td class="px-4 py-3 text-right font-mono">${money(row.reserveBefore)}</td><td class="px-4 py-3 text-right font-mono text-amber-700">−${money(row.reserveUsed)}</td><td class="px-4 py-3 text-right font-mono font-semibold">${money(row.reserveAfter)}</td><td class="px-5 py-3 text-right font-mono ${row.shortfall > 0 ? 'text-red-600 font-semibold' : 'text-emerald-600'}">${money(row.shortfall)}</td></tr>`).join('')}</tbody></table></div></div>
+
+            <div class="rounded-xl border ${exec.feeShortfall > 0 ? 'border-red-200 bg-red-50 text-red-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'} p-4 text-sm"><p class="font-bold">${exec.feeShortfall > 0 ? 'Reserve shortfall affects invested value' : 'Reserve fully protects invested value'}</p><p class="mt-1">This is an estimate. No reserve is consumed until actual Excel fills are confirmed and settled.</p></div>
+          </div>`;
+        modal.classList.remove('hidden');
       }
 
       const rebSymbolMatchesHolding = (holding, targets) => {
@@ -11746,10 +11883,19 @@
         const buyClose = document.getElementById("rebBuyCloseBtn");
         const buyOverlay = document.getElementById("rebBuyOverlay");
         const buyReset = document.getElementById("rebBuyResetBtn");
+        const buyEffect = document.getElementById("rebBuyEffectBtn");
         const buyCommit = document.getElementById("rebBuyCommitBtn");
         const closeBuy = () => { if (buyModal) buyModal.classList.add("hidden"); };
         if (buyClose) buyClose.addEventListener("click", closeBuy);
         if (buyOverlay) buyOverlay.addEventListener("click", closeBuy);
+        if (buyEffect) buyEffect.addEventListener('click', () => {
+          if (!buyModal?._buySelection) return;
+          rebOpenDetailedEffect(buyModal._buySelection);
+        });
+        const effectModal = document.getElementById('rebEffectModal');
+        const closeEffect = () => { if (effectModal) effectModal.classList.add('hidden'); };
+        document.getElementById('rebEffectCloseBtn')?.addEventListener('click', closeEffect);
+        document.getElementById('rebEffectDoneBtn')?.addEventListener('click', closeEffect);
         if (buyReset) buyReset.addEventListener("click", () => {
           if (buyReset.dataset.mode === "back" && buyModal && typeof buyModal._onBack === "function") {
             buyModal._onBack();
