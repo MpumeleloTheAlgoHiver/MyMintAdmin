@@ -494,11 +494,13 @@
       /* TOTAL AUM includes cash (i.value = holdings + residual + 8% buffer) so the
          headline portfolio matches what clients actually hold after rebalances. */
       const aum  = visible.reduce((s,i)=>s+(i.value ?? i.csrAum),0);
-      const inv  = visible.reduce((s,i)=>s+i.csrInvested,0);
-      const pnl  = visible.reduce((s,i)=>s+i.csrPnl,0);
-      /* Weighted average return &mdash; weight by each investor's AUM so small accounts don't distort the figure */
-      const avg = aum > 0 ? visible.reduce((s,i)=>s+(i.csrRetPct * i.csrAum), 0) / aum : 0;
-      const sorted = [...visible].sort((a,b) => b.csrRetPct - a.csrRetPct);
+      /* Keep every headline on the same live, complete-value basis used by the
+         investor rows. Mixing csrRetPct here with row.retPct makes Best/Worst
+         disagree with the number beside the selected basket. */
+      const inv  = visible.reduce((s,i)=>s+i.invested,0);
+      const pnl  = visible.reduce((s,i)=>s+i.pnl,0);
+      const avg = inv > 0 ? (pnl / inv) * 100 : 0;
+      const sorted = [...visible].sort((a,b) => b.retPct - a.retPct);
       const best  = sorted[0];
       const worst = sorted[sorted.length-1];
       const kpis = [
@@ -506,8 +508,8 @@
         { l:'TOTAL INVESTED',  v: fmtR(inv), c:'#64748b' },
         { l:'TOTAL P&L',       v: (pnl>=0?'+':'')+fmtR2(pnl), c: pctClr(pnl) },
         { l:'AVG RETURN',      v: fmtPct(avg), c: pctClr(avg) },
-        { l:'BEST PERFORMER',  v: best  ? `${best.name.split(' ')[0]} ${fmtPct(best.csrRetPct)}`   : '&mdash;', c:'#059669' },
-        { l:'WORST PERFORMER', v: worst ? `${worst.name.split(' ')[0]} ${fmtPct(worst.csrRetPct)}` : '&mdash;', c:'#dc2626' },
+        { l:'BEST PERFORMER',  v: best  ? `${best.name.split(' ')[0]} ${fmtPct(best.retPct)}`   : '&mdash;', c:'#059669' },
+        { l:'WORST PERFORMER', v: worst ? `${worst.name.split(' ')[0]} ${fmtPct(worst.retPct)}` : '&mdash;', c:'#dc2626' },
       ];
       document.getElementById('kpiBar').innerHTML = kpis.map(k =>
         `<div class="ov-kpi-card">

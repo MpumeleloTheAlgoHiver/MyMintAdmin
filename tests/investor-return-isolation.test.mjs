@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const api = fs.readFileSync(new URL('../api/investors/data.js', import.meta.url), 'utf8');
+const page = fs.readFileSync(new URL('../public/investors.html', import.meta.url), 'utf8');
 
 assert.doesNotMatch(
   api,
@@ -21,4 +22,16 @@ assert.match(
   'the immutable return-spine contract should be documented beside the response'
 );
 
-console.log('investor return isolation: 3/3 green');
+assert.match(
+  page,
+  /sort\(\(a,b\) => b\.retPct - a\.retPct\)/,
+  'Best and Worst Performer must rank the live all-time return shown in each row'
+);
+
+assert.doesNotMatch(
+  page,
+  /BEST PERFORMER[^\n]*csrRetPct|WORST PERFORMER[^\n]*csrRetPct/,
+  'KPI labels must not switch back to the legacy stored inception percentage'
+);
+
+console.log('investor return isolation: 5/5 green');
