@@ -58,6 +58,13 @@
     body.is-embedded .max-w-7xl { max-width: none !important; padding: 0 !important; margin: 0 !important; }
     body.is-embedded #mainGrid { grid-template-columns: 1fr !important; min-height: 100vh !important; gap: 0 !important; }
     body.is-embedded #detailPanel { border-radius: 0 !important; box-shadow: none !important; }
+
+    /* Spreadsheet full-screen mode: the spreadsheet card is reparented into
+       this fixed overlay, which sits above the sidebar/top-nav/everything
+       else so only the spreadsheet is visible. */
+    #xsFullscreenOverlay { display: none; position: fixed; inset: 0; background: #f8fafc; z-index: 99999; padding: 16px; box-sizing: border-box; overflow: auto; }
+    body.xs-fullscreen #xsFullscreenOverlay { display: block; }
+    body.xs-fullscreen { overflow: hidden; }
   </style>
 <script src="/js/cc-badge.js" defer></script>
 <script>
@@ -1115,7 +1122,7 @@
       if (!rows.length) return `<div style="background:#fff;border-radius:10px;padding:30px;text-align:center;color:#94a3b8;">No holdings to build a spreadsheet from.</div>`;
 
       return `
-        <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);">
+        <div id="spreadsheetCard" style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,0.04);">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
             <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.04em;">PORTFOLIO SPREADSHEET &mdash; ${(i.name||'').toUpperCase()}</div>
             <div style="display:flex;gap:8px;">
@@ -1127,15 +1134,58 @@
                 style="display:flex;align-items:center;gap:6px;background:#166534;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">
                 &#128190; Download .xlsx
               </button>
+              <button id="xsFullscreenBtn" onclick="toggleSpreadsheetFullscreen()"
+                style="display:flex;align-items:center;gap:6px;background:#1e293b;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">
+                &#10021; Full screen
+              </button>
             </div>
           </div>
           <div style="font-size:11px;color:#64748b;margin-bottom:10px;line-height:1.5;">
             Fully editable spreadsheet, seeded from this investor's real holdings. Every total column is a live formula (e.g. Total Avg Fill = Quantity &times; Avg Fill) &mdash; edit any input cell (Quantity, Avg Fill, Market Value) and the rest recalculates, just like Excel.
           </div>
-          <div id="xs-grid" style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;"></div>
+          <div id="xs-grid" style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;flex:1;min-height:0;"></div>
         </div>
       `;
     }
+
+    /* Full screen: reparent the whole spreadsheet card into a fixed overlay
+       that sits above the sidebar/top-nav/investor list, so only the
+       spreadsheet is visible. The x-spreadsheet instance lives on the same
+       DOM node throughout, so moving it doesn't require re-initializing. */
+    function toggleSpreadsheetFullscreen() {
+      const card = document.getElementById('spreadsheetCard');
+      const overlay = document.getElementById('xsFullscreenOverlay');
+      const btn = document.getElementById('xsFullscreenBtn');
+      if (!card || !overlay) return;
+      const isFull = document.body.classList.contains('xs-fullscreen');
+      if (!isFull) {
+        card._xsOrigParent = card.parentNode;
+        card._xsOrigNext = card.nextSibling;
+        overlay.appendChild(card);
+        document.body.classList.add('xs-fullscreen');
+        card.style.height = 'calc(100vh - 32px)';
+        card.style.display = 'flex';
+        card.style.flexDirection = 'column';
+        if (btn) btn.innerHTML = '&#10005; Exit full screen';
+      } else {
+        if (card._xsOrigParent) {
+          if (card._xsOrigNext) card._xsOrigParent.insertBefore(card, card._xsOrigNext);
+          else card._xsOrigParent.appendChild(card);
+        }
+        document.body.classList.remove('xs-fullscreen');
+        card.style.height = '';
+        card.style.display = '';
+        card.style.flexDirection = '';
+        if (btn) btn.innerHTML = '&#10021; Full screen';
+      }
+      setTimeout(() => { if (xsInstance) xsInstance.reRender(); }, 60);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.body.classList.contains('xs-fullscreen')) {
+        toggleSpreadsheetFullscreen();
+      }
+    });
 
     /* Column layout used by the live grid (and mirrored in the .xlsx export):
        A Symbol | B Name | C Quantity | D Avg Fill | E Total Avg Fill (=C*D)
@@ -1212,7 +1262,7 @@
         showGrid: true,
         showContextmenu: true,
         view: {
-          height: () => 560,
+          height: () => document.body.classList.contains('xs-fullscreen') ? (el.clientHeight || window.innerHeight - 160) : 560,
           width: () => el.clientWidth || 900,
         },
         row: { len: 100, height: 25 },
@@ -1388,6 +1438,7 @@
   }catch(e){}
 })();
 </script>
+<div id="xsFullscreenOverlay"></div>
 <script>window.PAGE_ACCESS_KEY = "investors";</script>
 <script src="/js/access-guard.js"></script>
 </body>
