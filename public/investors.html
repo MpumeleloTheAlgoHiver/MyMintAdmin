@@ -1271,16 +1271,19 @@
     function attachScrollDamping(el) {
       if (el._xsScrollDampAttached) return;
       el._xsScrollDampAttached = true;
-      let lastTime = 0;
-      const minGapMs = 70; // higher = slower scroll
+      let lastV = 0, lastH = 0;
+      const minGapVMs = 70;  // vertical: rows are ~25px, so a shorter gap still feels controlled
+      const minGapHMs = 220; // horizontal: columns are much wider (~100px+), so each step needs more time to not feel like a jump
       el.addEventListener('wheel', (e) => {
+        const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
         const now = Date.now();
-        if (now - lastTime < minGapMs) {
-          e.stopPropagation();
-          e.preventDefault();
-          return;
+        if (horizontal) {
+          if (now - lastH < minGapHMs) { e.stopPropagation(); e.preventDefault(); return; }
+          lastH = now;
+        } else {
+          if (now - lastV < minGapVMs) { e.stopPropagation(); e.preventDefault(); return; }
+          lastV = now;
         }
-        lastTime = now;
       }, { capture: true, passive: false });
     }
 
