@@ -260,7 +260,10 @@
       const _bufSeen = {};
       (holdings||[]).forEach(h => {
         if (!h.user_id || !h.transaction_id) return;
-        const key = `${h.user_id}:${h.family_member_id || ''}`;
+        /* A funding transaction belongs to the strategy purchase that created
+           these holdings. Keep the reserve on that strategy card instead of
+           repeating the owner's combined reserve on every basket. */
+        const key = `${h.user_id}:${h.family_member_id || ''}:${h.strategy_id || ''}`;
         if (!_bufSeen[key]) _bufSeen[key] = new Set();
         if (_bufSeen[key].has(h.transaction_id)) return;
         _bufSeen[key].add(h.transaction_id);
@@ -302,21 +305,23 @@
         secLiveMap[s.security_id] = { priceR: (Number(s.current_price)||0)/100, dayPct: Number(s['1d_pct'])||0, ytd: Number(s.ytd_pct)||0, y1: Number(s['1y_pct'])||0, asOf: s.as_of_date };
       });
 
-      /* Per-investor NAV history & metrics &mdash; keyed by user_id */
+      /* Per-investor NAV history & metrics &mdash; keyed by user + strategy.
+         One client can own multiple baskets and each has an independent return
+         spine; grouping by user alone leaks one basket's history into another. */
       stratNavMap = {}; stratMetricsMap = {};
       const stratLatest = {};
       (stratHist||[]).forEach(r => {
-        const uid = r.user_id;
-        if (!stratNavMap[uid]) stratNavMap[uid] = [];
+        const key = `${r.user_id}:${r.strategy_id || ''}`;
+        if (!stratNavMap[key]) stratNavMap[key] = [];
         const nav = Number(r.basket_value);
-        if (nav > 0) stratNavMap[uid].push({ date: r.as_of_date, nav, incPct: r.inception_pct != null ? Number(r.inception_pct) : null });
-        stratLatest[uid] = r;  /* last one wins &rarr; most recent (asc order) */
+        if (nav > 0) stratNavMap[key].push({ date: r.as_of_date, nav, incPct: r.inception_pct != null ? Number(r.inception_pct) : null });
+        stratLatest[key] = r;  /* last one wins &rarr; most recent (asc order) */
       });
-      Object.entries(stratNavMap).forEach(([uid, series]) => {
-        stratMetricsMap[uid] = {
+      Object.entries(stratNavMap).forEach(([key, series]) => {
+        stratMetricsMap[key] = {
           ...computeMetrics(series),
           calendar: computeCalendar(series),
-          latest: stratLatest[uid] || null,
+          latest: stratLatest[key] || null,
         };
       });
 
@@ -335,7 +340,9 @@
       (holdings||[]).forEach(row => {
         const uid = row.user_id; if (!uid) return;
         const fmId = row.family_member_id || '';
-        const key = `${uid}:${fmId}`;
+        /* The strategy is part of an investor position's identity. Without it,
+           a client's Yield and ETF holdings collapse into one card/export. */
+        const key = `${uid}:${fmId}:${row.strategy_id || ''}`;
         if (!byUser[key]) byUser[key] = { userId: uid, familyMemberId: fmId || null, strategyId: row.strategy_id, holdings: [], inception: row.created_at };
         const qty   = Number(row.quantity) || 0;
         let fill    = Number(row.avg_fill) || 0;
@@ -418,7 +425,8 @@
         u.holdings.sort((a,b) => b.currentR - a.currentR);
         /* Pull latest per-investor figures from client_strategy_returns_c
            (only meaningful for strategy investors). */
-        const csrLatest = isStrategy ? ((stratMetricsMap[u.userId] || {}).latest || null) : null;
+        const strategyHistoryKey = `${u.userId}:${u.strategyId || ''}`;
+        const csrLatest = isStrategy ? ((stratMetricsMap[strategyHistoryKey] || {}).latest || null) : null;
         const csrAum      = csrLatest ? csrLatest.basket_value / 100 : current;
         const csrPnl      = csrLatest ? csrLatest.inception_pnl / 100 : pnl;
         const csrInvested = csrLatest ? (csrLatest.basket_value - csrLatest.inception_pnl) / 100 : invested;
@@ -429,7 +437,7 @@
            not positions. Broken out from holdings value in the detail view. */
         const residualCash = residualByKey[`${u.userId}:${u.familyMemberId || ''}:${u.strategyId || ''}`] || 0;
         /* Held 8% buffer for this investor (cash sitting in the strategy). */
-        const bufferCash = bufferByInvestor[investorKey] || 0;
+        const bufferCash = bufferByInvestor[`${u.userId}:${u.familyMemberId || ''}:${u.strategyId || ''}`] || 0;
         /* holdingsValue = LIVE positions value (current = sum of live price x qty),
            which matches the orderbook. csrAum (basket_value snapshot) can be stale
            after a rebalance, so we use current here. value = positions + cash,
@@ -625,7 +633,8 @@
 
     /* ─── Tab: Performance (merged: user P&L chart + calendar + strategy stats + holdings) ─── */
     function renderPerformanceTab(i) {
-      const m = stratMetricsMap[i.userId] || {};
+      const historyKey = `${i.userId}:${i.strategyId || ''}`;
+      const m = stratMetricsMap[historyKey] || {};
       const latest = m.latest || {};
       const periods = [
         ['1D', latest['1d_pct']], ['5D', latest['5d_pct']], ['1M', latest['1m_pct']],
@@ -636,7 +645,7 @@
       /* Calendar &mdash; computed per-investor from their inception date so the first
          partial month uses their entry NAV, not the prior month-end */
       const incDate = i.inception ? i.inception.slice(0, 10) : null;
-      const cal = computeCalendar(stratNavMap[i.userId] || [], incDate);
+      const cal = computeCalendar(stratNavMap[historyKey] || [], incDate);
       const incKey = incDate ? incDate.slice(0, 7) : null; /* YYYY-MM */
       const keys = Object.keys(cal).sort();
       const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -741,7 +750,7 @@
     /* Build user P&L series: starts at (inception, 0), then strategy NAV ratio &times; invested */
     function renderUserPnlChart(i) {
       const el = document.getElementById('userPnlChart'); if (!el) return;
-      const navs = stratNavMap[i.userId] || [];
+      const navs = stratNavMap[`${i.userId}:${i.strategyId || ''}`] || [];
       const pts = navs.filter(p => p.incPct != null);
       if (!pts.length) {
         el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:12px;">Not enough data to chart inception return</div>`;
@@ -772,7 +781,7 @@
 
     /* ─── Tab: Risk ─── */
     function renderRiskTab(i) {
-      const m = stratMetricsMap[i.userId] || {};
+      const m = stratMetricsMap[`${i.userId}:${i.strategyId || ''}`] || {};
       const cards = [
         ['Sharpe Ratio',     m.sharpe,  'Annualised return per unit of total risk. Higher is better. > 1 is good.'],
         ['Sortino Ratio',    m.sortino, 'Like Sharpe but only counts downside risk. Higher is better.'],
@@ -799,7 +808,7 @@
 
     function renderDrawdownChart(i) {
       const el = document.getElementById('ddChart'); if (!el) return;
-      const series = (stratMetricsMap[i.userId] || {}).ddSeries || [];
+      const series = (stratMetricsMap[`${i.userId}:${i.strategyId || ''}`] || {}).ddSeries || [];
       if (series.length < 2) { el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:12px;">Not enough NAV data</div>`; return; }
       disposeChart(el);
       const chart = echarts.init(el); chart.__instanceFor = el;
@@ -1133,7 +1142,7 @@
             </button>
           </div>
           <div style="font-size:11px;color:#64748b;margin-bottom:12px;line-height:1.5;">
-            Mirrors the workbook you'll get from "Download .xlsx" &mdash; every total column is a live formula in the downloaded file (e.g. Total Avg Fill = Quantity &times; Avg Fill), so it recalculates in Excel if you edit a cell.
+            ${i.strategy ? `<strong>${i.strategy}</strong> only &mdash; ` : ''}mirrors the workbook you'll get from "Download .xlsx". Every total column is a live formula in the downloaded file (e.g. Total Avg Fill = Quantity &times; Avg Fill), so it recalculates in Excel if you edit a cell.
           </div>
           <table class="ov-table">
             <thead>
@@ -1228,7 +1237,8 @@
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Portfolio');
       const safeName = String(i.name || 'investor').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') || 'investor';
-      XLSX.writeFile(wb, `${safeName}-portfolio-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      const safeStrategy = String(i.strategy || 'direct-securities').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') || 'portfolio';
+      XLSX.writeFile(wb, `${safeName}-${safeStrategy}-${new Date().toISOString().slice(0, 10)}.xlsx`);
     }
 
     /* ─── App fee config (rebalance fee reconciliation reads custody/brokerage
