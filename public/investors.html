@@ -1261,8 +1261,8 @@
       };
       // Format a pre-computed percentage number as "7.55%" (or "-5.73%").
       const fmtPct = (n) => Number(n).toFixed(2) + '%';
+      // cashComponent = residual rebalance cash + held 8% execution buffer.
       const cashR = Number(i.cashComponent) || 0;
-      console.log('[Spreadsheet] cashComponent:', i.cashComponent, '→ cashR:', cashR, '| residualCash:', i.residualCash, '| bufferCash:', i.bufferCash, '| value:', i.value, '| holdingsValue:', i.holdingsValue);
 
       rows.forEach((r, idx) => {
         const rIdx = idx + 1;
@@ -1292,9 +1292,10 @@
         };
       });
 
-      // Cash row (residual rebalance cash + held 8% buffer for this strategy)
-      const hasCash = cashR > 0;
-      if (hasCash) {
+      // Cash row always shown — cashR may be 0 (no residual/buffer yet), in
+      // which case the row displays R 0.00 so the position is never silent.
+      const hasCash = true;
+      {
         const cashRIdx = rows.length + 1;
         rowsObj[cashRIdx] = {
           cells: {
