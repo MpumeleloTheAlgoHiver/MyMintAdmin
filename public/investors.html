@@ -1261,6 +1261,29 @@
     /* Mounts (or re-mounts) the grid into #xs-grid. Pass explicit `data` to
        preserve current cell edits across a remount (e.g. fullscreen toggle);
        omit it to rebuild fresh from the investor's live holdings. */
+    /* The grid moves exactly one row/col per wheel event regardless of the
+       event's delta magnitude, so a trackpad/mouse firing many wheel events
+       per swipe makes it fly through rows almost instantly. There's no
+       library option for this, so we throttle how often a wheel event is
+       allowed to reach it — capture-phase, so throttled-out events never
+       reach the grid's own listener at all. Attached once per #xs-grid node
+       (the div persists across remounts; only its contents are replaced). */
+    function attachScrollDamping(el) {
+      if (el._xsScrollDampAttached) return;
+      el._xsScrollDampAttached = true;
+      let lastTime = 0;
+      const minGapMs = 70; // higher = slower scroll
+      el.addEventListener('wheel', (e) => {
+        const now = Date.now();
+        if (now - lastTime < minGapMs) {
+          e.stopPropagation();
+          e.preventDefault();
+          return;
+        }
+        lastTime = now;
+      }, { capture: true, passive: false });
+    }
+
     function mountSpreadsheetGrid(data) {
       const el = document.getElementById('xs-grid');
       if (!el || typeof x_spreadsheet === 'undefined' || !currentInvestor) return;
@@ -1277,6 +1300,7 @@
         row: { len: 100, height: 25 },
         col: { len: 26, width: 100, indexWidth: 45, minWidth: 60 },
       }).loadData(data || spreadsheetGridData(currentInvestor));
+      attachScrollDamping(el);
     }
 
     function initSpreadsheetGrid(i) {
