@@ -6662,14 +6662,13 @@
       // Number pending rows starting after settled rows
       rebEventRows.forEach((row, i) => { row.line = rawRows.length + i + 1; });
 
-      // Ordinary pending rebalances stay in the standalone Rebalances tab.
-      // Liquidate-to-cash is different: it creates an executable SELL with no
-      // matching BUY, so expose that SELL in the Active Orderbook as well.
-      const liquidationSellRows = rebEventRows.filter((row) => row.isLiquidationSell);
-      const settledRows = [
-        ...filteredRows.filter(r => !r.isPendingRebalance),
-        ...liquidationSellRows,
-      ];
+      // Liquidations are managed entirely on the Rebalances (rebalance) side and
+      // executed there via the batch-level Fill & Settle flow — NOT sent from the
+      // orderbook. So a liquidate-to-cash SELL must NOT be duplicated into the
+      // Active Orderbook working set. (It used to be injected here so it was also
+      // sendable from the orderbook, but that just created a confusing duplicate
+      // of something already handled cleanly on the rebalance side.)
+      const settledRows = filteredRows.filter(r => !r.isPendingRebalance);
 
       allBirSourceRows = rawRows;
       allOrderbookRawRows = settledRows;
