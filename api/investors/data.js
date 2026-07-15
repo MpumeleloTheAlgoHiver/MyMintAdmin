@@ -159,12 +159,12 @@ module.exports = async (req, res) => {
        gets one shape. Intraday wins when present; stock_returns_c fills the
        gap for securities without an intraday tick. */
     const intradayByid = {};
-    (secIntraday || []).forEach((row) => {
+    (Array.isArray(secIntraday) ? secIntraday : []).forEach((row) => {
       if (!row?.security_id) return;
       if (intradayByid[row.security_id]) return; // first (latest) wins
       if (row.current_price != null) intradayByid[row.security_id] = Number(row.current_price);
     });
-    const secLive = (secReturns || []).map((r) => {
+    const secLive = (Array.isArray(secReturns) ? secReturns : []).map((r) => {
       const intraCents = intradayByid[r.security_id];
       if (Number.isFinite(intraCents) && intraCents > 0) {
         return { ...r, current_price: intraCents };
