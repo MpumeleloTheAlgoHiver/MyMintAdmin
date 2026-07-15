@@ -1164,7 +1164,11 @@
             4: { text: `=C${excelRow}*D${excelRow}` },
             5: { text: String(r.qty * r.priceR) },
             6: { text: `=F${excelRow}-E${excelRow}` },
-            7: { text: `=IF(E${excelRow}=0,0,G${excelRow}/E${excelRow}*100)` },
+            // Note: this grid's formula engine crashes if a division is nested
+            // inside an IF(...) argument, so this is a plain division (not
+            // IF-guarded) — a zero Total Avg Fill shows Infinity/NaN, same as
+            // dividing by zero in a real spreadsheet without a guard.
+            7: { text: `=G${excelRow}/E${excelRow}*100` },
             8: { text: `=E${excelRow}+G${excelRow}` },
           }
         };
@@ -1179,7 +1183,7 @@
           4: { text: `=SUM(E${firstDataExcelRow}:E${lastDataExcelRow})`, style: 1 },
           5: { text: `=SUM(F${firstDataExcelRow}:F${lastDataExcelRow})`, style: 1 },
           6: { text: `=F${totalRIdx + 1}-E${totalRIdx + 1}`, style: 1 },
-          7: { text: `=IF(E${totalRIdx + 1}=0,0,G${totalRIdx + 1}/E${totalRIdx + 1}*100)`, style: 1 },
+          7: { text: `=G${totalRIdx + 1}/E${totalRIdx + 1}*100`, style: 1 },
           8: { text: `=E${totalRIdx + 1}+G${totalRIdx + 1}`, style: 1 },
         }
       };
