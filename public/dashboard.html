@@ -8415,16 +8415,36 @@
         return { isinCode: isin.code, isinDescription: isin.description, totalShares, pricePerShare: priceR, grossProceeds, brokerage, offCustodyFee, offCustodyFeeMultiplier, netProceeds };
       }
 
-      function rebComputeBuyExecution(isinCode, isinDescription, pricePerShare, netCapital, clients, applyBuffer) {
+      function rebComputeBuyExecution(isinCode, isinDescription, pricePerShare, netCapital, clients, applyBuffer, reserveAvailable = 0, sellFees = 0) {
         const totalLots = clients.reduce((s, c) => s + c.lots, 0);
         const bufferedPrice = applyBuffer ? pricePerShare * 1.08 : pricePerShare;
         const affectedClientCount = Math.max(1, clients.filter((c) => Number(c.lots) > 0).length);
         const custodyFee = REB_OFF_CUSTODY_FEE * affectedClientCount;
         const perShareTradingCost = bufferedPrice * (1 + REB_BROKERAGE_RATE);
-        const affordableCapitalAfterFees = Math.max(0, Number(netCapital || 0) - custodyFee);
-        const buyPerLot = (totalLots > 0 && perShareTradingCost > 0)
-          ? Math.max(0, Math.floor(affordableCapitalAfterFees / (totalLots * perShareTradingCost)))
-          : 0;
+        const reserveMode = Number(reserveAvailable || 0) > 0 || Number(sellFees || 0) > 0;
+        let maxAffordableShares = 0;
+        if (totalLots > 0 && bufferedPrice > 0) {
+          if (reserveMode) {
+            // Reserve pays sell + buy fees first. Only the uncovered fee
+            // shortfall competes with sale proceeds for replacement shares.
+            let lo = 0;
+            let hi = Math.max(0, Math.floor(Number(netCapital || 0) / bufferedPrice));
+            while (lo <= hi) {
+              const mid = Math.floor((lo + hi) / 2);
+              const gross = mid * bufferedPrice;
+              const buyFees = (mid > 0 ? custodyFee : 0) + gross * REB_BROKERAGE_RATE;
+              const feeShortfall = Math.max(0, Number(sellFees || 0) + buyFees - Number(reserveAvailable || 0));
+              if (gross + feeShortfall <= Number(netCapital || 0) + 0.005) {
+                maxAffordableShares = mid;
+                lo = mid + 1;
+              } else hi = mid - 1;
+            }
+          } else {
+            const affordableCapitalAfterFees = Math.max(0, Number(netCapital || 0) - custodyFee);
+            maxAffordableShares = Math.max(0, Math.floor(affordableCapitalAfterFees / perShareTradingCost));
+          }
+        }
+        const buyPerLot = totalLots > 0 ? Math.floor(maxAffordableShares / totalLots) : 0;
 
         const baseClientAllocations = clients.map((c) => ({
           clientId: c.id,
@@ -8439,10 +8459,7 @@
         const baseBrokerage = baseGrossCost * REB_BROKERAGE_RATE;
         const baseAppliedCustodyFee = baseTotalShares > 0 ? custodyFee : 0;
         const baseTotalCost = baseGrossCost + baseBrokerage + baseAppliedCustodyFee;
-        const remainingBudgetAfterBase = Math.max(0, netCapital - baseTotalCost);
-        const maxExtraShares = perShareTradingCost > 0
-          ? Math.floor(remainingBudgetAfterBase / perShareTradingCost)
-          : 0;
+        const maxExtraShares = Math.max(0, maxAffordableShares - baseTotalShares);
 
         // Allocate extra shares by lot weight so client proportions remain aligned.
         if (maxExtraShares > 0 && totalLots > 0) {
@@ -8492,7 +8509,10 @@
         const brokerage = grossCost * REB_BROKERAGE_RATE;
         const appliedCustodyFee = totalShares > 0 ? custodyFee : 0;
         const totalCost = grossCost + brokerage + appliedCustodyFee;
-        const residualCash = Math.max(0, netCapital - totalCost);
+        const totalRebalanceFees = Number(sellFees || 0) + brokerage + appliedCustodyFee;
+        const reserveUsed = reserveMode ? Math.min(Number(reserveAvailable || 0), totalRebalanceFees) : 0;
+        const feeShortfall = reserveMode ? Math.max(0, totalRebalanceFees - reserveUsed) : brokerage + appliedCustodyFee;
+        const residualCash = Math.max(0, Number(netCapital || 0) - grossCost - feeShortfall);
 
         clientAllocations.forEach((alloc) => {
           const clientResidual = totalLots > 0 ? (alloc.lots / totalLots) * residualCash : 0;
@@ -8513,6 +8533,11 @@
           custodyFee: appliedCustodyFee,
           custodyFeeMultiplier: affectedClientCount,
           totalCost,
+          totalRebalanceFees,
+          reserveAvailable: Number(reserveAvailable || 0),
+          reserveUsed,
+          reserveAfter: Math.max(0, Number(reserveAvailable || 0) - reserveUsed),
+          feeShortfall,
           residualCash,
           extraSharesDistributed,
           clientAllocations,
@@ -8944,6 +8969,26 @@
         }
       }
 
+      async function rebLoadReserveBalances(strategyId, userIds) {
+        const ids = [...new Set((userIds || []).map(String).filter(Boolean))];
+        if (!ids.length || !strategyId) return {};
+        try {
+          const token = await rebApiToken();
+          if (!token) return {};
+          const resp = await fetch('/api/orderbook/send-csv?action=rebalance-load-reserves', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ strategyId, userIds: ids, familyMemberId: rebSelectedFamilyMemberId || null }),
+          });
+          if (!resp.ok) throw new Error(`load failed: ${resp.status}`);
+          const { reservesCentsByUser } = await resp.json();
+          return Object.fromEntries(Object.entries(reservesCentsByUser || {}).map(([uid, cents]) => [uid, Number(cents || 0) / 100]));
+        } catch (err) {
+          console.warn('rebLoadReserveBalances failed', err);
+          return {};
+        }
+      }
+
       async function rebUpsertWalletBalances(strategyId, balancesByUser, familyMemberId = null) {
         const entries = Object.entries(balancesByUser || {}).filter(([userId]) => userId);
         if (!entries.length || !strategyId) return;
@@ -8985,6 +9030,7 @@
       let rebShowUnitPrice = false; // false = show total value by default
       let rebSelectedStrategyId = null;
       let rebWalletByClient = {};   // userId -> stored credits balance
+      let rebReserveByClient = {};  // userId -> unused execution reserve (rands)
       let rebImpactChangeView = false;
       let rebPendingRebalance = null; // {batchId, sellCode, buyCode, extraBuyCode, events[]}
       /* Family-member scope for rebalance: NULL = parent only (default,
@@ -9176,6 +9222,7 @@
         rebRawHoldings = {};
         rebUnfilledHoldings = {};
         rebWalletByClient = {};
+        rebReserveByClient = {};
         rebPendingRebalance = null;
         rebSelectedStrategyId = strategyId ? String(strategyId) : null;
         const strategy = (allStrategiesFullData || []).find(s => String(s.id) === String(strategyId));
@@ -9314,6 +9361,7 @@
               }
               const scopedUserIds = [...new Set(scopedHoldRows.map(r => String(r.user_id)).filter(Boolean))];
               rebWalletByClient = await rebLoadWalletBalances(strategy.id, scopedUserIds);
+              rebReserveByClient = await rebLoadReserveBalances(strategy.id, scopedUserIds);
               /* First pass: collect distinct family_member_ids present in
                  this strategy so we can offer them as a scope choice. */
               const fmIdsInStrategy = new Set();
@@ -9969,6 +10017,9 @@
             if (selectedInstrument.currentPrice <= 0) {
               selectedExecMessage = '<p class="text-xs text-amber-600">No price available for this instrument.</p>';
             } else {
+              const sellExec = document.getElementById('rebSellModal')?._execData || {};
+              const totalReserve = clients.reduce((sum, c) => sum + Number(rebReserveByClient[String(c.id)] || 0), 0);
+              const sellFees = Number(sellExec.brokerage || 0) + Number(sellExec.offCustodyFee || 0);
               selectedExec = rebComputeBuyExecution(
                 selectedInstrument.code,
                 selectedInstrument.description,
@@ -9976,6 +10027,8 @@
                 netCapital,
                 clients,
                 applyBuffer,
+                totalReserve,
+                sellFees,
               );
             }
           }
@@ -10098,6 +10151,10 @@
                     ["Brokerage", `&minus;${rebFmtZAR(selectedExec.brokerage)}`, true],
                     [`Custody Fee (x${selectedExec.custodyFeeMultiplier || 1})`, `&minus;${rebFmtZAR(selectedExec.custodyFee)}`, true],
                     ["Total Cost", rebFmtZAR(selectedExec.totalCost), false],
+                    ["8% Reserve Before", rebFmtZAR(selectedExec.reserveAvailable), false],
+                    ["Fees Paid from Reserve", `&minus;${rebFmtZAR(selectedExec.reserveUsed)}`, true],
+                    ["8% Reserve After", rebFmtZAR(selectedExec.reserveAfter), false],
+                    ["Portfolio-Funded Fee Shortfall", selectedExec.feeShortfall > 0 ? `&minus;${rebFmtZAR(selectedExec.feeShortfall)}` : rebFmtZAR(0), selectedExec.feeShortfall > 0],
                     ["Residual Cash", rebFmtZAR(selectedExec.residualCash), false],
                   ].map(([l, v, d]) => `<div class="flex items-center justify-between">
                     <span class="text-slate-500">${l}</span>
@@ -10110,6 +10167,10 @@
                       <span class="font-mono text-xs">${ca.shares.toLocaleString()} shares${ca.extraShares > 0 ? ` (+${ca.extraShares} extra)` : ""} &middot; ${rebFmtZAR(ca.residualCash)} residual</span>
                     </div>`).join("")}
                   </div>
+                  ${selectedExec.reserveAfter < selectedExec.reserveAvailable ? `<div class="rounded-xl border ${selectedExec.feeShortfall > 0 ? 'border-red-200 bg-red-50 text-red-800' : 'border-amber-200 bg-amber-50 text-amber-800'} px-3 py-2 text-xs">
+                    <p class="font-semibold">Execution reserve will fall from ${rebFmtZAR(selectedExec.reserveAvailable)} to ${rebFmtZAR(selectedExec.reserveAfter)}.</p>
+                    <p class="mt-1">${selectedExec.feeShortfall > 0 ? `Reserve is insufficient. ${rebFmtZAR(selectedExec.feeShortfall)} will reduce invested portfolio value.` : 'The invested basket is preserved; gross strategy YTD is not changed by this reserve movement.'}</p>
+                  </div>` : ''}
                 </div>`;
               })() : ""}
             </div>`;
@@ -10467,6 +10528,14 @@
         if (Number(buyExec.residualCash) < 0) {
           throw new Error("Residual cannot be negative. Reduce buy quantity before committing.");
         }
+        if (Number(buyExec.reserveUsed || 0) > 0) {
+          const warning = Number(buyExec.feeShortfall || 0) > 0
+            ? `The 8% execution reserve will fall from ${rebFmtZAR(buyExec.reserveAvailable)} to ${rebFmtZAR(buyExec.reserveAfter)}. ` +
+              `${rebFmtZAR(buyExec.feeShortfall)} of fees may reduce invested portfolio value.\n\nExecute anyway?`
+            : `The 8% execution reserve will fall from ${rebFmtZAR(buyExec.reserveAvailable)} to ${rebFmtZAR(buyExec.reserveAfter)}. ` +
+              `The invested basket is expected to remain intact and gross YTD will not be changed by the reserve movement.\n\nExecute anyway?`;
+          if (!window.confirm(warning)) throw new Error('Rebalance cancelled before reserve consumption.');
+        }
         const extraBuySelection = buySelection.extraBuy || null;
         const extraBuyExec = extraBuySelection?.exec || null;
 
@@ -10698,6 +10767,7 @@
             buyGrossCost:   Number(buyExec.grossCost || 0),
             buyFees:        Number(buyExec.brokerage || 0) + Number(buyExec.custodyFee || 0),
             residualParked: Number(buyExec.residualCash || 0),
+            walletIn:       Number(buyExec.reserveUsed || 0),
           });
           if (!recon.ok) {
             const r = (c) => 'R' + (c / 100).toFixed(2);
@@ -11599,7 +11669,7 @@
             const clients = rebClientsForIsin(rebSelectedIsin);
             const totalLots = clients.reduce((sum, c) => sum + (Number(c.lots) || 0), 0);
             const exec = rebComputeSellExecution(rebSelectedIsin, rebSelectedStep.reductionUnits, totalLots, clients.length, clients);
-            rebShowBuyModal(exec.netProceeds);
+            rebShowBuyModal(exec.grossProceeds);
           });
         }
 
@@ -11638,7 +11708,7 @@
         if (sellCancel) sellCancel.addEventListener("click", closeSell);
         if (sellOverlay) sellOverlay.addEventListener("click", closeSell);
         if (sellConfirm) sellConfirm.addEventListener("click", () => {
-          const net = sellModal?._execData?.netProceeds || 0;
+          const net = sellModal?._execData?.grossProceeds || 0;
           closeSell();
           rebShowBuyModal(net);
         });

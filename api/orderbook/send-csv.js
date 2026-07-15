@@ -282,6 +282,79 @@ module.exports = async (req, res) => {
       return sendJson(res, 200, { drawdowns: all });
     }
 
+    // Reserve-first rebalance support. Preview reads each owner's unused 8%
+    // transaction reserve; settlement consumes the actual Excel-fill fees via
+    // an idempotent SQL function keyed by batch + owner.
+    if (action === 'rebalance-load-reserves') {
+      if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const strategyId = String(body.strategyId || '').trim();
+      const userIds = Array.isArray(body.userIds)
+        ? [...new Set(body.userIds.map((v) => String(v || '').trim()).filter(Boolean))]
+        : [];
+      if (!strategyId) return sendJson(res, 400, { error: 'strategyId required' });
+      if (!userIds.length) return sendJson(res, 200, { reservesCentsByUser: {} });
+      const familyMemberId = body.familyMemberId ? String(body.familyMemberId).trim() : null;
+      const fmFilter = familyMemberId
+        ? `&family_member_id=eq.${encodeURIComponent(familyMemberId)}`
+        : '&family_member_id=is.null';
+      const holdings = await fetchSupabaseJson(
+        `/rest/v1/stock_holdings_c?strategy_id=eq.${encodeURIComponent(strategyId)}` +
+        `&user_id=in.(${buildInFilter(userIds)})${fmFilter}&transaction_id=not.is.null` +
+        '&select=user_id,transaction_id'
+      );
+      const transactionIds = [...new Set((holdings || []).map((h) => h.transaction_id).filter(Boolean))];
+      const reservesCentsByUser = Object.fromEntries(userIds.map((uid) => [uid, 0]));
+      if (!transactionIds.length) return sendJson(res, 200, { reservesCentsByUser });
+      const txns = await fetchSupabaseJson(
+        `/rest/v1/transactions?id=in.(${buildInFilter(transactionIds)})` +
+        '&status=eq.posted&reversed=eq.false&select=id,buffer_cents,buffer_consumed_cents'
+      );
+      const availableByTxn = Object.fromEntries((txns || []).map((t) => [
+        String(t.id),
+        Math.max(0, Math.round(Number(t.buffer_cents || 0)) - Math.round(Number(t.buffer_consumed_cents || 0))),
+      ]));
+      const seen = new Set();
+      (holdings || []).forEach((h) => {
+        const key = `${h.user_id}|${h.transaction_id}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        reservesCentsByUser[String(h.user_id)] = (reservesCentsByUser[String(h.user_id)] || 0)
+          + (availableByTxn[String(h.transaction_id)] || 0);
+      });
+      return sendJson(res, 200, { reservesCentsByUser });
+    }
+
+    if (action === 'rebalance-consume-reserves') {
+      if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const batchId = String(body.batchId || '').trim();
+      const strategyId = String(body.strategyId || '').trim();
+      const familyMemberId = body.familyMemberId ? String(body.familyMemberId).trim() : null;
+      const feesCentsByUser = body.feesCentsByUser && typeof body.feesCentsByUser === 'object'
+        ? body.feesCentsByUser
+        : {};
+      if (!batchId || !strategyId) return sendJson(res, 400, { error: 'batchId and strategyId required' });
+      const resultsByUser = {};
+      for (const [userId, requested] of Object.entries(feesCentsByUser)) {
+        if (!userId) continue;
+        const result = await requestSupabaseJson('/rest/v1/rpc/apply_rebalance_reserve_charge', {
+          method: 'POST',
+          body: {
+            p_batch_id: batchId,
+            p_strategy_id: strategyId,
+            p_user_id: userId,
+            p_family_member_id: familyMemberId,
+            p_requested_cents: Math.max(0, Math.round(Number(requested) || 0)),
+            p_effective_at: body.effectiveAt || new Date().toISOString(),
+            p_metadata: body.metadataByUser?.[userId] || {},
+          },
+        });
+        resultsByUser[userId] = result;
+      }
+      return sendJson(res, 200, { ok: true, resultsByUser });
+    }
+
     // Read strategy_rebalance_residuals with the service-role key. The table's
     // RLS only grants SELECT to the owning user, so a browser read returns {} for
     // every other client — this lets the admin see every holder's residual.
