@@ -1652,13 +1652,6 @@
     const MANUALLY_CLOSED_BOOKS_KEY = 'orderbook-manually-closed-v1';
     const CLOSED_BOOKS_MIGRATED_KEY = 'orderbook-closed-migrated-v1';
     let filledOrderbooksArchive = [];
-    // Strategies flagged strategies_c.hide_from_orderbook are managed entirely on
-    // the Rebalances tab (e.g. a strategy that went through a liquidation step —
-    // the activity is shown there, and must NOT be duplicated on the orderbook
-    // side). Their rows never show in the working book, are never auto-captured,
-    // and are stripped from the Active Order Books render. Manual + reversible;
-    // repopulated each load.
-    let orderbookHiddenStrategyIds = new Set();
     // The blue pin promotes a captured snapshot into the top "live" table.
     // If any snapshot is pinned, the most recent pinned book's rows are shown
     // up top (instead of the live active rows) until it is unpinned.
@@ -5066,18 +5059,7 @@
       // UAT mode), so classify each book by whether its rows belong to test accounts
       // and show only the set that matches the current mode — Live hides test books,
       // UAT shows only test books.
-      const _modeBooks = filledOrderbooksArchive
-        .filter((b) => orderbookUatMode ? bookIsTestBook(b) : !bookIsTestBook(b))
-        .map((b) => {
-          // Strip any hide_from_orderbook-strategy row from the snapshot at render
-          // time — even if an older capture baked one in, it must not show here (it
-          // lives on the Rebalances tab). Non-mutating: the stored snapshot stands.
-          if (!orderbookHiddenStrategyIds.size || !Array.isArray(b.rows)) return b;
-          const rows = b.rows.filter((r) => !(r?.strategyId && orderbookHiddenStrategyIds.has(String(r.strategyId))));
-          if (rows.length === b.rows.length) return b;
-          return { ...b, rows: rows.map((r, i) => ({ ...r, line: i + 1 })) };
-        })
-        .filter((b) => !Array.isArray(b.rows) || b.rows.length > 0);
+      const _modeBooks = filledOrderbooksArchive.filter((b) => orderbookUatMode ? bookIsTestBook(b) : !bookIsTestBook(b));
 
       _modeBooks.forEach((book) => {
         const result = isBookFullyClosed(book);
@@ -6320,20 +6302,6 @@
         }
       }
 
-      // Orderbook-hidden strategies — fetched independently of the current holdings
-      // so the archive render can strip them even when the strategy has no live rows.
-      orderbookHiddenStrategyIds = new Set();
-      parallelQueries.push(
-        supabaseClient
-          .from('strategies_c')
-          .select('id')
-          .eq('hide_from_orderbook', true)
-          .then(({ data, error }) => {
-            if (error) { console.error('hide_from_orderbook strategies load error:', error); return; }
-            (data || []).forEach((s) => orderbookHiddenStrategyIds.add(String(s.id)));
-          })
-      );
-
       /* Execution-reserve (8% buffer) ledger &mdash; per-holding slippage the reserve
          absorbed (slippage_drawdown) vs. what spilled past it (shortfall = MINT's
          out-of-pocket loss). Folded into the MINT PnL column so admins see true
@@ -6555,12 +6523,6 @@
       const allRawRows = rawRows;
 
       const filteredRows = allRawRows.filter((row) => {
-        // hide_from_orderbook strategies are handled ONLY on the Rebalances tab —
-        // never in the orderbook (and so never auto-captured into an Active Order Book).
-        if (row.strategyId && orderbookHiddenStrategyIds.has(String(row.strategyId))) {
-          return false;
-        }
-
         // A pending sell re-surfaces even if the holding was archived as a filled
         // BUY — it's a new actionable order now.
         if (row.sourceId && archivedSourceIds.has(String(row.sourceId)) && !row.isPendingSell) {
@@ -6595,6 +6557,16 @@
         // the same sale — keep only the audit row so the sell shows once, carrying
         // its REB badge and exit price, and isn't double-counted.
         if (reason === 'REBALANCE_SELL' && !row.rebalanceBatchId) return false;
+
+        // Liquidation activity — a sell-to-cash batch (a SELL leg with NO buy leg)
+        // — is managed ENTIRELY on the Rebalances tab and must NOT appear on the
+        // orderbook or be auto-captured into an Active Order Book (the CEO reads it
+        // as a duplicate). Ordinary rebalance sells (part of a swap that HAS a buy
+        // leg) still show here. Identify it via the batch: no buy_isin, no extra.
+        if (reason === 'REBALANCE_SELL' && row.rebalanceBatchId) {
+          const b = batchById[row.rebalanceBatchId];
+          if (b && !b.buy_isin_code && !b.extra_buy_isin_code) return false;
+        }
 
         if (isActive) return true;
         if (side === 'SELL') return true;
