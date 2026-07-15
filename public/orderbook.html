@@ -1652,6 +1652,12 @@
     const MANUALLY_CLOSED_BOOKS_KEY = 'orderbook-manually-closed-v1';
     const CLOSED_BOOKS_MIGRATED_KEY = 'orderbook-closed-migrated-v1';
     let filledOrderbooksArchive = [];
+    // Strategies flagged strategies_c.is_liquidating are wound down entirely on
+    // the Rebalances tab (batch-level Fill & Settle). Their rows must NEVER show
+    // on the orderbook or in an Active Order Book — only in the Rebalances tab.
+    // Repopulated each load; used to strip rows from the working set, from
+    // auto-capture, and from the archive render.
+    let liquidatingStrategyIds = new Set();
     // The blue pin promotes a captured snapshot into the top "live" table.
     // If any snapshot is pinned, the most recent pinned book's rows are shown
     // up top (instead of the live active rows) until it is unpinned.
@@ -5059,7 +5065,18 @@
       // UAT mode), so classify each book by whether its rows belong to test accounts
       // and show only the set that matches the current mode — Live hides test books,
       // UAT shows only test books.
-      const _modeBooks = filledOrderbooksArchive.filter((b) => orderbookUatMode ? bookIsTestBook(b) : !bookIsTestBook(b));
+      const _modeBooks = filledOrderbooksArchive
+        .filter((b) => orderbookUatMode ? bookIsTestBook(b) : !bookIsTestBook(b))
+        .map((b) => {
+          // Strip any liquidating-strategy row from the snapshot at render time —
+          // even if an older capture baked one in, it must not show here (it lives
+          // on the Rebalances tab). Non-mutating: the stored snapshot is untouched.
+          if (!liquidatingStrategyIds.size || !Array.isArray(b.rows)) return b;
+          const rows = b.rows.filter((r) => !(r?.strategyId && liquidatingStrategyIds.has(String(r.strategyId))));
+          if (rows.length === b.rows.length) return b;
+          return { ...b, rows: rows.map((r, i) => ({ ...r, line: i + 1 })) };
+        })
+        .filter((b) => !Array.isArray(b.rows) || b.rows.length > 0);
 
       _modeBooks.forEach((book) => {
         const result = isBookFullyClosed(book);
@@ -6302,6 +6319,20 @@
         }
       }
 
+      // Liquidating strategies — fetched independently of the current holdings so
+      // the archive render can strip them even when the strategy has no live rows.
+      liquidatingStrategyIds = new Set();
+      parallelQueries.push(
+        supabaseClient
+          .from('strategies_c')
+          .select('id')
+          .eq('is_liquidating', true)
+          .then(({ data, error }) => {
+            if (error) { console.error('Liquidating strategies load error:', error); return; }
+            (data || []).forEach((s) => liquidatingStrategyIds.add(String(s.id)));
+          })
+      );
+
       /* Execution-reserve (8% buffer) ledger &mdash; per-holding slippage the reserve
          absorbed (slippage_drawdown) vs. what spilled past it (shortfall = MINT's
          out-of-pocket loss). Folded into the MINT PnL column so admins see true
@@ -6523,6 +6554,12 @@
       const allRawRows = rawRows;
 
       const filteredRows = allRawRows.filter((row) => {
+        // Liquidating strategies are handled ONLY on the Rebalances tab — never in
+        // the orderbook (and so never auto-captured into an Active Order Book).
+        if (row.strategyId && liquidatingStrategyIds.has(String(row.strategyId))) {
+          return false;
+        }
+
         // A pending sell re-surfaces even if the holding was archived as a filled
         // BUY — it's a new actionable order now.
         if (row.sourceId && archivedSourceIds.has(String(row.sourceId)) && !row.isPendingSell) {
