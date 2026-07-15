@@ -1460,7 +1460,7 @@
             </button>
             <h2 class="filled-orderbooks-title">Active Order Books</h2>
           </div>
-          <p class="filled-orderbooks-subtitle">Snapshots captured when the timer hits 15:30.</p>
+          <p class="filled-orderbooks-subtitle">Orders move here automatically once fully filled. Sending stays manual.</p>
           <div class="filled-orderbooks-list" id="filledOrderbooksList">
             <div class="filled-orderbook-empty">No active order books yet.</div>
           </div>
@@ -5585,17 +5585,24 @@
     const orderbookRowIsFilled = (r) =>
       Number(r?.avgFillNumber) > 0 || !!r?.fillDate;
 
-    const captureFilledOrderbook = async () => {
+    // isRowEligible: predicate that decides which rows drop into the snapshot.
+    //   Default = orderbookRowIsFilled (any executed avg fill / fill date).
+    //   The auto-on-full-fill path passes the STRICTER getRowFillStatus().filled
+    //   so a partially-filled basket is never relocated.
+    // autoSend: when false, the book is created + persisted but NO desk email is
+    //   sent — the row simply moves to Active Order Books and "Send Confirm"
+    //   stays available for a manual send.
+    const captureFilledOrderbook = async ({ isRowEligible = orderbookRowIsFilled, autoSend = true } = {}) => {
       if (!allOrderbookRows.length) return;
 
       // Pending rebalance rows are never archived (kept alive below).
       const pendingRows = allOrderbookRows.filter(r => r.isPendingRebalance);
       const settledRows = allOrderbookRows.filter(r => !r.isPendingRebalance);
 
-      // Only FILLED rows drop into the snapshot; unfilled rows stay live.
-      const filledRows   = settledRows.filter(orderbookRowIsFilled);
-      const unfilledRows = settledRows.filter(r => !orderbookRowIsFilled(r));
-      if (!filledRows.length) return; // nothing filled yet — no book to create
+      // Only eligible rows drop into the snapshot; the rest stay live.
+      const filledRows   = settledRows.filter(isRowEligible);
+      const unfilledRows = settledRows.filter(r => !isRowEligible(r));
+      if (!filledRows.length) return; // nothing eligible yet — no book to create
 
       const now = new Date();
       const dateKey = getArchiveDateKey(now);
@@ -5616,11 +5623,13 @@
         emailStatus: ''
       };
 
-      const emailResult = await sendFilledOrderbookEmail(snapshot);
-      snapshot.emailStatus = emailResult.status;
-      snapshot.emailError = emailResult.details || '';
-      if (emailResult.status === 'sent') {
-        snapshot.sentAt = new Date().toISOString();
+      if (autoSend) {
+        const emailResult = await sendFilledOrderbookEmail(snapshot);
+        snapshot.emailStatus = emailResult.status;
+        snapshot.emailError = emailResult.details || '';
+        if (emailResult.status === 'sent') {
+          snapshot.sentAt = new Date().toISOString();
+        }
       }
 
       try {
@@ -5666,6 +5675,29 @@
         await captureFilledOrderbook();
       } finally {
         isCapturingFilledOrderbook = false;
+      }
+    };
+
+    // ── Auto-move on FULL fill ─────────────────────────────────────────────────
+    // Rule: the moment an order is FULLY filled (every leg carries a fill date —
+    // getRowFillStatus().filled), it must leave the top/working book and drop
+    // straight into an Active Order Book. Partially-filled and unfilled orders
+    // stay on the working book. No desk email is sent here — sending stays manual
+    // via "Send Confirm" on the relocated row. Idempotent: a captured row's
+    // sourceId is excluded from the live set on the next load (getArchivedSourceIds),
+    // so it is never re-captured into a second book.
+    let isAutoCapturingFullFill = false;
+    const autoCaptureFullyFilledOrderbook = async () => {
+      if (orderbookUatMode) return;            // never relocate a filtered UAT set into real books
+      if (isAutoCapturingFullFill) return;
+      const isFullyFilled = (r) => !r.isPendingRebalance && getRowFillStatus(r).filled;
+      if (!(allOrderbookRows || []).some(isFullyFilled)) return;
+
+      isAutoCapturingFullFill = true;
+      try {
+        await captureFilledOrderbook({ isRowEligible: (r) => getRowFillStatus(r).filled, autoSend: false });
+      } finally {
+        isAutoCapturingFullFill = false;
       }
     };
 
@@ -6728,12 +6760,14 @@
         // if it couldn't load, the live set is unfiltered, and capturing/reconciling
         // would bake test orders into a real archived book (and into broker CSVs).
         if (!orderbookUatMode && _testUserIdSet !== null) {
-          // Auto-capture on load removed — orders are never archived automatically.
-          // Reconciliation (which only updates EXISTING archived books, never
-          // creates new ones) still runs so archived rows track live holdings.
-          reconcileArchivedBooksWithLiveHoldings()
+          // Auto-move FULLY-filled orders into an Active Order Book (no email —
+          // send stays manual). Then reconcile EXISTING archived books against
+          // live holdings. Capture runs first so a just-fully-filled row lands in
+          // its own book before reconciliation touches the archive.
+          autoCaptureFullyFilledOrderbook()
+            .then(() => reconcileArchivedBooksWithLiveHoldings())
             .then(() => maybeBackfillLegacyArchiveSnapshots())
-            .catch((err) => console.error('Post-render reconciliation error:', err?.message || err));
+            .catch((err) => console.error('Post-render capture/reconciliation error:', err?.message || err));
         }
       } catch (error) {
         console.error('Orderbook load error:', error);
