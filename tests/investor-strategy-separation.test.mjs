@@ -33,4 +33,16 @@ assert.match(
   'download filename should identify the selected strategy'
 );
 
-console.log('investor strategy separation: 5/5 green');
+assert.match(
+  html,
+  /const investorKey = `\$\{ownerKey\}:\$\{u\.strategyId \|\| ''\}`;/,
+  'card selection identity must include the strategy'
+);
+
+assert.match(
+  html,
+  /const prev = currentInvestor\?\.investorKey;[\s\S]*?i\.investorKey === prev/,
+  'realtime refresh must restore the exact selected basket'
+);
+
+console.log('investor strategy separation: 7/7 green');

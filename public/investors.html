@@ -413,7 +413,11 @@
         } else {
           name = parentName;
         }
-        const investorKey = `${u.userId}:${u.familyMemberId || ''}`;
+        const ownerKey = `${u.userId}:${u.familyMemberId || ''}`;
+        /* Selection identity must include the basket. The same owner can hold
+           several strategies, and an owner-only key makes every card highlight
+           together while .find() always opens the first basket. */
+        const investorKey = `${ownerKey}:${u.strategyId || ''}`;
         const invested = u.holdings.reduce((s,h)=>s+h.investedR, 0);
         const current  = u.holdings.reduce((s,h)=>s+h.currentR, 0);
         const pnl = current - invested;
@@ -471,8 +475,8 @@
           invested: investedStable, current, pnl: totalPnl, retPct: retPctStable, realized,
           csrAum, csrInvested, csrPnl, csrRetPct, csrYtdPct,
           residualCash, bufferCash, cashComponent, holdingsValue, value,
-          rebFeeBroker: (rebFeeByOwner[investorKey] || {}).broker || 0,
-          rebFeeCustody: (rebFeeByOwner[investorKey] || {}).custody || 0,
+          rebFeeBroker: (rebFeeByOwner[ownerKey] || {}).broker || 0,
+          rebFeeCustody: (rebFeeByOwner[ownerKey] || {}).custody || 0,
           days, annualised, inception,
           holdings: u.holdings,
           txns: userTxns,
@@ -1417,8 +1421,11 @@
         /* Pre-select user from URL if present */
         const urlParams = new URLSearchParams(window.location.search);
         const qUserId = urlParams.get('userId');
+        const qStrategyId = urlParams.get('strategyId');
         if (qUserId) {
-          currentInvestor = allInvestors.find(i => i.userId === qUserId) || null;
+          currentInvestor = allInvestors.find(i =>
+            i.userId === qUserId && (!qStrategyId || i.strategyId === qStrategyId)
+          ) || null;
         }
         
         renderList(allInvestors);
@@ -1432,9 +1439,9 @@
           if (_refreshInFlight) { _refreshQueued = true; return; }
           _refreshInFlight = true;
           try {
-            const prev = currentInvestor?.userId;
+            const prev = currentInvestor?.investorKey;
             allInvestors = await loadAll();
-            if (prev) currentInvestor = allInvestors.find(i => i.userId === prev) || null;
+            if (prev) currentInvestor = allInvestors.find(i => i.investorKey === prev) || null;
             renderKpiBar(allInvestors);
             renderList(allInvestors);
             if (currentInvestor) renderDetail();
