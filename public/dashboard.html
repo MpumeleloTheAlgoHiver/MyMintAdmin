@@ -11636,11 +11636,15 @@
         const holdingsSnapshotBefore = strategyRef?.holdings ? JSON.parse(JSON.stringify(strategyRef.holdings)) : null;
         const walletSnapshotBefore = { ...rebWalletByClient };
 
-        /* Update strategy holdings JSONB to include the new buy security */
-        await rebAddOrIncreaseStrategyHolding({
+        /* Build the intended post-settlement composition, but do not publish it
+           yet. A pending broker order is not an owned asset. The orderbook
+           applies this snapshot only after the actual Excel fill, exact-cents
+           affordability check, holding inserts, and residual movement succeed. */
+        const plannedHoldings = await rebAddOrIncreaseStrategyHolding({
           strategyId,
           buyInstrument: instrument,
           buyPerLot: buyQtyPerLot,
+          persist: false,
         });
 
         const rebalanceBatchId = (window.crypto && typeof window.crypto.randomUUID === "function")
@@ -11657,6 +11661,7 @@
         const buyEventRows = participants.map((p) => ({
           batch_id: rebalanceBatchId,
           user_id: String(p.client.id),
+          family_member_id: rebSelectedFamilyMemberId || null,
           security_id: buySecurityId,
           trade_side: "BUY",
           quantity: Number(p.sharesNeeded || 0),
@@ -11682,6 +11687,8 @@
             status: "PENDING",
             effective_date: effectiveDateStr,
             holdings_snapshot_before: holdingsSnapshotBefore,
+            holdings_snapshot_planned: plannedHoldings?.holdings || holdingsSnapshotBefore,
+            min_investment_planned: plannedHoldings?.minInvestment ?? null,
             wallet_snapshot_before: walletSnapshotBefore,
             sell_security_id: null,
             sell_isin_code: null,
@@ -11707,15 +11714,9 @@
           if (evtErr) throw new Error(evtErr.message || "Failed to insert rebalance events.");
         }
 
-        /* Deduct cost from each participant's wallet */
-        const finalWalletByClient = {};
-        participants.forEach((p) => {
-          finalWalletByClient[String(p.client.id)] = rebRoundMoney(Math.max(0, p.remaining));
-        });
-        if (Object.keys(finalWalletByClient).length) {
-          await rebUpsertWalletBalances(strategyId, finalWalletByClient, rebSelectedFamilyMemberId || null);
-          rebWalletByClient = { ...rebWalletByClient, ...finalWalletByClient };
-        }
+        /* Do not deduct an estimate here. Settlement debits the exact actual
+           fill cost in cents and consumes reserve for fees first. This keeps a
+           cancelled/failed pending order from changing cash, NAV, P&L or YTD. */
 
         return {
           batchId: rebalanceBatchId,
@@ -11725,7 +11726,7 @@
 
       /* Add (or increase shares of) a buy security in the strategy holdings JSONB.
          Used by wallet-only purchases when there's no sell to balance against. */
-      async function rebAddOrIncreaseStrategyHolding({ strategyId, buyInstrument, buyPerLot }) {
+      async function rebAddOrIncreaseStrategyHolding({ strategyId, buyInstrument, buyPerLot, persist = true }) {
         if (!strategyId || !buyInstrument?.fullSymbol) return;
         const strategy = (allStrategiesFullData || []).find((s) => String(s.id) === String(strategyId));
         if (!strategy) return;
@@ -11769,6 +11770,8 @@
         }
 
         const { holdings, minInvestment } = await rebMergeAndRevalueStrategyHoldings(nextHoldings);
+        if (!persist) return { holdings, minInvestment };
+
         const { error: strategyUpdateErr } = await supabaseClient
           .from("strategies_c")
           .update({ holdings: holdings.length ? holdings : null, min_investment: minInvestment })
@@ -11779,6 +11782,7 @@
           if (String(item.id) !== String(strategyId)) return item;
           return { ...item, holdings, min_investment: minInvestment };
         });
+        return { holdings, minInvestment };
       }
 
       /* ── Wire up rebalancing event listeners (deferred) ── */

@@ -6098,7 +6098,7 @@
           .order('created_at', { ascending: false }),
         supabaseClient
           .from('rebalance_batch')
-          .select('id, strategy_id, status, sell_isin_code, buy_isin_code, extra_buy_isin_code, net_proceeds, strategy_name_snapshot, created_at, created_by, settled_at, updated_at, is_reversed, reversed_at, reversed_reason, holdings_snapshot_before, wallet_snapshot_before')
+          .select('id, strategy_id, status, sell_isin_code, buy_isin_code, extra_buy_isin_code, net_proceeds, strategy_name_snapshot, created_at, created_by, settled_at, updated_at, is_reversed, reversed_at, reversed_reason, holdings_snapshot_before, holdings_snapshot_planned, min_investment_planned, wallet_snapshot_before')
           .order('created_at', { ascending: false }),
       ]);
 
@@ -7230,6 +7230,74 @@
         }
       };
 
+      /* Buy-only safety gate. All arithmetic is integer cents. It runs before
+         the batch claim and before any holding, reserve, residual or strategy
+         composition mutation. */
+      const preflightWalletOnlyBuy = async (batch, walletBuyEvts, fillBySecId) => {
+        if (!walletBuyEvts.length) return;
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (!token) throw new Error('Session expired before buy-only preflight.');
+
+        let brokerageRate = 0.005;
+        let custodyFeeCents = 6900;
+        try {
+          const feeResp = await fetch('/api/team?action=app-settings-get&key=fees', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const feeJson = feeResp.ok ? await feeResp.json() : null;
+          const fees = feeJson?.value || {};
+          if (Number.isFinite(Number(fees.rebBrokerageRate))) brokerageRate = Math.max(0, Number(fees.rebBrokerageRate));
+          if (Number.isFinite(Number(fees.rebCustodyFee))) custodyFeeCents = Math.round(Math.max(0, Number(fees.rebCustodyFee)) * 100);
+        } catch (_) { /* settlement uses the same defaults */ }
+
+        const scopes = new Map();
+        for (const evt of walletBuyEvts) {
+          const uid = String(evt.user_id || '');
+          const fm = evt.family_member_id ? String(evt.family_member_id) : '';
+          const fillCents = Math.round(Number(fillBySecId[evt.security_id]) || 0);
+          const commitCents = Math.round(Number(evt.price_at_commit) || 0);
+          if (!uid || fillCents <= 0) throw new Error('Buy-only settlement is missing a positive actual Excel fill.');
+          if (commitCents > 0) {
+            const ratio = fillCents / commitCents;
+            if (ratio < 0.2 || ratio > 5) {
+              throw new Error(`Buy-only fill for user ${uid.slice(0, 8)} differs from the committed price by ${ratio.toFixed(2)}x. Possible cents/rands unit error; settlement blocked.`);
+            }
+          }
+          const grossCents = Math.round(Math.max(0, Number(evt.quantity) || 0) * fillCents);
+          const feeCents = Math.round(grossCents * brokerageRate) + custodyFeeCents;
+          if (!scopes.has(fm)) scopes.set(fm, new Map());
+          const owners = scopes.get(fm);
+          const current = owners.get(uid) || { grossCents: 0, feeCents: 0 };
+          current.grossCents += grossCents;
+          current.feeCents += feeCents;
+          owners.set(uid, current);
+        }
+
+        for (const [fm, owners] of scopes.entries()) {
+          const userIds = [...owners.keys()];
+          const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+          const scopeBody = { strategyId: batch.strategy_id, familyMemberId: fm || null, userIds };
+          const [cashResp, reserveResp] = await Promise.all([
+            fetch('/api/orderbook/send-csv?action=rebalance-load-residuals', { method: 'POST', headers, body: JSON.stringify(scopeBody) }),
+            fetch('/api/orderbook/send-csv?action=rebalance-load-reserves', { method: 'POST', headers, body: JSON.stringify(scopeBody) }),
+          ]);
+          const cashJson = await cashResp.json().catch(() => ({}));
+          const reserveJson = await reserveResp.json().catch(() => ({}));
+          if (!cashResp.ok || !reserveResp.ok) throw new Error('Could not verify buy-only cash and reserve balances.');
+
+          owners.forEach((amounts, uid) => {
+            const residualCents = Math.round((Number(cashJson.balances?.[uid]) || 0) * 100);
+            const reserveCents = Math.max(0, Math.round(Number(reserveJson.reservesCentsByUser?.[uid]) || 0));
+            const feeShortfallCents = Math.max(0, amounts.feeCents - reserveCents);
+            const requiredCents = amounts.grossCents + feeShortfallCents;
+            if (residualCents < requiredCents) {
+              throw new Error(`Buy-only settlement blocked for user ${uid.slice(0, 8)}: actual fill requires R ${(requiredCents / 100).toFixed(2)}, but strategy residual has R ${(residualCents / 100).toFixed(2)} after reserve-first fees.`);
+            }
+          });
+        }
+      };
+
       const executeFillAndSettle = async (batch, events, fillBySecId) => {
         const nowIso = new Date().toISOString();
         const fillDateStr = nowIso.split('T')[0];
@@ -7261,6 +7329,12 @@
           if (!response.ok) throw new Error(result.details || result.error || 'Could not update holding.');
         };
 
+        const sellEvts = events.filter((e) => e.trade_side === 'SELL');
+        const buyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY');
+        const walletBuyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY_WALLET');
+        const isWalletOnlyBuy = walletBuyEvts.length > 0 && sellEvts.length === 0 && buyEvts.length === 0;
+        await preflightWalletOnlyBuy(batch, isWalletOnlyBuy ? walletBuyEvts : [], fillBySecId);
+
         /* ── Idempotency guard (atomic claim) ──────────────────────────────────
            Settlement is NOT idempotent — it inserts BUY holdings and SELL audit
            rows unconditionally. A double-click or a retry under a slow DB would
@@ -7279,9 +7353,6 @@
         if (!claim.data || !claim.data.length) {
           throw new Error('This batch is no longer pending — it has already been settled or reversed. Settlement skipped to prevent duplicate holdings.');
         }
-        const sellEvts = events.filter((e) => e.trade_side === 'SELL');
-        const buyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY');
-        const walletBuyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY_WALLET');
         const isLiquidationOnly = sellEvts.length > 0 && buyEvts.length === 0 && walletBuyEvts.length === 0;
         let actualLiquidationNetProceeds = null;
 
@@ -7593,6 +7664,37 @@
         }
 
         // Ã¢&rdquo;â¬Ã¢&rdquo;â¬ 3. Mark batch SETTLED Ã¢&rdquo;â¬Ã¢&rdquo;â¬
+        /* Publish a wallet-only composition only after actual-fill holdings and
+           the exact residual/reserve bridge have both succeeded. */
+        if (isWalletOnlyBuy && errors.length === 0) {
+          try {
+            const planned = Array.isArray(batch.holdings_snapshot_planned)
+              ? batch.holdings_snapshot_planned.map((h) => {
+                  const clean = { ...h };
+                  delete clean.pending;
+                  return clean;
+                })
+              : null;
+            if (!planned) throw new Error('Pending batch has no planned composition snapshot.');
+            const { data: sessionData } = await supabaseClient.auth.getSession();
+            const token = sessionData?.session?.access_token;
+            if (!token) throw new Error('Session expired before strategy composition settlement.');
+            const response = await fetch('/api/orderbook/send-csv?action=rebalance-update-strategy-holdings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({
+                strategyId,
+                holdings: planned,
+                minInvestment: Math.max(0, Number(batch.min_investment_planned) || 0),
+              }),
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.details || result.error || 'Could not publish settled buy-only composition.');
+          } catch (compositionErr) {
+            errors.push(`Buy-only composition settlement: ${compositionErr?.message || compositionErr}`);
+          }
+        }
+
         const { data: settledStrategy, error: settledStrategyErr } = await supabaseClient
           .from('strategies_c')
           .select('holdings')
