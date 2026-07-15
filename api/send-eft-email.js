@@ -322,6 +322,30 @@ const handlePendingTransactions = async (req, res) => {
   }
 };
 
+// Completed Ozow payments — recorded in `transactions` by the mint app's Ozow
+// webhook (api/ozow/notify.js), tagged payment_method='ozow'. Service-role read
+// so RLS doesn't filter by the caller. amount is in CENTS.
+const handleOzowTransactions = async (req, res) => {
+  try {
+    const txns = await fetchSupabaseJson(
+      '/rest/v1/transactions?payment_method=eq.ozow&order=created_at.desc&select=id,user_id,amount,store_reference,name,status,direction,transaction_date,created_at,family_member_id'
+    );
+    const rows = Array.isArray(txns) ? txns : [];
+    const userIds = [...new Set(rows.map(t => t.user_id).filter(Boolean))];
+    let profilesMap = {};
+    if (userIds.length > 0) {
+      const profiles = await fetchSupabaseJson(
+        `/rest/v1/profiles?select=id,first_name,last_name,mint_number,email&id=in.(${buildInFilter(userIds)})`
+      );
+      if (Array.isArray(profiles)) profiles.forEach(p => { profilesMap[p.id] = p; });
+    }
+    const enriched = rows.map(t => ({ ...t, profile: profilesMap[t.user_id] || null }));
+    return sendJson(res, 200, { transactions: enriched });
+  } catch (err) {
+    return sendJson(res, 500, { error: err.message || 'Failed to fetch ozow transactions' });
+  }
+};
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST' && req.method !== 'GET') {
     return sendJson(res, 405, { error: 'Method not allowed' });
@@ -348,9 +372,13 @@ module.exports = async (req, res) => {
     if (!action && (req.url || '').includes('action=approve-deposit')) action = 'approve-deposit';
     if (!action && (req.url || '').includes('action=reject-deposit')) action = 'reject-deposit';
     if (!action && (req.url || '').includes('action=pending-transactions')) action = 'pending-transactions';
+    if (!action && (req.url || '').includes('action=ozow-transactions')) action = 'ozow-transactions';
 
     if (action === 'pending-transactions') {
       return handlePendingTransactions(req, res);
+    }
+    if (action === 'ozow-transactions') {
+      return handleOzowTransactions(req, res);
     }
     if (action === 'add-wallet') {
       return handleAddWallet(req, res, token);

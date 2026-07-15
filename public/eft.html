@@ -230,6 +230,7 @@
             <button id="filterActive" class="filter-btn active" style="padding:6px 12px;font-size:12px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:#fff;color:#0f172a;box-shadow:0 1px 2px rgba(0,0,0,0.05);">Active Wallets</button>
             <button id="filterTest" class="filter-btn" style="padding:6px 12px;font-size:12px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:transparent;color:#64748b;">Test Wallets</button>
             <button id="filterPending" class="filter-btn" style="padding:6px 12px;font-size:12px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:transparent;color:#64748b;">Pending Approvals</button>
+            <button id="filterOzow" class="filter-btn" style="padding:6px 12px;font-size:12px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:transparent;color:#64748b;">Ozow Payments</button>
           </div>
         </div>
 
@@ -497,6 +498,12 @@
       currentEftFilter = 'pending';
       loadPaidEfts();
     });
+    document.getElementById('filterOzow').addEventListener('click', (e) => {
+      document.querySelectorAll('.filter-btn').forEach(b => { b.classList.remove('active'); b.style.background = 'transparent'; b.style.color = '#64748b'; });
+      e.target.classList.add('active'); e.target.style.background = '#fff'; e.target.style.color = '#0f172a';
+      currentEftFilter = 'ozow';
+      loadPaidEfts();
+    });
 
     window.approvePendingDeposit = async (transactionId) => {
       try {
@@ -592,6 +599,48 @@
                 <td style="font-weight:700;color:#f59e0b;">+${formatCurrency(txn.amount)}</td>
                 <td style="font-family:monospace;color:#7c3aed;font-weight:600;">Pending Deposit</td>
                 <td>${actionCell}</td>
+              </tr>
+            `;
+          }).join('');
+          return;
+        }
+
+        if (currentEftFilter === 'ozow') {
+          // Completed Ozow payments — who / when / how much / reference.
+          const resp = await fetch('/api/eft/ozow-transactions', {
+            headers: { Authorization: `Bearer ${session?.access_token}` }
+          });
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.error || `Server error ${resp.status}`);
+          }
+          const { transactions: txns } = await resp.json();
+
+          if (!txns || txns.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="5" class="empty-state">No Ozow payments yet</td></tr>';
+            totalWalletCount.textContent = '0';
+            totalWalletAmount.textContent = formatCurrency(0);
+            return;
+          }
+
+          // transactions.amount is in CENTS.
+          const totalRands = txns.reduce((sum, t) => sum + (Number(t.amount) || 0) / 100, 0);
+          totalWalletCount.textContent = txns.length.toString();
+          totalWalletAmount.textContent = formatCurrency(totalRands);
+
+          tableBody.innerHTML = txns.map(txn => {
+            const p = txn.profile || {};
+            const dateStr = new Date(txn.created_at || txn.transaction_date).toLocaleDateString('en-ZA');
+            const clientName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || (p.email || '—');
+            const amountRands = (Number(txn.amount) || 0) / 100;
+            const ref = txn.store_reference || '—';
+            return `
+              <tr>
+                <td style="color:#94a3b8;">${dateStr}</td>
+                <td style="font-weight:600;color:#1e293b;">${clientName}</td>
+                <td style="font-weight:700;color:#059669;">+${formatCurrency(amountRands)}</td>
+                <td style="font-family:monospace;color:#7c3aed;font-weight:600;">${ref}</td>
+                <td><span style="display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;background:#dcfce7;color:#166534;">Ozow</span></td>
               </tr>
             `;
           }).join('');

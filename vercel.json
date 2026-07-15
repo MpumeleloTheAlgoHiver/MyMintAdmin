@@ -5,6 +5,7 @@
     { "source": "/api/sumsub/metadata", "destination": "/api/sumsub/applicant" },
     { "source": "/api/orderbook/archive-upsert", "destination": "/api/orderbook/archive" },
     { "source": "/api/eft/pending-transactions", "destination": "/api/send-eft-email?action=pending-transactions" },
+    { "source": "/api/eft/ozow-transactions", "destination": "/api/send-eft-email?action=ozow-transactions" },
     { "source": "/api/return-alerts/notify", "destination": "/api/mint-mornings?action=return-alerts" },
     { "source": "/api/dividends/extract", "destination": "/api/team?fwd=dividends-extract" },
     { "source": "/api/dividends/runs", "destination": "/api/team?fwd=dividends-runs" },
