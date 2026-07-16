@@ -159,7 +159,7 @@
           </div>
         </div>
       </div>
-      <p class="page-subtitle" id="page-subtitle">Here's your day — own it.</p>
+      <p class="page-subtitle" id="page-subtitle">Here's your day, own it.</p>
 
       <!-- ══ MY DAY ══ -->
       <div class="tab-pane active" id="tab-myday">
@@ -1111,7 +1111,7 @@
 
     /* ── Tab switching ── */
     const TAB_META = {
-      myday:   { title: () => { const h = new Date(Date.now()+2*3600000).getUTCHours(); return (h<12?'Good morning':h<17?'Good afternoon':'Good evening') + (myMember?.full_name?.split(' ')[0] ? ', '+myMember.full_name.split(' ')[0] : '') + ' 👋'; }, sub: "Here's your day — own it." },
+      myday:   { title: () => { const h = new Date(Date.now()+2*3600000).getUTCHours(); return (h<12?'Good morning':h<17?'Good afternoon':'Good evening') + (myMember?.full_name?.split(' ')[0] ? ', '+myMember.full_name.split(' ')[0] : '') + ' 👋'; }, sub: "Here's your day, own it." },
       standup: { title: 'Daily Standup',   sub: 'What is everyone working on today?' },
       board:   { title: 'Team Board',       sub: 'Live view of where the team is right now.' },
       perf:    { title: 'Performance',      sub: 'Accountability scores based on committed vs completed tasks.' },
