@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const sumsubArchiveHandler = require('./api/sumsub/archive');
 const teamHandler = require('./api/team');
+const tasksHandler = require('./api/tasks');
 const { requirePermission } = require('./api/_team');
 const mintMorningsHandler = require('./api/mint-mornings');
 const webhooksHandler = require('./api/webhooks');
@@ -2157,6 +2158,22 @@ const server = http.createServer((req, res) => {
           req.body = await readJsonBody(req).catch(() => ({}));
         }
         await teamHandler(req, res);
+      } catch (err) {
+        if (!res.headersSent) {
+          sendJson(res, 500, { error: err.message });
+        }
+      }
+    })();
+    return;
+  }
+
+  if (req.url.startsWith('/api/tasks')) {
+    (async () => {
+      try {
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          req.body = await readJsonBody(req).catch(() => ({}));
+        }
+        await tasksHandler(req, res);
       } catch (err) {
         if (!res.headersSent) {
           sendJson(res, 500, { error: err.message });
