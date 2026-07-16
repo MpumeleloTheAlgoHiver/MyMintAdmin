@@ -122,9 +122,9 @@ module.exports = async (req, res) => {
          rebalance fees (sell/buy brokerage + custody), which aren't written to the
          transactions table (a rebalance posts a R0 audit row). Admin-only. */
       userIds.length
-        ? sbGet(`rebalance_event?select=user_id,family_member_id,batch_id,trade_side,quantity,price_at_commit,avg_fill,closed_reason&user_id=in.(${userIds.join(',')})`)
+        ? sbGet(`rebalance_event?select=id,user_id,family_member_id,batch_id,security_id,trade_side,quantity,price_at_commit,avg_fill,fill_date,closed_reason,strategy_name_snapshot,created_at,updated_at&user_id=in.(${userIds.join(',')})`)
         : Promise.resolve([]),
-      sbGet(`rebalance_batch?select=id,status`),
+      sbGet(`rebalance_batch?select=id,strategy_id,status,effective_date,sell_security_id,buy_security_id,extra_buy_security_id,sell_isin_code,buy_isin_code,extra_buy_isin_code,net_proceeds,strategy_name_snapshot,created_at,settled_at,settlement_effective_at,updated_at,is_reversed,holdings_snapshot_before,holdings_snapshot_planned,holdings_snapshot_after,wallet_snapshot_before`),
       /* Closed positions (rebalance sells) carry REALISED P&L: (avg_exit −
          avg_fill) × qty. Needed so a client's live P&L row stays stable across
          rebalances instead of shrinking when sold shares leave the cost basis. */
