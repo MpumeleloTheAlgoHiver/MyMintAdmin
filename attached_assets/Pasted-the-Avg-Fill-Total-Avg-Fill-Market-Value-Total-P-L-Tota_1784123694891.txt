@@ -1,0 +1,86 @@
+the Avg Fill Total Avg Fill Market Value Total P&L Total P&L % Total Value w/ P&L should have rands format and also the % should have percentages
+lastly add the users strategy cash ( the cash in that strategy ) as a row just below the last asset
+20 minutes ago
+
+77 actions
+Now applying the cash-row and currency/percent formatting fixes to the single deduplicated copy.
+
+
+4 actions
+Now updating the row/total-row formula cells to use pct for column 7 (P&L %) instead of money.
+
+
+Show less
+
+Edit cancelled: investors.html
+Tracing formula replacement
+
+Tracing formula replacement
+
+Searched for "6: { text: `=F"
+Verifying file content
+
+Verifying file content
+
+Counted lines
+Validating edit application
+
+Validating edit application
+
+Searched for "^</html>|^</body>|Local…"
+Detecting boundary anomalies
+
+Detecting boundary anomalies
+
+Ran a Node.js script
+Comparing script versions
+
+Comparing script versions
+
+Ran a Node.js script
+Detecting divergence from edits
+
+Detecting divergence from edits
+
+Searched for "const money|const pct|f…"
+Merging new with old
+
+Merging new with old
+
+Read /tmp/copy1.html
+Applying missing updates
+
+Applying missing updates
+
+Searched for "function spreadsheetGri…"
+Searching for deleted function
+
+Searching for deleted function
+
+Searched for "spreadsheetGridData|att…"
+Restoring missing function definition
+
+Restoring missing function definition
+
+Searched for "Column layout used by|^…"
+Reconstructing code structure
+
+Reconstructing code structure
+Adding directive
+
+Adding directive
+Verifying merged content
+
+Verifying merged content
+
+Ran a Node.js script
+Correcting formatting and duplicates
+
+Correcting formatting and duplicates
+
+Ran a Node.js script
+Everything is deduplicated and syntactically valid now (single copy of every function, 5 script blocks all parse cleanly). Fixing the remaining P&L % column to use the percent format instead of money.
+
+
+2 actions
+You've reached your daily free quota limit. It will reset at 12:00 AM UTC.

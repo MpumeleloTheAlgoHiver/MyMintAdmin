@@ -65,6 +65,14 @@
     #xsFullscreenOverlay { display: none; position: fixed; inset: 0; background: #f8fafc; z-index: 99999; padding: 16px; box-sizing: border-box; overflow: auto; }
     body.xs-fullscreen #xsFullscreenOverlay { display: block; }
     body.xs-fullscreen { overflow: hidden; }
+
+    /* Formula bar — mirrors Excel/Sheets: cell reference box + fx + the
+       raw formula/content of the currently selected cell. */
+    #xsFormulaBar { display: flex; align-items: stretch; gap: 0; border: 1px solid #e2e8f0; border-bottom: none; border-radius: 6px 6px 0 0; background: #fff; font-size: 12px; }
+    #xsCellRef { width: 64px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #334155; background: #f8fafc; border-right: 1px solid #e2e8f0; }
+    #xsFxIcon { width: 30px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-style: italic; color: #166534; font-weight: 700; border-right: 1px solid #e2e8f0; font-size: 13px; }
+    #xsFormulaInput { flex: 1; border: none; outline: none; padding: 6px 10px; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #1e293b; background: transparent; }
+    #xsFormulaInput::placeholder { color: #cbd5e1; font-family: inherit; }
   </style>
 <script src="/js/cc-badge.js" defer></script>
 <script>
@@ -1158,7 +1166,12 @@
           <div style="font-size:11px;color:#64748b;margin-bottom:10px;line-height:1.5;">
             ${i.strategy ? `<strong>${i.strategy}</strong> only &mdash; ` : ''}fully editable spreadsheet, seeded from this basket's real holdings. Every total column is a live formula (e.g. Total Avg Fill = Quantity &times; Avg Fill) &mdash; edit any input cell (Quantity, Avg Fill, Market Value) and the rest recalculates, just like Excel.
           </div>
-          <div id="xs-grid" style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;flex:1;min-height:0;"></div>
+          <div id="xsFormulaBar">
+            <div id="xsCellRef">A1</div>
+            <div id="xsFxIcon">fx</div>
+            <input id="xsFormulaInput" type="text" placeholder="" spellcheck="false" />
+          </div>
+          <div id="xs-grid" style="border:1px solid #e2e8f0;border-radius:0 0 6px 6px;overflow:hidden;flex:1;min-height:0;"></div>
         </div>
       `;
     }
@@ -1208,54 +1221,102 @@
       }
     });
 
-    /* Column layout used by the live grid (and mirrored in the .xlsx export):
-       A Symbol | B Name | C Quantity | D Avg Fill | E Total Avg Fill (=C*D)
-       F Market Value (raw, priced at load time) | G Total P&L (=F-E)
-       H Total P&L % (=IF(E=0,0,G/E*100)) | I Total Value w/ P&L (=E+G) */
+    /* Column layout (0-indexed) used by the live grid and mirrored in .xlsx:
+       0=A Symbol | 1=B Name | 2=C Quantity | 3=D Avg Fill
+       4=E Total Avg Fill  | 5=F Market Value | 6=G Total P&L
+       7=H Total P&L %     | 8=I Total Value w/ P&L
+
+       All cell values are pre-computed in JS — no formula strings are ever
+       placed in cell `text`.  x-data-spreadsheet's formula engine throws
+       non-Error strings (e.g. "#DIV/0!") inside requestAnimationFrame
+       callbacks (outside any try-catch), crashing the page.
+
+       Formula bar behaviour is provided by a PARALLEL formula map
+       (xsFormulaMap, built by buildFormulaMap) that our custom formula bar
+       reads directly.  When the user clicks a calculated cell the bar shows
+       the human-readable formula; when they click an input cell it shows the
+       raw value.  The library never evaluates a formula string. */
     function spreadsheetGridData(i) {
       const rows = spreadsheetRows(i);
+
+      // Style indexes — no `format` property on any (numbro crashes on
+      // error-string formula results inside rAF, which is uncatchable).
+      // 0=header  1=total-label  2=money-data  3=pct-data
+      // 4=total-money  5=total-pct
+      const S_MONEY = 2, S_PCT = 3, S_TOTAL_MONEY = 4, S_TOTAL_PCT = 5;
+
+      // Format a number as "R 1,234.56" / "-R 1,234.56".
+      const fmtRands = (n) => {
+        const v = Number(n) || 0;
+        const abs = Math.abs(v).toFixed(2);
+        const [int, dec] = abs.split('.');
+        const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return (v < 0 ? '-' : '') + 'R\u00a0' + grouped + '.' + dec;
+      };
+      // Format a pre-computed % number as "7.55%".
+      const fmtPct = (n) => Number(n).toFixed(2) + '%';
+
+      // cashComponent = residual rebalance cash + held 8% execution buffer.
+      const cashR = Number(i.cashComponent) || 0;
+
+      const rowsObj = {};
+
+      // ── Header row ──────────────────────────────────────────────────────
       const headers = ['Symbol', 'Name', 'Quantity', 'Avg Fill', 'Total Avg Fill', 'Market Value', 'Total P&L', 'Total P&L %', 'Total Value w/ P&L'];
-      const cellsForRow = (vals) => vals.reduce((acc, v, c) => {
-        if (v !== null && v !== undefined && v !== '') acc[c] = { text: String(v) };
-        return acc;
-      }, {});
+      rowsObj[0] = { cells: Object.fromEntries(headers.map((h, c) => [c, { text: h, style: 0 }])) };
 
-      const rowsObj = { 0: { cells: cellsForRow(headers) } };
-      rowsObj[0].cells = Object.fromEntries(Object.entries(rowsObj[0].cells).map(([c, cell]) => [c, { ...cell, style: 0 }]));
-
+      // ── Holding rows ─────────────────────────────────────────────────────
       rows.forEach((r, idx) => {
-        const rIdx = idx + 1;      // spreadsheet row (0-based), row 0 is the header
-        const excelRow = rIdx + 1; // 1-based Excel-style row number used inside formula strings
+        const rIdx  = idx + 1;
+        const qty     = Number(r.qty)      || 0;
+        const avgFill = Number(r.avgFillR) || 0;
+        const price   = Number(r.priceR)   || 0;
+        const cost    = qty * avgFill;
+        const mktVal  = qty * price;
+        const pnl     = mktVal - cost;
+        const pnlPct  = cost > 0 ? (pnl / cost * 100).toFixed(2) : '0.00';
         rowsObj[rIdx] = {
           cells: {
             0: { text: r.symbol },
             1: { text: r.name },
-            2: { text: String(r.qty) },
-            3: { text: String(r.avgFillR) },
-            4: { text: `=C${excelRow}*D${excelRow}` },
-            5: { text: String(r.qty * r.priceR) },
-            6: { text: `=F${excelRow}-E${excelRow}` },
-            // Note: this grid's formula engine crashes if a division is nested
-            // inside an IF(...) argument, so this is a plain division (not
-            // IF-guarded) — a zero Total Avg Fill shows Infinity/NaN, same as
-            // dividing by zero in a real spreadsheet without a guard.
-            7: { text: `=G${excelRow}/E${excelRow}*100` },
-            8: { text: `=E${excelRow}+G${excelRow}` },
+            2: { text: String(qty) },
+            3: { text: fmtRands(avgFill), style: S_MONEY },
+            4: { text: fmtRands(cost),    style: S_MONEY },
+            5: { text: fmtRands(mktVal),  style: S_MONEY },
+            6: { text: fmtRands(pnl),     style: S_MONEY },
+            7: { text: fmtPct(pnlPct),    style: S_PCT   },
+            8: { text: fmtRands(mktVal),  style: S_MONEY },
           }
         };
       });
 
-      const totalRIdx = rows.length + 1;
-      const firstDataExcelRow = 2;
-      const lastDataExcelRow = rows.length + 1;
+      // ── Cash row (always shown; cashR may be 0 when no residual/buffer) ──
+      const cashRIdx = rows.length + 1;
+      rowsObj[cashRIdx] = {
+        cells: {
+          0: { text: 'CASH' },
+          1: { text: 'Strategy Cash' },
+          5: { text: fmtRands(cashR), style: S_MONEY },
+          6: { text: fmtRands(0),     style: S_MONEY },
+          7: { text: fmtPct(0),       style: S_PCT   },
+          8: { text: fmtRands(cashR), style: S_MONEY },
+        }
+      };
+
+      // ── Total row (pre-computed — no formula engine risk) ─────────────
+      const totalRIdx    = rows.length + 2;
+      const totalAvgFill = rows.reduce((s, r) => s + (Number(r.qty)||0) * (Number(r.avgFillR)||0), 0);
+      const totalMktVal  = rows.reduce((s, r) => s + (Number(r.qty)||0) * (Number(r.priceR)  ||0), 0) + cashR;
+      const totalPnl     = totalMktVal - totalAvgFill;
+      const totalPnlPct  = totalAvgFill > 0 ? (totalPnl / totalAvgFill * 100).toFixed(2) : '0.00';
       rowsObj[totalRIdx] = {
         cells: {
-          0: { text: 'Total', style: 1 },
-          4: { text: `=SUM(E${firstDataExcelRow}:E${lastDataExcelRow})`, style: 1 },
-          5: { text: `=SUM(F${firstDataExcelRow}:F${lastDataExcelRow})`, style: 1 },
-          6: { text: `=F${totalRIdx + 1}-E${totalRIdx + 1}`, style: 1 },
-          7: { text: `=G${totalRIdx + 1}/E${totalRIdx + 1}*100`, style: 1 },
-          8: { text: `=E${totalRIdx + 1}+G${totalRIdx + 1}`, style: 1 },
+          0: { text: 'Total',                  style: 1           },
+          4: { text: fmtRands(totalAvgFill),   style: S_TOTAL_MONEY },
+          5: { text: fmtRands(totalMktVal),    style: S_TOTAL_MONEY },
+          6: { text: fmtRands(totalPnl),       style: S_TOTAL_MONEY },
+          7: { text: fmtPct(totalPnlPct),      style: S_TOTAL_PCT   },
+          8: { text: fmtRands(totalMktVal),    style: S_TOTAL_MONEY },
         }
       };
       rowsObj.len = Math.max(100, totalRIdx + 20);
@@ -1264,13 +1325,65 @@
         name: 'Portfolio',
         freeze: 'A1',
         styles: [
-          { font: { bold: true }, bgcolor: '#f1f5f9', color: '#334155' }, // 0: header
-          { font: { bold: true }, bgcolor: '#f8fafc' },                    // 1: total row
+          { font: { bold: true }, bgcolor: '#f1f5f9', color: '#334155' }, // 0 header
+          { font: { bold: true }, bgcolor: '#f8fafc' },                   // 1 total label
+          {},                                                             // 2 money data
+          {},                                                             // 3 pct data
+          { font: { bold: true }, bgcolor: '#f8fafc' },                   // 4 total money
+          { font: { bold: true }, bgcolor: '#f8fafc' },                   // 5 total pct
         ],
         merges: [],
         rows: rowsObj,
-        cols: { len: 26, 0: { width: 90 }, 1: { width: 170 }, 4: { width: 110 }, 5: { width: 110 }, 6: { width: 100 }, 7: { width: 100 }, 8: { width: 140 } },
+        cols: { len: 26, 0: { width: 90 }, 1: { width: 170 }, 4: { width: 120 }, 5: { width: 120 }, 6: { width: 100 }, 7: { width: 100 }, 8: { width: 140 } },
       }];
+    }
+
+    /* Builds the formula-display map for the custom formula bar.
+       Keys are "rowIndex,colIndex" (both 0-based, matching x-data-spreadsheet
+       row/col indexes).  Values are the Excel-style formula string shown in
+       the formula bar when that cell is selected.
+
+       The library never sees these strings — they live only in JS and are
+       read by xsUpdateFormulaBar.  This avoids triggering the formula engine
+       (which crashes on error strings inside rAF) while still letting the
+       formula bar show meaningful formulas when the user clicks a calculated
+       cell.  holdingCount is the number of holding rows (excludes the cash
+       and total rows). */
+    function buildFormulaMap(holdingCount) {
+      const map = {};
+      for (let idx = 0; idx < holdingCount; idx++) {
+        const rIdx = idx + 1;    // spreadsheet row index (0 = headers)
+        const fRow = rIdx + 1;  // Excel-style 1-based row number
+        // Col 4 = E  Total Avg Fill
+        map[`${rIdx},4`] = `=C${fRow}*D${fRow}`;
+        // Col 6 = G  P&L
+        map[`${rIdx},6`] = `=F${fRow}-E${fRow}`;
+        // Col 7 = H  P&L %  (IF-guarded to prevent #DIV/0!)
+        map[`${rIdx},7`] = `=IF(E${fRow}=0,0,(F${fRow}-E${fRow})*100/E${fRow})`;
+        // Col 8 = I  Total Value w/ P&L
+        map[`${rIdx},8`] = `=F${fRow}`;
+      }
+      // Cash row (ri = holdingCount+1): Total Value mirrors Market Value
+      const cashRIdx = holdingCount + 1;
+      const cashFRow = cashRIdx + 1;   // Excel 1-based row
+      map[`${cashRIdx},8`] = `=F${cashFRow}`;
+
+      // Total row (ri = holdingCount+2): SUM over all holdings + cash
+      const totalRIdx = holdingCount + 2;
+      const totalFRow = totalRIdx + 1; // Excel 1-based row
+      const dataFirst  = 2;            // Excel row of first holding
+      const dataLast   = cashFRow;     // Excel row of cash row (last data row before totals)
+      // Col 4 = E  Total Cost (sum of Qty × Avg Fill)
+      map[`${totalRIdx},4`] = `=SUM(E${dataFirst}:E${dataLast})`;
+      // Col 5 = F  Total Market Value
+      map[`${totalRIdx},5`] = `=SUM(F${dataFirst}:F${dataLast})`;
+      // Col 6 = G  Total P&L
+      map[`${totalRIdx},6`] = `=SUM(G${dataFirst}:G${dataLast})`;
+      // Col 7 = H  Overall P&L % (total P&L ÷ total cost)
+      map[`${totalRIdx},7`] = `=IF(E${totalFRow}=0,0,G${totalFRow}/E${totalFRow}*100)`;
+      // Col 8 = I  Total Value w/ P&L
+      map[`${totalRIdx},8`] = `=SUM(I${dataFirst}:I${dataLast})`;
+      return map;
     }
 
     /* Mounts (or re-mounts) the grid into #xs-grid. Pass explicit `data` to
@@ -1302,9 +1415,63 @@
       }, { capture: true, passive: false });
     }
 
+    /* Excel-style column letters: 0->A, 25->Z, 26->AA, ... */
+    function xsColLetter(ci) {
+      let n = ci, s = '';
+      do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0);
+      return s;
+    }
+
+    let xsSelected = { ri: 0, ci: 0 };
+    // Parallel formula map: "ri,ci" → formula string shown in the formula bar
+    // when that cell is selected.  The library never sees these strings —
+    // keeping formulas out of cell `text` avoids the formula-engine crash.
+    let xsFormulaMap = {};
+
+    /* Formula bar: shows "<CellRef> | fx | <formula or value>" for the
+       selected cell.  Calculated cells show their formula from xsFormulaMap;
+       input cells show the raw cell text. */
+    function xsUpdateFormulaBar(ri, ci) {
+      const refEl = document.getElementById('xsCellRef');
+      const inputEl = document.getElementById('xsFormulaInput');
+      if (!refEl || !inputEl || !xsInstance) return;
+      xsFormulaBarDirty = false;  // navigating to a new cell resets edit state
+      xsSelected = { ri, ci };
+      refEl.textContent = `${xsColLetter(ci)}${ri + 1}`;
+      // Prefer the formula from the map; fall back to the cell's raw text.
+      const formula = xsFormulaMap[`${ri},${ci}`];
+      if (formula) {
+        inputEl.value = formula;
+        return;
+      }
+      const data = xsInstance.getData();
+      const sheet = data && data[0];
+      const cell = sheet && sheet.rows && sheet.rows[ri] && sheet.rows[ri].cells && sheet.rows[ri].cells[ci];
+      inputEl.value = cell ? String(cell.text || '') : '';
+    }
+
+    // Set to true only when the user actually types in the formula bar.
+    // Prevents blur-on-cell-click from wiping formulas from the map.
+    let xsFormulaBarDirty = false;
+
+    function xsCommitFormulaBar() {
+      const inputEl = document.getElementById('xsFormulaInput');
+      if (!inputEl || !xsInstance || !xsFormulaBarDirty) return;
+      xsFormulaBarDirty = false;
+      // User explicitly edited this cell — remove its display formula so
+      // subsequent clicks show the typed value, not the original formula.
+      delete xsFormulaMap[`${xsSelected.ri},${xsSelected.ci}`];
+      xsInstance.cellText(xsSelected.ri, xsSelected.ci, inputEl.value, 0);
+    }
+
     function mountSpreadsheetGrid(data) {
       const el = document.getElementById('xs-grid');
       if (!el || typeof x_spreadsheet === 'undefined' || !currentInvestor) return;
+      // Rebuild the formula map so the formula bar always reflects the current
+      // holding structure, even when `data` is a saved snapshot (e.g. after a
+      // fullscreen toggle).  Formula structure only depends on holding count.
+      xsFormulaMap = buildFormulaMap((currentInvestor.holdings || []).length);
+      try {
       el.innerHTML = '';
       xsInstance = x_spreadsheet('#xs-grid', {
         mode: 'edit',
@@ -1319,6 +1486,40 @@
         col: { len: 26, width: 100, indexWidth: 45, minWidth: 60 },
       }).loadData(data || spreadsheetGridData(currentInvestor));
       attachScrollDamping(el);
+
+      xsInstance.on('cell-selected', (cell, ri, ci) => xsUpdateFormulaBar(ri, ci));
+      xsInstance.on('cells-selected', (cell, { sri, sci }) => xsUpdateFormulaBar(sri, sci));
+      xsInstance.on('cell-edited', (text, ri, ci) => {
+        if (ri === xsSelected.ri && ci === xsSelected.ci) xsUpdateFormulaBar(ri, ci);
+      });
+      xsUpdateFormulaBar(0, 0);
+
+      el.addEventListener('mousedown', () => {
+        // x-data-spreadsheet 1.1.9: after loadData(), xsInstance.data is the
+        // stale pre-load DataProxy; the live selector is on xsInstance.datas[0].
+        // Fire after a tick so the library has committed the new selection.
+        setTimeout(() => {
+          const sel = xsInstance && xsInstance.datas && xsInstance.datas[0] && xsInstance.datas[0].selector;
+          if (sel) xsUpdateFormulaBar(sel.ri, sel.ci);
+        }, 0);
+      });
+
+      const inputEl = document.getElementById('xsFormulaInput');
+      if (inputEl && !inputEl._xsBound) {
+        inputEl._xsBound = true;
+        // Mark dirty only when the user actually types — blur without typing
+        // must NOT delete the cell's formula from the map.
+        inputEl.addEventListener('input', () => { xsFormulaBarDirty = true; });
+        inputEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); xsCommitFormulaBar(); inputEl.blur(); }
+          else if (e.key === 'Escape') { xsFormulaBarDirty = false; xsUpdateFormulaBar(xsSelected.ri, xsSelected.ci); inputEl.blur(); }
+        });
+        inputEl.addEventListener('blur', xsCommitFormulaBar);
+      }
+      } catch(e) {
+        console.error('[Spreadsheet] mountSpreadsheetGrid error:', String(e), e);
+        el.innerHTML = `<div style="padding:20px;color:#ef4444;font-size:13px;">Spreadsheet failed to load: ${String(e)}</div>`;
+      }
     }
 
     function initSpreadsheetGrid(i) {
@@ -1341,8 +1542,15 @@
       const headers = ['Symbol', 'Name', 'Quantity', 'Avg Fill', 'Total Avg Fill', 'Market Value', 'Total P&L', 'Total P&L %', 'Total Value w/ P&L'];
       const aoa = [headers];
       rows.forEach(r => aoa.push([r.symbol, r.name, r.qty, r.avgFillR, null, null, null, null, null]));
+      // Cash row: residual rebalance cash + held 8% buffer for this strategy
+      const xlsxCashR = Number(i.cashComponent) || 0;
+      if (xlsxCashR > 0) {
+        // C/D/E left null (no qty/fill/total-avg-fill for cash); F=market value,
+        // G=0 (no P&L on cash), H=0%, I=cash value (same as market value)
+        aoa.push(['CASH', 'Strategy Cash', null, null, null, xlsxCashR, 0, 0, xlsxCashR]);
+      }
       const firstDataRow = 2;
-      const lastDataRow = 1 + rows.length;
+      const lastDataRow = 1 + rows.length + (xlsxCashR > 0 ? 1 : 0);
       aoa.push(['Total', '', null, null, null, null, null, null, null]); // totals row placeholder
       const totalRow = lastDataRow + 1;
 
@@ -1364,7 +1572,16 @@
         ws[`D${row}`].z = ws[`F${row}`].z = ws[`E${row}`].z = ws[`G${row}`].z = ws[`I${row}`].z = '"R"#,##0.00';
       });
 
-      /* Totals row &mdash; SUM formulas over the data range above it. */
+      // Apply number formats to the cash row cells written via aoa
+      if (xlsxCashR > 0) {
+        const cashRow = firstDataRow + rows.length;
+        if (ws[`F${cashRow}`]) ws[`F${cashRow}`].z = '"R"#,##0.00';
+        if (ws[`G${cashRow}`]) ws[`G${cashRow}`].z = '"R"#,##0.00';
+        if (ws[`H${cashRow}`]) ws[`H${cashRow}`].z = '0.00"%"';
+        if (ws[`I${cashRow}`]) ws[`I${cashRow}`].z = '"R"#,##0.00';
+      }
+
+      /* Totals row — SUM formulas over the data range above it (includes cash row). */
       ws[`A${totalRow}`] = { t: 's', v: 'Total' };
       ws[`E${totalRow}`] = { t: 'n', f: `SUM(E${firstDataRow}:E${lastDataRow})`, z: '"R"#,##0.00' };
       ws[`F${totalRow}`] = { t: 'n', f: `SUM(F${firstDataRow}:F${lastDataRow})`, z: '"R"#,##0.00' };
