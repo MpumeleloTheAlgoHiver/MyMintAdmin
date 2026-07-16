@@ -1469,15 +1469,12 @@
       });
       xsUpdateFormulaBar(0, 0);
 
-      // Fallback for plain single clicks: x-data-spreadsheet 1.1.9 stores the
-      // selected position as selector.ri / selector.ci (not selector.indexes).
-      // Reading directly from a mousedown listener guarantees the bar updates
-      // on every click — including re-clicking the same cell and clicks that
-      // the library's 'cell-selected' event misses.
       el.addEventListener('mousedown', () => {
-        // Use setTimeout so the library updates selector.ri/ci before we read.
+        // x-data-spreadsheet 1.1.9: after loadData(), xsInstance.data is the
+        // stale pre-load DataProxy; the live selector is on xsInstance.datas[0].
+        // Fire after a tick so the library has committed the new selection.
         setTimeout(() => {
-          const sel = xsInstance && xsInstance.data && xsInstance.data.selector;
+          const sel = xsInstance && xsInstance.datas && xsInstance.datas[0] && xsInstance.datas[0].selector;
           if (sel) xsUpdateFormulaBar(sel.ri, sel.ci);
         }, 0);
       });
