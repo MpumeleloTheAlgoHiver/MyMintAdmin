@@ -1219,110 +1219,104 @@
       }
     });
 
-    /* Column layout used by the live grid (and mirrored in the .xlsx export):
-       A Symbol | B Name | C Quantity | D Avg Fill | E Total Avg Fill (=C*D)
-       F Market Value (raw, priced at load time) | G Total P&L (=F-E)
-       H Total P&L % (=IF(E=0,0,G*100/E)) | I Total Value w/ P&L (=E+G)
+    /* Column layout (0-indexed) used by the live grid and mirrored in .xlsx:
+       0=A Symbol | 1=B Name | 2=C Quantity | 3=D Avg Fill
+       4=E Total Avg Fill  | 5=F Market Value | 6=G Total P&L
+       7=H Total P&L %     | 8=I Total Value w/ P&L
 
-       Decimal handling: this grid's formula engine rounds +,-,* results to
-       max(decimalPlaces(operand1), decimalPlaces(operand2)) — so if an input
-       cell's text carries raw floating-point noise (e.g. "786.0500000001"
-       from a JS multiplication), every formula built on top of it inherits
-       that same long decimal tail. Rounding literal numeric cells to cents
-       with .toFixed(2) before they ever reach the grid keeps that tail from
-       ever appearing, on top of the 'number' cell format below (which covers
-       manually-typed values). The P&L % formula multiplies by 100 BEFORE
-       dividing (not after) because the engine's '/' operator itself rounds
-       to 2dp when the raw quotient has many decimals — dividing last avoids
-       throwing away precision partway through the calculation. */
+       Input cells (editable): Quantity (C), Avg Fill (D), Market Value (F).
+       Calculated cells use formula strings so the formula bar shows the
+       formula when a cell is selected, exactly like Excel.
+
+       Formula safety rules — x-data-spreadsheet's formula engine throws
+       non-Error strings (e.g. "#DIV/0!") inside requestAnimationFrame
+       callbacks that are outside any try-catch, crashing the page:
+         • All division is guarded with IF(denom=0, 0, …) to prevent
+           #DIV/0! from ever being produced.
+         • No `format` property in any style entry — numbro (the built-in
+           number formatter) crashes on error strings the same way.
+         • The Total row uses pre-computed text (not formulas) so it never
+           triggers the engine at all.
+
+       Decimal precision: seeding numeric cells with .toFixed() prevents
+       floating-point noise (e.g. "786.0500000001") from propagating into
+       formula results, which the engine would otherwise carry through. */
     function spreadsheetGridData(i) {
       const rows = spreadsheetRows(i);
-      const headers = ['Symbol', 'Name', 'Quantity', 'Avg Fill', 'Total Avg Fill', 'Market Value', 'Total P&L', 'Total P&L %', 'Total Value w/ P&L'];
-      const cellsForRow = (vals) => vals.reduce((acc, v, c) => {
-        if (v !== null && v !== undefined && v !== '') acc[c] = { text: String(v) };
-        return acc;
-      }, {});
 
-      const rowsObj = { 0: { cells: cellsForRow(headers) } };
-      rowsObj[0].cells = Object.fromEntries(Object.entries(rowsObj[0].cells).map(([c, cell]) => [c, { ...cell, style: 0 }]));
+      // Style indexes (no `format` property on any — see safety rules above)
+      // 0=header  1=total-label  2=data  3=total-row
+      const S_HDR = 0, S_TOTAL_LBL = 1, S_DATA = 2, S_TOTAL = 3;
 
-      // Style indexes: 0=header  1=total-label  2=money  3=pct  4=total-money  5=total-pct
-      // No `format` property on any style — x-data-spreadsheet's numbro formatter
-      // throws non-Error strings inside rAF callbacks (outside any try-catch) for
-      // certain values; all cells use pre-computed text to avoid the formula engine.
-      const S_MONEY = 2, S_PCT = 3, S_TOTAL_MONEY = 4, S_TOTAL_PCT = 5;
-      // Format a number as "R 1,234.56" (or "-R 1,234.56" for negatives).
-      const fmtRands = (n) => {
-        const v = Number(n) || 0;
-        const abs = Math.abs(v).toFixed(2);
-        const [int, dec] = abs.split('.');
-        const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        return (v < 0 ? '-' : '') + 'R\u00a0' + grouped + '.' + dec;
-      };
-      // Format a pre-computed percentage number as "7.55%" (or "-5.73%").
-      const fmtPct = (n) => Number(n).toFixed(2) + '%';
+      const rowsObj = {};
+
+      // ── Header row ──────────────────────────────────────────────────────
+      const headers = [
+        'Symbol', 'Name', 'Quantity',
+        'Avg Fill (R)',        // D — editable input
+        'Total Avg Fill (R)',  // E — formula =C*D
+        'Market Value (R)',    // F — editable input (seeded from live price)
+        'P&L (R)',             // G — formula =F-E
+        'P&L %',              // H — formula =IF(E=0,0,(F-E)*100/E)
+        'Total Value (R)',     // I — formula =F
+      ];
+      rowsObj[0] = { cells: Object.fromEntries(headers.map((h, c) => [c, { text: h, style: S_HDR }])) };
+
       // cashComponent = residual rebalance cash + held 8% execution buffer.
       const cashR = Number(i.cashComponent) || 0;
 
+      // ── Holding rows ─────────────────────────────────────────────────────
+      // In x-data-spreadsheet rows are 0-indexed; the formula engine uses
+      // 1-based row numbers as in Excel.  Row index rIdx → formula row fRow.
       rows.forEach((r, idx) => {
-        const rIdx = idx + 1;
-        const avgFill = Number(r.avgFillR) || 0;
-        const price   = Number(r.priceR)   || 0;
+        const rIdx = idx + 1;           // spreadsheet row index
+        const fRow = rIdx + 1;          // Excel-style row number for formulas
         const qty     = Number(r.qty)      || 0;
-        const cost    = qty * avgFill;           // Total Avg Fill (cost basis)
-        const mktVal  = qty * price;             // Market Value
-        const pnl     = mktVal - cost;           // Total P&L
-        const pnlPct  = cost > 0 ? (pnl / cost * 100).toFixed(2) : '0.00'; // P&L %
-        // All cells are pre-computed static text — no formulas.
-        // x-data-spreadsheet's formula engine throws non-Error strings (e.g.
-        // "#DIV/0!") inside requestAnimationFrame callbacks (outside any try-catch),
-        // crashing the page. Pre-computed values never trigger that path.
+        const avgFill = Number(r.avgFillR) || 0;
+        const mktVal  = qty * (Number(r.priceR) || 0);
         rowsObj[rIdx] = {
           cells: {
             0: { text: r.symbol },
             1: { text: r.name },
-            2: { text: String(qty) },
-            3: { text: fmtRands(avgFill), style: S_MONEY },
-            4: { text: fmtRands(cost),    style: S_MONEY },
-            5: { text: fmtRands(mktVal),  style: S_MONEY },
-            6: { text: fmtRands(pnl),     style: S_MONEY },
-            7: { text: fmtPct(pnlPct),    style: S_PCT   },
-            8: { text: fmtRands(mktVal),  style: S_MONEY },
+            2: { text: qty.toFixed(4) },          // C — Quantity (input)
+            3: { text: avgFill.toFixed(4) },       // D — Avg Fill (input)
+            4: { text: `=C${fRow}*D${fRow}`,                               style: S_DATA }, // E Total Avg Fill
+            5: { text: mktVal.toFixed(2) },        // F — Market Value (input, seeded)
+            6: { text: `=F${fRow}-E${fRow}`,                               style: S_DATA }, // G P&L
+            7: { text: `=IF(E${fRow}=0,0,(F${fRow}-E${fRow})*100/E${fRow})`, style: S_DATA }, // H P&L %
+            8: { text: `=F${fRow}`,                                        style: S_DATA }, // I Total Value
           }
         };
       });
 
-      // Cash row always shown — cashR may be 0 (no residual/buffer yet), in
-      // which case the row displays R 0.00 so the position is never silent.
-      const hasCash = true;
-      {
-        const cashRIdx = rows.length + 1;
-        rowsObj[cashRIdx] = {
-          cells: {
-            0: { text: 'CASH' },
-            1: { text: 'Strategy Cash' },
-            5: { text: fmtRands(cashR), style: S_MONEY },
-            6: { text: fmtRands(0),     style: S_MONEY },
-            7: { text: fmtPct(0),       style: S_PCT   },
-            8: { text: fmtRands(cashR), style: S_MONEY },
-          }
-        };
-      }
+      // ── Cash row (always shown; cashR may be 0 when no residual/buffer) ──
+      const cashRIdx = rows.length + 1;
+      const cashFRow = cashRIdx + 1;
+      rowsObj[cashRIdx] = {
+        cells: {
+          0: { text: 'CASH' },
+          1: { text: 'Strategy Cash' },
+          5: { text: cashR.toFixed(2) },     // F — cash amount (editable)
+          6: { text: '0' },                   // G — no P&L on cash
+          7: { text: '0' },                   // H — no P&L% on cash
+          8: { text: `=F${cashFRow}` },       // I — Total Value = cash
+        }
+      };
 
-      const totalRIdx = rows.length + (hasCash ? 2 : 1);
-      // Pre-compute totals to avoid formula engine division-by-zero crashes.
-      const totalAvgFill  = rows.reduce((s, r) => s + r.qty * (Number(r.avgFillR) || 0), 0);
-      const totalMktVal   = rows.reduce((s, r) => s + r.qty * (Number(r.priceR)   || 0), 0) + cashR;
-      const totalPnl      = totalMktVal - totalAvgFill;
-      const totalPnlPct   = totalAvgFill > 0 ? (totalPnl / totalAvgFill * 100).toFixed(2) : '0.00';
+      // ── Total row (pre-computed — no formula engine, no crash risk) ──────
+      const totalRIdx = rows.length + 2;
+      const totalAvgFill = rows.reduce((s, r) => s + (Number(r.qty)||0) * (Number(r.avgFillR)||0), 0);
+      const totalMktVal  = rows.reduce((s, r) => s + (Number(r.qty)||0) * (Number(r.priceR)||0), 0) + cashR;
+      const totalPnl     = totalMktVal - totalAvgFill;
+      const totalPnlPct  = totalAvgFill > 0 ? (totalPnl / totalAvgFill * 100).toFixed(2) : '0.00';
       rowsObj[totalRIdx] = {
         cells: {
-          0: { text: 'Total',                     style: 1             },
-          4: { text: fmtRands(totalAvgFill),       style: S_TOTAL_MONEY },
-          5: { text: fmtRands(totalMktVal),        style: S_TOTAL_MONEY },
-          6: { text: fmtRands(totalPnl),           style: S_TOTAL_MONEY },
-          7: { text: fmtPct(totalPnlPct),          style: S_TOTAL_PCT   },
-          8: { text: fmtRands(totalMktVal),        style: S_TOTAL_MONEY },
+          0: { text: 'Total',                        style: S_TOTAL_LBL },
+          4: { text: totalAvgFill.toFixed(2),        style: S_TOTAL },
+          5: { text: totalMktVal.toFixed(2),         style: S_TOTAL },
+          6: { text: totalPnl.toFixed(2),            style: S_TOTAL },
+          7: { text: totalPnlPct,                    style: S_TOTAL },
+          8: { text: totalMktVal.toFixed(2),         style: S_TOTAL },
         }
       };
       rowsObj.len = Math.max(100, totalRIdx + 20);
@@ -1331,16 +1325,25 @@
         name: 'Portfolio',
         freeze: 'A1',
         styles: [
-          { font: { bold: true }, bgcolor: '#f1f5f9', color: '#334155' },           // 0: header
-          { font: { bold: true }, bgcolor: '#f8fafc' },                             // 1: total label
-          {},                                                                       // 2: money data — no format; numbro crashes when formula results
-          {},                                                                       // 3: pct data  — are error strings (#NAME?, #VALUE!) inside rAF,
-          { font: { bold: true }, bgcolor: '#f8fafc' },                             // 4: total money  which is outside any try-catch
-          { font: { bold: true }, bgcolor: '#f8fafc' },                             // 5: total pct
+          { font: { bold: true }, bgcolor: '#f1f5f9', color: '#334155' }, // 0: header
+          { font: { bold: true }, bgcolor: '#f8fafc' },                   // 1: total label
+          {},                                                             // 2: data cells (no format — see safety rules)
+          { font: { bold: true }, bgcolor: '#f8fafc' },                   // 3: total values
         ],
         merges: [],
         rows: rowsObj,
-        cols: { len: 26, 0: { width: 90 }, 1: { width: 170 }, 4: { width: 110 }, 5: { width: 110 }, 6: { width: 100 }, 7: { width: 100 }, 8: { width: 140 } },
+        cols: {
+          len: 26,
+          0: { width: 90 },
+          1: { width: 165 },
+          2: { width: 80 },
+          3: { width: 110 },
+          4: { width: 130 },
+          5: { width: 120 },
+          6: { width: 100 },
+          7: { width: 90 },
+          8: { width: 130 },
+        },
       }];
     }
 
