@@ -287,15 +287,6 @@
         _bufSeen[key].add(h.transaction_id);
         bufferByInvestor[key] = (bufferByInvestor[key] || 0) + (bufferCentsById[h.transaction_id] || 0) / 100;
       });
-      /* DEBUG — remove after confirming cash row */
-      const _mpuId = 'b215eb9a-4017-45f1-a460-6056b1db0c4d';
-      const _mintSid = 'eaae2859-e791-4fa4-8a8b-164c1d38a4c3';
-      const _mpuKey = `${_mpuId}::${_mintSid}`;
-      console.log('[DBG buffer] txns count:', (txns||[]).length,
-        '| bufferCentsById[d596c692]:', bufferCentsById['d596c692-bcd1-4c77-b3ca-d50689b7cd65'],
-        '| bufferByInvestor[mpuKey]:', bufferByInvestor[_mpuKey],
-        '| holdings with mpuId+mintSid:', (holdings||[]).filter(h=>h.user_id===_mpuId&&h.strategy_id===_mintSid).map(h=>({tid:h.transaction_id,sid:h.strategy_id}))
-      );
 
       /* Rebalance fees per (user|familyMember) � admin reconciliation only.
          A rebalance posts a R0 audit transaction, so its sell/buy brokerage (0.5%)

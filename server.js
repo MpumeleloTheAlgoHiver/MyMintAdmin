@@ -1969,58 +1969,13 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Investor data endpoint — uses service role key to bypass RLS
+  // Investor data endpoint — delegates to api/investors/data.js (canonical implementation)
   if (req.url === '/api/investors/data' && req.method === 'GET') {
     (async () => {
       try {
-        if (!supabaseUrl || !supabaseServiceRoleKey) return sendJson(res, 500, { error: 'Supabase not configured' });
-        const sbH = { apikey: supabaseServiceRoleKey, Authorization: `Bearer ${supabaseServiceRoleKey}`, 'Content-Type': 'application/json' };
-        const sbGet = (path) => fetch(`${supabaseUrl}/rest/v1/${path}`, { headers: sbH }).then(r => r.json());
-
-        const [holdings, strategies] = await Promise.all([
-          sbGet('stock_holdings_c?select=user_id,security_id,strategy_id,quantity,avg_fill,market_value,created_at&is_active=eq.true&trade_side=eq.BUY'),
-          sbGet('strategies_c?select=id,name,short_name,description,risk_level,sector'),
-        ]);
-
-        const userIds = [...new Set((holdings || []).map(r => r.user_id).filter(Boolean))];
-        const secIds = [...new Set((holdings || []).map(r => r.security_id).filter(Boolean))];
-        /* Fetch per-investor NAV history from client_strategy_returns_c — keyed by user_id */
-        const stratHistArrays = userIds.length
-          ? await Promise.all(userIds.map(uid =>
-            sbGet(`client_strategy_returns_c?select=user_id,strategy_id,as_of_date,basket_value,1d_pct,5d_pct,1m_pct,6m_pct,ytd_pct,1y_pct,5y_pct,inception_pct,inception_pnl&user_id=eq.${uid}&order=as_of_date.asc`)
-          ))
-          : [];
-        const stratHist = stratHistArrays.flat();
-
-        /* Recalculate inception_pnl and inception_pct on the LATEST row per user only
-           (fixes avg_fill unit mismatches for the investor card without distorting chart history) */
-        const investedByUser = {};
-        (holdings || []).forEach(h => {
-          const uid = h.user_id;
-          const cost = Number(h.avg_fill) * Number(h.quantity);
-          if (uid && cost > 0) investedByUser[uid] = (investedByUser[uid] || 0) + cost;
-        });
-        /* Find the latest row per user (stratHist is ordered asc, so last entry is latest) */
-        const latestRowByUser = {};
-        stratHist.forEach(r => { latestRowByUser[r.user_id] = r; });
-        Object.values(latestRowByUser).forEach(r => {
-          const invested = investedByUser[r.user_id];
-          if (invested > 0) {
-            r.inception_pnl = r.basket_value - invested;
-            r.inception_pct = (r.inception_pnl / invested) * 100;
-          }
-        });
-
-        const [profiles, secMeta, secLive, txns] = await Promise.all([
-          userIds.length ? sbGet(`profiles?select=id,first_name,last_name,email,mint_number&id=in.(${userIds.join(',')})`) : Promise.resolve([]),
-          secIds.length ? sbGet(`securities_c?select=id,symbol,name,sector,logo_url&id=in.(${secIds.join(',')})`) : Promise.resolve([]),
-          secIds.length ? sbGet(`stock_returns_c?select=security_id,symbol,current_price,1d_pct,ytd_pct,1y_pct,as_of_date&security_id=in.(${secIds.join(',')})&order=as_of_date.desc`) : Promise.resolve([]),
-          userIds.length ? sbGet(`transactions?select=user_id,amount,direction,name,description,status,transaction_date&user_id=in.(${userIds.join(',')})&order=transaction_date.desc`) : Promise.resolve([]),
-        ]);
-
-        sendJson(res, 200, { holdings, strategies, stratHist, profiles, secMeta, secLive, txns });
+        await require('./api/investors/data')(req, res);
       } catch (err) {
-        sendJson(res, 500, { error: err.message });
+        if (!res.headersSent) sendJson(res, 500, { error: err.message });
       }
     })();
     return;
