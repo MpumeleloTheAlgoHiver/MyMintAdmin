@@ -1361,9 +1361,26 @@
         // Col 8 = I  Total Value w/ P&L
         map[`${rIdx},8`] = `=F${fRow}`;
       }
-      // Cash row: Total Value mirrors Market Value
+      // Cash row (ri = holdingCount+1): Total Value mirrors Market Value
       const cashRIdx = holdingCount + 1;
-      map[`${cashRIdx},8`] = `=F${cashRIdx + 1}`;
+      const cashFRow = cashRIdx + 1;   // Excel 1-based row
+      map[`${cashRIdx},8`] = `=F${cashFRow}`;
+
+      // Total row (ri = holdingCount+2): SUM over all holdings + cash
+      const totalRIdx = holdingCount + 2;
+      const totalFRow = totalRIdx + 1; // Excel 1-based row
+      const dataFirst  = 2;            // Excel row of first holding
+      const dataLast   = cashFRow;     // Excel row of cash row (last data row before totals)
+      // Col 4 = E  Total Cost (sum of Qty × Avg Fill)
+      map[`${totalRIdx},4`] = `=SUM(E${dataFirst}:E${dataLast})`;
+      // Col 5 = F  Total Market Value
+      map[`${totalRIdx},5`] = `=SUM(F${dataFirst}:F${dataLast})`;
+      // Col 6 = G  Total P&L
+      map[`${totalRIdx},6`] = `=SUM(G${dataFirst}:G${dataLast})`;
+      // Col 7 = H  Overall P&L % (total P&L ÷ total cost)
+      map[`${totalRIdx},7`] = `=IF(E${totalFRow}=0,0,G${totalFRow}/E${totalFRow}*100)`;
+      // Col 8 = I  Total Value w/ P&L
+      map[`${totalRIdx},8`] = `=SUM(I${dataFirst}:I${dataLast})`;
       return map;
     }
 
@@ -1416,6 +1433,7 @@
       const refEl = document.getElementById('xsCellRef');
       const inputEl = document.getElementById('xsFormulaInput');
       if (!refEl || !inputEl || !xsInstance) return;
+      xsFormulaBarDirty = false;  // navigating to a new cell resets edit state
       xsSelected = { ri, ci };
       refEl.textContent = `${xsColLetter(ci)}${ri + 1}`;
       // Prefer the formula from the map; fall back to the cell's raw text.
@@ -1430,11 +1448,16 @@
       inputEl.value = cell ? String(cell.text || '') : '';
     }
 
+    // Set to true only when the user actually types in the formula bar.
+    // Prevents blur-on-cell-click from wiping formulas from the map.
+    let xsFormulaBarDirty = false;
+
     function xsCommitFormulaBar() {
       const inputEl = document.getElementById('xsFormulaInput');
-      if (!inputEl || !xsInstance) return;
-      // When the user overrides a calculated cell via the formula bar, remove
-      // its formula from the map so subsequent clicks show the edited value.
+      if (!inputEl || !xsInstance || !xsFormulaBarDirty) return;
+      xsFormulaBarDirty = false;
+      // User explicitly edited this cell — remove its display formula so
+      // subsequent clicks show the typed value, not the original formula.
       delete xsFormulaMap[`${xsSelected.ri},${xsSelected.ci}`];
       xsInstance.cellText(xsSelected.ri, xsSelected.ci, inputEl.value, 0);
     }
@@ -1482,9 +1505,12 @@
       const inputEl = document.getElementById('xsFormulaInput');
       if (inputEl && !inputEl._xsBound) {
         inputEl._xsBound = true;
+        // Mark dirty only when the user actually types — blur without typing
+        // must NOT delete the cell's formula from the map.
+        inputEl.addEventListener('input', () => { xsFormulaBarDirty = true; });
         inputEl.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') { e.preventDefault(); xsCommitFormulaBar(); inputEl.blur(); }
-          else if (e.key === 'Escape') { xsUpdateFormulaBar(xsSelected.ri, xsSelected.ci); inputEl.blur(); }
+          else if (e.key === 'Escape') { xsFormulaBarDirty = false; xsUpdateFormulaBar(xsSelected.ri, xsSelected.ci); inputEl.blur(); }
         });
         inputEl.addEventListener('blur', xsCommitFormulaBar);
       }
