@@ -45,6 +45,11 @@ begin
   v_info := case when jsonb_typeof(v_pack->'info') = 'object' then v_pack->'info' else '{}'::jsonb end;
   v_kyc := v_raw->'experian_kyc_result';
   v_idmn := v_raw->'experian_idmn_result';
+  -- Do not retain a metadata-only Experian object when the underlying provider
+  -- evidence is absent. Provenance must never imply verification without data.
+  if v_kyc is null and v_idmn is null then
+    v_pack := v_pack - 'experian';
+  end if;
 
   v_first := coalesce(nullif(v_info->>'firstName',''), nullif(v_profile->>'first_name',''), jsonb_path_query_first(coalesce(v_idmn,v_kyc), '$.**.firstName') #>> '{}', jsonb_path_query_first(coalesce(v_idmn,v_kyc), '$.**.forename') #>> '{}');
   v_last := coalesce(nullif(v_info->>'lastName',''), nullif(v_profile->>'last_name',''), jsonb_path_query_first(coalesce(v_idmn,v_kyc), '$.**.lastName') #>> '{}', jsonb_path_query_first(coalesce(v_idmn,v_kyc), '$.**.surname') #>> '{}');
@@ -64,17 +69,17 @@ begin
   insert into public.user_onboarding_pack_details(user_id, pack_details, updated_at)
   values(v_uid, v_pack || jsonb_build_object(
     'info', v_info,
-    'experian', jsonb_strip_nulls(jsonb_build_object(
-      'kyc', v_kyc, 'idmn', v_idmn,
-      'source', 'Experian verified onboarding data', 'reconstructed_at', now()
-    )),
     'data_provenance', jsonb_build_object(
       'profile', 'User-confirmed profile fields',
       'sumsub', case when v_pack ? 'info' then 'SumSub applicant data' else 'Not available' end,
       'experian', case when v_kyc is not null or v_idmn is not null then 'Experian KYC / ID Me Now' else 'Not available' end,
       'reconstruction_scope', 'Mpumelelo only'
     )
-  ), now())
+  ) || case when v_kyc is not null or v_idmn is not null then jsonb_build_object(
+    'experian', jsonb_strip_nulls(jsonb_build_object(
+      'kyc', v_kyc, 'idmn', v_idmn,
+      'source', 'Experian verified onboarding data', 'reconstructed_at', now()
+    ))) else '{}'::jsonb end, now())
   on conflict(user_id) do update set
     pack_details = excluded.pack_details,
     updated_at = excluded.updated_at;
