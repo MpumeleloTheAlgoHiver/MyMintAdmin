@@ -773,6 +773,84 @@ module.exports = async (req, res) => {
       return sendJson(res, 200, { ok: true, value: saved?.value || value });
     }
 
+    // APP-SETTINGS-MAINTENANCE-GET — read the global app-enabled flag. This is the
+    // is_enabled column on the singleton app_settings row the MINT app enforces
+    // (.limit(1)); true = live, false = maintenance. Any team member may read it.
+    if (action === 'app-settings-maintenance-get') {
+      if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
+      const result = await requireAuth(req, res);
+      if (!result) return;
+      try {
+        const rows = await supabaseRequest('/rest/v1/app_settings?select=key,is_enabled,updated_at,updated_by&limit=1');
+        const row = rows && rows[0];
+        return sendJson(res, 200, {
+          ok: true,
+          key: row?.key ?? null,
+          is_enabled: (row && typeof row.is_enabled === 'boolean') ? row.is_enabled : null,
+          updated_at: row?.updated_at ?? null,
+          updated_by: row?.updated_by ?? null
+        });
+      } catch (err) {
+        return sendJson(res, 200, { ok: true, is_enabled: null, notice: 'app_settings table not found.' });
+      }
+    }
+
+    // APP-SETTINGS-MAINTENANCE-SET — master admin AND the maintenance password.
+    // Flips is_enabled on the row the app reads: false = the MINT app drops into
+    // maintenance (signs users out) in real time; true = back online. Double-gated
+    // because it takes the whole app down. Password checked server-side against
+    // MAINTENANCE_PASSWORD (never shipped to the browser).
+    if (action === 'app-settings-maintenance-set') {
+      if (req.method !== 'POST' && req.method !== 'PUT' && req.method !== 'PATCH') {
+        return sendJson(res, 405, { error: 'Method not allowed' });
+      }
+      const result = await requireMasterAdmin(req, res);
+      if (!result) return;
+
+      const expected = process.env.MAINTENANCE_PASSWORD;
+      if (!expected) {
+        return sendJson(res, 500, { error: 'Maintenance password is not configured on the server. Set the MAINTENANCE_PASSWORD env var.' });
+      }
+      if (String(req.body?.password ?? '') !== expected) {
+        return sendJson(res, 403, { error: 'Incorrect maintenance password.' });
+      }
+      const enabled = req.body?.is_enabled;
+      if (typeof enabled !== 'boolean') return sendJson(res, 400, { error: 'is_enabled boolean is required' });
+
+      // Target the SAME row the app reads (.limit(1)) so the flag it enforces is
+      // the one we flip — regardless of what that row's key happens to be.
+      let key = null, before = null;
+      try {
+        const rows = await supabaseRequest('/rest/v1/app_settings?select=key,is_enabled&limit=1');
+        key = rows && rows[0]?.key;
+        before = rows && rows[0]?.is_enabled;
+      } catch { /* fall through */ }
+      if (!key) return sendJson(res, 500, { error: 'No app_settings row found to update.' });
+
+      let saved;
+      try {
+        const out = await supabaseRequest(`/rest/v1/app_settings?key=eq.${encodeURIComponent(key)}`, {
+          method: 'PATCH',
+          extraHeaders: { 'Prefer': 'return=representation' },
+          body: { is_enabled: enabled, updated_at: new Date().toISOString(), updated_by: result.user.email }
+        });
+        saved = Array.isArray(out) ? out[0] : out;
+      } catch (err) {
+        return sendJson(res, 500, { error: `Could not update maintenance mode: ${err.message}` });
+      }
+
+      await writeAudit({
+        action: 'update',
+        target_email: result.user.email,
+        target_member_id: null,
+        actor_email: result.user.email,
+        actor_user_id: result.user.id,
+        details: { setting: 'maintenance_mode', key, before_is_enabled: before, after_is_enabled: enabled }
+      });
+
+      return sendJson(res, 200, { ok: true, is_enabled: (saved && typeof saved.is_enabled === 'boolean') ? saved.is_enabled : enabled });
+    }
+
     // UPDATE-PERMISSIONS — admin only. Sets a member's approver_tier + permissions JSONB.
     if (action === 'update-permissions') {
       if (req.method !== 'POST' && req.method !== 'PATCH') return sendJson(res, 405, { error: 'Method not allowed' });

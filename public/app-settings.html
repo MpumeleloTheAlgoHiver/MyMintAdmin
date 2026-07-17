@@ -58,6 +58,9 @@
     .toast.ok{background:#34c759;} .toast.err{background:#ff3b30;}
     .banner{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:12px;padding:12px 16px;font-size:13px;margin-bottom:20px;display:none;}
     .gate{display:none;text-align:center;padding:60px 20px;color:#8e8e93;}
+    .maint-pill{display:inline-block;padding:5px 12px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.02em;background:#eee;color:#555;}
+    .maint-pill.live{background:#dcfce7;color:#166534;}
+    .maint-pill.down{background:#fee2e2;color:#991b1b;}
   </style>
 </head>
 <body>
@@ -73,6 +76,37 @@
     <div class="gate" id="gate">Admins only.</div>
 
     <div id="content" style="display:none;">
+      <div class="card" id="maintCard">
+        <div class="card-title">Maintenance Mode</div>
+        <div class="card-sub">Turns the whole MINT app on/off. When ON, users are signed out to the maintenance screen in real time (admins with bypass are unaffected). No deploy needed. Password required to change.</div>
+
+        <div class="field">
+          <div>
+            <div class="field-label">App status</div>
+            <div class="field-hint" id="maintStatusHint">Loading…</div>
+          </div>
+          <div class="input-wrap">
+            <span id="maintStatusPill" class="maint-pill">…</span>
+          </div>
+        </div>
+
+        <div id="maintConfirm" style="display:none;margin-top:14px;padding:14px;border:1px solid #efeaf7;border-radius:12px;background:#faf7ff;">
+          <div class="field-hint" id="maintConfirmMsg" style="margin-bottom:10px;font-weight:600;"></div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <input type="password" id="maintPassword" placeholder="Maintenance password" autocomplete="off"
+                   style="padding:9px 12px;border:1px solid #d8d8de;border-radius:10px;min-width:220px;font-size:14px;">
+            <button class="btn btn-primary" id="maintApplyBtn" type="button">Confirm</button>
+            <button class="btn" id="maintCancelBtn" type="button">Cancel</button>
+          </div>
+          <div class="field-hint" id="maintErr" style="color:#d11;margin-top:8px;display:none;"></div>
+        </div>
+
+        <div class="actions" style="margin-top:16px;">
+          <button class="btn btn-primary" id="maintToggleBtn" type="button" disabled>…</button>
+          <span class="meta" id="maintMeta"></span>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-title">Fees</div>
         <div class="card-sub">The single source of truth for platform fees. The app and CRM read these values.</div>
@@ -213,6 +247,87 @@
       }
     });
 
+    // ── Maintenance Mode ──────────────────────────────────────────────────────
+    // is_enabled === true  → app is LIVE
+    // is_enabled === false → app is in MAINTENANCE
+    let maintEnabled = null;
+
+    const renderMaint = () => {
+      const pill = document.getElementById('maintStatusPill');
+      const hint = document.getElementById('maintStatusHint');
+      const btn  = document.getElementById('maintToggleBtn');
+      if (maintEnabled === null) {
+        pill.textContent = 'Unknown'; pill.className = 'maint-pill';
+        hint.textContent = 'Could not read the app status.';
+        btn.textContent = 'Unavailable'; btn.disabled = true; btn.style.background = '';
+        return;
+      }
+      const live = maintEnabled === true;
+      pill.textContent = live ? 'Live' : 'In maintenance';
+      pill.className = 'maint-pill ' + (live ? 'live' : 'down');
+      hint.textContent = live
+        ? 'The app is live for all users.'
+        : 'The app is in maintenance — users are signed out to the maintenance screen.';
+      btn.disabled = false;
+      btn.textContent = live ? 'Turn ON maintenance' : 'Turn OFF maintenance (go live)';
+      // Turning the app OFF is the dangerous direction → red.
+      btn.style.background = live ? '#dc2626' : '';
+      btn.style.borderColor = live ? '#dc2626' : '';
+    };
+
+    const loadMaint = async () => {
+      const r = await api('GET', '/api/team?action=app-settings-maintenance-get');
+      maintEnabled = (r && typeof r.is_enabled === 'boolean') ? r.is_enabled : null;
+      renderMaint();
+      const meta = document.getElementById('maintMeta');
+      if (r && r.updated_at) {
+        meta.textContent = `Last changed ${new Date(r.updated_at).toLocaleString('en-ZA')}${r.updated_by ? ' · ' + r.updated_by : ''}`;
+      }
+    };
+
+    document.getElementById('maintToggleBtn').addEventListener('click', () => {
+      if (maintEnabled === null) return;
+      const nextEnabled = !maintEnabled;                // desired is_enabled after the action
+      const goingDown = nextEnabled === false;          // turning maintenance ON
+      const panel = document.getElementById('maintConfirm');
+      panel.dataset.nextEnabled = String(nextEnabled);
+      document.getElementById('maintConfirmMsg').textContent = goingDown
+        ? '⚠ This puts the MINT app into maintenance mode immediately and signs users out. Enter the maintenance password to confirm.'
+        : 'This brings the MINT app back online for all users. Enter the maintenance password to confirm.';
+      document.getElementById('maintPassword').value = '';
+      const err = document.getElementById('maintErr'); err.style.display = 'none';
+      panel.style.display = 'block';
+      document.getElementById('maintPassword').focus();
+    });
+
+    document.getElementById('maintCancelBtn').addEventListener('click', () => {
+      document.getElementById('maintConfirm').style.display = 'none';
+    });
+
+    document.getElementById('maintApplyBtn').addEventListener('click', async () => {
+      const panel = document.getElementById('maintConfirm');
+      const nextEnabled = panel.dataset.nextEnabled === 'true';
+      const password = document.getElementById('maintPassword').value;
+      const err = document.getElementById('maintErr');
+      const applyBtn = document.getElementById('maintApplyBtn');
+      err.style.display = 'none';
+      if (!password) { err.textContent = 'Password is required.'; err.style.display = 'block'; return; }
+      applyBtn.disabled = true; applyBtn.textContent = 'Applying…';
+      const r = await api('POST', '/api/team?action=app-settings-maintenance-set', { is_enabled: nextEnabled, password });
+      applyBtn.disabled = false; applyBtn.textContent = 'Confirm';
+      if (r && r.ok) {
+        maintEnabled = (typeof r.is_enabled === 'boolean') ? r.is_enabled : nextEnabled;
+        panel.style.display = 'none';
+        renderMaint();
+        toast(maintEnabled ? 'App is now LIVE' : 'Maintenance mode is ON');
+        document.getElementById('maintMeta').textContent =
+          `Last changed ${new Date().toLocaleString('en-ZA')} · ${document.getElementById('sidebarUserEmail')?.textContent || ''}`;
+      } else {
+        err.textContent = (r && r.error) || 'Could not update maintenance mode.';
+        err.style.display = 'block';
+      }
+    });
+
     document.getElementById('signOutBtn')?.addEventListener('click', async () => {
       await supabaseClient.auth.signOut();
       window.location.href = '/signin.html';
@@ -233,7 +348,7 @@
       document.getElementById('teamNavLink').style.display = 'flex';
       document.getElementById('content').style.display = 'block';
       renderFields();
-      await load();
+      await Promise.all([load(), loadMaint()]);
     })();
   </script>
 <script>window.PAGE_ACCESS_KEY = '__admin_only__';</script>
