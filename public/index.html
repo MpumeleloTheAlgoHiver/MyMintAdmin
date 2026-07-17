@@ -8446,11 +8446,31 @@
         let kycMap = {};
 
         if (userIds.length) {
+          // Chunk the user-id filter. A single .in('user_id', [all users]) builds
+          // one giant URL; past ~150 users it exceeds the server's max URL length
+          // and 404s, which aborted this whole load (including the family_members
+          // fetch below) — so children silently stopped appearing. Split into
+          // batches, run them in parallel, merge, and never throw (capture the
+          // first error) so one bad batch can't take down the page.
+          const IN_CHUNK = 100;
+          const idBatches = [];
+          for (let i = 0; i < userIds.length; i += IN_CHUNK) idBatches.push(userIds.slice(i, i + IN_CHUNK));
+          const fetchChunked = async (buildQuery) => {
+            const parts = await Promise.all(idBatches.map((batch) => buildQuery(batch)));
+            const rows = [];
+            let firstError = null;
+            for (const p of parts) {
+              if (p?.error && !firstError) firstError = p.error;
+              if (Array.isArray(p?.data)) rows.push(...p.data);
+            }
+            return { data: rows, error: firstError };
+          };
+
           const [onboardingRes, packRes, allocationsRes, holdingsRes] = await Promise.all([
-            supabaseClient.from('user_onboarding').select('*').in('user_id', userIds),
-            supabaseClient.from('user_onboarding_pack_details').select('*').in('user_id', userIds),
-            supabaseClient.from('allocations').select('user_id, asset_class, weight, value, return_1d, return_1w, return_1m, return_ytd, return_1y, as_of_date, security_id, created_at, updated_at').in('user_id', userIds).order('updated_at', { ascending: false }),
-            supabaseClient.from('stock_holdings_c').select('user_id, security_id, quantity, avg_fill, expected_fill:"Expected_fill", market_value, unrealized_pnl, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", as_of_date, strategy_id, strategy_name_snapshot, trade_side, is_active, created_at, updated_at').eq('is_active', true).eq('trade_side', 'BUY').in('user_id', userIds).order('updated_at', { ascending: false })
+            fetchChunked((batch) => supabaseClient.from('user_onboarding').select('*').in('user_id', batch)),
+            fetchChunked((batch) => supabaseClient.from('user_onboarding_pack_details').select('*').in('user_id', batch)),
+            fetchChunked((batch) => supabaseClient.from('allocations').select('user_id, asset_class, weight, value, return_1d, return_1w, return_1m, return_ytd, return_1y, as_of_date, security_id, created_at, updated_at').in('user_id', batch).order('updated_at', { ascending: false })),
+            fetchChunked((batch) => supabaseClient.from('stock_holdings_c').select('user_id, security_id, quantity, avg_fill, expected_fill:"Expected_fill", market_value, unrealized_pnl, status:"Status", fill_date:"Fill_date", exit_date:"Exit_date", as_of_date, strategy_id, strategy_name_snapshot, trade_side, is_active, created_at, updated_at').eq('is_active', true).eq('trade_side', 'BUY').in('user_id', batch).order('updated_at', { ascending: false }))
           ]);
 
           // Fetch ALL family_members + transactions (not filtered by userIds) &mdash; RLS policy controls access
