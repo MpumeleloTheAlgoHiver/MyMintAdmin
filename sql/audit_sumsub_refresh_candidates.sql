@@ -44,6 +44,13 @@ with candidates as (
     case when coalesce(nullif(profile->>'address',''),jsonb_path_query_first(pack->'info','$.**.formattedAddress')#>>'{}') is null then 'address' end
   ],null) missing_fields from candidates
 )
-select id,client_name,email,external_user_id,applicant_id,kyc_status,missing_fields
+  select id,client_name,email,external_user_id,applicant_id,kyc_status,
+    case when applicant_id ~ '^[a-fA-F0-9]{24}$' then 'SUMSUB'
+      when applicant_id is null then 'EXTERNAL_LOOKUP_ONLY'
+      when applicant_id like 'mock-%' then 'MOCK'
+      when applicant_id like 'admin-%' then 'ADMIN_COMPLETED'
+      when applicant_id ~ '^\d+$' then 'EXPERIAN_TRANSACTION'
+      else 'OTHER' end provider_classification,
+    missing_fields
 from missing where cardinality(missing_fields)>0
 order by cardinality(missing_fields) desc,client_name;
