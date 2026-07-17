@@ -817,11 +817,11 @@ module.exports = async (req, res) => {
       }
     }
 
-    // APP-SETTINGS-MAINTENANCE-SET — master admin AND the maintenance password.
-    // Flips is_enabled on the row the app reads: false = the MINT app drops into
-    // maintenance (signs users out) in real time; true = back online. Double-gated
-    // because it takes the whole app down. Password checked server-side against
-    // MAINTENANCE_PASSWORD (never shipped to the browser).
+    // APP-SETTINGS-MAINTENANCE-SET — master admin AND the admin's own account
+    // password (re-auth), same pattern as computershare-number. Flips is_enabled
+    // on the row the app reads: false = the MINT app drops into maintenance (signs
+    // users out) in real time; true = back online. Double-gated because it takes
+    // the whole app down.
     if (action === 'app-settings-maintenance-set') {
       if (req.method !== 'POST' && req.method !== 'PUT' && req.method !== 'PATCH') {
         return sendJson(res, 405, { error: 'Method not allowed' });
@@ -829,12 +829,10 @@ module.exports = async (req, res) => {
       const result = await requireMasterAdmin(req, res);
       if (!result) return;
 
-      const expected = process.env.MAINTENANCE_PASSWORD;
-      if (!expected) {
-        return sendJson(res, 500, { error: 'Maintenance password is not configured on the server. Set the MAINTENANCE_PASSWORD env var.' });
-      }
-      if (String(req.body?.password ?? '') !== expected) {
-        return sendJson(res, 403, { error: 'Incorrect maintenance password.' });
+      const password = String(req.body?.password ?? '');
+      if (!password) return sendJson(res, 400, { error: 'Your account password is required.' });
+      if (!(await verifyUserPassword(result.user.email, password))) {
+        return sendJson(res, 403, { error: 'Incorrect password.' });
       }
       const enabled = req.body?.is_enabled;
       if (typeof enabled !== 'boolean') return sendJson(res, 400, { error: 'is_enabled boolean is required' });

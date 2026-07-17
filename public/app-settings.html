@@ -78,7 +78,7 @@
     <div id="content" style="display:none;">
       <div class="card" id="maintCard">
         <div class="card-title">Maintenance Mode</div>
-        <div class="card-sub">Turns the whole MINT app on/off. When ON, users are signed out to the maintenance screen in real time (admins with bypass are unaffected). No deploy needed. Password required to change.</div>
+        <div class="card-sub">Turns the whole MINT app on/off. When ON, users are signed out to the maintenance screen in real time (admins with bypass are unaffected). No deploy needed. Re-enter your account password to change.</div>
 
         <div class="field">
           <div>
@@ -93,7 +93,7 @@
         <div id="maintConfirm" style="display:none;margin-top:14px;padding:14px;border:1px solid #efeaf7;border-radius:12px;background:#faf7ff;">
           <div class="field-hint" id="maintConfirmMsg" style="margin-bottom:10px;font-weight:600;"></div>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-            <input type="password" id="maintPassword" placeholder="Maintenance password" autocomplete="off"
+            <input type="password" id="maintPassword" placeholder="Your account password" autocomplete="current-password"
                    style="padding:9px 12px;border:1px solid #d8d8de;border-radius:10px;min-width:220px;font-size:14px;">
             <button class="btn btn-primary" id="maintApplyBtn" type="button">Confirm</button>
             <button class="btn" id="maintCancelBtn" type="button">Cancel</button>
@@ -292,8 +292,8 @@
       const panel = document.getElementById('maintConfirm');
       panel.dataset.nextEnabled = String(nextEnabled);
       document.getElementById('maintConfirmMsg').textContent = goingDown
-        ? '⚠ This puts the MINT app into maintenance mode immediately and signs users out. Enter the maintenance password to confirm.'
-        : 'This brings the MINT app back online for all users. Enter the maintenance password to confirm.';
+        ? '⚠ This puts the MINT app into maintenance mode immediately and signs users out. Enter your account password to confirm.'
+        : 'This brings the MINT app back online for all users. Enter your account password to confirm.';
       document.getElementById('maintPassword').value = '';
       const err = document.getElementById('maintErr'); err.style.display = 'none';
       panel.style.display = 'block';
