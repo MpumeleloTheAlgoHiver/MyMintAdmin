@@ -12,6 +12,10 @@ select
   (select count(*) from packs) as existing_packs,
   (select count(*) from packs where jsonb_typeof(pack->'info')='object') as packs_with_info,
   (select count(*) from onboarding where raw ? 'experian_kyc_result' or raw ? 'experian_idmn_result') as retained_experian_payloads,
+  (select count(*) from public.profiles p
+    where coalesce(to_jsonb(p)->>'id_number','') ~ '^\d{13}$') as profiles_with_sa_id,
+  (select count(*) from public.profiles p
+    where coalesce(to_jsonb(p)->>'id_number','') ~ '^\d{13}$'
+      and nullif(to_jsonb(p)->>'gender','') is null) as sa_id_profiles_missing_gender,
   (select count(*) from public.profiles p left join packs k on k.user_id=p.id left join onboarding o on o.user_id=p.id
     where k.user_id is not null or o.user_id is not null) as reconstruction_scope;
-

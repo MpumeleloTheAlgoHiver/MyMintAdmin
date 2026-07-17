@@ -20,6 +20,12 @@ declare
   v_last text;
   v_dob text;
   v_id_number text;
+  v_gender text;
+  v_gender_source text;
+  v_sa_id_valid boolean;
+  v_checksum_sum integer;
+  v_digit integer;
+  v_index integer;
   v_phone text;
   v_address text;
   v_had_sumsub boolean;
@@ -51,11 +57,39 @@ begin
     v_last := coalesce(nullif(v_profile->>'last_name',''),nullif(v_info->>'lastName',''),jsonb_path_query_first(coalesce(v_idmn,v_kyc),'$.**.lastName')#>>'{}',jsonb_path_query_first(coalesce(v_idmn,v_kyc),'$.**.surname')#>>'{}');
     v_dob := coalesce(nullif(v_profile->>'date_of_birth',''),nullif(v_info->>'dob',''),nullif(v_info->>'dateOfBirth',''),jsonb_path_query_first(coalesce(v_idmn,v_kyc),'$.**.dateOfBirth')#>>'{}',jsonb_path_query_first(coalesce(v_idmn,v_kyc),'$.**.dob')#>>'{}');
     v_id_number := coalesce(nullif(v_profile->>'id_number',''),nullif(v_info->>'idNumber',''),jsonb_path_query_first(coalesce(v_idmn,v_kyc),'$.**.identityNumber')#>>'{}',jsonb_path_query_first(coalesce(v_idmn,v_kyc),'$.**.idNumber')#>>'{}');
+    v_gender := coalesce(nullif(v_profile->>'gender',''), nullif(v_info->>'gender',''),
+      jsonb_path_query_first(coalesce(v_idmn,v_kyc),'$.**.gender')#>>'{}');
+    v_gender_source := case
+      when nullif(v_profile->>'gender','') is not null then 'Profile'
+      when nullif(v_info->>'gender','') is not null then 'Provider record'
+      when jsonb_path_query_first(coalesce(v_idmn,v_kyc),'$.**.gender') is not null then 'Experian'
+      else 'Not available' end;
+    v_sa_id_valid := false;
+    if v_id_number ~ '^\d{13}$'
+       and substring(v_id_number,3,2)::int between 1 and 12
+       and substring(v_id_number,5,2)::int between 1 and 31 then
+      v_checksum_sum := 0;
+      for v_index in 1..12 loop
+        v_digit := substring(v_id_number,v_index,1)::int;
+        if mod(v_index,2)=0 then
+          v_digit := v_digit*2;
+          if v_digit>9 then v_digit:=v_digit-9; end if;
+        end if;
+        v_checksum_sum := v_checksum_sum+v_digit;
+      end loop;
+      v_sa_id_valid := mod(10-mod(v_checksum_sum,10),10)=substring(v_id_number,13,1)::int;
+    end if;
+    if v_gender is null and v_sa_id_valid then
+      -- SA ID digits 7-10 are the sequence: 0000-4999 female, 5000-9999 male.
+      -- This is a derived display value, not a provider assertion.
+      v_gender := case when substring(v_id_number,7,4)::int >= 5000 then 'Male' else 'Female' end;
+      v_gender_source := 'Derived from validated SA ID';
+    end if;
     v_phone := coalesce(nullif(v_profile->>'phone_number',''),nullif(v_info->>'phone',''),jsonb_path_query_first(coalesce(v_kyc,v_idmn),'$.**.phoneNumber')#>>'{}');
     v_address := coalesce(nullif(v_profile->>'address',''),jsonb_path_query_first(v_info,'$.**.formattedAddress')#>>'{}',jsonb_path_query_first(coalesce(v_kyc,v_idmn),'$.**.formattedAddress')#>>'{}',jsonb_path_query_first(coalesce(v_kyc,v_idmn),'$.**.residentialAddress')#>>'{}');
 
     v_info := v_info || jsonb_strip_nulls(jsonb_build_object(
-      'firstName',v_first,'lastName',v_last,'dob',v_dob,'idNumber',v_id_number,
+      'firstName',v_first,'lastName',v_last,'dob',v_dob,'gender',v_gender,'idNumber',v_id_number,
       'email',nullif(v_profile->>'email',''),'phone',v_phone,
       'addresses',case when v_address is not null and not(v_info?'addresses')
         then jsonb_build_array(jsonb_build_object('formattedAddress',v_address)) else null end
@@ -69,6 +103,7 @@ begin
           'profile','User-confirmed profile fields',
           'sumsub',case when v_had_sumsub then 'SumSub applicant data' else 'Not available' end,
           'experian',case when v_kyc is not null or v_idmn is not null then 'Experian KYC / ID Me Now' else 'Not available' end,
+          'gender',v_gender_source,
           'reconstruction_scope','All existing onboarding clients',
           'reconstructed_at',now()
         )
@@ -91,4 +126,3 @@ select
   count(*) filter(where pack_details?'info') as with_info,
   count(*) filter(where pack_details?'experian' and (pack_details->'data_provenance'->>'experian')<>'Not available') as with_experian_evidence
 from public.user_onboarding_pack_details;
-
