@@ -61,6 +61,13 @@
     .maint-pill{display:inline-block;padding:5px 12px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.02em;background:#eee;color:#555;}
     .maint-pill.live{background:#dcfce7;color:#166534;}
     .maint-pill.down{background:#fee2e2;color:#991b1b;}
+    .switch{position:relative;display:inline-block;width:50px;height:28px;flex-shrink:0;}
+    .switch input{opacity:0;width:0;height:0;}
+    .switch .slider{position:absolute;inset:0;cursor:pointer;background:#d1d1d6;border-radius:999px;transition:background .2s;}
+    .switch .slider:before{content:"";position:absolute;height:22px;width:22px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.25);}
+    .switch input:checked + .slider{background:#22c55e;}
+    .switch input:checked + .slider:before{transform:translateX(22px);}
+    .switch input:disabled + .slider{opacity:.5;cursor:not-allowed;}
   </style>
 </head>
 <body>
@@ -82,11 +89,15 @@
 
         <div class="field">
           <div>
-            <div class="field-label">App status</div>
+            <div class="field-label">App enabled</div>
             <div class="field-hint" id="maintStatusHint">Loading…</div>
           </div>
-          <div class="input-wrap">
+          <div class="input-wrap" style="gap:12px;align-items:center;">
             <span id="maintStatusPill" class="maint-pill">…</span>
+            <label class="switch" title="Toggle the app on / off">
+              <input type="checkbox" id="maintSwitch" disabled>
+              <span class="slider"></span>
+            </label>
           </div>
         </div>
 
@@ -102,7 +113,6 @@
         </div>
 
         <div class="actions" style="margin-top:16px;">
-          <button class="btn btn-primary" id="maintToggleBtn" type="button" disabled>…</button>
           <span class="meta" id="maintMeta"></span>
         </div>
       </div>
@@ -255,24 +265,21 @@
     const renderMaint = () => {
       const pill = document.getElementById('maintStatusPill');
       const hint = document.getElementById('maintStatusHint');
-      const btn  = document.getElementById('maintToggleBtn');
+      const sw   = document.getElementById('maintSwitch');
       if (maintEnabled === null) {
         pill.textContent = 'Unknown'; pill.className = 'maint-pill';
         hint.textContent = 'Could not read the app status.';
-        btn.textContent = 'Unavailable'; btn.disabled = true; btn.style.background = '';
+        sw.checked = false; sw.disabled = true;
         return;
       }
-      const live = maintEnabled === true;
+      const live = maintEnabled === true;   // switch ON = live
       pill.textContent = live ? 'Live' : 'In maintenance';
       pill.className = 'maint-pill ' + (live ? 'live' : 'down');
       hint.textContent = live
         ? 'The app is live for all users.'
         : 'The app is in maintenance — users are signed out to the maintenance screen.';
-      btn.disabled = false;
-      btn.textContent = live ? 'Turn ON maintenance' : 'Turn OFF maintenance (go live)';
-      // Turning the app OFF is the dangerous direction → red.
-      btn.style.background = live ? '#dc2626' : '';
-      btn.style.borderColor = live ? '#dc2626' : '';
+      sw.checked = live;
+      sw.disabled = false;
     };
 
     const loadMaint = async () => {
@@ -285,7 +292,10 @@
       }
     };
 
-    document.getElementById('maintToggleBtn').addEventListener('click', () => {
+    document.getElementById('maintSwitch').addEventListener('click', (e) => {
+      // Don't let the switch flip until the password is confirmed — re-assert the
+      // current state and open the confirm panel for the requested change instead.
+      e.preventDefault();
       if (maintEnabled === null) return;
       const nextEnabled = !maintEnabled;                // desired is_enabled after the action
       const goingDown = nextEnabled === false;          // turning maintenance ON
@@ -302,6 +312,7 @@
 
     document.getElementById('maintCancelBtn').addEventListener('click', () => {
       document.getElementById('maintConfirm').style.display = 'none';
+      renderMaint(); // re-assert the switch to the confirmed state
     });
 
     document.getElementById('maintApplyBtn').addEventListener('click', async () => {
