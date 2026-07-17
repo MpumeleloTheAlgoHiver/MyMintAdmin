@@ -4145,7 +4145,10 @@
                   <span class="simple-uid-sep" aria-hidden="true">&middot;</span>
                   <span class="simple-uid" data-uid>UID: AA-0000-XX</span>
                 </div>
-                <div class="simple-row-cs" data-row-cs style="display:none;font-size:11px;font-weight:600;color:#0e7490;font-family:ui-monospace,monospace;margin-top:2px;letter-spacing:0.04em;"></div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+                  <span class="simple-row-cs" data-row-cs style="display:none;font-size:11px;font-weight:600;color:#0e7490;font-family:ui-monospace,monospace;letter-spacing:0.04em;"></span>
+                  <button type="button" data-computershare-edit title="Add Computershare number" aria-label="Add Computershare number" style="display:none;width:24px;height:24px;border:0;border-radius:999px;background:#ede9fe;color:#6d28d9;cursor:pointer;font-size:13px;line-height:1;">✎</button>
+                </div>
               </div>
             </div>
             <div class="simple-mid">
@@ -6391,6 +6394,22 @@
       return null;
     };
 
+    const inferAdultGenderFromIdNumber = (idNumber) => {
+      const digits = String(idNumber || '').replace(/\D/g, '');
+      if (!/^\d{13}$/.test(digits)) return '';
+      const month = Number(digits.slice(2, 4));
+      const day = Number(digits.slice(4, 6));
+      if (month < 1 || month > 12 || day < 1 || day > 31) return '';
+      let sum = 0;
+      for (let index = 0; index < 12; index += 1) {
+        let digit = Number(digits[index]);
+        if (index % 2 === 1) { digit *= 2; if (digit > 9) digit -= 9; }
+        sum += digit;
+      }
+      if ((10 - (sum % 10)) % 10 !== Number(digits[12])) return '';
+      return Number(digits.slice(6, 10)) >= 5000 ? 'Male' : 'Female';
+    };
+
     const buildRichClientPack = (profileId, packJson) => {
       const base = parseJsonSafe(packJson) || {};
       const onboarding = onboardingMap?.[profileId] || {};
@@ -6404,6 +6423,7 @@
       const lastName = existingInfo.lastName || existingInfo.lastNameEn || profile.last_name || findProviderValue(provider, ['lastName', 'surname', 'familyName']);
       const dateOfBirth = existingInfo.dob || existingInfo.dateOfBirth || profile.date_of_birth || findProviderValue(provider, ['dateOfBirth', 'birthDate', 'dob']);
       const idNumber = profile.id_number || findProviderValue(provider, ['identityNumber', 'idNumber', 'documentNumber']);
+      const gender = existingInfo.gender || profile.gender || inferAdultGenderFromIdNumber(idNumber);
       const phone = existingInfo.phone || profile.phone_number || findProviderValue(provider, ['phoneNumber', 'mobileNumber', 'cellphone']);
       const address = profile.address || findProviderValue(experianKyc || provider, ['formattedAddress', 'residentialAddress', 'streetAddress', 'address']);
       const info = {
@@ -6412,6 +6432,7 @@
         ...(lastName ? { lastName } : {}),
         ...(dateOfBirth ? { dob: dateOfBirth } : {}),
         ...(idNumber ? { idNumber } : {}),
+        ...(gender ? { gender } : {}),
         ...(profile.email ? { email: profile.email } : {}),
         ...(phone ? { phone } : {}),
         ...(address && !existingInfo.addresses ? { addresses: [{ formattedAddress: address }] } : {}),
@@ -6621,6 +6642,11 @@
         clone.querySelectorAll('[data-row-cs]').forEach(el => {
           el.textContent = csNum;
           el.style.display = csNum ? '' : 'none';
+        });
+        clone.querySelectorAll('[data-computershare-edit]').forEach(el => {
+          el.style.display = csNum ? 'none' : 'inline-flex';
+          el.style.alignItems = 'center';
+          el.style.justifyContent = 'center';
         });
         clone.querySelectorAll('[data-row-kyc]').forEach(el => {
           el.textContent = effectiveKycState.label;
@@ -6840,6 +6866,10 @@
         clone.querySelectorAll('[data-row-cs]').forEach(el => {
           el.textContent = childCsNum;
           el.style.display = childCsNum ? '' : 'none';
+        });
+        clone.querySelectorAll('[data-computershare-edit]').forEach(el => {
+          el.style.display = childCsNum ? 'none' : 'inline-flex';
+          el.style.alignItems = 'center'; el.style.justifyContent = 'center';
         });
 
         // KYC badge &rarr; show child KYC status
@@ -10060,8 +10090,65 @@
       return null;
     };
 
+    const requestComputershareCredentials = () => new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.62)';
+      overlay.innerHTML = `<div role="dialog" aria-modal="true" aria-label="Add Computershare number" style="width:min(390px,100%);background:#fff;border-radius:18px;padding:22px;box-shadow:0 24px 70px rgba(15,23,42,.3)">
+        <h3 style="margin:0;color:#111827;font-size:17px">Add Computershare number</h3>
+        <p style="margin:5px 0 16px;color:#64748b;font-size:12px">Your admin password is required to authorize this change.</p>
+        <label style="display:block;margin-bottom:12px;color:#334155;font-size:12px;font-weight:700">Computershare number<input data-cs-number autocomplete="off" style="box-sizing:border-box;width:100%;margin-top:6px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font:inherit"></label>
+        <label style="display:block;margin-bottom:16px;color:#334155;font-size:12px;font-weight:700">Your admin password<input data-cs-password type="password" autocomplete="current-password" style="box-sizing:border-box;width:100%;margin-top:6px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font:inherit"></label>
+        <div data-cs-error style="display:none;margin-bottom:10px;color:#dc2626;font-size:12px"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px"><button data-cs-cancel type="button" class="mandate-action-btn">Cancel</button><button data-cs-save type="button" class="mandate-action-btn" style="background:#6d28d9;color:#fff">Save</button></div>
+      </div>`;
+      document.body.appendChild(overlay);
+      const numberInput = overlay.querySelector('[data-cs-number]');
+      const passwordInput = overlay.querySelector('[data-cs-password]');
+      const close = (value) => { overlay.remove(); resolve(value); };
+      overlay.querySelector('[data-cs-cancel]').addEventListener('click', () => close(null));
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) close(null); });
+      overlay.querySelector('[data-cs-save]').addEventListener('click', () => {
+        const number = String(numberInput.value || '').trim();
+        const password = String(passwordInput.value || '');
+        const error = overlay.querySelector('[data-cs-error]');
+        if (!number || !password) { error.textContent = 'Both fields are required.'; error.style.display = 'block'; return; }
+        close({ number, password });
+      });
+      numberInput.focus();
+    });
+
 
     document.addEventListener('click', async (event) => {
+      const computershareEditBtn = event.target.closest('[data-computershare-edit]');
+      if (computershareEditBtn) {
+        event.preventDefault(); event.stopPropagation();
+        const item = computershareEditBtn.closest('.simple-item');
+        const profileId = item?.dataset?.profileId;
+        if (!item || !profileId) return;
+        const credentials = await requestComputershareCredentials();
+        if (!credentials) return;
+        try {
+          const { data: sessionData } = await supabaseClient.auth.getSession();
+          const token = sessionData?.session?.access_token;
+          if (!token) throw new Error('Your session has expired. Please sign in again.');
+          const response = await fetch('/api/team?action=computershare-number', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              ...(item.dataset.familyChild === 'true' ? { family_member_id: profileId } : { profile_id: profileId }),
+              computershare_number: credentials.number, password: credentials.password
+            })
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(payload.error || 'Could not save Computershare number.');
+          const profile = allProfiles.find(row => String(row.id) === String(profileId));
+          if (profile) profile.computershare_number = payload.computershare_number;
+          item.querySelectorAll('[data-row-cs]').forEach(el => { el.textContent = payload.computershare_number; el.style.display = ''; });
+          item.querySelectorAll('[data-computershare-edit]').forEach(el => { el.style.display = 'none'; });
+        } catch (error) {
+          alert(error?.message || 'Could not save Computershare number.');
+        }
+        return;
+      }
       const tableToggleBtn = event.target.closest('#completedTableViewBtn');
       if (tableToggleBtn) {
         if (activeProfileFilters.kyc !== 'completed') return;

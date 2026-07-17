@@ -35,6 +35,7 @@ begin
   for r in
     select p.id
     from public.profiles p
+    where exists(select 1 from public.user_onboarding o where o.user_id=p.id)
   loop
     select to_jsonb(p) into v_profile from public.profiles p where p.id=r.id;
     select case when jsonb_typeof(to_jsonb(o)->'sumsub_raw')='object'
@@ -124,7 +125,7 @@ begin
           'sumsub',case when v_had_sumsub then 'SumSub applicant data' else 'Not available' end,
           'experian',case when v_has_experian then 'Experian KYC / ID Me Now' else 'Not available' end,
           'gender',v_gender_source,
-          'reconstruction_scope','All client profiles',
+          'reconstruction_scope','Profiles with an onboarding record',
           'reconstructed_at',now()
         )
       ) || case when v_has_experian then jsonb_build_object(

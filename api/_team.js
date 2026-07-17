@@ -30,6 +30,16 @@ const verifyToken = async (token) => {
   return res.json();
 };
 
+const verifyUserPassword = async (email, password) => {
+  const { supabaseUrl, serviceRoleKey } = getSupabaseCreds();
+  const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { 'apikey': serviceRoleKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
+  return response.ok;
+};
+
 const getTeamMember = async (userId, email) => {
   const { supabaseUrl, serviceRoleKey } = getSupabaseCreds();
   
@@ -611,6 +621,7 @@ module.exports = {
   requireAuth,
   requireAdmin,
   requireMasterAdmin,
+  verifyUserPassword,
   requirePermission,
   supabaseRequest,
   createAuthUser,

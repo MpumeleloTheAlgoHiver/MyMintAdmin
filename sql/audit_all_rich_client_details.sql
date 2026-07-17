@@ -17,4 +17,5 @@ select
   (select count(*) from public.profiles p
     where coalesce(to_jsonb(p)->>'id_number','') ~ '^\d{13}$'
       and nullif(to_jsonb(p)->>'gender','') is null) as sa_id_profiles_missing_gender,
-  (select count(*) from public.profiles) as reconstruction_scope;
+  (select count(*) from public.profiles p
+    where exists(select 1 from public.user_onboarding o where o.user_id=p.id)) as reconstruction_scope;

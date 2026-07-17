@@ -4,7 +4,9 @@ const {
   sendJson,
   isAllowedDomain,
   requireAuth,
+  requireAdmin,
   requireMasterAdmin,
+  verifyUserPassword,
   supabaseRequest,
   createAuthUser,
   listAuthUsers,
@@ -93,6 +95,26 @@ module.exports = async (req, res) => {
         permissions: member.permissions || {},
         id: member.id
       });
+    }
+
+    if (action === 'computershare-number') {
+      if (req.method !== 'POST' && req.method !== 'PATCH') return sendJson(res, 405, { error: 'Method not allowed' });
+      const result = await requireAdmin(req, res);
+      if (!result) return;
+      const profileId = String(req.body?.profile_id || '').trim();
+      const familyMemberId = String(req.body?.family_member_id || '').trim();
+      const number = String(req.body?.computershare_number || '').trim().toUpperCase();
+      const password = String(req.body?.password || '');
+      if ((!profileId && !familyMemberId) || !number || !password) return sendJson(res, 400, { error: 'Client, Computershare number and password are required' });
+      if (!/^[A-Z0-9][A-Z0-9\-/ ]{2,39}$/.test(number)) return sendJson(res, 400, { error: 'Enter a valid Computershare number' });
+      if (!(await verifyUserPassword(result.user.email, password))) return sendJson(res, 403, { error: 'Incorrect password' });
+      const table = familyMemberId ? 'family_members' : 'profiles';
+      const id = familyMemberId || profileId;
+      await supabaseRequest(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH', body: { computershare_number: number, updated_at: new Date().toISOString() }
+      });
+      await writeAudit({ action: 'update_computershare_number', target_email: null, target_member_id: id, actor_email: result.user.email, actor_user_id: result.user.id, details: { table } });
+      return sendJson(res, 200, { ok: true, computershare_number: number });
     }
 
     // LIST — admin only
