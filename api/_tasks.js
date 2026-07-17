@@ -12,9 +12,9 @@ module.exports = async (req, res) => {
   if (!auth) return;
 
   const url = new URL(req.url, 'http://x');
-  // Extract task id from path: /api/tasks/:id
+  // Extract task id from path or query param (query param used when routed via team.js on Vercel)
   const pathParts = url.pathname.replace(/^\/api\/tasks\/?/, '').split('/').filter(Boolean);
-  const taskId = pathParts[0] || null;
+  const taskId = pathParts[0] || url.searchParams.get('taskId') || null;
 
   // GET /api/tasks?action=me — current user's own member record
   if (req.method === 'GET' && url.searchParams.get('action') === 'me') {

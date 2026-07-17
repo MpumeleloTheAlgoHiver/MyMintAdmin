@@ -12,7 +12,8 @@
     { "source": "/api/dividends/payouts", "destination": "/api/team?fwd=dividends-payouts" },
     { "source": "/api/dividends/email", "destination": "/api/team?fwd=dividends-email" },
     { "source": "/api/alliance-news", "destination": "/api/team?fwd=alliance-news" },
-    { "source": "/api/tasks/:path*", "destination": "/api/team?fwd=tasks" },
+    { "source": "/api/tasks/:id", "destination": "/api/team?fwd=tasks&taskId=:id" },
+    { "source": "/api/tasks", "destination": "/api/team?fwd=tasks" },
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ],
   "crons": [
