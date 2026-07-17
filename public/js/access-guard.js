@@ -24,6 +24,7 @@
     '/finances.html':   'finances',
     '/settings.html':    'settings',
     '/cyber-compliance.html': 'cyber-compliance',
+    '/standup.html':          'standup',
     '/team.html':             '__admin_only__'
   };
 
