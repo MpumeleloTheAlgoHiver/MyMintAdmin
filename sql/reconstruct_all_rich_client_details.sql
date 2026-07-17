@@ -33,8 +33,6 @@ begin
   for r in
     select p.id
     from public.profiles p
-    where exists(select 1 from public.user_onboarding_pack_details k where k.user_id=p.id)
-       or exists(select 1 from public.user_onboarding o where o.user_id=p.id)
   loop
     select to_jsonb(p) into v_profile from public.profiles p where p.id=r.id;
     select case when jsonb_typeof(to_jsonb(o)->'sumsub_raw')='object'
@@ -104,7 +102,7 @@ begin
           'sumsub',case when v_had_sumsub then 'SumSub applicant data' else 'Not available' end,
           'experian',case when v_kyc is not null or v_idmn is not null then 'Experian KYC / ID Me Now' else 'Not available' end,
           'gender',v_gender_source,
-          'reconstruction_scope','All existing onboarding clients',
+          'reconstruction_scope','All client profiles',
           'reconstructed_at',now()
         )
       ) || case when v_kyc is not null or v_idmn is not null then jsonb_build_object(
@@ -124,5 +122,7 @@ commit;
 select
   count(*) as normalized_packs,
   count(*) filter(where pack_details?'info') as with_info,
+  count(*) filter(where nullif(pack_details->'info'->>'gender','') is not null) as with_gender,
+  count(*) filter(where pack_details->'data_provenance'->>'gender'='Derived from validated SA ID') as gender_derived_from_sa_id,
   count(*) filter(where pack_details?'experian' and (pack_details->'data_provenance'->>'experian')<>'Not available') as with_experian_evidence
 from public.user_onboarding_pack_details;
