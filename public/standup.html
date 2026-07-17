@@ -207,9 +207,14 @@
     }
 
     async function loadAll() {
-      const [tasks,members] = await Promise.all([api('/api/tasks'),api('/api/tasks?action=members')]);
-      allTasks   = Array.isArray(tasks) ? tasks : [];
-      allMembers = Array.isArray(members) ? members : [];
+      try {
+        const [tasks,members] = await Promise.all([api('/api/tasks'),api('/api/tasks?action=members')]);
+        allTasks   = Array.isArray(tasks) ? tasks : [];
+        allMembers = Array.isArray(members) ? members : [];
+      } catch(err) {
+        console.error('[standup] loadAll failed:', err.message);
+        document.getElementById('subtitle').textContent = 'Error loading data: ' + err.message;
+      }
     }
 
     async function init() {
@@ -219,6 +224,7 @@
       document.getElementById('eyebrow').textContent =
         sast.toLocaleDateString('en-ZA',{weekday:'long',day:'numeric',month:'long',timeZone:'UTC'}).toUpperCase();
       await loadAll();
+      console.log('[standup] tasks:', allTasks.length, 'members:', allMembers.length, 'user email:', user?.email);
       myMember = allMembers.find(m=>m.email===user?.email)||null;
       const h = sast.getUTCHours();
       const greet = h<12?'Good morning':h<17?'Good afternoon':'Good evening';
