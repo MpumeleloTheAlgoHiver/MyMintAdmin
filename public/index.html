@@ -6375,14 +6375,76 @@
       report.doc.save(report.filename);
     };
 
-    const renderPackDetails = (container, packJson) => {
+    const findProviderValue = (source, aliases = [], depth = 0) => {
+      if (!source || typeof source !== 'object' || depth > 8) return null;
+      const wanted = new Set(aliases.map(alias => String(alias).replace(/[^a-z0-9]/gi, '').toLowerCase()));
+      for (const [key, value] of Object.entries(source)) {
+        const normalized = String(key).replace(/[^a-z0-9]/gi, '').toLowerCase();
+        if (wanted.has(normalized) && value !== null && value !== undefined && value !== '' && typeof value !== 'object') return value;
+      }
+      for (const value of Object.values(source)) {
+        if (value && typeof value === 'object') {
+          const found = findProviderValue(value, aliases, depth + 1);
+          if (found !== null && found !== undefined && found !== '') return found;
+        }
+      }
+      return null;
+    };
+
+    const buildRichClientPack = (profileId, packJson) => {
+      const base = parseJsonSafe(packJson) || {};
+      const onboarding = onboardingMap?.[profileId] || {};
+      const raw = parseJsonSafe(onboarding?.sumsub_raw) || {};
+      const experianKyc = raw?.experian_kyc_result || base?.experian?.kyc || null;
+      const experianIdmn = raw?.experian_idmn_result || base?.experian?.idmn || base?.experian_idmn || null;
+      const provider = experianIdmn || experianKyc || {};
+      const profile = allProfiles.find(row => String(row.id) === String(profileId)) || {};
+      const existingInfo = base.info && typeof base.info === 'object' ? base.info : {};
+      const firstName = existingInfo.firstName || existingInfo.firstNameEn || profile.first_name || findProviderValue(provider, ['firstName', 'forename', 'givenName']);
+      const lastName = existingInfo.lastName || existingInfo.lastNameEn || profile.last_name || findProviderValue(provider, ['lastName', 'surname', 'familyName']);
+      const dateOfBirth = existingInfo.dob || existingInfo.dateOfBirth || profile.date_of_birth || findProviderValue(provider, ['dateOfBirth', 'birthDate', 'dob']);
+      const idNumber = profile.id_number || findProviderValue(provider, ['identityNumber', 'idNumber', 'documentNumber']);
+      const phone = existingInfo.phone || profile.phone_number || findProviderValue(provider, ['phoneNumber', 'mobileNumber', 'cellphone']);
+      const address = profile.address || findProviderValue(experianKyc || provider, ['formattedAddress', 'residentialAddress', 'streetAddress', 'address']);
+      const info = {
+        ...existingInfo,
+        ...(firstName ? { firstName } : {}),
+        ...(lastName ? { lastName } : {}),
+        ...(dateOfBirth ? { dob: dateOfBirth } : {}),
+        ...(idNumber ? { idNumber } : {}),
+        ...(profile.email ? { email: profile.email } : {}),
+        ...(phone ? { phone } : {}),
+        ...(address && !existingInfo.addresses ? { addresses: [{ formattedAddress: address }] } : {}),
+      };
+      return {
+        ...base,
+        info,
+        ...(experianKyc || experianIdmn ? {
+          experian: {
+            ...(base.experian && typeof base.experian === 'object' ? base.experian : {}),
+            ...(experianKyc ? { kyc: experianKyc } : {}),
+            ...(experianIdmn ? { idmn: experianIdmn } : {}),
+            source: 'Experian verified onboarding data',
+            reconstructed_at: base?.experian?.reconstructed_at || new Date().toISOString(),
+          },
+        } : {}),
+        data_provenance: {
+          ...(base.data_provenance && typeof base.data_provenance === 'object' ? base.data_provenance : {}),
+          profile: 'User-confirmed profile fields',
+          sumsub: base.info || base.fixedInfo ? 'SumSub applicant data' : 'Not available',
+          experian: experianKyc || experianIdmn ? 'Experian KYC / ID Me Now' : 'Not available',
+        },
+      };
+    };
+
+    const renderPackDetails = (container, packJson, targetProfileId = null) => {
       if (!container) return;
       const packDetailsGrid = container.querySelector('#packDetailsGrid');
       const packDetailsDocs = container.querySelector('#packDetailsDocs');
       const packDetailsReview = container.querySelector('#packDetailsReview');
       if (!packDetailsGrid || !packDetailsDocs || !packDetailsReview) return;
 
-      let resolvedPack = packJson;
+      let resolvedPack = targetProfileId ? buildRichClientPack(targetProfileId, packJson) : packJson;
       if (typeof resolvedPack === 'string') {
         try {
           resolvedPack = JSON.parse(resolvedPack);
@@ -10298,7 +10360,7 @@
           const externalUserId = item?.dataset?.externalUserId;
           const packJson = profileId ? packJsonMap[profileId] : null;
           if (packJson) {
-            renderPackDetails(container, packJson);
+            renderPackDetails(container, packJson, profileId);
           } else if (profileId) {
             supabaseClient
               .from('user_onboarding_pack_details')
@@ -10308,27 +10370,27 @@
               .then(async ({ data, error }) => {
                 if (!error && data?.pack_details) {
                   packJsonMap[profileId] = data.pack_details;
-                  renderPackDetails(container, data.pack_details);
+                  renderPackDetails(container, data.pack_details, profileId);
                   return;
                 }
 
                 if (!externalUserId) {
                   if (error) console.error('Pack details load error:', error);
-                  renderPackDetails(container, null);
+                  renderPackDetails(container, null, profileId);
                   return;
                 }
 
                 try {
                   const applicantJson = await fetchApplicantByExternalId(externalUserId);
                   await persistPackForProfile(item, applicantJson);
-                  renderPackDetails(container, applicantJson);
+                  renderPackDetails(container, applicantJson, profileId);
                 } catch (fetchError) {
                   console.error('Pack details fetch error:', fetchError);
-                  renderPackDetails(container, null);
+                  renderPackDetails(container, null, profileId);
                 }
               });
           } else {
-            renderPackDetails(container, null);
+            renderPackDetails(container, null, profileId);
           }
           return;
         }
@@ -10502,7 +10564,7 @@
         const container = packDetailsBtn.closest('.tabs-container');
         if (!item?.dataset?.profileId) return;
         const packJson = packJsonMap[item.dataset.profileId];
-        renderPackDetails(container, packJson);
+        renderPackDetails(container, packJson, item.dataset.profileId);
       }
     });
 
