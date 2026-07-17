@@ -209,7 +209,7 @@
     async function loadAll() {
       const [tasks,members] = await Promise.all([api('/api/tasks'),api('/api/tasks?action=members')]);
       allTasks   = Array.isArray(tasks) ? tasks : [];
-      allMembers = (Array.isArray(members)?members:[]).filter(m=>m.status==='active'||!m.status);
+      allMembers = Array.isArray(members) ? members : [];
     }
 
     async function init() {
