@@ -747,6 +747,30 @@ module.exports = async (req, res) => {
       }
     }
 
+    // RETURN-REPAIR-PREVIEW — master-admin read of a validated run, including
+    // production comparators. Used only by the dedicated Repair settings page.
+    if (action === 'return-repair-preview') {
+      if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
+      const result = await requireMasterAdmin(req, res);
+      if (!result) return;
+      const runId = (url.searchParams.get('run_id') || '').trim();
+      if (!runId) return sendJson(res, 400, { error: 'run_id is required' });
+      try {
+        const runs = await supabaseRequest(`/rest/v1/return_repair_runs_c?id=eq.${encodeURIComponent(runId)}&status=in.(VALIDATED,APPROVED,PROMOTED)&select=id,repair_key,status,scope,validation_summary&limit=1`);
+        const run = runs?.[0];
+        if (!run) return sendJson(res, 404, { error: 'Validated repair run not found' });
+        const shadow = await supabaseRequest(`/rest/v1/strategy_returns_shadow_c?run_id=eq.${encodeURIComponent(runId)}&select=strategy_id,as_of_date,securities_value_cents,continuity_cash_cents,complete_value_cents,chain_nav_cents,%221d_pct%22,%225d_pct%22,mtd_pct,ytd_pct,composition_effective_from,holdings_snapshot&order=as_of_date.asc`);
+        const strategyIds = [...new Set((shadow || []).map(x => x.strategy_id).filter(Boolean))];
+        const strategies = strategyIds.length ? await supabaseRequest(`/rest/v1/strategies_c?id=in.(${strategyIds.join(',')})&select=id,name,short_name,investor_environment`) : [];
+        const production = strategyIds.length ? await supabaseRequest(`/rest/v1/strategies_returns_c?strategy_id=in.(${strategyIds.join(',')})&select=strategy_id,as_of_date,basket_value,ytd_pct,%221d_pct%22,%225d_pct%22,%221m_pct%22&order=as_of_date.desc`) : [];
+        const latestProduction = {};
+        for (const row of production || []) if (!latestProduction[row.strategy_id]) latestProduction[row.strategy_id] = row;
+        return sendJson(res, 200, { ok: true, run, strategies, shadow: shadow || [], latestProduction });
+      } catch (err) {
+        return sendJson(res, 500, { error: `Could not load repair preview: ${err.message}` });
+      }
+    }
+
     // APP-SETTINGS-SAVE — admin only. Upserts a settings JSON blob by key. For
     // 'fees', the payload is whitelisted + coerced to non-negative numbers.
     if (action === 'app-settings-save') {
