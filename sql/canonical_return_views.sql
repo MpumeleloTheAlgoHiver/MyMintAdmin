@@ -16,6 +16,19 @@ with selected_runs as (
 ), promoted as (
   select s.* from public.strategy_returns_shadow_c s
   join selected_runs x on x.strategy_id=s.strategy_id and x.run_id=s.run_id
+), publication_start as (
+  select strategy_id,min(as_of_date) as first_date
+    from public.strategy_return_publication_audit_c
+   group by strategy_id
+), published_base as (
+  select a.*,
+         lag(a.chain_factor,1) over (partition by a.strategy_id order by a.as_of_date) as previous_chain,
+         lag(a.chain_factor,5) over (partition by a.strategy_id order by a.as_of_date) as five_day_chain,
+         first_value(a.chain_factor) over (
+           partition by a.strategy_id,date_trunc('month',a.as_of_date::timestamp)
+           order by a.as_of_date
+         ) as month_open_chain
+    from public.strategy_return_publication_audit_c a
 ), repaired_strategies as (
   select distinct strategy_id from promoted
 )
@@ -26,6 +39,22 @@ select p.strategy_id,p.as_of_date,
        p.composition_effective_from,p.holdings_snapshot,
        'PROMOTED_REPAIR'::text as source_kind,p.run_id as repair_run_id
   from promoted p
+  left join publication_start u on u.strategy_id=p.strategy_id
+ where u.first_date is null or p.as_of_date<u.first_date
+union all
+select a.strategy_id,a.as_of_date,
+       a.securities_value_cents,a.continuity_cash_cents,a.complete_value_cents,
+       a.complete_value_cents as basket_value_cents,
+       case when a.previous_chain is null then a.boundary_bridge_pct
+            else (a.chain_factor/a.previous_chain-1)*100 end as "1d_pct",
+       case when a.five_day_chain is null then null
+            else (a.chain_factor/a.five_day_chain-1)*100 end as "5d_pct",
+       null::numeric as "1m_pct",
+       case when a.month_open_chain is null then null
+            else (a.chain_factor/a.month_open_chain-1)*100 end as mtd_pct,
+       a.ytd_pct,a.composition_effective_from,a.holdings_snapshot,
+       'GUARDED_PUBLICATION'::text as source_kind,a.source_run_id as repair_run_id
+  from published_base a
 union all
 select l.strategy_id,l.as_of_date,
        l.basket_value::bigint as securities_value_cents,0::bigint as continuity_cash_cents,
@@ -34,7 +63,9 @@ select l.strategy_id,l.as_of_date,
        l.as_of_date as composition_effective_from,'[]'::jsonb as holdings_snapshot,
        'LEGACY_PRODUCTION'::text as source_kind,null::uuid as repair_run_id
   from public.strategies_returns_c l
- where not exists (select 1 from repaired_strategies x where x.strategy_id=l.strategy_id);
+  left join publication_start u on u.strategy_id=l.strategy_id
+ where not exists (select 1 from repaired_strategies x where x.strategy_id=l.strategy_id)
+   and (u.first_date is null or l.as_of_date<u.first_date);
 
 create or replace view public.client_strategy_returns_effective_c
 with (security_invoker = false)
