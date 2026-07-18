@@ -64,6 +64,25 @@ module.exports = async (req, res) => {
         )
       : [];
     let stratHist = stratHistArrays.flat();
+    let canonicalEffective = false;
+    try {
+      const effectiveArrays = userIds.length
+        ? await Promise.all(userIds.map(uid => sbGet(
+            `client_strategy_returns_effective_c?select=user_id,family_member_id,strategy_id,as_of_date,basket_value_cents,1d_pct,5d_pct,1m_pct,ytd_pct,inception_pct,inception_pnl_cents,securities_value_cents,residual_cash_cents,unused_reserve_cents,accrued_liability_cents,source_kind,repair_run_id&user_id=eq.${uid}&order=as_of_date.asc`
+          )))
+        : [];
+      if (effectiveArrays.every(Array.isArray)) {
+        stratHist = effectiveArrays.flat().map(row => ({
+          ...row,
+          basket_value: row.basket_value_cents,
+          inception_pnl: row.inception_pnl_cents,
+          gross_strategy_twr_pct: row.ytd_pct,
+          repair_preview: row.source_kind === 'PROMOTED_REPAIR',
+          repair_full_history: row.source_kind === 'PROMOTED_REPAIR',
+        }));
+        canonicalEffective = true;
+      }
+    } catch (_) { canonicalEffective = false; }
 
     /* Optional admin repair preview. The switch lives in app_settings and can
        only be changed by a master admin. Only a VALIDATED/APPROVED shadow run
@@ -71,6 +90,9 @@ module.exports = async (req, res) => {
        fallback when the switch is disabled or any validation lookup fails. */
     let repairPreview = { enabled: false };
     try {
+      if (canonicalEffective) {
+        repairPreview = { enabled: true, canonical: true, source: 'client_strategy_returns_effective_c' };
+      } else {
       const settings = await sbGet('app_settings?key=eq.repair_preview&select=value&limit=1');
       const cfg = settings?.[0]?.value || {};
       if (cfg.enabled === true && cfg.run_id) {
@@ -133,6 +155,7 @@ module.exports = async (req, res) => {
           stratHist.sort((a, b) => String(a.as_of_date).localeCompare(String(b.as_of_date)));
           repairPreview = { enabled: true, run_id: run.id, repair_key: run.repair_key, status: run.status, client_rows: (shadow || []).length };
         }
+      }
       }
     } catch (e) {
       repairPreview = { enabled: false, fallback: true, reason: 'Shadow preview unavailable; production values retained.' };

@@ -17,8 +17,8 @@ assert.match(
 
 assert.match(
   html,
-  /const key = `\$\{r\.user_id\}:\$\{r\.strategy_id \|\| ''\}`;/,
-  'return history must be scoped to the selected strategy'
+  /const key = `\$\{r\.user_id\}:\$\{r\.family_member_id \|\| ''\}:\$\{r\.strategy_id \|\| ''\}`;/,
+  'return history must be scoped to the selected owner and strategy'
 );
 
 assert.match(

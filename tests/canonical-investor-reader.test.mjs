@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const api=fs.readFileSync(new URL('../api/investors/data.js',import.meta.url),'utf8');
+const page=fs.readFileSync(new URL('../public/investors.html',import.meta.url),'utf8');
+assert.match(api,/client_strategy_returns_effective_c/);
+assert.match(api,/canonicalEffective = true/);
+assert.match(api,/source_kind === 'PROMOTED_REPAIR'/);
+assert.match(page,/r\.user_id}:\$\{r\.family_member_id \|\| ''}:\$\{r\.strategy_id/);
+assert.match(page,/u\.userId}:\$\{u\.familyMemberId \|\| ''}:\$\{u\.strategyId/);
+console.log('canonical investor reader: 5/5 green');

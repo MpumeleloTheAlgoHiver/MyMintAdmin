@@ -329,13 +329,14 @@
         secLiveMap[s.security_id] = { priceR: (Number(s.current_price)||0)/100, dayPct: Number(s['1d_pct'])||0, ytd: Number(s.ytd_pct)||0, y1: Number(s['1y_pct'])||0, asOf: s.as_of_date };
       });
 
-      /* Per-investor NAV history & metrics &mdash; keyed by user + strategy.
+      /* Per-investor NAV history & metrics &mdash; keyed by owner + strategy.
          One client can own multiple baskets and each has an independent return
-         spine; grouping by user alone leaks one basket's history into another. */
+         spine. family_member_id prevents a child's history leaking into the
+         managing parent's card for the same strategy. */
       stratNavMap = {}; stratMetricsMap = {};
       const stratLatest = {};
       (stratHist||[]).forEach(r => {
-        const key = `${r.user_id}:${r.strategy_id || ''}`;
+        const key = `${r.user_id}:${r.family_member_id || ''}:${r.strategy_id || ''}`;
         if (!stratNavMap[key]) stratNavMap[key] = [];
         const nav = Number(r.basket_value);
         if (nav > 0) stratNavMap[key].push({ date: r.as_of_date, nav, incPct: r.inception_pct != null ? Number(r.inception_pct) : null, repairPreview: r.repair_preview === true, repairFullHistory: r.repair_full_history === true });
@@ -456,7 +457,7 @@
         u.holdings.sort((a,b) => b.currentR - a.currentR);
         /* Pull latest per-investor figures from client_strategy_returns_c
            (only meaningful for strategy investors). */
-        const strategyHistoryKey = `${u.userId}:${u.strategyId || ''}`;
+        const strategyHistoryKey = `${u.userId}:${u.familyMemberId || ''}:${u.strategyId || ''}`;
         const csrLatest = isStrategy ? ((stratMetricsMap[strategyHistoryKey] || {}).latest || null) : null;
         const csrAum      = csrLatest ? csrLatest.basket_value / 100 : current;
         const csrPnl      = csrLatest ? csrLatest.inception_pnl / 100 : pnl;
