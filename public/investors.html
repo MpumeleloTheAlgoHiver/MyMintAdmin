@@ -485,7 +485,7 @@
         const realized = realizedByKey[`${u.userId}:${u.familyMemberId || ''}:${u.strategyId || ''}`] || 0;
         const totalPnl = repairRow ? Number(repairRow.inception_pnl||0)/100 : +(((current - invested) + realized)).toFixed(2);
         const investedStable = repairRow ? +(value-totalPnl).toFixed(2) : +((value - totalPnl)).toFixed(2);
-        const retPctStable = repairRow && repairRow.net_cash_return_pct!=null ? Number(repairRow.net_cash_return_pct) : (investedStable > 0 ? +((totalPnl / investedStable) * 100).toFixed(2) : 0);
+        const retPctStable = repairRow && repairRow.gross_strategy_twr_pct!=null ? Number(repairRow.gross_strategy_twr_pct) : (investedStable > 0 ? +((totalPnl / investedStable) * 100).toFixed(2) : 0);
         return {
           type: isStrategy ? 'strategy' : 'security',
           userId: u.userId, investorKey, familyMemberId: u.familyMemberId, isMinor: !!u.familyMemberId, name, email: prof.email, mintNo: prof.mint_number, computershareNumber: (u.familyMemberId ? (famMap[u.familyMemberId] || {}).computershare_number : prof.computershare_number) || null,

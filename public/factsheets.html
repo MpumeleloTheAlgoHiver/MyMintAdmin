@@ -614,9 +614,27 @@
     let _sparkMap = {};
     let _investorCounts = {};
     let _logoMap = {};
+    let _repairStrategyMap = {};
     let _priceMap = {}; /* symbol → price in Rand (for min investment calculation) */
     let _filter = 'all';
     let _query = '';
+
+    async function loadRepairStrategyPreview(session) {
+      try {
+        const headers = { Authorization:`Bearer ${session.access_token}` };
+        const setting = await (await fetch('/api/team?action=app-settings-get&key=repair_preview',{headers})).json();
+        if (!setting?.value?.enabled || !setting.value.run_id) return;
+        const preview = await (await fetch(`/api/team?action=return-repair-preview&run_id=${encodeURIComponent(setting.value.run_id)}`,{headers})).json();
+        if (!preview?.ok) return;
+        const grouped = {};
+        for (const row of preview.shadow || []) {
+          if (!grouped[row.strategy_id]) grouped[row.strategy_id] = [];
+          grouped[row.strategy_id].push({strategy_id:row.strategy_id,as_of_date:row.as_of_date,basket_value:row.chain_nav_cents,complete_value_cents:row.complete_value_cents,ytd_pct:row.ytd_pct,repair_preview:true});
+        }
+        for (const rows of Object.values(grouped)) rows.sort((a,b)=>String(a.as_of_date).localeCompare(String(b.as_of_date)));
+        _repairStrategyMap = grouped;
+      } catch (_) { _repairStrategyMap = {}; }
+    }
 
     const escHtml = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
@@ -914,11 +932,12 @@
       }
 
       /* Returns */
-      const { data: retRows } = await supabaseClient
+      const { data: productionRetRows } = await supabaseClient
         .from('strategies_returns_c')
         .select('strategy_id,ytd_pct,basket_value,as_of_date')
         .eq('strategy_id',strategyId)
         .order('as_of_date',{ascending:true});
+      const retRows = _repairStrategyMap[strategyId] || productionRetRows || [];
 
       const latestRet = retRows && retRows.length>0 ? retRows[retRows.length-1] : null;
       const ytdVal = latestRet?.ytd_pct != null ? Number(latestRet.ytd_pct) : null;
@@ -1150,6 +1169,7 @@
     (async () => {
       const { data:{ session } } = await supabaseClient.auth.getSession();
       if (!session) { window.location.href = '/'; return; }
+      await loadRepairStrategyPreview(session);
 
       const email = session.user?.email||'';
       const el = $('sidebarEmail');
@@ -1202,6 +1222,7 @@
             .eq('as_of_date',latestDate);
           (ytdRows||[]).forEach(r=>{ latestYtd[r.strategy_id]=r.ytd_pct; });
         }
+        for(const [strategyId,rows] of Object.entries(_repairStrategyMap)){const latest=rows.at(-1);if(latest?.ytd_pct!=null)latestYtd[strategyId]=latest.ytd_pct;}
         _ytdMap=latestYtd;
         /* Step 3: fetch last 90 days of basket_value for sparklines (well within row limit) */
         const sparks={};
@@ -1217,6 +1238,7 @@
           if(!sparks[r.strategy_id]) sparks[r.strategy_id]=[];
           if(r.basket_value!=null) sparks[r.strategy_id].push(Number(r.basket_value));
         });
+        for(const [strategyId,rows] of Object.entries(_repairStrategyMap))sparks[strategyId]=rows.slice(-90).map(r=>Number(r.basket_value)).filter(Number.isFinite);
         _sparkMap=sparks;
       } catch(_){}
 

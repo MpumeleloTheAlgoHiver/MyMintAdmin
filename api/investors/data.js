@@ -81,6 +81,8 @@ module.exports = async (req, res) => {
             ? await sbGet(`client_strategy_returns_shadow_c?run_id=eq.${run.id}&user_id=in.(${userIds.join(',')})&select=*&order=as_of_date.asc`)
             : [];
           const shadowGroups = new Map();
+          const repairedSeriesKeys = new Set((shadow || []).map(row => `${row.user_id}:${row.strategy_id}`));
+          stratHist = stratHist.filter(row => !repairedSeriesKeys.has(`${row.user_id}:${row.strategy_id}`));
           for (const row of shadow || []) {
             const key = `${row.user_id}:${row.family_member_id || ''}:${row.strategy_id}`;
             if (!shadowGroups.has(key)) shadowGroups.set(key, []);
@@ -123,10 +125,9 @@ module.exports = async (req, res) => {
               net_cash_return_pct: row.net_cash_return_pct,
               confidence: row.confidence,
             };
-            const idx = stratHist.findIndex(x => x.user_id === row.user_id && x.strategy_id === row.strategy_id && x.as_of_date === row.as_of_date);
-            if (idx >= 0) stratHist[idx] = { ...stratHist[idx], ...mapped };
-            else stratHist.push(mapped);
+            stratHist.push(mapped);
           }
+          stratHist.sort((a, b) => String(a.as_of_date).localeCompare(String(b.as_of_date)));
           repairPreview = { enabled: true, run_id: run.id, repair_key: run.repair_key, status: run.status, client_rows: (shadow || []).length };
         }
       }
