@@ -80,6 +80,24 @@ module.exports = async (req, res) => {
           const shadow = userIds.length
             ? await sbGet(`client_strategy_returns_shadow_c?run_id=eq.${run.id}&user_id=in.(${userIds.join(',')})&select=*&order=as_of_date.asc`)
             : [];
+          const shadowGroups = new Map();
+          for (const row of shadow || []) {
+            const key = `${row.user_id}:${row.family_member_id || ''}:${row.strategy_id}`;
+            if (!shadowGroups.has(key)) shadowGroups.set(key, []);
+            shadowGroups.get(key).push(row);
+          }
+          const periodReturn = (end, start) => {
+            const endFactor = 1 + Number(end?.gross_strategy_twr_pct || 0) / 100;
+            const startFactor = 1 + Number(start?.gross_strategy_twr_pct || 0) / 100;
+            return start && startFactor > 0 ? (endFactor / startFactor - 1) * 100 : null;
+          };
+          for (const rows of shadowGroups.values()) rows.forEach((row, index) => {
+            row._1d_pct = periodReturn(row, rows[index - 1]);
+            row._5d_pct = periodReturn(row, rows[Math.max(0, index - 5)]);
+            const cutoff = new Date(`${row.as_of_date}T00:00:00Z`); cutoff.setUTCDate(cutoff.getUTCDate() - 30);
+            const monthBase = rows.slice(0, index).filter(x => new Date(`${x.as_of_date}T00:00:00Z`) <= cutoff).at(-1) || rows[0];
+            row._1m_pct = periodReturn(row, monthBase);
+          });
           for (const row of shadow || []) {
             const mapped = {
               user_id: row.user_id,
@@ -89,9 +107,13 @@ module.exports = async (req, res) => {
               portfolio_value: row.complete_nav_cents,
               total_value_cents: row.complete_nav_cents,
               ytd_pct: row.gross_strategy_twr_pct,
-              inception_pct: row.net_cash_return_pct,
+              inception_pct: row.gross_strategy_twr_pct,
+              '1d_pct': row._1d_pct,
+              '5d_pct': row._5d_pct,
+              '1m_pct': row._1m_pct,
               inception_pnl: row.net_cash_pnl_cents,
               repair_preview: true,
+              repair_full_history: row.source_evidence?.full_daily_history === true,
               repair_run_id: run.id,
               securities_value_cents: row.securities_value_cents,
               residual_cash_cents: row.residual_cash_cents,

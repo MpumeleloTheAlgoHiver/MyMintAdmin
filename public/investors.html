@@ -249,7 +249,7 @@
       const { holdings, strategies, stratHist, profiles, secMeta, secLive, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches, closedHoldings, repairPreview } = await resp.json();
       const repairBanner=document.getElementById('repairPreviewBanner');
       if(repairBanner){
-        if(repairPreview?.enabled){repairBanner.style.display='block';repairBanner.textContent=`Repair preview · ${repairPreview.repair_key} · ${repairPreview.client_rows} reconciled client checkpoints · production data unchanged`;}
+        if(repairPreview?.enabled){repairBanner.style.display='block';repairBanner.textContent=`Repair preview · ${repairPreview.repair_key} · ${repairPreview.client_rows} reconciled client daily rows · production data unchanged`;}
         else{repairBanner.style.display='none';repairBanner.textContent='';}
       }
 
@@ -338,13 +338,16 @@
         const key = `${r.user_id}:${r.strategy_id || ''}`;
         if (!stratNavMap[key]) stratNavMap[key] = [];
         const nav = Number(r.basket_value);
-        if (nav > 0) stratNavMap[key].push({ date: r.as_of_date, nav, incPct: r.inception_pct != null ? Number(r.inception_pct) : null, repairPreview: r.repair_preview === true });
+        if (nav > 0) stratNavMap[key].push({ date: r.as_of_date, nav, incPct: r.inception_pct != null ? Number(r.inception_pct) : null, repairPreview: r.repair_preview === true, repairFullHistory: r.repair_full_history === true });
         stratLatest[key] = r;  /* last one wins &rarr; most recent (asc order) */
       });
       Object.entries(stratNavMap).forEach(([key, series]) => {
+        const metricSeries = series.some(p => p.repairFullHistory)
+          ? series.map(p => ({ ...p, nav: 100000 * (1 + Number(p.incPct || 0) / 100) }))
+          : series;
         stratMetricsMap[key] = {
-          ...computeMetrics(series),
-          calendar: computeCalendar(series),
+          ...computeMetrics(metricSeries),
+          calendar: computeCalendar(metricSeries),
           latest: stratLatest[key] || null,
         };
       });
@@ -490,7 +493,7 @@
           strategyDesc: strat.description, riskLevel: strat.risk_level,
           invested: investedStable, current, pnl: totalPnl, retPct: retPctStable, realized,
           csrAum, csrInvested, csrPnl, csrRetPct, csrYtdPct,
-          residualCash, bufferCash, cashComponent, accruedLiability, holdingsValue, value, repairPreview:!!repairRow,
+          residualCash, bufferCash, cashComponent, accruedLiability, holdingsValue, value, repairPreview:!!repairRow, repairFullHistory:repairRow?.repair_full_history===true,
           rebFeeBroker: (rebFeeByOwner[ownerKey] || {}).broker || 0,
           rebFeeCustody: (rebFeeByOwner[ownerKey] || {}).custody || 0,
           days, annualised, inception,
@@ -677,13 +680,17 @@
       /* Calendar &mdash; computed per-investor from their inception date so the first
          partial month uses their entry NAV, not the prior month-end */
       const incDate = i.inception ? i.inception.slice(0, 10) : null;
-      const cal = i.repairPreview ? {} : computeCalendar(stratNavMap[historyKey] || [], incDate);
+      const rawCalendarSeries = stratNavMap[historyKey] || [];
+      const calendarSeries = i.repairFullHistory
+        ? rawCalendarSeries.map(p => ({ ...p, nav: 100000 * (1 + Number(p.incPct || 0) / 100) }))
+        : rawCalendarSeries;
+      const cal = i.repairPreview && !i.repairFullHistory ? {} : computeCalendar(calendarSeries, incDate);
       const incKey = incDate ? incDate.slice(0, 7) : null; /* YYYY-MM */
       const keys = Object.keys(cal).sort();
       const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       let calendarHtml;
       if (!keys.length) {
-        calendarHtml = `<div style="padding:20px;text-align:center;color:#94a3b8;font-size:12px;">${i.repairPreview?'Corrected monthly history is awaiting full-chain validation.':'No monthly returns since investor\'s inception.'}</div>`;
+        calendarHtml = `<div style="padding:20px;text-align:center;color:#94a3b8;font-size:12px;">${i.repairPreview&&!i.repairFullHistory?'Corrected monthly history is awaiting full-chain validation.':'No monthly returns since investor\'s inception.'}</div>`;
       } else {
         const byYear = {};
         keys.forEach(k => { const [y, mn] = k.split('-'); (byYear[y] = byYear[y] || {})[+mn] = cal[k]; });
@@ -783,7 +790,7 @@
     function renderUserPnlChart(i) {
       const el = document.getElementById('userPnlChart'); if (!el) return;
       const navs = stratNavMap[`${i.userId}:${i.strategyId || ''}`] || [];
-      if (i.repairPreview) {
+      if (i.repairPreview && !i.repairFullHistory) {
         el.innerHTML = `<div style="height:100%;display:flex;align-items:center;justify-content:center;padding:28px;text-align:center;">
           <div style="max-width:520px;"><div style="width:34px;height:34px;margin:0 auto 10px;border-radius:50%;background:#ede9fe;color:#6d28d9;display:flex;align-items:center;justify-content:center;font-weight:800;">✓</div>
           <div style="font-size:13px;font-weight:700;color:#4c1d95;">Corrected current value is active</div>
