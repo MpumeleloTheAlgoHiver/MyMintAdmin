@@ -787,6 +787,32 @@ module.exports = async (req, res) => {
 
     // APP-SETTINGS-SAVE — admin only. Upserts a settings JSON blob by key. For
     // 'fees', the payload is whitelisted + coerced to non-negative numbers.
+    // Password-protected reusable return-repair workflow. Database RPCs keep
+    // approval, promotion and rollback atomic and idempotent.
+    if (['return-repair-approve', 'return-repair-promote', 'return-repair-rollback'].includes(action)) {
+      if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+      const result = await requireMasterAdmin(req, res);
+      if (!result) return;
+      const runId = String(req.body?.run_id || '').trim();
+      const password = String(req.body?.password || '');
+      if (!runId || !password) return sendJson(res, 400, { error: 'Repair run and account password are required.' });
+      if (!(await verifyUserPassword(result.user.email, password))) return sendJson(res, 403, { error: 'Incorrect password.' });
+      const operation = action.replace('return-repair-', '');
+      if (operation === 'rollback' && String(req.body?.confirmation || '').trim().toUpperCase() !== 'ROLLBACK') {
+        return sendJson(res, 400, { error: 'Type ROLLBACK to confirm restoration of the preceding valuation rule.' });
+      }
+      const rpc = { approve: 'approve_return_repair_run', promote: 'promote_return_repair_run', rollback: 'rollback_return_repair_run' }[operation];
+      try {
+        const response = await supabaseRequest(`/rest/v1/rpc/${rpc}`, {
+          method: 'POST', body: { p_run_id: runId, p_approved_by: result.user.id }
+        });
+        await writeAudit({ action: `return_repair_${operation}`, actor_email: result.user.email, actor_user_id: result.user.id, details: { run_id: runId, result: response } });
+        return sendJson(res, 200, { ok: true, operation, result: response });
+      } catch (err) {
+        return sendJson(res, 400, { error: `Repair ${operation} failed: ${err.message}` });
+      }
+    }
+
     if (action === 'app-settings-save') {
       if (req.method !== 'POST' && req.method !== 'PUT' && req.method !== 'PATCH') {
         return sendJson(res, 405, { error: 'Method not allowed' });
