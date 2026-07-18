@@ -3488,8 +3488,48 @@
         return map;
       };
 
-      /* Fetch latest strategy returns from strategies_returns_c.
-         Values are already in % form. */
+      let repairStrategyReturnsPromise = null;
+      const fetchApprovedRepairStrategyReturns = async () => {
+        if (repairStrategyReturnsPromise) return repairStrategyReturnsPromise;
+        repairStrategyReturnsPromise = (async () => {
+          try {
+            const { data } = await supabaseClient.auth.getSession();
+            const token = data?.session?.access_token;
+            if (!token) return {};
+            const headers = { Authorization: `Bearer ${token}` };
+            const settingResponse = await fetch('/api/team?action=app-settings-get&key=repair_preview', { headers });
+            const setting = await settingResponse.json();
+            if (!settingResponse.ok || !setting?.value?.enabled || !setting.value.run_id) return {};
+            const previewResponse = await fetch(`/api/team?action=return-repair-preview&run_id=${encodeURIComponent(setting.value.run_id)}`, { headers });
+            const preview = await previewResponse.json();
+            if (!previewResponse.ok || !preview?.ok || !['APPROVED', 'PROMOTED'].includes(preview.run?.status)) return {};
+            const latest = {};
+            for (const row of preview.shadow || []) {
+              if (!latest[row.strategy_id] || String(row.as_of_date) > String(latest[row.strategy_id].as_of_date)) {
+                latest[row.strategy_id] = {
+                  strategy_id: row.strategy_id,
+                  '1d_pct': row['1d_pct'],
+                  '5d_pct': row['5d_pct'],
+                  '1m_pct': row.mtd_pct,
+                  '6m_pct': null,
+                  ytd_pct: row.ytd_pct,
+                  '1y_pct': null,
+                  '5y_pct': null,
+                  basket_value: row.chain_nav_cents,
+                  complete_value_cents: row.complete_value_cents,
+                  as_of_date: row.as_of_date,
+                  repair_run_id: preview.run.id
+                };
+              }
+            }
+            return latest;
+          } catch (_) { return {}; }
+        })();
+        return repairStrategyReturnsPromise;
+      };
+
+      /* Fetch latest strategy returns, overlaying an explicitly approved repair
+         run so cards, charts and rebalance previews share one source. */
       const fetchStrategyReturns = async (strategyIds) => {
         if (!strategyIds || !strategyIds.length) return {};
         const map = {};
@@ -3518,6 +3558,8 @@
           if (!data) return;
           data.forEach(r => { if (!map[r.strategy_id]) map[r.strategy_id] = r; });
         });
+        const repaired = await fetchApprovedRepairStrategyReturns();
+        uniqIds.forEach(id => { if (repaired[id]) map[id] = repaired[id]; });
         return map;
       };
 
