@@ -730,6 +730,23 @@ module.exports = async (req, res) => {
       }
     }
 
+    // RETURN-REPAIR-RUNS — admin-only list used by App Settings. Shadow runs
+    // contain sensitive client reconciliation data and are never exposed to
+    // ordinary authenticated staff through this endpoint.
+    if (action === 'return-repair-runs') {
+      if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
+      const result = await requireMasterAdmin(req, res);
+      if (!result) return;
+      try {
+        const rows = await supabaseRequest(
+          '/rest/v1/return_repair_runs_c?select=id,repair_key,status,scope,methodology_version,validation_summary,created_at,validated_at&status=in.(VALIDATED,APPROVED,PROMOTED)&order=created_at.desc&limit=25'
+        );
+        return sendJson(res, 200, { ok: true, runs: rows || [] });
+      } catch (err) {
+        return sendJson(res, 500, { error: `Could not load repair runs: ${err.message}` });
+      }
+    }
+
     // APP-SETTINGS-SAVE — admin only. Upserts a settings JSON blob by key. For
     // 'fees', the payload is whitelisted + coerced to non-negative numbers.
     if (action === 'app-settings-save') {

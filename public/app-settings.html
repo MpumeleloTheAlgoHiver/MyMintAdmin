@@ -68,6 +68,10 @@
     .switch input:checked + .slider{background:#22c55e;}
     .switch input:checked + .slider:before{transform:translateX(22px);}
     .switch input:disabled + .slider{opacity:.5;cursor:not-allowed;}
+    .repair-select{min-width:310px;max-width:100%;padding:9px 34px 9px 11px;border:1px solid #d1d1d6;border-radius:9px;background:#fff;color:#1c1c1e;font-size:13px;}
+    .repair-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px;}
+    .repair-stat{padding:10px 12px;border:1px solid #ede9fe;background:#faf7ff;border-radius:10px;}
+    .repair-stat b{display:block;font-size:14px;color:#4c1d95;margin-top:3px;}
   </style>
 </head>
 <body>
@@ -114,6 +118,33 @@
 
         <div class="actions" style="margin-top:16px;">
           <span class="meta" id="maintMeta"></span>
+        </div>
+      </div>
+
+      <div class="card" id="repairCard">
+        <div class="card-title">Repair Preview</div>
+        <div class="card-sub">Reusable, read-only preview for validated data-repair runs. This changes CRM display data only; it does not overwrite production returns.</div>
+        <div class="field">
+          <div>
+            <div class="field-label">Validated repair run</div>
+            <div class="field-hint">Only validated or approved shadow runs may be selected.</div>
+          </div>
+          <select class="repair-select" id="repairRunSelect" disabled><option value="">Loading…</option></select>
+        </div>
+        <div class="field">
+          <div>
+            <div class="field-label">Use repair data in CRM</div>
+            <div class="field-hint">When disabled, CRM immediately falls back to the original production tables.</div>
+          </div>
+          <label class="switch" title="Toggle validated repair preview">
+            <input type="checkbox" id="repairSwitch" disabled>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="repair-summary" id="repairSummary" style="display:none;"></div>
+        <div class="actions" style="margin-top:16px;">
+          <button class="btn btn-primary" id="repairSaveBtn" disabled>Save preview setting</button>
+          <span class="meta" id="repairMeta"></span>
         </div>
       </div>
 
@@ -164,6 +195,8 @@
 
     let currentToken = null;
     let original = {};
+    let repairOriginal = { enabled:false, run_id:'' };
+    let repairRuns = [];
 
     const authHeaders = () => ({ 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' });
     const api = async (method, path, body) => {
@@ -236,6 +269,48 @@
       populate(r && r.value ? r.value : {});
       setMeta(r && r.updated_at, r && r.updated_by);
     };
+
+    const renderRepairSummary = () => {
+      const run = repairRuns.find(x => x.id === document.getElementById('repairRunSelect').value);
+      const el = document.getElementById('repairSummary');
+      if (!run) { el.style.display='none'; el.innerHTML=''; return; }
+      const v = run.validation_summary || {};
+      el.style.display='grid';
+      el.innerHTML = `<div class="repair-stat"><span class="field-hint">Status</span><b>${run.status}</b></div>
+        <div class="repair-stat"><span class="field-hint">Strategy rows</span><b>${v.strategy_rows ?? '—'}</b></div>
+        <div class="repair-stat"><span class="field-hint">Client rows</span><b>${v.client_rows ?? '—'}</b></div>`;
+    };
+    const checkRepairDirty = () => {
+      const enabled = document.getElementById('repairSwitch').checked;
+      const runId = document.getElementById('repairRunSelect').value;
+      document.getElementById('repairSaveBtn').disabled = !runId || (enabled===repairOriginal.enabled && runId===repairOriginal.run_id);
+    };
+    const loadRepair = async () => {
+      const [runsResult, setting] = await Promise.all([
+        api('GET','/api/team?action=return-repair-runs'),
+        api('GET','/api/team?action=app-settings-get&key=repair_preview')
+      ]);
+      repairRuns = runsResult?.runs || [];
+      const select = document.getElementById('repairRunSelect');
+      select.innerHTML = repairRuns.length ? repairRuns.map(r=>`<option value="${r.id}">${r.repair_key} · ${r.status}</option>`).join('') : '<option value="">No validated runs</option>';
+      const saved = setting?.value || {};
+      if (saved.run_id && repairRuns.some(r=>r.id===saved.run_id)) select.value=saved.run_id;
+      repairOriginal={enabled:saved.enabled===true,run_id:select.value||''};
+      document.getElementById('repairSwitch').checked=repairOriginal.enabled;
+      select.disabled=!repairRuns.length; document.getElementById('repairSwitch').disabled=!repairRuns.length;
+      document.getElementById('repairMeta').textContent=setting?.updated_at?`Last changed ${new Date(setting.updated_at).toLocaleString('en-ZA')}`:'Preview has not been configured.';
+      renderRepairSummary(); checkRepairDirty();
+    };
+    document.getElementById('repairRunSelect').addEventListener('change',()=>{renderRepairSummary();checkRepairDirty();});
+    document.getElementById('repairSwitch').addEventListener('change',checkRepairDirty);
+    document.getElementById('repairSaveBtn').addEventListener('click',async()=>{
+      const btn=document.getElementById('repairSaveBtn'),value={enabled:document.getElementById('repairSwitch').checked,run_id:document.getElementById('repairRunSelect').value};
+      btn.disabled=true;btn.textContent='Saving…';
+      const r=await api('POST','/api/team?action=app-settings-save',{key:'repair_preview',value});
+      btn.textContent='Save preview setting';
+      if(r?.ok){repairOriginal=value;checkRepairDirty();toast(value.enabled?'Repair preview enabled':'Repair preview disabled');document.getElementById('repairMeta').textContent=`Last changed ${new Date().toLocaleString('en-ZA')}`;}
+      else{toast(r?.error||'Could not save repair preview',false);checkRepairDirty();}
+    });
 
     document.getElementById('saveBtn').addEventListener('click', async () => {
       const btn = document.getElementById('saveBtn');
@@ -359,7 +434,7 @@
       document.getElementById('teamNavLink').style.display = 'flex';
       document.getElementById('content').style.display = 'block';
       renderFields();
-      await Promise.all([load(), loadMaint()]);
+      await Promise.all([load(), loadMaint(), loadRepair()]);
     })();
   </script>
 <script>window.PAGE_ACCESS_KEY = '__admin_only__';</script>

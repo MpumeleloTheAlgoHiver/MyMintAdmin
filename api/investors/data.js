@@ -63,7 +63,54 @@ module.exports = async (req, res) => {
           )
         )
       : [];
-    const stratHist = stratHistArrays.flat();
+    let stratHist = stratHistArrays.flat();
+
+    /* Optional admin repair preview. The switch lives in app_settings and can
+       only be changed by a master admin. Only a VALIDATED/APPROVED shadow run
+       is accepted. Production return rows remain untouched and are the instant
+       fallback when the switch is disabled or any validation lookup fails. */
+    let repairPreview = { enabled: false };
+    try {
+      const settings = await sbGet('app_settings?key=eq.repair_preview&select=value&limit=1');
+      const cfg = settings?.[0]?.value || {};
+      if (cfg.enabled === true && cfg.run_id) {
+        const runs = await sbGet(`return_repair_runs_c?id=eq.${encodeURIComponent(cfg.run_id)}&status=in.(VALIDATED,APPROVED)&select=id,repair_key,status,scope&limit=1`);
+        const run = runs?.[0];
+        if (run) {
+          const shadow = userIds.length
+            ? await sbGet(`client_strategy_returns_shadow_c?run_id=eq.${run.id}&user_id=in.(${userIds.join(',')})&select=*&order=as_of_date.asc`)
+            : [];
+          for (const row of shadow || []) {
+            const mapped = {
+              user_id: row.user_id,
+              strategy_id: row.strategy_id,
+              as_of_date: row.as_of_date,
+              basket_value: row.complete_nav_cents,
+              portfolio_value: row.complete_nav_cents,
+              total_value_cents: row.complete_nav_cents,
+              ytd_pct: row.gross_strategy_twr_pct,
+              inception_pct: row.net_cash_return_pct,
+              inception_pnl: row.net_cash_pnl_cents,
+              repair_preview: true,
+              repair_run_id: run.id,
+              securities_value_cents: row.securities_value_cents,
+              residual_cash_cents: row.residual_cash_cents,
+              unused_reserve_cents: row.unused_reserve_cents,
+              accrued_liability_cents: row.accrued_liability_cents,
+              gross_strategy_twr_pct: row.gross_strategy_twr_pct,
+              net_cash_return_pct: row.net_cash_return_pct,
+              confidence: row.confidence,
+            };
+            const idx = stratHist.findIndex(x => x.user_id === row.user_id && x.strategy_id === row.strategy_id && x.as_of_date === row.as_of_date);
+            if (idx >= 0) stratHist[idx] = { ...stratHist[idx], ...mapped };
+            else stratHist.push(mapped);
+          }
+          repairPreview = { enabled: true, run_id: run.id, repair_key: run.repair_key, status: run.status, client_rows: (shadow || []).length };
+        }
+      }
+    } catch (e) {
+      repairPreview = { enabled: false, fallback: true, reason: 'Shadow preview unavailable; production values retained.' };
+    }
 
     /* Recalculate inception_pnl and inception_pct using the client cost basis
        (Expected_fill, the price the client saw), NOT avg_fill — avg_fill carries
@@ -195,7 +242,7 @@ module.exports = async (req, res) => {
     }
 
     res.statusCode = 200;
-    res.end(JSON.stringify({ holdings, strategies, stratHist, profiles, secMeta, secLive, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches, closedHoldings, aumFeeState, aumFeeTxns, aumSegments, wallets, uatTxns, uatProfiles, uatFamilyMembers }));
+    res.end(JSON.stringify({ holdings, strategies, stratHist, profiles, secMeta, secLive, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches, closedHoldings, aumFeeState, aumFeeTxns, aumSegments, wallets, uatTxns, uatProfiles, uatFamilyMembers, repairPreview }));
   } catch (err) {
     res.statusCode = 500;
     res.end(JSON.stringify({ error: err.message }));
