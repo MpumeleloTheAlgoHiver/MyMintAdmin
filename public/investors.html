@@ -338,7 +338,7 @@
         const key = `${r.user_id}:${r.strategy_id || ''}`;
         if (!stratNavMap[key]) stratNavMap[key] = [];
         const nav = Number(r.basket_value);
-        if (nav > 0) stratNavMap[key].push({ date: r.as_of_date, nav, incPct: r.inception_pct != null ? Number(r.inception_pct) : null });
+        if (nav > 0) stratNavMap[key].push({ date: r.as_of_date, nav, incPct: r.inception_pct != null ? Number(r.inception_pct) : null, repairPreview: r.repair_preview === true });
         stratLatest[key] = r;  /* last one wins &rarr; most recent (asc order) */
       });
       Object.entries(stratNavMap).forEach(([key, series]) => {
@@ -677,13 +677,13 @@
       /* Calendar &mdash; computed per-investor from their inception date so the first
          partial month uses their entry NAV, not the prior month-end */
       const incDate = i.inception ? i.inception.slice(0, 10) : null;
-      const cal = computeCalendar(stratNavMap[historyKey] || [], incDate);
+      const cal = i.repairPreview ? {} : computeCalendar(stratNavMap[historyKey] || [], incDate);
       const incKey = incDate ? incDate.slice(0, 7) : null; /* YYYY-MM */
       const keys = Object.keys(cal).sort();
       const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       let calendarHtml;
       if (!keys.length) {
-        calendarHtml = `<div style="padding:20px;text-align:center;color:#94a3b8;font-size:12px;">No monthly returns since investor's inception.</div>`;
+        calendarHtml = `<div style="padding:20px;text-align:center;color:#94a3b8;font-size:12px;">${i.repairPreview?'Corrected monthly history is awaiting full-chain validation.':'No monthly returns since investor\'s inception.'}</div>`;
       } else {
         const byYear = {};
         keys.forEach(k => { const [y, mn] = k.split('-'); (byYear[y] = byYear[y] || {})[+mn] = cal[k]; });
@@ -783,6 +783,14 @@
     function renderUserPnlChart(i) {
       const el = document.getElementById('userPnlChart'); if (!el) return;
       const navs = stratNavMap[`${i.userId}:${i.strategyId || ''}`] || [];
+      if (i.repairPreview) {
+        el.innerHTML = `<div style="height:100%;display:flex;align-items:center;justify-content:center;padding:28px;text-align:center;">
+          <div style="max-width:520px;"><div style="width:34px;height:34px;margin:0 auto 10px;border-radius:50%;background:#ede9fe;color:#6d28d9;display:flex;align-items:center;justify-content:center;font-weight:800;">✓</div>
+          <div style="font-size:13px;font-weight:700;color:#4c1d95;">Corrected current value is active</div>
+          <div style="font-size:11.5px;color:#746b80;line-height:1.55;margin-top:6px;">The old daily history and the repaired checkpoint use different return bases, so they are not joined into a misleading chart. The chart will return when this client’s complete daily chain has passed validation.</div></div>
+        </div>`;
+        return;
+      }
       const pts = navs.filter(p => p.incPct != null);
       if (!pts.length) {
         el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:12px;">Not enough data to chart inception return</div>`;
