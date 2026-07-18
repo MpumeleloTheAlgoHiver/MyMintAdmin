@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const sql=fs.readFileSync(new URL('../sql/canonical_return_views.sql',import.meta.url),'utf8');
+assert.match(sql,/strategy_returns_effective_c/);
+assert.match(sql,/client_strategy_returns_effective_c/);
+assert.match(sql,/where r\.status='PROMOTED'/);
+assert.match(sql,/select distinct on \(s\.strategy_id\)/);
+assert.match(sql,/select distinct on \(c\.user_id,coalesce\(c\.family_member_id/);
+assert.doesNotMatch(sql,/partition by s\.strategy_id, s\.as_of_date/);
+assert.match(sql,/not exists \(select 1 from repaired_strategies/);
+assert.match(sql,/x\.family_member_id is not distinct from l\.family_member/);
+assert.match(sql,/revoke all on public\.client_strategy_returns_effective_c from public,anon,authenticated/);
+assert.match(sql,/grant select on public\.client_strategy_returns_effective_c to service_role/);
+console.log('canonical return views: 10/10 green');
