@@ -74,7 +74,7 @@ module.exports = async (req, res) => {
       const settings = await sbGet('app_settings?key=eq.repair_preview&select=value&limit=1');
       const cfg = settings?.[0]?.value || {};
       if (cfg.enabled === true && cfg.run_id) {
-        const runs = await sbGet(`return_repair_runs_c?id=eq.${encodeURIComponent(cfg.run_id)}&status=in.(VALIDATED,APPROVED)&select=id,repair_key,status,scope&limit=1`);
+        const runs = await sbGet(`return_repair_runs_c?id=eq.${encodeURIComponent(cfg.run_id)}&status=in.(VALIDATED,APPROVED,PROMOTED)&select=id,repair_key,status,scope&limit=1`);
         const run = runs?.[0];
         if (run) {
           const shadow = userIds.length
