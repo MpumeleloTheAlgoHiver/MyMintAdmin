@@ -765,7 +765,21 @@ module.exports = async (req, res) => {
         const production = strategyIds.length ? await supabaseRequest(`/rest/v1/strategies_returns_c?strategy_id=in.(${strategyIds.join(',')})&select=strategy_id,as_of_date,basket_value,ytd_pct,%221d_pct%22,%225d_pct%22,%221m_pct%22&order=as_of_date.desc`) : [];
         const latestProduction = {};
         for (const row of production || []) if (!latestProduction[row.strategy_id]) latestProduction[row.strategy_id] = row;
-        return sendJson(res, 200, { ok: true, run, strategies, shadow: shadow || [], latestProduction });
+        const proposedRules = strategyIds.map(strategyId => {
+          const rows = (shadow || []).filter(x => x.strategy_id === strategyId);
+          const latest = rows[rows.length - 1];
+          if (!latest) return null;
+          return {
+            strategy_id: strategyId,
+            effective_from: latest.as_of_date,
+            securities_value_per_lot_cents: latest.securities_value_cents,
+            continuity_cash_per_lot_cents: latest.continuity_cash_cents,
+            complete_value_per_lot_cents: latest.complete_value_cents,
+            scope: 'GLOBAL_STRATEGY_PER_LOT',
+            repair_run_id: run.id
+          };
+        }).filter(Boolean);
+        return sendJson(res, 200, { ok: true, run, strategies, shadow: shadow || [], latestProduction, proposedRules });
       } catch (err) {
         return sendJson(res, 500, { error: `Could not load repair preview: ${err.message}` });
       }
