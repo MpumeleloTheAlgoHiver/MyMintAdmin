@@ -493,6 +493,81 @@ module.exports = async (req, res) => {
       return sendJson(res, 200, { ok: true, strategyId });
     }
 
+    // Publish the post-settlement composition as a zero-return chain boundary.
+    // Actual Excel fills price changed instruments; guarded intraday prices
+    // value unchanged instruments. The SQL RPC atomically preserves YTD and
+    // turns value no longer represented by securities into continuity cash.
+    if (action === 'rebalance-finalize-return-boundary') {
+      if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const batchId = String(body.batchId || '').trim();
+      const holdings = Array.isArray(body.holdingsSnapshot) ? body.holdingsSnapshot : null;
+      const fillBySecId = body.fillBySecId && typeof body.fillBySecId === 'object' ? body.fillBySecId : {};
+      if (!batchId || !holdings) return sendJson(res, 400, { error: 'batchId and holdingsSnapshot required' });
+      if (!authUser?.id) return sendJson(res, 401, { error: 'Authenticated actor is required' });
+
+      const symbols = [...new Set(holdings.map((h) => String(h?.symbol || h?.ticker || '').trim().toUpperCase()).filter(Boolean))];
+      const querySymbols = [...new Set([...symbols, ...symbols.map((s) => s.endsWith('.JO') ? s.slice(0, -3) : `${s}.JO`)])];
+      const securityRows = querySymbols.length ? await fetchSupabaseJson(
+        `/rest/v1/securities_c?symbol=in.(${buildInFilter(querySymbols)})&select=id,symbol,last_price`
+      ) : [];
+      const intradayRows = querySymbols.length ? await fetchSupabaseJson(
+        `/rest/v1/stock_intraday_c?symbol=in.(${buildInFilter(querySymbols)})&select=symbol,current_price,timestamp&order=timestamp.desc`
+      ) : [];
+      const norm = (value) => String(value || '').trim().toUpperCase().replace(/\.JO$/, '');
+      const securityBySymbol = new Map();
+      (securityRows || []).forEach((row) => { if (!securityBySymbol.has(norm(row.symbol))) securityBySymbol.set(norm(row.symbol), row); });
+      const liveBySymbol = new Map();
+      (intradayRows || []).forEach((row) => {
+        const key = norm(row.symbol);
+        if (!liveBySymbol.has(key) && Number(row.current_price) > 0) liveBySymbol.set(key, row);
+      });
+
+      let securitiesValueCents = 0;
+      let oldestObservedMs = Date.now();
+      const valuation = [];
+      for (const holding of holdings) {
+        const symbol = String(holding?.symbol || holding?.ticker || '').trim().toUpperCase();
+        const shares = Number(holding?.shares ?? holding?.quantity);
+        const security = securityBySymbol.get(norm(symbol));
+        const live = liveBySymbol.get(norm(symbol));
+        const actualFill = security?.id ? Number(fillBySecId[security.id]) : 0;
+        const reference = Number(live?.current_price || security?.last_price || 0);
+        if (!symbol || !Number.isFinite(shares) || shares <= 0 || !(actualFill > 0 || reference > 0)) {
+          return sendJson(res, 409, { error: `Boundary valuation incomplete for ${symbol || 'unknown holding'}` });
+        }
+        if (actualFill > 0 && reference > 0) {
+          const ratio = actualFill / reference;
+          if (ratio < 0.2 || ratio > 5) return sendJson(res, 409, { error: `Possible cents/rands error for ${symbol}: actual fill differs ${ratio.toFixed(2)}x from live price` });
+        }
+        const priceCents = Math.round(actualFill > 0 ? actualFill : reference);
+        securitiesValueCents += Math.round(shares * priceCents);
+        const observedMs = actualFill > 0 ? Date.now() : new Date(live?.timestamp || 0).getTime();
+        if (!Number.isFinite(observedMs) || observedMs <= 0) return sendJson(res, 409, { error: `No timestamped guarded price for ${symbol}` });
+        oldestObservedMs = Math.min(oldestObservedMs, observedMs);
+        valuation.push({ symbol, shares, price_cents: priceCents, source: actualFill > 0 ? 'ACTUAL_EXCEL_FILL' : 'GUARDED_INTRADAY' });
+      }
+
+      const effectiveAt = body.effectiveAt || new Date().toISOString();
+      const effectiveMs = new Date(effectiveAt).getTime();
+      if (holdings.length && oldestObservedMs < effectiveMs - 86400000) {
+        return sendJson(res, 409, { error: 'Boundary valuation blocked: at least one unchanged holding price is older than 24 hours' });
+      }
+
+      const result = await requestSupabaseJson('/rest/v1/rpc/finalize_rebalance_return_boundary', {
+        method: 'POST',
+        body: {
+          p_batch_id: batchId,
+          p_securities_value_cents: securitiesValueCents,
+          p_holdings_snapshot: holdings,
+          p_effective_at: effectiveAt,
+          p_price_observed_at: new Date(oldestObservedMs).toISOString(),
+          p_actor: authUser.id,
+        },
+      });
+      return sendJson(res, 200, { ok: true, boundary: result, valuation });
+    }
+
     // Rebalance settlement creates immutable holding/audit rows and an activity
     // transaction. Browser INSERT policies intentionally deny these writes, so
     // perform only these tightly-whitelisted inserts behind the existing Master

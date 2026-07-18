@@ -7702,6 +7702,38 @@
           .single();
         if (settledStrategyErr) errors.push(`Post-settlement composition snapshot: ${settledStrategyErr.message}`);
 
+        // A batch is not SETTLED until its immutable return boundary exists.
+        // This preserves the prior YTD chain while rebasing tomorrow's return
+        // onto the actual post-trade holdings and continuity cash.
+        if (errors.length === 0) {
+          try {
+            const { data: sessionData } = await supabaseClient.auth.getSession();
+            const token = sessionData?.session?.access_token;
+            if (!token) throw new Error('Session expired before return-boundary publication.');
+            const response = await fetch('/api/orderbook/send-csv?action=rebalance-finalize-return-boundary', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({
+                batchId: batch.id,
+                holdingsSnapshot: settledStrategy?.holdings || [],
+                fillBySecId,
+                effectiveAt: nowIso,
+              }),
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.details || result.error || 'Return boundary publication failed.');
+          } catch (boundaryErr) {
+            errors.push(`Return continuity boundary: ${boundaryErr?.message || boundaryErr}`);
+          }
+        }
+
+        // Never label a partially applied batch SETTLED. The idempotent reserve,
+        // residual and boundary ledgers make a subsequent retry safe.
+        if (errors.length) {
+          console.error('Settlement paused before final status:', errors);
+          throw new Error(`Settlement paused with ${errors.length} issue(s):\n${errors.join('\n')}`);
+        }
+
         const settledBatchPatch = {
           status: 'SETTLED',
           settled_at: nowIso,
@@ -7713,11 +7745,6 @@
         const { error: settleErr } = await supabaseClient.from('rebalance_batch').update(settledBatchPatch).eq('id', batch.id);
         if (settleErr) throw new Error(settleErr.message);
 
-        // Report any non-fatal errors that occurred during settlement
-        if (errors.length) {
-          console.error('Settlement completed with warnings:', errors);
-          throw new Error(`Batch settled but ${errors.length} holding update(s) had issues:\n${errors.join('\n')}`);
-        }
       };
 
       /* Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Reverse Rebalance Batch Ã¢&rdquo;â¬Ã¢&rdquo;â¬ */
