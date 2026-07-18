@@ -99,6 +99,8 @@ module.exports = async (req, res) => {
             const cutoff = new Date(`${row.as_of_date}T00:00:00Z`); cutoff.setUTCDate(cutoff.getUTCDate() - 30);
             const monthBase = rows.slice(0, index).filter(x => new Date(`${x.as_of_date}T00:00:00Z`) <= cutoff).at(-1) || rows[0];
             row._1m_pct = periodReturn(row, monthBase);
+            const openingGrossNav = Number(rows[0]?.complete_nav_cents || 0) + Number(rows[0]?.accrued_liability_cents || 0);
+            row._strategy_pnl_cents = Math.round(openingGrossNav * Number(row.gross_strategy_twr_pct || 0) / 100);
           });
           for (const row of shadow || []) {
             const mapped = {
@@ -113,7 +115,8 @@ module.exports = async (req, res) => {
               '1d_pct': row._1d_pct,
               '5d_pct': row._5d_pct,
               '1m_pct': row._1m_pct,
-              inception_pnl: row.net_cash_pnl_cents,
+              inception_pnl: row._strategy_pnl_cents,
+              cash_difference_cents: row.net_cash_pnl_cents,
               repair_preview: true,
               repair_full_history: row.source_evidence?.full_daily_history === true,
               repair_run_id: run.id,
