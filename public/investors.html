@@ -668,8 +668,10 @@
     }
 
     /* ─── Tab: Performance (merged: user P&L chart + calendar + strategy stats + holdings) ─── */
+    const investorHistoryKey = (i) => `${i.userId}:${i.familyMemberId || ''}:${i.strategyId || ''}`;
+
     function renderPerformanceTab(i) {
-      const historyKey = `${i.userId}:${i.strategyId || ''}`;
+      const historyKey = investorHistoryKey(i);
       const m = stratMetricsMap[historyKey] || {};
       const latest = m.latest || {};
       const periods = [
@@ -790,7 +792,7 @@
     /* Build user P&L series: starts at (inception, 0), then strategy NAV ratio &times; invested */
     function renderUserPnlChart(i) {
       const el = document.getElementById('userPnlChart'); if (!el) return;
-      const navs = stratNavMap[`${i.userId}:${i.strategyId || ''}`] || [];
+      const navs = stratNavMap[investorHistoryKey(i)] || [];
       if (i.repairPreview && !i.repairFullHistory) {
         el.innerHTML = `<div style="height:100%;display:flex;align-items:center;justify-content:center;padding:28px;text-align:center;">
           <div style="max-width:520px;"><div style="width:34px;height:34px;margin:0 auto 10px;border-radius:50%;background:#ede9fe;color:#6d28d9;display:flex;align-items:center;justify-content:center;font-weight:800;">✓</div>
@@ -829,7 +831,7 @@
 
     /* ─── Tab: Risk ─── */
     function renderRiskTab(i) {
-      const m = stratMetricsMap[`${i.userId}:${i.strategyId || ''}`] || {};
+      const m = stratMetricsMap[investorHistoryKey(i)] || {};
       const cards = [
         ['Sharpe Ratio',     m.sharpe,  'Annualised return per unit of total risk. Higher is better. > 1 is good.'],
         ['Sortino Ratio',    m.sortino, 'Like Sharpe but only counts downside risk. Higher is better.'],
@@ -856,7 +858,7 @@
 
     function renderDrawdownChart(i) {
       const el = document.getElementById('ddChart'); if (!el) return;
-      const series = (stratMetricsMap[`${i.userId}:${i.strategyId || ''}`] || {}).ddSeries || [];
+      const series = (stratMetricsMap[investorHistoryKey(i)] || {}).ddSeries || [];
       if (series.length < 2) { el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:12px;">Not enough NAV data</div>`; return; }
       disposeChart(el);
       const chart = echarts.init(el); chart.__instanceFor = el;
