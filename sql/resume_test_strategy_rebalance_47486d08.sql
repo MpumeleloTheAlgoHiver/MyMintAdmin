@@ -10,7 +10,8 @@ declare
   v_strategy_id constant uuid := '26daf728-8e95-4ff0-b9e7-69b382b0bb8c';
   v_user_id constant uuid := 'b215eb9a-4017-45f1-a460-6056b1db0c4d';
   v_actor constant uuid := 'd3f65e83-0f29-4b1e-9351-46943756de45';
-  v_requested_fees_cents constant bigint := 13944;
+  -- R25 custody on each side + 0.5% brokerage on the actual fills.
+  v_requested_fees_cents constant bigint := 5144;
   v_sell_gross_cents constant bigint := 16562;
   v_buy_gross_cents constant bigint := 12104;
   v_securities_value_cents constant bigint := 49095;
