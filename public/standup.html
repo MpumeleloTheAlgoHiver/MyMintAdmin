@@ -160,7 +160,13 @@
 
       <!-- STANDUP -->
       <div class="tab-pane" id="tab-standup">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+          <!-- Date nav -->
+          <div style="display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #e5e5ea;border-radius:14px;padding:4px 10px;">
+            <button onclick="changeStandupDate(-1)" style="background:none;border:none;cursor:pointer;color:#7c3aed;font-size:16px;padding:2px 6px;border-radius:6px;" title="Previous day">‹</button>
+            <input type="date" id="standupDatePicker" max="" onchange="setStandupDate(this.value)" style="border:none;outline:none;font-size:12px;font-weight:700;color:#1c1c1e;background:transparent;cursor:pointer;font-family:inherit;text-align:center;min-width:120px;">
+            <button onclick="changeStandupDate(1)" id="standupNextBtn" style="background:none;border:none;cursor:pointer;color:#7c3aed;font-size:16px;padding:2px 6px;border-radius:6px;" title="Next day">›</button>
+          </div>
           <div style="display:flex;align-items:center;gap:4px;background:#fff;border:1px solid #e5e5ea;border-radius:14px;padding:4px;">
             <button id="phaseBtn1" onclick="switchPhase(1)" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:13px;font-weight:700;border:none;cursor:pointer;background:#7c3aed;color:#fff;font-family:inherit;">✓ Yesterday's Review</button>
             <button id="phaseBtn2" onclick="switchPhase(2)" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:13px;font-weight:700;border:none;cursor:pointer;background:transparent;color:#8e8e93;font-family:inherit;">◎ Today's Tasks</button>
@@ -234,6 +240,7 @@
       return m>0?`${h}h ${m}m`:`${h}h`;
     }
     function isOverdue(t){return t.due_date&&t.due_date<TODAY&&t.status!=='done';}
+    function daysOverdue(t){if(!t.due_date||t.status==='done')return 0;const d=Math.floor((new Date(TODAY)-new Date(t.due_date))/86400000);return d>0?d:0;}
     function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
     function badge(p){return `<span class="badge badge-${p}">${p}</span>`;}
     function initials(n){return (n||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);}
@@ -286,7 +293,7 @@
       } catch(e){alert('Failed to update status: '+e.message);}
     }
 
-    let allTasks=[],allMembers=[],myMember=null,isAdmin=false,doneOpen=true;
+    let allTasks=[],allMembers=[],myMember=null,isAdmin=false,doneOpen=true,standupDate=TODAY,standupSnapshot=null;
 
     async function api(path,opts={}) {
       const r=await fetch(path,{...opts,headers:{'Content-Type':'application/json','Authorization':`Bearer ${getToken()}`,...(opts.headers||{})}});
@@ -411,7 +418,40 @@
     }
 
     /* ── STANDUP ── */
-    function renderStandup(){renderPhase1();renderPhase2();}
+    function renderStandup(){updateStandupDateLabel();renderPhase1();renderPhase2();}
+
+    function updateStandupDateLabel() {
+      const picker=document.getElementById('standupDatePicker');
+      picker.value=standupDate;
+      picker.max=TODAY;
+      document.getElementById('standupNextBtn').style.opacity=standupDate>=TODAY?'0.3':'1';
+      document.getElementById('standupNextBtn').disabled=standupDate>=TODAY;
+    }
+
+    async function loadSnapshot(date) {
+      if (date >= TODAY) { standupSnapshot=null; return; }
+      try {
+        const r = await api(`/api/standup-log?date=${date}`);
+        standupSnapshot = (r && !r.live) ? r : null;
+      } catch { standupSnapshot=null; }
+    }
+
+    async function setStandupDate(val) {
+      if(!val||val>TODAY) return;
+      standupDate=val;
+      await loadSnapshot(val);
+      renderStandup();
+    }
+
+    async function changeStandupDate(delta) {
+      const d=new Date(standupDate+'T00:00:00Z');
+      d.setUTCDate(d.getUTCDate()+delta);
+      const newDate=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+      if(newDate>TODAY) return;
+      standupDate=newDate;
+      await loadSnapshot(newDate);
+      renderStandup();
+    }
 
     function switchPhase(n) {
       document.getElementById('phase1').style.display=n===1?'':'none';
@@ -425,7 +465,8 @@
     }
 
     function renderPhase1() {
-      const unfinished=allTasks.filter(t=>t.due_date===YESTERDAY&&t.status!=='done');
+      const prevDate=(()=>{const d=new Date(standupDate+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-1);return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;})();
+      const unfinished=allTasks.filter(t=>t.due_date===prevDate&&t.status!=='done');
       let html='';
       allMembers.forEach(m=>{
         const tasks=unfinished.filter(t=>t.assigned_to===m.id);
@@ -470,13 +511,27 @@
     async function p1Carry(id){await api(`/api/tasks/${id}`,{method:'PATCH',body:JSON.stringify({due_date:TODAY})});await loadAll();renderStandup();}
 
     function renderPhase2() {
-      const myTodayCount=allTasks.filter(t=>t.assigned_to===myMember?.id&&t.status!=='done'&&(t.due_date===TODAY||t.status==='in_progress'||(isOverdue(t)&&t.due_date!==YESTERDAY))).length;
-      document.getElementById('phaseBtn2').textContent=myTodayCount>0?`◎ Today's ${myTodayCount}`:'◎ Today\'s Tasks';
+      const isToday=standupDate===TODAY;
+      const isPast=standupDate<TODAY;
+      // For past dates use snapshot rows; for today use live allTasks
+      const snapRows=standupSnapshot?.rows||null;
+      const myTodayCount=allTasks.filter(t=>t.assigned_to===myMember?.id&&t.status!=='done'&&(t.due_date===standupDate||t.status==='in_progress')).length;
+      document.getElementById('phaseBtn2').textContent=myTodayCount>0?`◎ ${isToday?"Today's":'Tasks'} ${myTodayCount}`:`◎ ${isToday?"Today's Tasks":'Tasks'}`;
       let html='';
+      if (isPast && snapRows && standupSnapshot?.fallback===false) {
+        html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 14px;background:#ede9fe;border-radius:10px;font-size:12px;color:#7c3aed;font-weight:600;">📸 Snapshot — ${new Date(standupDate+'T00:00:00Z').toLocaleDateString('en-ZA',{weekday:'long',day:'numeric',month:'long',timeZone:'UTC'})}</div>`;
+      } else if (isPast && snapRows && standupSnapshot?.fallback===true) {
+        html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 14px;background:#fff8e1;border-radius:10px;font-size:12px;color:#c47f00;font-weight:600;">⚠ No snapshot for this date — showing tasks by due date</div>`;
+      }
       allMembers.forEach(m=>{
-        const tasks=allTasks.filter(t=>t.assigned_to===m.id&&(t.due_date===TODAY||t.status==='in_progress'||(isOverdue(t)&&t.due_date!==YESTERDAY)));
+        let tasks;
+        if (isPast && snapRows) {
+          tasks=snapRows.filter(r=>r.member_id===m.id);
+        } else {
+          tasks=allTasks.filter(t=>t.assigned_to===m.id&&(t.due_date===standupDate||(isToday&&(t.status==='in_progress'||(isOverdue(t))))));
+        }
         const isMe=m.id===myMember?.id;
-        const canEdit=isAdmin||isMe;
+        const canEdit=(!isPast)&&(isAdmin||isMe);
         const fname=esc((m.full_name||m.email||'').split(' ')[0]);
         html+=`
           <div style="background:#fff;border:1px solid ${isMe?'#c4b5fd':'#e5e5ea'};border-radius:14px;overflow:hidden;margin-bottom:10px;">
@@ -579,7 +634,8 @@
               <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
                 <span style="font-size:11px;color:#8e8e93;display:flex;align-items:center;gap:4px;"><span style="color:#7c3aed;">●</span> ${active.length} active</span>
                 <span style="font-size:11px;color:#8e8e93;display:flex;align-items:center;gap:4px;"><span style="color:#28a745;">✓</span> ${doneTodayM.length} done today</span>
-                ${overdueMem.length>0?`<span style="font-size:11px;color:#ff3b30;font-weight:600;">⚡ ${overdueMem.length} overdue</span>`:''}
+                ${overdueMem.length>0?`<button onclick="drillToDate('${member.id}')" style="font-size:11px;color:#ff3b30;font-weight:700;background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;gap:3px;">${overdueMem.some(t=>daysOverdue(t)>=5)?'🚨':'⚡'} ${overdueMem.length} overdue ↗</button>`:''}
+                <span style="font-size:11px;color:#8e8e93;display:flex;align-items:center;gap:4px;"><span style="color:#7c3aed;font-weight:700;">${progress}%</span> exec rate</span>
               </div>
             </div>
             <div style="padding:12px;display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;">
@@ -589,7 +645,7 @@
                   <button onclick="toggleStatus('${t.id}','${t.status}')" style="width:18px;height:18px;border-radius:50%;border:2px solid #d1d1d6;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;"></button>
                   <span style="flex:1;font-size:12px;font-weight:500;color:#1c1c1e;word-break:break-word;min-width:0;line-height:1.4;">${esc(t.title)}</span>
                   <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:20px;flex-shrink:0;${t.priority==='urgent'?'background:#fff0ef;color:#ff3b30;':t.priority==='high'?'background:#fff8e1;color:#c47f00;':t.priority==='medium'?'background:#ede9fe;color:#7c3aed;':'background:#f2f2f7;color:#8e8e93;'}">${t.priority}</span>
-                  ${isOver?'<span style="font-size:9px;font-weight:700;color:#ff3b30;flex-shrink:0;">OVERDUE</span>':''}
+                  ${isOver?`<span style="font-size:9px;font-weight:700;color:#ff3b30;flex-shrink:0;" title="${daysOverdue(t)} days overdue">${daysOverdue(t)>=5?'🚨':'⚠'} ${daysOverdue(t)}d</span>`:''}
                 </div>`;
               }).join('')}
               ${doneTasks.map(t=>`<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:10px;opacity:.4;">
@@ -790,6 +846,18 @@
       modal.style.display='flex';
     }
     function closeVt(){document.getElementById('vtModal').style.display='none';}
+
+    /* ── Drill-down: team board overdue → standup date ── */
+    function drillToDate(memberId) {
+      const overdueTasks=allTasks.filter(t=>t.assigned_to===memberId&&isOverdue(t));
+      if(!overdueTasks.length) return;
+      // jump to the earliest overdue date
+      const earliest=overdueTasks.map(t=>t.due_date).sort()[0];
+      standupDate=earliest;
+      switchTab('standup',document.getElementById('pillStandup'));
+      switchPhase(2);
+      renderStandup();
+    }
 
     /* ── Sidebar badge ── */
     function updateStandupBadge() {
