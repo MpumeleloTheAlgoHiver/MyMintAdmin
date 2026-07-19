@@ -1,3 +1,8 @@
+-- ⚠️ SUPERSEDED by sql/effective_return_views_v2.sql (2026-07-19). Do NOT run this
+-- file — it recreates the views WITHOUT the full-chain period derivation, the
+-- basket_value alias, 6m/1y/5y/all_pct, and the *_latest_c companions, so running
+-- it would revert the CRM/app read contract. Kept for history only.
+--
 -- One canonical read contract for strategy and client returns.
 -- Promoted repaired series replace only the matching legacy series; unaffected
 -- strategies/owners continue to resolve from production history.
