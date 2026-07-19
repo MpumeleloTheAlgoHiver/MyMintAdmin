@@ -24,7 +24,12 @@
 
 begin;
 
-create or replace view public.strategy_returns_effective_c
+-- The prior view (from canonical_return_views.sql) has a different column set, so
+-- CREATE OR REPLACE fails (42P16). Nothing reads this view yet (reader cutover is
+-- Stage 3/4), so dropping + recreating is safe.
+drop view if exists public.strategy_returns_effective_c cascade;
+
+create view public.strategy_returns_effective_c
 with (security_invoker = false)
 as
 with sourced as (
