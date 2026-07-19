@@ -625,7 +625,8 @@
         const setting = await (await fetch('/api/team?action=app-settings-get&key=repair_preview',{headers})).json();
         if (!setting?.value?.enabled || !setting.value.run_id) return;
         const preview = await (await fetch(`/api/team?action=return-repair-preview&run_id=${encodeURIComponent(setting.value.run_id)}`,{headers})).json();
-        if (!preview?.ok) return;
+        /* APPROVED-only: PROMOTED runs already flow through strategy_returns_effective_c. */
+        if (!preview?.ok || preview.run?.status !== 'APPROVED') return;
         const grouped = {};
         for (const row of preview.shadow || []) {
           if (!grouped[row.strategy_id]) grouped[row.strategy_id] = [];
@@ -933,7 +934,7 @@
 
       /* Returns */
       const { data: productionRetRows } = await supabaseClient
-        .from('strategies_returns_c')
+        .from('strategy_returns_effective_c')
         .select('strategy_id,ytd_pct,basket_value,as_of_date')
         .eq('strategy_id',strategyId)
         .order('as_of_date',{ascending:true});
@@ -1204,22 +1205,14 @@
       /* YTD + spark data */
       try {
         const ids = strategies.map(s=>s.id).filter(Boolean);
-        /* Step 1: get the latest as_of_date to avoid 1000-row default limit cutting off newest rows */
-        const { data: dateRow } = await supabaseClient
-          .from('strategies_returns_c')
-          .select('as_of_date')
-          .order('as_of_date',{ascending:false})
-          .limit(1)
-          .maybeSingle();
-        const latestDate = dateRow?.as_of_date;
-        /* Step 2: fetch YTD for that single date only — exactly 1 row per strategy */
+        /* Latest YTD per strategy from the effective view's latest companion —
+           no global as_of_date step (effective dates are per-strategy). */
         const latestYtd={};
-        if (latestDate) {
+        {
           const { data: ytdRows } = await supabaseClient
-            .from('strategies_returns_c')
+            .from('strategy_returns_effective_latest_c')
             .select('strategy_id,ytd_pct')
-            .in('strategy_id',ids)
-            .eq('as_of_date',latestDate);
+            .in('strategy_id',ids);
           (ytdRows||[]).forEach(r=>{ latestYtd[r.strategy_id]=r.ytd_pct; });
         }
         for(const [strategyId,rows] of Object.entries(_repairStrategyMap)){const latest=rows.at(-1);if(latest?.ytd_pct!=null)latestYtd[strategyId]=latest.ytd_pct;}
@@ -1229,7 +1222,7 @@
         const d90=new Date(); d90.setDate(d90.getDate()-90);
         const d90str=d90.toISOString().slice(0,10);
         const { data: sparkRows } = await supabaseClient
-          .from('strategies_returns_c')
+          .from('strategy_returns_effective_c')
           .select('strategy_id,basket_value,as_of_date')
           .in('strategy_id',ids)
           .gte('as_of_date',d90str)

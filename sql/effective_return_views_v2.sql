@@ -1,32 +1,38 @@
 -- ============================================================
--- Strategy effective return view v2 — the single read contract
+-- Strategy effective return views — the single read contract (Stage 2 + 3)
 -- ------------------------------------------------------------
--- One coherent daily series per strategy, stitched by priority PER DATE:
+-- strategy_returns_effective_c        : one coherent daily series per strategy.
+-- strategy_returns_effective_latest_c : latest row per strategy (reader convenience).
+--
+-- Series is stitched by priority PER DATE:
 --   publication (guarded daily cron / settlement) > promoted repair shadow >
 --   legacy nightly.
 -- Because ytd_pct IS the chain value at each date (chain_factor = 1 + ytd/100),
--- 1d / 5d / 1m / MTD are DERIVED from that unified chain via window functions —
--- so all periods are consistent and accurate across the shadow→publication and
--- legacy→publication handoffs (the Stage-1 seed made those handoffs continuous).
+-- ALL periods (1d / 5d / 1m / MTD / 6m / 1y / 5y / all) are DERIVED from that
+-- unified chain via window functions — consistent and accurate across the
+-- shadow->publication and legacy->publication handoffs (the Stage-1 seed made
+-- those handoffs continuous).
 --
 -- Rebalance-aware: value is the COMPLETE lot (securities + continuity cash) once
--- a strategy is published; a rebalance's securities→cash shift never resets YTD
+-- a strategy is published; a rebalance's securities->cash shift never resets YTD
 -- because the chain carries through the boundary.
 --
--- Non-destructive: a view only. Deploying it changes no data and no reader until
--- readers are explicitly pointed at it (Stage 3/4). service_role read only.
+-- Shape-compatible with strategies_returns_c so CRM readers can swap the source
+-- with no logic change: exposes basket_value (cents, same as legacy) AND
+-- basket_value_cents, plus the full period set.
 --
--- Validated read-only before writing (Yield 809-day / ETF 805-day series;
--- handoffs continuous; derived periods matched).
+-- Access: SELECT to anon/authenticated/service_role. security_invoker = false so
+-- the browser reads repaired data through the view WITHOUT needing RLS grants on
+-- the shadow/publication tables. Strategy-level returns are non-sensitive
+-- aggregates (already shown in the CRM); no per-user data is exposed.
 --
--- Safe to run more than once.
+-- Non-destructive: views only. Safe to run more than once.
 -- ============================================================
 
 begin;
 
--- The prior view (from canonical_return_views.sql) has a different column set, so
--- CREATE OR REPLACE fails (42P16). Nothing reads this view yet (reader cutover is
--- Stage 3/4), so dropping + recreating is safe.
+-- CREATE OR REPLACE can't change a view's column set (42P16); drop + recreate.
+drop view if exists public.strategy_returns_effective_latest_c cascade;
 drop view if exists public.strategy_returns_effective_c cascade;
 
 create view public.strategy_returns_effective_c
@@ -66,9 +72,13 @@ unified as (
 chained as (
   select u.*,
          (1 + ytd_pct / 100.0) as cf,
-         lag(1 + ytd_pct / 100.0, 1)  over w as cf_1,
-         lag(1 + ytd_pct / 100.0, 5)  over w as cf_5,
-         lag(1 + ytd_pct / 100.0, 21) over w as cf_21,
+         lag(1 + ytd_pct / 100.0, 1)    over w as cf_1,
+         lag(1 + ytd_pct / 100.0, 5)    over w as cf_5,
+         lag(1 + ytd_pct / 100.0, 21)   over w as cf_21,
+         lag(1 + ytd_pct / 100.0, 126)  over w as cf_126,
+         lag(1 + ytd_pct / 100.0, 252)  over w as cf_252,
+         lag(1 + ytd_pct / 100.0, 1260) over w as cf_1260,
+         first_value(1 + ytd_pct / 100.0) over w as cf_first,
          first_value(1 + ytd_pct / 100.0) over (
            partition by strategy_id, date_trunc('month', as_of_date::timestamp)
            order by as_of_date
@@ -80,23 +90,37 @@ chained as (
 select
   strategy_id,
   as_of_date,
-  value_cents as basket_value_cents,
+  value_cents                          as basket_value_cents,
+  value_cents                          as basket_value,   -- legacy alias (cents)
   ytd_pct,
-  case when cf_1  is null or cf_1  = 0 then null else round(((cf / cf_1)  - 1) * 100, 6) end as "1d_pct",
-  case when cf_5  is null or cf_5  = 0 then null else round(((cf / cf_5)  - 1) * 100, 6) end as "5d_pct",
-  case when cf_21 is null or cf_21 = 0 then null else round(((cf / cf_21) - 1) * 100, 6) end as "1m_pct",
+  case when cf_1     is null or cf_1     = 0 then null else round(((cf / cf_1)     - 1) * 100, 6) end as "1d_pct",
+  case when cf_5     is null or cf_5     = 0 then null else round(((cf / cf_5)     - 1) * 100, 6) end as "5d_pct",
+  case when cf_21    is null or cf_21    = 0 then null else round(((cf / cf_21)    - 1) * 100, 6) end as "1m_pct",
   case when cf_month_first is null or cf_month_first = 0 then null
        else round(((cf / cf_month_first) - 1) * 100, 6) end as mtd_pct,
+  case when cf_126   is null or cf_126   = 0 then null else round(((cf / cf_126)   - 1) * 100, 6) end as "6m_pct",
+  case when cf_252   is null or cf_252   = 0 then null else round(((cf / cf_252)   - 1) * 100, 6) end as "1y_pct",
+  case when cf_1260  is null or cf_1260  = 0 then null else round(((cf / cf_1260)  - 1) * 100, 6) end as "5y_pct",
+  case when cf_first is null or cf_first = 0 then null else round(((cf / cf_first) - 1) * 100, 6) end as all_pct,
   source_kind
 from chained;
 
-revoke all on public.strategy_returns_effective_c from public, anon, authenticated;
-grant select on public.strategy_returns_effective_c to service_role;
+create view public.strategy_returns_effective_latest_c
+with (security_invoker = false)
+as
+select distinct on (strategy_id) *
+  from public.strategy_returns_effective_c
+ order by strategy_id, as_of_date desc;
+
+revoke all on public.strategy_returns_effective_c        from public;
+revoke all on public.strategy_returns_effective_latest_c from public;
+grant select on public.strategy_returns_effective_c        to anon, authenticated, service_role;
+grant select on public.strategy_returns_effective_latest_c to anon, authenticated, service_role;
 
 commit;
 
 -- Verify (latest row per strategy):
--- select distinct on (strategy_id) strategy_id, as_of_date, basket_value_cents,
---        ytd_pct, "1d_pct", "5d_pct", "1m_pct", mtd_pct, source_kind
---   from public.strategy_returns_effective_c
---  order by strategy_id, as_of_date desc;
+-- select strategy_id, as_of_date, basket_value, ytd_pct, "1d_pct", "5d_pct",
+--        "1m_pct", mtd_pct, "6m_pct", "1y_pct", "5y_pct", all_pct, source_kind
+--   from public.strategy_returns_effective_latest_c
+--  order by strategy_id;

@@ -234,7 +234,7 @@
 
     const fetchFactsheetStrategyReturns = async (strategyId) => {
       const { data: productionRows } = await supabaseClient
-        .from('strategies_returns_c')
+        .from('strategy_returns_effective_c')
         .select('strategy_id, ytd_pct, 1d_pct, basket_value, as_of_date')
         .eq('strategy_id', strategyId)
         .order('as_of_date', { ascending: true });
@@ -246,7 +246,7 @@
         const setting = await (await fetch('/api/team?action=app-settings-get&key=repair_preview', { headers })).json();
         if (!setting?.value?.enabled || !setting.value.run_id) return productionRows || [];
         const preview = await (await fetch(`/api/team?action=return-repair-preview&run_id=${encodeURIComponent(setting.value.run_id)}`, { headers })).json();
-        if (!preview?.ok || !['APPROVED', 'PROMOTED'].includes(preview.run?.status)) return productionRows || [];
+        if (!preview?.ok || preview.run?.status !== 'APPROVED') return productionRows || [];
         const repaired = (preview.shadow || []).filter(row => String(row.strategy_id) === String(strategyId)).map(row => ({
           strategy_id: row.strategy_id, ytd_pct: row.ytd_pct, '1d_pct': row['1d_pct'], basket_value: row.chain_nav_cents,
           complete_value_cents: row.complete_value_cents, as_of_date: row.as_of_date, repair_run_id: preview.run.id
@@ -880,7 +880,7 @@
 
     const fetchFactsheetStrategyReturns = async (strategyId) => {
       const { data: productionRows } = await supabaseClient
-        .from('strategies_returns_c')
+        .from('strategy_returns_effective_c')
         .select('strategy_id, ytd_pct, 1d_pct, basket_value, as_of_date')
         .eq('strategy_id', strategyId)
         .order('as_of_date', { ascending: true });
@@ -892,7 +892,7 @@
         const setting = await (await fetch('/api/team?action=app-settings-get&key=repair_preview', { headers })).json();
         if (!setting?.value?.enabled || !setting.value.run_id) return productionRows || [];
         const preview = await (await fetch(`/api/team?action=return-repair-preview&run_id=${encodeURIComponent(setting.value.run_id)}`, { headers })).json();
-        if (!preview?.ok || !['APPROVED', 'PROMOTED'].includes(preview.run?.status)) return productionRows || [];
+        if (!preview?.ok || preview.run?.status !== 'APPROVED') return productionRows || [];
         const repaired = (preview.shadow || []).filter(row => String(row.strategy_id) === String(strategyId)).map(row => ({
           strategy_id: row.strategy_id, ytd_pct: row.ytd_pct, '1d_pct': row['1d_pct'], basket_value: row.chain_nav_cents,
           complete_value_cents: row.complete_value_cents, as_of_date: row.as_of_date, repair_run_id: preview.run.id

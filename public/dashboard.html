@@ -3502,7 +3502,9 @@
             if (!settingResponse.ok || !setting?.value?.enabled || !setting.value.run_id) return {};
             const previewResponse = await fetch(`/api/team?action=return-repair-preview&run_id=${encodeURIComponent(setting.value.run_id)}`, { headers });
             const preview = await previewResponse.json();
-            if (!previewResponse.ok || !preview?.ok || !['APPROVED', 'PROMOTED'].includes(preview.run?.status)) return {};
+            /* APPROVED-only: PROMOTED runs already flow through strategy_returns_effective_c,
+               so overlaying their (now frozen) shadow here would override fresher publications. */
+            if (!previewResponse.ok || !preview?.ok || preview.run?.status !== 'APPROVED') return {};
             const latest = {};
             for (const row of preview.shadow || []) {
               if (!latest[row.strategy_id] || String(row.as_of_date) > String(latest[row.strategy_id].as_of_date)) {
@@ -3534,30 +3536,26 @@
         if (!strategyIds || !strategyIds.length) return {};
         const map = {};
         const uniqIds = [...new Set(strategyIds.filter(Boolean))];
-        /* Step 1: get the latest as_of_date (avoids 1000-row limit &mdash; strategies_returns_c has 300+ rows per strategy) */
-        const { data: dateRow } = await supabaseClient
-          .from('strategies_returns_c')
-          .select('as_of_date')
-          .order('as_of_date', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        const latestDate = dateRow?.as_of_date;
-        if (!latestDate) return map;
-        /* Step 2: fetch all strategies for that single date &mdash; exactly 1 row per strategy */
+        if (!uniqIds.length) return map;
+        /* Single read from the effective view's latest-per-strategy companion.
+           No global as_of_date step: the effective series is per-strategy dated
+           (publication/shadow/legacy stitched by priority), so a single global
+           latest date would drop strategies that published on an earlier day. */
         const chunks = [];
         for (let i = 0; i < uniqIds.length; i += 200) chunks.push(uniqIds.slice(i, i + 200));
         const results = await Promise.all(
           chunks.map(chunk =>
-            supabaseClient.from('strategies_returns_c')
+            supabaseClient.from('strategy_returns_effective_latest_c')
               .select('strategy_id, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct, basket_value, as_of_date')
               .in('strategy_id', chunk)
-              .eq('as_of_date', latestDate)
           )
         );
         results.forEach(({ data }) => {
           if (!data) return;
           data.forEach(r => { if (!map[r.strategy_id]) map[r.strategy_id] = r; });
         });
+        /* Optional preview overlay for an APPROVED-but-not-yet-promoted repair run.
+           Promoted runs already flow through the effective view above. */
         const repaired = await fetchApprovedRepairStrategyReturns();
         uniqIds.forEach(id => { if (repaired[id]) map[id] = repaired[id]; });
         return map;
@@ -5081,7 +5079,7 @@
             const chunks90 = [];
             for (let i = 0; i < ids.length; i += 50) chunks90.push(ids.slice(i, i + 50));
             const sparkResults = await Promise.all(chunks90.map(chunk =>
-              supabaseClient.from('strategies_returns_c')
+              supabaseClient.from('strategy_returns_effective_c')
                 .select('strategy_id,basket_value,as_of_date')
                 .in('strategy_id', chunk)
                 .gte('as_of_date', d90str)
@@ -5808,7 +5806,7 @@
 
         window.__dbgBreadcrumb('ovSelect:fetch-analytics');
         const { data: _stratRetHistory } = await supabaseClient
-          .from('strategies_returns_c')
+          .from('strategy_returns_effective_c')
           .select('strategy_id, as_of_date, basket_value, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct')
           .eq('strategy_id', strat.id)
           .order('as_of_date', { ascending: true });
