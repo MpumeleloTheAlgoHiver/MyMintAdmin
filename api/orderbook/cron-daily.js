@@ -6,6 +6,7 @@ const {
   loadLiveOrderbookRows
 } = require('../_orderbook');
 const { publishEodReturns } = require('../_returns-publish');
+const { publishClientEodReturns } = require('../_client-returns-publish');
 
 const getNowInTimezoneParts = (date, timeZone) => {
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -75,6 +76,23 @@ module.exports = async (req, res) => {
       console.error('[returns-publish] failed (non-fatal):', e?.message || e);
     }
 
+    // Client publication runs after strategies and has its own independent
+    // apply switch. It values actual owner quantities plus strategy-scoped
+    // residual/reserve cash, excludes accrued liabilities from gross TWR, and
+    // refuses unexplained composition changes.
+    let clientReturnsPublish = null;
+    try {
+      clientReturnsPublish = await publishClientEodReturns({
+        asOfDate: dateKey,
+        apply: process.env.CLIENT_RETURNS_PUBLISH_APPLY === '1',
+        includeUat: process.env.CLIENT_RETURNS_INCLUDE_UAT === '1',
+        includeTestUsers: process.env.CLIENT_RETURNS_INCLUDE_TEST === '1'
+      });
+      console.log('[client-returns-publish]', clientReturnsPublish.apply ? 'APPLIED' : 'dry-run', JSON.stringify(clientReturnsPublish.summary));
+    } catch (e) {
+      console.error('[client-returns-publish] failed (non-fatal):', e?.message || e);
+    }
+
     const currentMinuteOfDay = (localNow.hour * 60) + localNow.minute;
     const targetMinuteOfDay = (targetHour * 60) + targetMinute;
 
@@ -120,7 +138,8 @@ module.exports = async (req, res) => {
         runDate: dateKey,
         now: localNow,
         target: { hour: targetHour, minute: targetMinute, timeZone },
-        returnsPublish: returnsPublish || null
+        returnsPublish: returnsPublish || null,
+        clientReturnsPublish: clientReturnsPublish || null
       });
     }
 

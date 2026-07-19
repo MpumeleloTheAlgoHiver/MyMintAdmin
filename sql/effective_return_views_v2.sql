@@ -140,6 +140,10 @@ with selected_runs as (
       and x.family_member_id is not distinct from c.family_member_id and x.run_id = c.run_id
 ), repaired_owners as (
   select distinct user_id, family_member_id, strategy_id from promoted
+), publication_start as (
+  select user_id, family_member_id, strategy_id, min(as_of_date) as first_date
+    from public.client_strategy_return_publication_audit_c
+   group by user_id, family_member_id, strategy_id
 ),
 base as (
   select p.user_id, p.family_member_id, p.strategy_id, p.as_of_date,
@@ -150,6 +154,19 @@ base as (
          p.net_cash_pnl_cents, p.net_cash_return_pct, p.opening_perf_nav as opening_performance_nav_cents,
          'PROMOTED_REPAIR'::text as source_kind, p.run_id as repair_run_id
     from promoted p
+    left join publication_start u on u.user_id = p.user_id
+      and u.family_member_id is not distinct from p.family_member_id
+      and u.strategy_id = p.strategy_id
+   where u.first_date is null or p.as_of_date < u.first_date
+  union all
+  select a.user_id, a.family_member_id, a.strategy_id, a.as_of_date,
+         a.securities_value_cents, a.residual_cash_cents, a.unused_reserve_cents,
+         a.accrued_liability_cents, a.complete_nav_cents as basket_value_cents,
+         a.gross_strategy_twr_pct as ytd_pct, a.gross_strategy_twr_pct as inception_pct,
+         a.inception_pnl_cents, a.net_cash_pnl_cents, a.net_cash_return_pct,
+         a.opening_performance_nav_cents,
+         'GUARDED_CLIENT_PUBLICATION'::text as source_kind, null::uuid as repair_run_id
+    from public.client_strategy_return_publication_audit_c a
   union all
   select l.user_id, l.family_member::uuid as family_member_id, l.strategy_id, l.as_of_date,
          l.basket_value::bigint as securities_value_cents, 0::bigint as residual_cash_cents,
@@ -160,11 +177,15 @@ base as (
          null::bigint as opening_performance_nav_cents,
          'LEGACY_PRODUCTION'::text as source_kind, null::uuid as repair_run_id
     from public.client_strategy_returns_c l
+    left join publication_start u on u.user_id = l.user_id
+      and u.family_member_id is not distinct from l.family_member::uuid
+      and u.strategy_id = l.strategy_id
    where not exists (
      select 1 from repaired_owners x
       where x.user_id = l.user_id and x.strategy_id = l.strategy_id
         and x.family_member_id is not distinct from l.family_member::uuid
    )
+     and (u.first_date is null or l.as_of_date < u.first_date)
 ),
 chained as (
   select b.*,
