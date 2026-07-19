@@ -5,5 +5,7 @@ attached_assets/*.tar.gz
 attached_assets/*.tar
 *.log
 .env
+.env.local
+.env.*.local
 .vercel
 .commitmsg.tmp

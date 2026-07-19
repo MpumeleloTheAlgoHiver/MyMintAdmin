@@ -5218,8 +5218,15 @@
       renderRebalanceBooks();
     };
 
-    const rebalanceStatusPill = (status) => {
+    const rebalanceStatusPill = (status, settlementState) => {
       const normalized = String(status || '').toUpperCase();
+      const checkpoint = String(settlementState || '').toUpperCase();
+      if (normalized === 'PENDING' && checkpoint === 'PAUSED') {
+        return '<span title="No final Settled status was published. Resume safely from the completed checkpoints." style="background:#fff7ed;color:#9a3412;border:1px solid #fdba74;border-radius:999px;padding:3px 8px;font-size:0.72rem;font-weight:700;">Settlement paused</span>';
+      }
+      if (normalized === 'PENDING' && checkpoint === 'PROCESSING') {
+        return '<span style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:999px;padding:3px 8px;font-size:0.72rem;font-weight:700;">Settling</span>';
+      }
       if (normalized === 'PENDING') {
         return '<span style="background:#fffbeb;color:#92400e;border:1px solid #fcd34d;border-radius:999px;padding:3px 8px;font-size:0.72rem;font-weight:700;">Pending</span>';
       }
@@ -5252,10 +5259,13 @@
         const operationLabel = isLiquidation ? 'Liquidation' : 'Rebalance';
         const destinationLabel = isLiquidation ? 'Cash' : sb.buyIsin;
         const isPending = String(sb.batchStatus || '').toUpperCase() === 'PENDING';
+        const checkpoint = String(sb.settlementState || 'PENDING').toUpperCase();
+        const isProcessing = checkpoint === 'PROCESSING';
+        const settleLabel = checkpoint === 'PAUSED' ? 'Resume Settlement' : 'Fill &amp; Settle';
         const actionHtml = isPending
           ? `<span style="display:inline-flex;gap:6px;align-items:center;">
               <button title="Fill &amp; Settle Batch" data-fill-settle-batch data-batch-id="${escapeHtml(sb.id || '')}"
-                style="background:#059669;color:white;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;">Fill &amp; Settle</button>
+                ${isProcessing ? 'disabled' : ''} style="background:${isProcessing ? '#94a3b8' : '#059669'};color:white;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;border:none;cursor:${isProcessing ? 'not-allowed' : 'pointer'};white-space:nowrap;">${settleLabel}</button>
               <button title="Reverse Batch" data-reverse-batch data-batch-id="${escapeHtml(sb.id || '')}"
                 style="background:#dc2626;color:white;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;">Reverse</button>
             </span>`
@@ -5279,7 +5289,7 @@
             <summary class="filled-orderbook-summary">
               <span>${operationLabel} &mdash; ${escapeHtml(sb.strategyName)} (${escapeHtml(sb.sellIsin)} &rarr; ${escapeHtml(destinationLabel)}${sb.extraBuyIsin ? ' + ' + escapeHtml(sb.extraBuyIsin) : ''})</span>
               <span class="filled-orderbook-meta">
-                ${rebalanceStatusPill(sb.batchStatus)}
+                ${rebalanceStatusPill(sb.batchStatus, sb.settlementState)}
                 <span>${sb.clientCount} client${sb.clientCount !== 1 ? 's' : ''}</span>
                 <span>${escapeHtml(dateLabel)}</span>
                 ${actionHtml}
@@ -6098,7 +6108,7 @@
           .order('created_at', { ascending: false }),
         supabaseClient
           .from('rebalance_batch')
-          .select('id, strategy_id, status, sell_isin_code, buy_isin_code, extra_buy_isin_code, net_proceeds, strategy_name_snapshot, created_at, created_by, settled_at, updated_at, is_reversed, reversed_at, reversed_reason, holdings_snapshot_before, holdings_snapshot_planned, min_investment_planned, wallet_snapshot_before')
+          .select('id, strategy_id, status, settlement_state, settlement_error, settlement_started_at, sell_isin_code, buy_isin_code, extra_buy_isin_code, net_proceeds, strategy_name_snapshot, created_at, created_by, settled_at, updated_at, is_reversed, reversed_at, reversed_reason, holdings_snapshot_before, holdings_snapshot_planned, min_investment_planned, wallet_snapshot_before')
           .order('created_at', { ascending: false }),
       ]);
 
@@ -6713,6 +6723,8 @@
           return {
             id: b.id,
             batchStatus: b.status,
+            settlementState: b.settlement_state || (String(b.status || '').toUpperCase() === 'SETTLED' ? 'COMPLETE' : 'PENDING'),
+            settlementError: b.settlement_error || null,
             strategyName: b.strategy_name_snapshot || strategy?.name || 'Unknown Strategy',
             displayAt: b.settled_at || b.reversed_at || b.updated_at || b.created_at,
             createdAt: b.created_at || null,
@@ -7001,6 +7013,15 @@
               loadOrderbook().catch(console.error);
               alert('Batch settled successfully. Holdings updated.');
             } catch (err) {
+              try {
+                const { data: pauseSession } = await supabaseClient.auth.getSession();
+                const pauseToken = pauseSession?.session?.access_token;
+                if (pauseToken) await fetch('/api/orderbook/send-csv?action=rebalance-settlement-pause', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${pauseToken}` },
+                  body: JSON.stringify({ batchId: batch.id, error: err?.message || 'Settlement paused' }),
+                });
+              } catch (_) { /* best-effort checkpoint; retain the original error */ }
               alert('Settlement failed: ' + err.message);
               confirmBtn.disabled = false;
               confirmBtn.textContent = 'Confirm Fill & Settle';
@@ -7038,13 +7059,13 @@
 
       // fillBySecId: { [security_id]: fillCents } — per-security broker fill prices
       // from the uploaded sheet (covers both the SELL side and the BUY side).
-      const creditLiquidationResiduals = async (batch, sellEvts, fillBySecId) => {
+      const creditLiquidationResiduals = async (batch, sellEvts, fillBySecId, feeConfig = null) => {
         if (!batch?.strategy_id || !sellEvts.length) return 0;
         const { data: sessionData } = await supabaseClient.auth.getSession();
         const token = sessionData?.session?.access_token;
         if (!token) throw new Error('Session expired before residual credit.');
 
-        const { brokerageRate, custodyFeeRands: custodyFee } = await loadRebFeeConfigStrict(token);
+        const { brokerageRate, custodyFeeRands: custodyFee } = feeConfig || await loadRebFeeConfigStrict(token);
 
         const grossByOwner = new Map();
         sellEvts.forEach((evt) => {
@@ -7133,13 +7154,13 @@
          actual broker fills. Recycled sell proceeds are internal capital, not
          a contribution: net cash movement = sell gross − sell fees − buy gross
          − buy fees. The SQL RPC records opening/movement/closing atomically. */
-      const settleRebalanceCashBridge = async (batch, sellEvts, buyEvts, fillBySecId) => {
+      const settleRebalanceCashBridge = async (batch, sellEvts, buyEvts, fillBySecId, feeConfig = null) => {
         if (!batch?.strategy_id || (!sellEvts.length && !buyEvts.length)) return;
         const { data: sessionData } = await supabaseClient.auth.getSession();
         const token = sessionData?.session?.access_token;
         if (!token) throw new Error('Session expired before rebalance cash settlement.');
 
-        const { brokerageRate, custodyFeeRands } = await loadRebFeeConfigStrict(token);
+        const { brokerageRate, custodyFeeRands } = feeConfig || await loadRebFeeConfigStrict(token);
 
         const owners = new Map();
         const addLeg = (evt, side) => {
@@ -7238,13 +7259,13 @@
       /* Buy-only safety gate. All arithmetic is integer cents. It runs before
          the batch claim and before any holding, reserve, residual or strategy
          composition mutation. */
-      const preflightWalletOnlyBuy = async (batch, walletBuyEvts, fillBySecId) => {
+      const preflightWalletOnlyBuy = async (batch, walletBuyEvts, fillBySecId, feeConfig = null) => {
         if (!walletBuyEvts.length) return;
         const { data: sessionData } = await supabaseClient.auth.getSession();
         const token = sessionData?.session?.access_token;
         if (!token) throw new Error('Session expired before buy-only preflight.');
 
-        const { brokerageRate, custodyFeeCents } = await loadRebFeeConfigStrict(token);
+        const { brokerageRate, custodyFeeCents } = feeConfig || await loadRebFeeConfigStrict(token);
 
         const scopes = new Map();
         for (const evt of walletBuyEvts) {
@@ -7328,7 +7349,11 @@
         const buyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY');
         const walletBuyEvts = events.filter((e) => e.closed_reason === 'REBALANCE_EVENT_BUY_WALLET');
         const isWalletOnlyBuy = walletBuyEvts.length > 0 && sellEvts.length === 0 && buyEvts.length === 0;
-        await preflightWalletOnlyBuy(batch, isWalletOnlyBuy ? walletBuyEvts : [], fillBySecId);
+        const { data: settlementSession } = await supabaseClient.auth.getSession();
+        const settlementToken = settlementSession?.session?.access_token;
+        if (!settlementToken) throw new Error('Session expired before settlement preflight.');
+        const settlementFeeConfig = await loadRebFeeConfigStrict(settlementToken);
+        await preflightWalletOnlyBuy(batch, isWalletOnlyBuy ? walletBuyEvts : [], fillBySecId, settlementFeeConfig);
 
         /* ── Idempotency guard (atomic claim) ──────────────────────────────────
            Settlement is NOT idempotent — it inserts BUY holdings and SELL audit
@@ -7338,14 +7363,16 @@
            only proceed if THIS call won the flip. The DB makes the WHERE
            status='PENDING' atomic, so a concurrent/duplicate settle matches 0
            rows and aborts here, before any holdings are written. */
-        const claim = await supabaseClient
-          .from('rebalance_batch')
-          .update({ status: 'SETTLED', updated_at: nowIso })
-          .eq('id', batch.id)
-          .eq('status', 'PENDING')
-          .select('id');
-        if (claim.error) throw new Error('Could not claim batch for settlement: ' + claim.error.message);
-        if (!claim.data || !claim.data.length) {
+        const priorSettlementState = String(batch.settlement_state || 'PENDING').toUpperCase() === 'PAUSED'
+          ? 'PAUSED'
+          : 'PENDING';
+        const claimResponse = await fetch('/api/orderbook/send-csv?action=rebalance-settlement-claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settlementToken}` },
+          body: JSON.stringify({ batchId: batch.id, priorState: priorSettlementState }),
+        });
+        const claimResult = await claimResponse.json().catch(() => ({}));
+        if (!claimResponse.ok) {
           throw new Error('This batch is no longer pending — it has already been settled or reversed. Settlement skipped to prevent duplicate holdings.');
         }
         const isLiquidationOnly = sellEvts.length > 0 && buyEvts.length === 0 && walletBuyEvts.length === 0;
@@ -7362,6 +7389,25 @@
 
         // Ã¢&rdquo;â¬Ã¢&rdquo;â¬ 1. Close / reduce existing SELL positions for every user Ã¢&rdquo;â¬Ã¢&rdquo;â¬
         for (const evt of sellEvts) {
+          let settledSellQuery = supabaseClient
+            .from('stock_holdings_c')
+            .select('id')
+            .eq('rebalance_batch_id', batch.id)
+            .eq('user_id', evt.user_id)
+            .eq('security_id', evt.security_id)
+            .eq('trade_side', 'SELL');
+          settledSellQuery = evt.family_member_id
+            ? settledSellQuery.eq('family_member_id', evt.family_member_id)
+            : settledSellQuery.is('family_member_id', null);
+          const { data: settledSellRows, error: settledSellErr } = await settledSellQuery.limit(1);
+          if (settledSellErr) { errors.push(`SELL resume check: ${settledSellErr.message}`); continue; }
+          if (settledSellRows?.length) {
+            const { error: evtResumeErr } = await supabaseClient.from('rebalance_event').update({
+              avg_fill: fillBySecId[evt.security_id], fill_date: fillDateStr, updated_at: nowIso,
+            }).eq('id', evt.id);
+            if (evtResumeErr) errors.push(`SELL resume event update: ${evtResumeErr.message}`);
+            continue;
+          }
           /* Critical: scope by family_member_id too. Without this, when a
              parent AND their child both hold the same security in the same
              strategy, the lookup returns both rows and .find(...) silently
@@ -7526,6 +7572,27 @@
             // Per-security fill price from the uploaded sheet.
             const fillCentsForUser = fillBySecId[evt.security_id];
 
+            let settledBuyQuery = supabaseClient
+              .from('stock_holdings_c')
+              .select('id')
+              .eq('rebalance_batch_id', batch.id)
+              .eq('user_id', evt.user_id)
+              .eq('security_id', evt.security_id)
+              .eq('trade_side', 'BUY');
+            settledBuyQuery = evt.family_member_id
+              ? settledBuyQuery.eq('family_member_id', evt.family_member_id)
+              : settledBuyQuery.is('family_member_id', null);
+            const { data: settledBuyRows, error: settledBuyErr } = await settledBuyQuery.limit(1);
+            if (settledBuyErr) { errors.push(`${label} resume check: ${settledBuyErr.message}`); continue; }
+            if (settledBuyRows?.length) {
+              const settledId = settledBuyRows[0].id;
+              const { error: evtResumeErr } = await supabaseClient.from('rebalance_event').update({
+                avg_fill: fillCentsForUser, fill_date: fillDateStr, updated_at: nowIso, settled_holding_id: settledId,
+              }).eq('id', evt.id);
+              if (evtResumeErr) errors.push(`${label} resume event update: ${evtResumeErr.message}`);
+              continue;
+            }
+
             /* Expected_fill = committed price in rands (price_at_commit is cents).
                This is the price the admin locked in at execution time — the best
                proxy for "what price was shown" on a rebalance buy, so PnL cost
@@ -7607,7 +7674,7 @@
             const fm = e.family_member_id ? String(e.family_member_id) : '';
             ownerKeys.add(`${uid}|${fm}`);
           });
-          const txnRows = [...ownerKeys].map((key) => {
+          let txnRows = [...ownerKeys].map((key) => {
             const [uid, fm] = key.split('|');
             const fmId = fm || null;
             const own = (e) => String(e.user_id) === uid
@@ -7631,10 +7698,17 @@
               description: parts.length ? parts.join(', ') : 'Strategy rebalance',
               currency: 'ZAR',
               transaction_date: nowIso,
+              store_reference: `REBALANCE-${batch.id}-${uid}-${fmId || 'parent'}`,
             };
           });
           if (txnRows.length) {
-            try { await settlementInsert('transactions', txnRows); }
+            const refs = txnRows.map((row) => row.store_reference);
+            const { data: existingTxnRows, error: existingTxnErr } = await supabaseClient
+              .from('transactions').select('store_reference').in('store_reference', refs);
+            if (existingTxnErr) throw existingTxnErr;
+            const existingRefs = new Set((existingTxnRows || []).map((row) => row.store_reference));
+            txnRows = txnRows.filter((row) => !existingRefs.has(row.store_reference));
+            try { if (txnRows.length) await settlementInsert('transactions', txnRows); }
             catch (txnErr) { errors.push(`Rebalance txn insert: ${txnErr.message}`); }
           }
         } catch (txnCatchErr) {
@@ -7646,13 +7720,13 @@
         // snapshot with proceeds calculated from the actual broker fill.
         if (isLiquidationOnly && errors.length === 0) {
           try {
-            actualLiquidationNetProceeds = await creditLiquidationResiduals(batch, sellEvts, fillBySecId);
+            actualLiquidationNetProceeds = await creditLiquidationResiduals(batch, sellEvts, fillBySecId, settlementFeeConfig);
           } catch (creditErr) {
             errors.push(`Liquidation residual credit: ${creditErr?.message || creditErr}`);
           }
         } else if (!isLiquidationOnly && errors.length === 0) {
           try {
-            await settleRebalanceCashBridge(batch, sellEvts, [...buyEvts, ...walletBuyEvts], fillBySecId);
+            await settleRebalanceCashBridge(batch, sellEvts, [...buyEvts, ...walletBuyEvts], fillBySecId, settlementFeeConfig);
           } catch (cashBridgeErr) {
             errors.push(`Rebalance cash bridge: ${cashBridgeErr?.message || cashBridgeErr}`);
           }
@@ -7726,6 +7800,11 @@
         // residual and boundary ledgers make a subsequent retry safe.
         if (errors.length) {
           console.error('Settlement paused before final status:', errors);
+          await fetch('/api/orderbook/send-csv?action=rebalance-settlement-pause', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settlementToken}` },
+            body: JSON.stringify({ batchId: batch.id, error: errors.join('\n') }),
+          }).catch(() => null);
           throw new Error(`Settlement paused with ${errors.length} issue(s):\n${errors.join('\n')}`);
         }
 
@@ -7734,11 +7813,22 @@
           settled_at: nowIso,
           settlement_effective_at: nowIso,
           holdings_snapshot_after: settledStrategy?.holdings || null,
+          settlement_state: 'COMPLETE',
+          settlement_error: null,
           updated_at: nowIso,
         };
         if (actualLiquidationNetProceeds != null) settledBatchPatch.net_proceeds = actualLiquidationNetProceeds;
-        const { error: settleErr } = await supabaseClient.from('rebalance_batch').update(settledBatchPatch).eq('id', batch.id);
-        if (settleErr) throw new Error(settleErr.message);
+        const { data: settledBatchRows, error: settleErr } = await supabaseClient.from('rebalance_batch')
+          .update(settledBatchPatch).eq('id', batch.id).eq('status', 'PENDING')
+          .eq('settlement_state', 'PROCESSING').select('id');
+        if (settleErr || !settledBatchRows?.length) {
+          await fetch('/api/orderbook/send-csv?action=rebalance-settlement-pause', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settlementToken}` },
+            body: JSON.stringify({ batchId: batch.id, error: settleErr?.message || 'Final settlement status update did not match the claimed batch.' }),
+          }).catch(() => null);
+          throw new Error(settleErr?.message || 'Could not finalize the claimed settlement batch.');
+        }
 
       };
 

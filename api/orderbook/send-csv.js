@@ -572,6 +572,47 @@ module.exports = async (req, res) => {
     // transaction. Browser INSERT policies intentionally deny these writes, so
     // perform only these tightly-whitelisted inserts behind the existing Master
     // rebalance permission. Updates/claims remain scoped in the settlement UI.
+    if (action === 'rebalance-settlement-claim') {
+      if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const batchId = String(body.batchId || '').trim();
+      const priorState = String(body.priorState || 'PENDING').trim().toUpperCase();
+      if (!batchId) return sendJson(res, 400, { error: 'batchId required' });
+      if (!['PENDING', 'PAUSED'].includes(priorState)) {
+        return sendJson(res, 400, { error: 'priorState must be PENDING or PAUSED' });
+      }
+      const now = new Date().toISOString();
+      const claimed = await requestSupabaseJson(
+        `/rest/v1/rebalance_batch?id=eq.${encodeURIComponent(batchId)}&status=eq.PENDING&settlement_state=eq.${priorState}&select=id,settlement_state`,
+        {
+          method: 'PATCH',
+          body: { settlement_state: 'PROCESSING', settlement_started_at: now, settlement_error: null, updated_at: now },
+          extraHeaders: { Prefer: 'return=representation' },
+        }
+      );
+      if (!Array.isArray(claimed) || !claimed.length) {
+        return sendJson(res, 409, { error: 'Batch is already settling, settled, reversed, or was claimed by another session.' });
+      }
+      return sendJson(res, 200, { ok: true, batchId, settlementState: 'PROCESSING' });
+    }
+
+    if (action === 'rebalance-settlement-pause') {
+      if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const batchId = String(body.batchId || '').trim();
+      const error = String(body.error || 'Settlement paused').slice(0, 4000);
+      if (!batchId) return sendJson(res, 400, { error: 'batchId required' });
+      const paused = await requestSupabaseJson(
+        `/rest/v1/rebalance_batch?id=eq.${encodeURIComponent(batchId)}&status=eq.PENDING&settlement_state=eq.PROCESSING&select=id`,
+        {
+          method: 'PATCH',
+          body: { settlement_state: 'PAUSED', settlement_error: error, updated_at: new Date().toISOString() },
+          extraHeaders: { Prefer: 'return=representation' },
+        }
+      );
+      return sendJson(res, 200, { ok: true, paused: Array.isArray(paused) && paused.length > 0 });
+    }
+
     if (action === 'rebalance-settlement-insert') {
       if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
       const body = req.body && typeof req.body === 'object' ? req.body : {};

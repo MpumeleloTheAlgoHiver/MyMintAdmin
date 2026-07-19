@@ -17,7 +17,7 @@ async function publishClientEodReturns({ asOfDate, apply = false, includeUat = f
   const strategyById = Object.fromEntries((strategies || []).map((row) => [row.id, row]));
 
   const holdings = await requestSupabaseJson(
-    '/rest/v1/stock_holdings_c?select=id,user_id,family_member_id,strategy_id,security_id,quantity,transaction_id,rebalance_batch_id&is_active=eq.true&quantity=gt.0',
+    '/rest/v1/stock_holdings_c?select=id,user_id,family_member_id,strategy_id,security_id,quantity,transaction_id,rebalance_batch_id,created_at,Fill_date&is_active=eq.true&quantity=gt.0',
     { method: 'GET' }
   );
   let testUserIds = new Set();
@@ -147,13 +147,28 @@ async function publishClientEodReturns({ asOfDate, apply = false, includeUat = f
       if (previous && String(previous.as_of_date) === asOf) {
         results.push({ client: group.userId, strategy: strategy.name, action: 'skip', reason: 'already published today' }); skipped++; continue;
       }
-      if (!previous && !seed) {
+      const isGenuineNewAllocation = !previous && !seed
+        && group.rows.length > 0
+        && group.rows.every((row) => String(row.Fill_date || row.created_at || '').slice(0, 10) === asOf)
+        && group.rows.every((row) => row.transaction_id && String(txById.get(row.transaction_id)?.status || '') === 'posted'
+          && !txById.get(row.transaction_id)?.reversed);
+      if (!previous && !seed && !isGenuineNewAllocation) {
         results.push({ client: group.userId, strategy: strategy.name, action: 'skip', reason: 'no trusted return seed' }); skipped++; continue;
       }
 
       let chainFactor; let twr; let openingPerformanceNav; let externalContribution;
       let mode; let dailyPct = null; let boundaryBatchId = null;
-      if (!previous) {
+      if (isGenuineNewAllocation) {
+        // A first filled allocation starts at 0%, never at an invented historical
+        // return. From tomorrow onward the same cash-neutral chain compounds its
+        // actual market performance. Requiring same-day holdings plus posted,
+        // unreversed transactions prevents an old unseeded account being reset.
+        twr = 0;
+        chainFactor = 1;
+        openingPerformanceNav = performanceNavCents;
+        externalContribution = completeNavCents;
+        mode = 'new-allocation-inception';
+      } else if (!previous) {
         twr = Number(seed.ytd_pct || seed.inception_pct || 0);
         chainFactor = 1 + twr / 100;
         openingPerformanceNav = Math.round(Number(seed.opening_performance_nav_cents) || (performanceNavCents / chainFactor));

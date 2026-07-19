@@ -54,16 +54,9 @@ module.exports = async (req, res) => {
     const famIds   = [...new Set((holdings || []).map((r) => r.family_member_id).filter(Boolean))];
 
     /* Fetch per-investor NAV history from client_strategy_returns_c — keyed by user_id */
-    const stratHistArrays = userIds.length
-      ? await Promise.all(
-          userIds.map((uid) =>
-            sbGet(
-              `client_strategy_returns_c?select=user_id,strategy_id,as_of_date,basket_value,1d_pct,5d_pct,1m_pct,6m_pct,ytd_pct,1y_pct,5y_pct,inception_pct,inception_pnl&user_id=eq.${uid}&order=as_of_date.asc`
-            )
-          )
-        )
-      : [];
-    let stratHist = stratHistArrays.flat();
+    // Fail closed: only the canonical effective view may feed client returns.
+    // An outage must not silently resurrect drift-prone legacy percentages.
+    let stratHist = [];
     let canonicalEffective = false;
     try {
       const effectiveArrays = userIds.length
@@ -82,7 +75,7 @@ module.exports = async (req, res) => {
         }));
         canonicalEffective = true;
       }
-    } catch (_) { canonicalEffective = false; }
+    } catch (_) { canonicalEffective = false; stratHist = []; }
 
     /* Optional admin repair preview. The switch lives in app_settings and can
        only be changed by a master admin. Only a VALIDATED/APPROVED shadow run

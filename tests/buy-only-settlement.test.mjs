@@ -47,8 +47,15 @@ check('wallet-buy events preserve parent/child ownership scope', () => {
 
 check('actual-fill preflight runs before atomic settlement claim', () => {
   const preflight = orderbook.indexOf('await preflightWalletOnlyBuy(');
-  const claim = orderbook.indexOf(".update({ status: 'SETTLED'", preflight);
+  const claim = orderbook.indexOf('action=rebalance-settlement-claim', preflight);
   assert.ok(preflight >= 0 && claim > preflight);
+});
+
+check('business status stays pending until final successful checkpoint', () => {
+  const claim = orderbook.indexOf('action=rebalance-settlement-claim');
+  const final = orderbook.indexOf("status: 'SETTLED'", claim);
+  assert.ok(claim >= 0 && final > claim);
+  assert.doesNotMatch(orderbook.slice(claim, final), /update\(\{ status: 'SETTLED'/);
 });
 
 check('100x cents/rands anomalies are blocked', () => {
@@ -71,4 +78,4 @@ check('migration supplies immutable pending-plan fields', () => {
   assert.match(migration, /min_investment_planned numeric/);
 });
 
-console.log(`buy-only settlement: ${passed}/10 green`);
+console.log(`buy-only settlement: ${passed}/11 green`);
