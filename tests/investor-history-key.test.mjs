@@ -8,4 +8,7 @@ assert.match(html, /stratNavMap\[investorHistoryKey\(i\)\]/);
 assert.match(html, /stratMetricsMap\[investorHistoryKey\(i\)\]/);
 assert.doesNotMatch(html, /stratNavMap\[`\$\{i\.userId\}:\$\{i\.strategyId/);
 assert.doesNotMatch(html, /stratMetricsMap\[`\$\{i\.userId\}:\$\{i\.strategyId/);
-console.log('investor history key: 6/6 green');
+assert.match(html, /Verified return history/);
+assert.match(html, /if\(repairPreview\.repair_key\)/);
+assert.doesNotMatch(html, /Repair preview .*\$\{repairPreview\.repair_key\}.*\$\{repairPreview\.client_rows\}/);
+console.log('investor history and trust banner: 9/9 green');

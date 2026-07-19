@@ -107,7 +107,7 @@
 
     <div style="flex:1;overflow:visible;">
       <div class="max-w-7xl mx-auto px-5 py-5 space-y-4">
-        <div id="repairPreviewBanner" style="display:none;padding:9px 13px;border:1px solid #c4b5fd;background:#f5f3ff;color:#5b21b6;border-radius:10px;font-size:11.5px;font-weight:600;"></div>
+        <div id="repairPreviewBanner" style="display:none;align-items:center;gap:9px;padding:8px 12px;border:1px solid #ddd6fe;background:linear-gradient(90deg,#faf5ff,#f5f3ff);color:#5b21b6;border-radius:10px;font-size:11.5px;font-weight:600;box-shadow:0 1px 2px rgba(91,33,182,.05);"></div>
         <div id="kpiBar" style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:8px;"></div>
         <div id="mainGrid" style="display:grid;grid-template-columns:300px 1fr;gap:12px;min-height:600px;">
           <div id="listPanel" style="background:white;border-radius:12px;padding:16px;box-shadow:0 0 0 1px rgba(0,0,0,0.05),0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;gap:10px;">
@@ -249,7 +249,17 @@
       const { holdings, strategies, stratHist, profiles, secMeta, secLive, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches, closedHoldings, repairPreview } = await resp.json();
       const repairBanner=document.getElementById('repairPreviewBanner');
       if(repairBanner){
-        if(repairPreview?.enabled){repairBanner.style.display='block';repairBanner.textContent=`Repair preview · ${repairPreview.repair_key} · ${repairPreview.client_rows} reconciled client daily rows · production data unchanged`;}
+        if(repairPreview?.enabled){
+          repairBanner.style.display='flex';
+          if(repairPreview.canonical){
+            repairBanner.innerHTML='<span style="display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;border-radius:50%;background:#ede9fe;color:#6d28d9;font-size:12px;">&#10003;</span><span><strong style="color:#4c1d95;">Verified return history</strong><span style="color:#7c6f91;font-weight:500;margin-left:6px;">Canonical reconciled daily series is active</span></span>';
+          }else{
+            const details=['Validated repair workspace'];
+            if(repairPreview.repair_key) details.push(repairPreview.repair_key);
+            if(Number.isFinite(Number(repairPreview.client_rows))) details.push(`${Number(repairPreview.client_rows).toLocaleString()} reconciled daily rows`);
+            repairBanner.textContent=details.join('  ·  ');
+          }
+        }
         else{repairBanner.style.display='none';repairBanner.textContent='';}
       }
 
