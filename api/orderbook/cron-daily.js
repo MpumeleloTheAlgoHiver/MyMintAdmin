@@ -5,6 +5,7 @@ const {
   sendOrderbookCsvEmail,
   loadLiveOrderbookRows
 } = require('../_orderbook');
+const { publishEodReturns } = require('../_returns-publish');
 
 const getNowInTimezoneParts = (date, timeZone) => {
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -59,6 +60,21 @@ module.exports = async (req, res) => {
     const nowIso = now.toISOString();
     const localNow = getNowInTimezoneParts(now, timeZone);
     const dateKey = `${String(localNow.year).padStart(4, '0')}-${String(localNow.month).padStart(2, '0')}-${String(localNow.day).padStart(2, '0')}`;
+
+    // ── EOD return publication (Stage 1, rebalance-aware) ──────────────────────
+    // Runs first, independently of the order-book email flow below. Publishes every
+    // active strategy's complete-value return through the guarded RPC, chaining from
+    // its own prior publication (rebalance-aware; YTD never resets). Safe by default:
+    // writes only when RETURNS_PUBLISH_APPLY=1, otherwise read-only. Never fatal to
+    // the order-book cron.
+    let returnsPublish = null;
+    try {
+      returnsPublish = await publishEodReturns({ asOfDate: dateKey, apply: process.env.RETURNS_PUBLISH_APPLY === '1' });
+      console.log('[returns-publish]', returnsPublish.apply ? 'APPLIED' : 'dry-run', JSON.stringify(returnsPublish.summary));
+    } catch (e) {
+      console.error('[returns-publish] failed (non-fatal):', e?.message || e);
+    }
+
     const currentMinuteOfDay = (localNow.hour * 60) + localNow.minute;
     const targetMinuteOfDay = (targetHour * 60) + targetMinute;
 
@@ -103,7 +119,8 @@ module.exports = async (req, res) => {
         reason: 'Before target send time',
         runDate: dateKey,
         now: localNow,
-        target: { hour: targetHour, minute: targetMinute, timeZone }
+        target: { hour: targetHour, minute: targetMinute, timeZone },
+        returnsPublish: returnsPublish || null
       });
     }
 
