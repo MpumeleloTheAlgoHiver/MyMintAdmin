@@ -9,6 +9,7 @@ select k.user_id,'SUMSUB','BACKFILL_CURRENT_STATE',
   jsonb_build_object('source','user_onboarding_pack_details','backfilled',true),now()
 from public.user_onboarding_pack_details k
 join public.user_onboarding o on o.user_id=k.user_id
+join public.profiles p on p.id=k.user_id
 where (nullif(to_jsonb(o)->>'sumsub_applicant_id','') ~ '^[a-fA-F0-9]{24}$'
     or coalesce(k.pack_details->'data_provenance'->>'sumsub','') not in ('','Not available'))
   and not exists(select 1 from public.provider_identity_snapshots_c s
@@ -27,7 +28,9 @@ with experian_docs as (
   select o.user_id,
     case when jsonb_typeof(to_jsonb(o)->'sumsub_raw')='object' then to_jsonb(o)->'sumsub_raw' else '{}'::jsonb end raw,
     coalesce(d.documents,'[]'::jsonb) documents
-  from public.user_onboarding o left join experian_docs d on d.user_id=o.user_id
+  from public.user_onboarding o
+  join public.profiles p on p.id=o.user_id
+  left join experian_docs d on d.user_id=o.user_id
 )
 insert into public.provider_identity_snapshots_c
   (user_id,provider,capture_type,external_reference,payload,metadata,captured_at)
@@ -45,3 +48,25 @@ commit;
 
 select provider,count(*) snapshots,count(distinct user_id) users
 from public.provider_identity_snapshots_c group by provider order by provider;
+
+-- Report legacy provider/onboarding rows that could not be archived because
+-- their owning profile no longer exists. These are deliberately not assigned
+-- to another client or silently deleted.
+select orphan_source,user_id
+from (
+  select 'user_onboarding'::text orphan_source,o.user_id
+  from public.user_onboarding o
+  left join public.profiles p on p.id=o.user_id
+  where p.id is null
+  union
+  select 'user_onboarding_pack_details',k.user_id
+  from public.user_onboarding_pack_details k
+  left join public.profiles p on p.id=k.user_id
+  where p.id is null
+  union
+  select 'sumsub_document_archive',d.profile_id
+  from public.sumsub_document_archive d
+  left join public.profiles p on p.id=d.profile_id
+  where p.id is null
+) orphaned_provider_records
+order by user_id,orphan_source;
