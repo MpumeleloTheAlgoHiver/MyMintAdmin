@@ -7011,6 +7011,31 @@
         }
       };
 
+      /* STRICT rebalance fee loader — the single fee source for every settlement
+         path (liquidation residuals, cash bridge, wallet-only preflight). Money
+         movement must use the CONFIGURED custody + brokerage fees from
+         app_settings('fees'), never a hardcoded fallback. If the config cannot be
+         read (or is missing rebCustodyFee/rebBrokerageRate), this THROWS — which
+         halts settlement before any reserve is consumed, any residual credited or
+         any holding touched. This is what stops the obsolete R69 custody from ever
+         being silently charged again (the R25-configured / R69-fallback incident). */
+      const loadRebFeeConfigStrict = async (token) => {
+        let brokerageRate = null, custodyFeeRands = null;
+        try {
+          const feeResp = await fetch('/api/team?action=app-settings-get&key=fees', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const feeJson = feeResp.ok ? await feeResp.json() : null;
+          const fees = feeJson?.value || {};
+          if (Number.isFinite(Number(fees.rebBrokerageRate))) brokerageRate = Math.max(0, Number(fees.rebBrokerageRate));
+          if (Number.isFinite(Number(fees.rebCustodyFee))) custodyFeeRands = Math.max(0, Number(fees.rebCustodyFee));
+        } catch (_) { /* leave null → hard-halt below (no silent fallback) */ }
+        if (brokerageRate === null || custodyFeeRands === null) {
+          throw new Error('Rebalance settlement halted: the configured custody/brokerage fees (rebCustodyFee, rebBrokerageRate) could not be loaded from App Settings. Nothing was charged or written — fix the fee config and retry.');
+        }
+        return { brokerageRate, custodyFeeRands, custodyFeeCents: Math.round(custodyFeeRands * 100) };
+      };
+
       // fillBySecId: { [security_id]: fillCents } — per-security broker fill prices
       // from the uploaded sheet (covers both the SELL side and the BUY side).
       const creditLiquidationResiduals = async (batch, sellEvts, fillBySecId) => {
@@ -7019,17 +7044,7 @@
         const token = sessionData?.session?.access_token;
         if (!token) throw new Error('Session expired before residual credit.');
 
-        let brokerageRate = 0.005;
-        let custodyFee = 69;
-        try {
-          const feeResp = await fetch('/api/team?action=app-settings-get&key=fees', {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const feeJson = feeResp.ok ? await feeResp.json() : null;
-          const fees = feeJson?.value || {};
-          if (Number.isFinite(Number(fees.rebBrokerageRate))) brokerageRate = Math.max(0, Number(fees.rebBrokerageRate));
-          if (Number.isFinite(Number(fees.rebCustodyFee))) custodyFee = Math.max(0, Number(fees.rebCustodyFee));
-        } catch (_) { /* use dashboard engine defaults */ }
+        const { brokerageRate, custodyFeeRands: custodyFee } = await loadRebFeeConfigStrict(token);
 
         const grossByOwner = new Map();
         sellEvts.forEach((evt) => {
@@ -7124,17 +7139,7 @@
         const token = sessionData?.session?.access_token;
         if (!token) throw new Error('Session expired before rebalance cash settlement.');
 
-        let brokerageRate = 0.005;
-        let custodyFeeRands = 69;
-        try {
-          const feeResp = await fetch('/api/team?action=app-settings-get&key=fees', {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const feeJson = feeResp.ok ? await feeResp.json() : null;
-          const fees = feeJson?.value || {};
-          if (Number.isFinite(Number(fees.rebBrokerageRate))) brokerageRate = Math.max(0, Number(fees.rebBrokerageRate));
-          if (Number.isFinite(Number(fees.rebCustodyFee))) custodyFeeRands = Math.max(0, Number(fees.rebCustodyFee));
-        } catch (_) { /* use the same defaults as the dashboard engine */ }
+        const { brokerageRate, custodyFeeRands } = await loadRebFeeConfigStrict(token);
 
         const owners = new Map();
         const addLeg = (evt, side) => {
@@ -7239,17 +7244,7 @@
         const token = sessionData?.session?.access_token;
         if (!token) throw new Error('Session expired before buy-only preflight.');
 
-        let brokerageRate = 0.005;
-        let custodyFeeCents = 6900;
-        try {
-          const feeResp = await fetch('/api/team?action=app-settings-get&key=fees', {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const feeJson = feeResp.ok ? await feeResp.json() : null;
-          const fees = feeJson?.value || {};
-          if (Number.isFinite(Number(fees.rebBrokerageRate))) brokerageRate = Math.max(0, Number(fees.rebBrokerageRate));
-          if (Number.isFinite(Number(fees.rebCustodyFee))) custodyFeeCents = Math.round(Math.max(0, Number(fees.rebCustodyFee)) * 100);
-        } catch (_) { /* settlement uses the same defaults */ }
+        const { brokerageRate, custodyFeeCents } = await loadRebFeeConfigStrict(token);
 
         const scopes = new Map();
         for (const evt of walletBuyEvts) {

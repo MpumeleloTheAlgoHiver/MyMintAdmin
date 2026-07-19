@@ -8396,27 +8396,59 @@
       ═══════════════════════════════════════════════════════════════════ */
 
       /* ── Constants ── */
-      // Defaults — overridden from app_settings('fees') below so the CRM App
-      // Settings page controls these too. Falls back to these on any failure.
-      let REB_BROKERAGE_RATE = 0.005; // 0.5%
-      let REB_OFF_CUSTODY_FEE = 69;   // R69
+      // Rebalance fees come ONLY from app_settings('fees') (the CRM App Settings
+      // page). They start null and are populated by rebEnsureFeesLoaded(); there is
+      // NO hardcoded fallback. Every preview/compute/settle path halts if they are
+      // not loaded, so an obsolete custody fee (e.g. the old R69 vs configured R25)
+      // can never be silently charged again.
+      let REB_BROKERAGE_RATE = null;
+      let REB_OFF_CUSTODY_FEE = null;
+      let rebFeesLoadedAt = 0;
       const REB_WALLET_TABLE = "wallets";
 
-      (async () => {
+      // STRICT loader — throws if the configured custody + brokerage fees cannot be
+      // read (or are missing). Cached 60s; pass {force:true} to refetch. Callers on
+      // any write or preview path await this before computing/settling.
+      async function rebEnsureFeesLoaded({ force = false } = {}) {
+        if (!force && REB_OFF_CUSTODY_FEE !== null && REB_BROKERAGE_RATE !== null
+            && (Date.now() - rebFeesLoadedAt) < 60000) {
+          return { REB_OFF_CUSTODY_FEE, REB_BROKERAGE_RATE };
+        }
+        let custody = null, brokerage = null;
         try {
           const { data } = await supabaseClient.auth.getSession();
-          if (!data || !data.session || !data.session.access_token) return;
-          const res = await fetch('/api/team?action=app-settings-get&key=fees', {
-            headers: { Authorization: 'Bearer ' + data.session.access_token }
-          });
-          const j = await res.json();
-          const f = j && j.value;
-          if (f) {
-            if (f.rebCustodyFee != null && !isNaN(+f.rebCustodyFee)) REB_OFF_CUSTODY_FEE = +f.rebCustodyFee;
-            if (f.rebBrokerageRate != null && !isNaN(+f.rebBrokerageRate)) REB_BROKERAGE_RATE = +f.rebBrokerageRate;
+          const token = data?.session?.access_token;
+          if (token) {
+            const res = await fetch('/api/team?action=app-settings-get&key=fees', {
+              headers: { Authorization: 'Bearer ' + token }
+            });
+            const j = res.ok ? await res.json() : null;
+            const f = j && j.value;
+            if (f) {
+              if (f.rebCustodyFee != null && !isNaN(+f.rebCustodyFee)) custody = Math.max(0, +f.rebCustodyFee);
+              if (f.rebBrokerageRate != null && !isNaN(+f.rebBrokerageRate)) brokerage = Math.max(0, +f.rebBrokerageRate);
+            }
           }
-        } catch (e) { /* keep defaults */ }
-      })();
+        } catch (e) { /* leave null → hard-halt below (no silent fallback) */ }
+        if (custody === null || brokerage === null) {
+          REB_OFF_CUSTODY_FEE = null; REB_BROKERAGE_RATE = null;
+          throw new Error('Rebalance halted: the configured custody/brokerage fees (rebCustodyFee, rebBrokerageRate) could not be loaded from App Settings. No holdings, reserve or residuals were changed — fix the fee config and retry.');
+        }
+        REB_OFF_CUSTODY_FEE = custody; REB_BROKERAGE_RATE = brokerage; rebFeesLoadedAt = Date.now();
+        return { REB_OFF_CUSTODY_FEE, REB_BROKERAGE_RATE };
+      }
+
+      // Sync guard used inside the compute functions — no preview or settlement math
+      // may run on unloaded fees (which previously fell back to a wrong value).
+      function rebAssertFeesLoaded() {
+        if (REB_OFF_CUSTODY_FEE === null || REB_BROKERAGE_RATE === null) {
+          throw new Error('Rebalance fees are not loaded from App Settings yet. Refresh the page and retry — the engine will not run with a fallback fee.');
+        }
+      }
+
+      // Eager best-effort preload so previews are ready without a click delay.
+      // Failures are swallowed here; the compute/settle guards enforce correctness.
+      rebEnsureFeesLoaded().catch(() => {});
 
       /* ── Engine functions ── */
       function rebGetDivisors(n) {
@@ -8455,6 +8487,7 @@
       }
 
       function rebComputeSellExecution(isin, reductionPerLot, totalLots, affectedClientCount, clients) {
+        rebAssertFeesLoaded();
         const totalShares = reductionPerLot * totalLots;
         /* Cents-vs-rands guard: securities_c.last_price is stored in CENTS and is
            usually ÷100'd to rands, but if a cents value slips through here the
@@ -8477,6 +8510,7 @@
       }
 
       function rebComputeBuyExecution(isinCode, isinDescription, pricePerShare, netCapital, clients, applyBuffer, reserveAvailable = 0, sellFees = 0) {
+        rebAssertFeesLoaded();
         const totalLots = clients.reduce((s, c) => s + c.lots, 0);
         const bufferedPrice = applyBuffer ? pricePerShare * 1.08 : pricePerShare;
         const affectedClientCount = Math.max(1, clients.filter((c) => Number(c.lots) > 0).length);
@@ -8841,6 +8875,7 @@
       }
 
       function rebComputeWalletFundedBuyExecution({ instrument, clients, capitalByClient, applyBuffer }) {
+        rebAssertFeesLoaded();
         const pricePerShare = Number(instrument?.currentPrice || 0);
         if (!instrument || pricePerShare <= 0 || !Array.isArray(clients) || !clients.length) {
           return null;
@@ -10036,6 +10071,7 @@
 
       /* ── Buy Modal ── */
       async function rebShowBuyModal(netCapital) {
+        await rebEnsureFeesLoaded();
         const modal = document.getElementById("rebBuyModal");
         const metaEl = document.getElementById("rebBuyModalMeta");
         const body = document.getElementById("rebBuyModalBody");
@@ -10351,6 +10387,7 @@
       }
 
       function rebOpenDetailedEffect(selection) {
+        rebAssertFeesLoaded();
         const modal = document.getElementById('rebEffectModal');
         const body = document.getElementById('rebEffectBody');
         const meta = document.getElementById('rebEffectMeta');
@@ -10681,6 +10718,7 @@
       }
 
       async function rebPersistCommittedTradeSequence() {
+        await rebEnsureFeesLoaded(); // no write may proceed on unloaded/fallback fees
         /* ── Validation ── */
         const buyModal = document.getElementById("rebBuyModal");
         const buySelection = buyModal?._buySelection;
@@ -11275,6 +11313,7 @@
       /* Liquidate-to-Cash commit: sell only, no buy. Net proceeds distributed
          to each user's rebalance_residual wallet (added on top of existing balance). */
       async function rebPersistLiquidationToCash() {
+        await rebEnsureFeesLoaded(); // no write may proceed on unloaded/fallback fees
         if (!rebSelectedIsin || !rebSelectedStep) throw new Error("Missing sell selection.");
         const strategyId = rebSelectedStrategyId;
         if (!strategyId) throw new Error("Strategy context missing.");
@@ -11447,6 +11486,7 @@
          if any client can't afford their per-lot allocation, the commit is
          blocked. */
       async function rebShowWalletModal() {
+        await rebEnsureFeesLoaded();
         const modal = document.getElementById("rebWalletModal");
         const body = document.getElementById("rebWalletModalBody");
         const metaEl = document.getElementById("rebWalletModalMeta");
@@ -11642,6 +11682,7 @@
          them at the actual fill price (clean buy). Strategy holdings JSONB
          updated to add or increase the bought security. */
       async function rebPersistWalletOnlyBuy({ instrument, buyPerLot, perUserPlan, pricePerShare }) {
+        await rebEnsureFeesLoaded(); // no write may proceed on unloaded/fallback fees
         if (!instrument || !rebSelectedStrategyId) throw new Error("Missing strategy or buy instrument.");
         const buyQtyPerLot = Math.max(0, Math.floor(Number(buyPerLot) || 0));
         if (buyQtyPerLot <= 0) throw new Error("Buy per lot must be ≥ 1.");
