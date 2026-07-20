@@ -7131,17 +7131,32 @@
 
         // Preview reserve availability for every owner BEFORE consuming anything,
         // so any shortfall is shown to the admin with the exact math instead of
-        // being silently deducted from what gets credited.
+        // being silently deducted from what gets credited. Skip owners whose
+        // LIQUIDATION_PROCEEDS cash event for THIS batch is already recorded —
+        // apply_strategy_rebalance_cash_event is idempotent, so their charge is
+        // final; re-showing this warning on a resumed settlement would compare
+        // against the ALREADY-DEBITED balance and describe a charge that
+        // already happened as if it were still pending.
         const shortfallPreview = [];
         for (const [fm, ownerRows] of ownerByScope.entries()) {
           const userIds = Object.keys(ownerRows);
-          const reserveResp = await fetch('/api/orderbook/send-csv?action=rebalance-load-reserves', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ strategyId: batch.strategy_id, familyMemberId: fm || null, userIds }),
-          });
+          const [reserveResp, appliedResp] = await Promise.all([
+            fetch('/api/orderbook/send-csv?action=rebalance-load-reserves', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ strategyId: batch.strategy_id, familyMemberId: fm || null, userIds }),
+            }),
+            fetch('/api/orderbook/send-csv?action=rebalance-load-cash-events', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ strategyId: batch.strategy_id, familyMemberId: fm || null, userIds, batchId: batch.id, eventType: 'LIQUIDATION_PROCEEDS' }),
+            }),
+          ]);
           const reserveJson = await reserveResp.json().catch(() => ({}));
+          const appliedJson = await appliedResp.json().catch(() => ({}));
+          const appliedUserIds = new Set((appliedJson.appliedUserIds || []).map(String));
           Object.entries(ownerRows).forEach(([uid, row]) => {
+            if (appliedUserIds.has(uid)) return; // already credited for this batch — resume, don't re-warn
             const reserveAvailableCents = Math.max(0, Math.round(Number(reserveJson.reservesCentsByUser?.[uid]) || 0));
             shortfallPreview.push({
               label: `Client ${uid.slice(0, 8)} — liquidation`,
@@ -7268,17 +7283,32 @@
 
         // Preview reserve availability for every owner BEFORE consuming anything,
         // so any shortfall is shown to the admin with the exact math instead of
-        // being silently deducted from the net cash delta.
+        // being silently deducted from the net cash delta. Skip owners whose
+        // REBALANCE_RESIDUAL cash event for THIS batch is already recorded —
+        // apply_strategy_rebalance_cash_event is idempotent, so their charge is
+        // final; re-showing this warning on a resumed settlement would compare
+        // against the ALREADY-DEBITED balance and describe a charge that
+        // already happened as if it were still pending.
         const shortfallPreview = [];
         for (const [fm, scope] of byScope.entries()) {
           const userIds = Object.keys(scope.owners);
-          const reserveResp = await fetch('/api/orderbook/send-csv?action=rebalance-load-reserves', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ strategyId: batch.strategy_id, familyMemberId: fm || null, userIds }),
-          });
+          const [reserveResp, appliedResp] = await Promise.all([
+            fetch('/api/orderbook/send-csv?action=rebalance-load-reserves', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ strategyId: batch.strategy_id, familyMemberId: fm || null, userIds }),
+            }),
+            fetch('/api/orderbook/send-csv?action=rebalance-load-cash-events', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ strategyId: batch.strategy_id, familyMemberId: fm || null, userIds, batchId: batch.id, eventType: 'REBALANCE_RESIDUAL' }),
+            }),
+          ]);
           const reserveJson = await reserveResp.json().catch(() => ({}));
+          const appliedJson = await appliedResp.json().catch(() => ({}));
+          const appliedUserIds = new Set((appliedJson.appliedUserIds || []).map(String));
           Object.entries(scope.owners).forEach(([uid, owner]) => {
+            if (appliedUserIds.has(uid)) return; // already charged for this batch — resume, don't re-warn
             const reserveAvailableCents = Math.max(0, Math.round(Number(reserveJson.reservesCentsByUser?.[uid]) || 0));
             const netBeforeCents = owner.sellGrossCents - owner.buyGrossCents;
             shortfallPreview.push({
