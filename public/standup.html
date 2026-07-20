@@ -983,6 +983,11 @@
         document.getElementById('greeting').textContent=typeof meta.title==='function'?meta.title():meta.title;
         document.getElementById('subtitle').textContent=meta.sub;
       }
+      if(id==='standup'){
+        standupDate=TODAY;
+        switchPhase(1);
+        renderStandup();
+      }
     }
 
     window.addEventListener('access-guard:ready',init);
