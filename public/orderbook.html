@@ -7387,13 +7387,25 @@
           const userIds = [...owners.keys()];
           const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
           const scopeBody = { strategyId: batch.strategy_id, familyMemberId: fm || null, userIds };
-          const [cashResp, reserveResp] = await Promise.all([
+          const [cashResp, reserveResp, appliedResp] = await Promise.all([
             fetch('/api/orderbook/send-csv?action=rebalance-load-residuals', { method: 'POST', headers, body: JSON.stringify(scopeBody) }),
             fetch('/api/orderbook/send-csv?action=rebalance-load-reserves', { method: 'POST', headers, body: JSON.stringify(scopeBody) }),
+            // Has THIS batch already applied a REBALANCE_RESIDUAL cash event for
+            // a user (via settleRebalanceCashBridge)? apply_strategy_rebalance_
+            // cash_event is idempotent per (batch,strategy,user,fm,event_type),
+            // so once applied it's final — checking the balance again on a
+            // resumed settlement would compare against the ALREADY-DEBITED
+            // balance and wrongly block. Those users skip the balance check.
+            fetch('/api/orderbook/send-csv?action=rebalance-load-cash-events', {
+              method: 'POST', headers,
+              body: JSON.stringify({ ...scopeBody, batchId: batch.id, eventType: 'REBALANCE_RESIDUAL' }),
+            }),
           ]);
           const cashJson = await cashResp.json().catch(() => ({}));
           const reserveJson = await reserveResp.json().catch(() => ({}));
-          if (!cashResp.ok || !reserveResp.ok) throw new Error('Could not verify buy-only cash and reserve balances.');
+          const appliedJson = await appliedResp.json().catch(() => ({}));
+          if (!cashResp.ok || !reserveResp.ok || !appliedResp.ok) throw new Error('Could not verify buy-only cash and reserve balances.');
+          const appliedUserIds = new Set((appliedJson.appliedUserIds || []).map(String));
 
           // Two passes: (1) genuinely insufficient funds always hard-blocks —
           // there is nothing to negotiate if the money isn't there. (2) a
@@ -7403,6 +7415,7 @@
           const blocked = [];
           const shortfallPreview = [];
           owners.forEach((amounts, uid) => {
+            if (appliedUserIds.has(uid)) return; // already charged for this batch — resume, don't re-check
             const residualCents = Math.round((Number(cashJson.balances?.[uid]) || 0) * 100);
             const reserveCents = Math.max(0, Math.round(Number(reserveJson.reservesCentsByUser?.[uid]) || 0));
             const feeShortfallCents = Math.max(0, amounts.feeCents - reserveCents);

@@ -325,6 +325,40 @@ module.exports = async (req, res) => {
       return sendJson(res, 200, { reservesCentsByUser });
     }
 
+    // Read-only lookup of already-applied strategy_rebalance_cash_events_c
+    // rows for THIS batch. apply_strategy_rebalance_cash_event is idempotent
+    // per (batch_id, strategy_id, user_id, family_member_id, event_type), so
+    // once it has run for a user their charge is final and safe to retry —
+    // but a balance-based preflight re-check afterwards would compare the
+    // requirement against the ALREADY-DEBITED balance and wrongly block a
+    // resumed settlement. Callers use this to skip re-checking users who are
+    // already covered.
+    if (action === 'rebalance-load-cash-events') {
+      if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const batchId = String(body.batchId || '').trim();
+      const strategyId = String(body.strategyId || '').trim();
+      const eventType = String(body.eventType || '').trim();
+      const userIds = Array.isArray(body.userIds)
+        ? [...new Set(body.userIds.map((v) => String(v || '').trim()).filter(Boolean))]
+        : [];
+      if (!batchId || !strategyId || !eventType) {
+        return sendJson(res, 400, { error: 'batchId, strategyId and eventType required' });
+      }
+      if (!userIds.length) return sendJson(res, 200, { appliedUserIds: [] });
+      const familyMemberId = body.familyMemberId ? String(body.familyMemberId).trim() : null;
+      const fmFilter = familyMemberId
+        ? `&family_member_id=eq.${encodeURIComponent(familyMemberId)}`
+        : '&family_member_id=is.null';
+      const rows = await fetchSupabaseJson(
+        `/rest/v1/strategy_rebalance_cash_events_c?batch_id=eq.${encodeURIComponent(batchId)}` +
+        `&strategy_id=eq.${encodeURIComponent(strategyId)}&event_type=eq.${encodeURIComponent(eventType)}` +
+        `&user_id=in.(${buildInFilter(userIds)})${fmFilter}&select=user_id`
+      );
+      const appliedUserIds = [...new Set((rows || []).map((r) => String(r.user_id)))];
+      return sendJson(res, 200, { appliedUserIds });
+    }
+
     if (action === 'rebalance-consume-reserves') {
       if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
       const body = req.body && typeof req.body === 'object' ? req.body : {};
