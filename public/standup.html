@@ -191,6 +191,49 @@
         <div id="perf-content"></div>
       </div>
 
+      <!-- EDIT TASK MODAL -->
+      <div id="editModal" onclick="if(event.target===this)closeEdit()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1001;align-items:center;justify-content:center;padding:24px;">
+        <div style="background:#fff;border-radius:20px;width:100%;max-width:500px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.2);">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f2f2f7;">
+            <h2 style="font-size:16px;font-weight:800;color:#1c1c1e;margin:0;">Edit Task</h2>
+            <button onclick="closeEdit()" style="width:30px;height:30px;border-radius:50%;background:#f2f2f7;border:none;cursor:pointer;font-size:16px;color:#8e8e93;">✕</button>
+          </div>
+          <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
+            <div>
+              <label style="font-size:11px;font-weight:700;color:#8e8e93;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">Title</label>
+              <input id="editTitle" type="text" style="width:100%;border:1px solid #e5e5ea;border-radius:10px;padding:9px 14px;font-size:14px;outline:none;font-family:inherit;color:#1c1c1e;" />
+            </div>
+            <div>
+              <label style="font-size:11px;font-weight:700;color:#8e8e93;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">Description</label>
+              <textarea id="editDesc" rows="3" style="width:100%;resize:none;border:1px solid #e5e5ea;border-radius:10px;padding:9px 14px;font-size:13px;font-family:inherit;color:#1c1c1e;outline:none;"></textarea>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+              <div>
+                <label style="font-size:11px;font-weight:700;color:#8e8e93;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">Due Date</label>
+                <input id="editDue" type="date" style="width:100%;border:1px solid #e5e5ea;border-radius:10px;padding:9px 14px;font-size:13px;outline:none;font-family:inherit;color:#1c1c1e;" />
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:#8e8e93;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">Priority</label>
+                <select id="editPriority" style="width:100%;border:1px solid #e5e5ea;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:600;color:#7c3aed;background:#fff;outline:none;cursor:pointer;font-family:inherit;">
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+            </div>
+            <div id="editAssigneeRow">
+              <label style="font-size:11px;font-weight:700;color:#8e8e93;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">Assignee</label>
+              <select id="editAssignee" style="width:100%;border:1px solid #e5e5ea;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:600;color:#1c1c1e;background:#fff;outline:none;cursor:pointer;font-family:inherit;"></select>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;padding:0 24px 20px;justify-content:flex-end;">
+            <button onclick="closeEdit()" style="padding:9px 20px;border-radius:10px;border:1px solid #e5e5ea;background:#fff;color:#8e8e93;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Cancel</button>
+            <button onclick="saveEdit()" style="padding:9px 20px;border-radius:10px;border:none;background:#7c3aed;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Save Changes</button>
+          </div>
+        </div>
+      </div>
+
       <!-- VIEW TASKS MODAL -->
       <div id="vtModal" onclick="if(event.target===this)closeVt()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;padding:24px;">
         <div style="background:#fff;border-radius:20px;width:100%;max-width:600px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.2);">
@@ -346,6 +389,7 @@
         ${statusPill(t.id,t.status,canEdit)}
         ${badge(t.priority)}
         ${t.due_date?`<span class="task-date${ov?' overdue':''}">${fmtDate(t.due_date)}${ov?' ⚠':''}</span>`:''}
+        ${canEdit?`<button onclick="openEdit('${t.id}')" title="Edit task" style="background:none;border:none;cursor:pointer;color:#c4b5fd;padding:2px 4px;flex-shrink:0;font-size:13px;line-height:1;" onmouseover="this.style.color='#7c3aed'" onmouseout="this.style.color='#c4b5fd'">✎</button>`:''}
         ${canEdit&&opts.del?`<button class="btn-xs btn-xs-red" onclick="deleteTask('${t.id}')">✕</button>`:''}
       </div>`;
     }
@@ -609,7 +653,8 @@
           const active=tasks.filter(t=>t.status==='in_progress');
           const overdueMem=tasks.filter(t=>t.status!=='done'&&t.due_date&&t.due_date<today);
           const doneTodayM=tasks.filter(t=>t.status==='done'&&(t.completed_at||'').startsWith(today));
-          const progress=tasks.length>0?Math.round((done.length/tasks.length)*100):0;
+          const settled=tasks.filter(t=>t.status!=='in_progress');
+          const progress=settled.length>0?Math.round((done.length/settled.length)*100):0;
           const ini=(member.full_name||member.email||'U').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
           const activeTasks=tasks.filter(t=>t.status!=='done').slice(0,5);
           const doneTasks=done.slice(0,3);
@@ -688,7 +733,8 @@
         const late=tasks.filter(t=>t.status==='done'&&t.completed_at&&t.due_date&&t.completed_at.slice(0,10)>t.due_date);
         const todayDone=done.filter(t=>(t.completed_at||'').startsWith(today));
         const todayCommitted=tasks.filter(t=>t.status!=='done'&&(t.due_date===today||t.status==='in_progress'||(t.due_date&&t.due_date<today)));
-        const rate=tasks.length>0?Math.round((done.length/tasks.length)*100):0;
+        const settled=tasks.filter(t=>t.status!=='in_progress');
+        const rate=settled.length>0?Math.round((done.length/settled.length)*100):0;
         const acct=todayCommitted.length>0?Math.round((todayDone.length/todayCommitted.length)*100):100;
         return {m,tasks,done,overdue,late,todayDone,todayCommitted,rate,acct};
       }).filter(s=>s.tasks.length>0).sort((a,b)=>b.rate-a.rate);
@@ -811,6 +857,41 @@
       const tasks=allTasks.filter(t=>t.assigned_to===memberId&&t.status==='done'&&(t.completed_at||'').startsWith(monthPrefix));
       if (!tasks.length) return alert(`No completed tasks for ${member.full_name||member.email} in ${monthLabel}.`);
       generateKpiPdf(member,tasks,monthLabel);
+    }
+
+    /* ── Edit Task modal ── */
+    let editingTaskId=null;
+    function openEdit(taskId) {
+      const t=allTasks.find(t=>t.id===taskId);if(!t)return;
+      editingTaskId=taskId;
+      document.getElementById('editTitle').value=t.title||'';
+      document.getElementById('editDesc').value=t.description||'';
+      document.getElementById('editDue').value=t.due_date||'';
+      document.getElementById('editPriority').value=t.priority||'medium';
+      const asel=document.getElementById('editAssignee');
+      asel.innerHTML=allMembers.map(m=>`<option value="${m.id}"${m.id===t.assigned_to?' selected':''}>${esc(m.full_name||m.email)}</option>`).join('');
+      document.getElementById('editAssigneeRow').style.display=isAdmin?'':'none';
+      const modal=document.getElementById('editModal');
+      modal.style.display='flex';
+      setTimeout(()=>document.getElementById('editTitle').focus(),50);
+    }
+    function closeEdit(){document.getElementById('editModal').style.display='none';editingTaskId=null;}
+    async function saveEdit() {
+      if(!editingTaskId)return;
+      const title=document.getElementById('editTitle').value.trim();
+      if(!title)return alert('Title is required.');
+      const updates={
+        title,
+        description:document.getElementById('editDesc').value.trim()||null,
+        due_date:document.getElementById('editDue').value||null,
+        priority:document.getElementById('editPriority').value,
+      };
+      if(isAdmin) updates.assigned_to=document.getElementById('editAssignee').value||null;
+      try {
+        await api(`/api/tasks/${editingTaskId}`,{method:'PATCH',body:JSON.stringify(updates)});
+        closeEdit();
+        await loadAll();render();
+      } catch(e){alert('Failed to save: '+e.message);}
     }
 
     /* ── View Tasks modal ── */
