@@ -42,6 +42,12 @@ declare
   v_holding_count integer;
   v_rule_id uuid;
 begin
+  -- This is a rare, admin-triggered settlement step, not a high-frequency API
+  -- call — give it headroom above the API role's default statement_timeout so
+  -- a brief lock wait (e.g. a concurrent claim on the same batch) doesn't
+  -- surface as a hard failure. Scoped to this transaction only (SET LOCAL).
+  perform set_config('statement_timeout', '30000', true);
+
   if p_batch_id is null or p_actor is null then raise exception 'Batch and actor are required'; end if;
   if p_securities_value_cents is null or p_securities_value_cents < 0 then raise exception 'Securities value is invalid'; end if;
   if p_holdings_snapshot is null or jsonb_typeof(p_holdings_snapshot)<>'array' then raise exception 'Holdings snapshot must be an array'; end if;
