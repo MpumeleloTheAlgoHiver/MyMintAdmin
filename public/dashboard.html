@@ -11546,6 +11546,14 @@
         let selectedBuyId = null;
         let buyPerLot = 1;
         let searchTerm = "";
+        // Per-client absolute share overrides: { [clientId]: shares }. Same
+        // idea as the sell->buy panel's extraShares — the uniform lots x
+        // buyPerLot rate is the default, but any one client's ACTUAL purchase
+        // can be set directly (e.g. a client holding 6 lots is otherwise
+        // always forced into multiples of 6). The strategy template's own
+        // per-lot definition (rebAddOrIncreaseStrategyHolding) stays uniform
+        // regardless — only this client's purchased quantity changes.
+        let clientShareOverrides = {};
 
         const render = () => {
           const totalWallet = strategyClients.reduce((s, c) => s + Number(rebWalletByClient[String(c.id)] || 0), 0);
@@ -11564,17 +11572,27 @@
           const custodyFeeTotal = REB_OFF_CUSTODY_FEE * affectedCount;
           const custodyFeePerClient = affectedCount > 0 ? custodyFeeTotal / affectedCount : 0;
 
-          /* Per-user affordability check (uniformity by lots &times; buyPerLot) */
+          /* Per-user affordability check. Default is uniform (lots x buyPerLot);
+             a client with an explicit override buys that absolute share count
+             instead — used to escape the "always a multiple of my lot count"
+             floor (e.g. a 6-lot client can't otherwise buy fewer than 6). */
           const perUserPlan = strategyClients.map((c) => {
             const walletR = Number(rebWalletByClient[String(c.id)] || 0);
             const lots = Math.max(0, Number(c.totalCurrentHolding || 0));
-            const sharesNeeded = lots * Math.max(0, Number(buyPerLot) || 0);
+            const uniformShares = lots * Math.max(0, Number(buyPerLot) || 0);
+            const override = clientShareOverrides[String(c.id)];
+            const hasOverride = override != null;
+            const sharesNeeded = hasOverride ? Math.max(0, Math.floor(Number(override) || 0)) : uniformShares;
             const cost = sharesNeeded * perShareTradingCost + (sharesNeeded > 0 ? custodyFeePerClient : 0);
             const afford = walletR >= cost - 0.0001;
             const remaining = walletR - cost;
-            return { client: c, walletR, lots, sharesNeeded, cost, afford, remaining };
+            return { client: c, walletR, lots, sharesNeeded, uniformShares, hasOverride, cost, afford, remaining };
           });
-          const everyoneAffords = pricePerShare > 0 && buyPerLot > 0 && perUserPlan.every((p) => p.afford && p.sharesNeeded > 0);
+          // buyPerLot > 0 is not required directly — a client with an explicit
+          // override can have a positive sharesNeeded even when buyPerLot is 0
+          // (irrelevant to them); .every(sharesNeeded > 0) already enforces
+          // that every participant has a real, positive quantity.
+          const everyoneAffords = pricePerShare > 0 && perUserPlan.every((p) => p.afford && p.sharesNeeded > 0);
           const anyAfford = perUserPlan.some((p) => p.afford && p.sharesNeeded > 0);
           const totalShares = perUserPlan.reduce((s, p) => s + p.sharesNeeded, 0);
           const totalCost = perUserPlan.reduce((s, p) => s + p.cost, 0);
@@ -11608,7 +11626,7 @@
                         <th class="text-left px-3 py-2">Client</th>
                         <th class="text-right px-3 py-2">Lots</th>
                         <th class="text-right px-3 py-2">Wallet</th>
-                        ${selectedInstrument ? `<th class="text-right px-3 py-2">Buy Cost</th><th class="text-right px-3 py-2">After</th>` : ''}
+                        ${selectedInstrument ? `<th class="text-right px-3 py-2">Shares</th><th class="text-right px-3 py-2">Buy Cost</th><th class="text-right px-3 py-2">After</th>` : ''}
                       </tr>
                     </thead>
                     <tbody>
@@ -11622,6 +11640,14 @@
                           <td class="px-3 py-2 text-right font-mono text-slate-500">${p.lots.toLocaleString()}</td>
                           <td class="px-3 py-2 text-right font-mono ${p.walletR > 0 ? 'text-violet-700 font-semibold' : 'text-slate-400'}">${rebFmtZAR(p.walletR)}</td>
                           ${selectedInstrument ? `
+                            <td class="px-3 py-2 text-right">
+                              <div class="flex items-center justify-end gap-1">
+                                <input type="number" min="0" step="1" data-client-shares="${p.client.id}" value="${p.sharesNeeded}"
+                                  title="${p.hasOverride ? 'Custom quantity for this client only' : 'Default: lots &times; buy-per-lot'}"
+                                  class="w-16 px-1.5 py-1 text-right font-mono text-xs border rounded-md focus:outline-none focus:ring-1 focus:ring-violet-300 ${p.hasOverride ? 'border-violet-300 bg-violet-50 text-violet-800 font-semibold' : 'border-slate-200 text-slate-600'}" />
+                                ${p.hasOverride ? `<button type="button" data-client-shares-reset="${p.client.id}" title="Reset to lots &times; buy-per-lot" class="text-slate-400 hover:text-slate-600 text-xs leading-none">&times;</button>` : ''}
+                              </div>
+                            </td>
                             <td class="px-3 py-2 text-right font-mono text-slate-600">${rebFmtZAR(p.cost)}</td>
                             <td class="px-3 py-2 text-right font-mono font-semibold ${p.afford ? 'text-green-700' : 'text-red-600'}">${rebFmtZAR(p.remaining)}</td>
                           ` : ''}
@@ -11680,9 +11706,30 @@
             }
           }
           const select = document.getElementById("rebWalletBuySelect");
-          if (select) select.addEventListener("change", (e) => { selectedBuyId = e.target.value || null; render(); });
+          if (select) select.addEventListener("change", (e) => {
+            selectedBuyId = e.target.value || null;
+            clientShareOverrides = {}; // a different security has different affordability/price
+            render();
+          });
           const qtyInput = document.getElementById("rebWalletBuyPerLot");
           if (qtyInput) qtyInput.addEventListener("change", (e) => { buyPerLot = Math.max(0, Math.floor(Number(e.target.value) || 0)); render(); });
+          body.querySelectorAll("[data-client-shares]").forEach((input) => {
+            input.addEventListener("change", () => {
+              const clientId = input.dataset.clientShares;
+              const val = Math.max(0, Math.floor(Number(input.value) || 0));
+              clientShareOverrides = { ...clientShareOverrides, [clientId]: val };
+              render();
+            });
+          });
+          body.querySelectorAll("[data-client-shares-reset]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const clientId = btn.dataset.clientSharesReset;
+              const next = { ...clientShareOverrides };
+              delete next[clientId];
+              clientShareOverrides = next;
+              render();
+            });
+          });
           const commitBtn = document.getElementById("rebWalletBuyCommitBtn");
           if (commitBtn) commitBtn.addEventListener("click", async () => {
             if (commitBtn.disabled) return;
