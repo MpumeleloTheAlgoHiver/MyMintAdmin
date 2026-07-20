@@ -7057,6 +7057,34 @@
         return { brokerageRate, custodyFeeRands, custodyFeeCents: Math.round(custodyFeeRands * 100) };
       };
 
+      /* The 8% execution reserve always covers custody + brokerage first; only
+         the UNCOVERED remainder ever reduces what the client is credited (or
+         raises what their wallet must fund). Previously that shortfall was
+         absorbed silently. Now — for every settlement path (liquidation,
+         rebalance sell/buy, buy-only) — the admin sees the exact calculation
+         and must explicitly approve before it happens. Runs BEFORE any
+         reserve/residual mutation in the caller, so Cancel aborts cleanly. */
+      const confirmReserveShortfalls = (items) => {
+        const short = items.filter((it) => it.shortfallCents > 0);
+        if (!short.length) return true;
+        const r = (c) => (Math.round(c) / 100).toFixed(2);
+        const lines = ['The 8% reserve will NOT fully cover the settlement fee for:', ''];
+        short.forEach((it) => {
+          // afterCents is caller-supplied — the shortfall REDUCES a credited
+          // amount (liquidation/rebalance) but INCREASES a required wallet
+          // funding amount (buy-only), so the direction can't be assumed here.
+          const afterCents = it.afterCents != null ? it.afterCents : (it.beforeCents - it.shortfallCents);
+          lines.push(it.label);
+          lines.push(`  Fee required (custody + brokerage): R ${r(it.requiredFeeCents)}`);
+          lines.push(`  Reserve available: R ${r(it.reserveAvailableCents)}`);
+          lines.push(`  Shortfall: R ${r(it.shortfallCents)}`);
+          lines.push(`  ${it.impactLabel}: R ${r(it.beforeCents)} -> R ${r(afterCents)}`);
+          lines.push('');
+        });
+        lines.push('Proceed? The shortfall above will apply exactly as shown.');
+        return window.confirm(lines.join('\n'));
+      };
+
       // fillBySecId: { [security_id]: fillCents } — per-security broker fill prices
       // from the uploaded sheet (covers both the SELL side and the BUY side).
       const creditLiquidationResiduals = async (batch, sellEvts, fillBySecId, feeConfig = null) => {
@@ -7092,6 +7120,34 @@
             feeCents: Math.round(grossCents * brokerageRate) + Math.round(custodyFee * 100),
           };
         });
+
+        // Preview reserve availability for every owner BEFORE consuming anything,
+        // so any shortfall is shown to the admin with the exact math instead of
+        // being silently deducted from what gets credited.
+        const shortfallPreview = [];
+        for (const [fm, ownerRows] of ownerByScope.entries()) {
+          const userIds = Object.keys(ownerRows);
+          const reserveResp = await fetch('/api/orderbook/send-csv?action=rebalance-load-reserves', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ strategyId: batch.strategy_id, familyMemberId: fm || null, userIds }),
+          });
+          const reserveJson = await reserveResp.json().catch(() => ({}));
+          Object.entries(ownerRows).forEach(([uid, row]) => {
+            const reserveAvailableCents = Math.max(0, Math.round(Number(reserveJson.reservesCentsByUser?.[uid]) || 0));
+            shortfallPreview.push({
+              label: `Client ${uid.slice(0, 8)} — liquidation`,
+              requiredFeeCents: row.feeCents,
+              reserveAvailableCents,
+              shortfallCents: Math.max(0, row.feeCents - reserveAvailableCents),
+              impactLabel: 'Credited proceeds',
+              beforeCents: row.grossCents,
+            });
+          });
+        }
+        if (!confirmReserveShortfalls(shortfallPreview)) {
+          throw new Error('Liquidation cancelled: reserve shortfall was not approved by the admin.');
+        }
 
         const creditByOwner = new Map();
         for (const [fm, ownerRows] of ownerByScope.entries()) {
@@ -7202,6 +7258,35 @@
           };
         });
 
+        // Preview reserve availability for every owner BEFORE consuming anything,
+        // so any shortfall is shown to the admin with the exact math instead of
+        // being silently deducted from the net cash delta.
+        const shortfallPreview = [];
+        for (const [fm, scope] of byScope.entries()) {
+          const userIds = Object.keys(scope.owners);
+          const reserveResp = await fetch('/api/orderbook/send-csv?action=rebalance-load-reserves', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ strategyId: batch.strategy_id, familyMemberId: fm || null, userIds }),
+          });
+          const reserveJson = await reserveResp.json().catch(() => ({}));
+          Object.entries(scope.owners).forEach(([uid, owner]) => {
+            const reserveAvailableCents = Math.max(0, Math.round(Number(reserveJson.reservesCentsByUser?.[uid]) || 0));
+            const netBeforeCents = owner.sellGrossCents - owner.buyGrossCents;
+            shortfallPreview.push({
+              label: `Client ${uid.slice(0, 8)} — rebalance`,
+              requiredFeeCents: owner.requestedFeeCents,
+              reserveAvailableCents,
+              shortfallCents: Math.max(0, owner.requestedFeeCents - reserveAvailableCents),
+              impactLabel: 'Net cash delta',
+              beforeCents: netBeforeCents,
+            });
+          });
+        }
+        if (!confirmReserveShortfalls(shortfallPreview)) {
+          throw new Error('Rebalance settlement cancelled: reserve shortfall was not approved by the admin.');
+        }
+
         for (const [fm, scope] of byScope.entries()) {
           const feesCentsByUser = Object.fromEntries(
             Object.entries(scope.owners).map(([uid, owner]) => [uid, owner.requestedFeeCents])
@@ -7302,15 +7387,38 @@
           const reserveJson = await reserveResp.json().catch(() => ({}));
           if (!cashResp.ok || !reserveResp.ok) throw new Error('Could not verify buy-only cash and reserve balances.');
 
+          // Two passes: (1) genuinely insufficient funds always hard-blocks —
+          // there is nothing to negotiate if the money isn't there. (2) a
+          // reserve shortfall that the wallet CAN still cover is shown to the
+          // admin with the exact math (same as liquidation/rebalance) instead
+          // of silently proceeding.
+          const blocked = [];
+          const shortfallPreview = [];
           owners.forEach((amounts, uid) => {
             const residualCents = Math.round((Number(cashJson.balances?.[uid]) || 0) * 100);
             const reserveCents = Math.max(0, Math.round(Number(reserveJson.reservesCentsByUser?.[uid]) || 0));
             const feeShortfallCents = Math.max(0, amounts.feeCents - reserveCents);
             const requiredCents = amounts.grossCents + feeShortfallCents;
             if (residualCents < requiredCents) {
-              throw new Error(`Buy-only settlement blocked for user ${uid.slice(0, 8)}: actual fill requires R ${(requiredCents / 100).toFixed(2)}, but strategy residual has R ${(residualCents / 100).toFixed(2)} after reserve-first fees.`);
+              blocked.push(`user ${uid.slice(0, 8)}: actual fill requires R ${(requiredCents / 100).toFixed(2)}, but strategy residual has R ${(residualCents / 100).toFixed(2)} after reserve-first fees.`);
+              return;
             }
+            shortfallPreview.push({
+              label: `Client ${uid.slice(0, 8)} — buy-only`,
+              requiredFeeCents: amounts.feeCents,
+              reserveAvailableCents: reserveCents,
+              shortfallCents: feeShortfallCents,
+              impactLabel: 'Wallet residual required',
+              beforeCents: amounts.grossCents,
+              afterCents: requiredCents,
+            });
           });
+          if (blocked.length) {
+            throw new Error(`Buy-only settlement blocked — ${blocked.join(' ')}`);
+          }
+          if (!confirmReserveShortfalls(shortfallPreview)) {
+            throw new Error('Buy-only settlement cancelled: reserve shortfall was not approved by the admin.');
+          }
         }
       };
 
