@@ -227,6 +227,15 @@
               <select id="editAssignee" style="width:100%;border:1px solid #e5e5ea;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:600;color:#1c1c1e;background:#fff;outline:none;cursor:pointer;font-family:inherit;"></select>
             </div>
           </div>
+          <div style="padding:0 24px 16px;">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 14px;border:1px solid #e5e5ea;border-radius:10px;background:#fafafa;">
+              <input type="checkbox" id="editOngoing" style="width:16px;height:16px;accent-color:#7c3aed;cursor:pointer;" />
+              <div>
+                <div style="font-size:13px;font-weight:700;color:#1c1c1e;">🔁 Mark as Ongoing</div>
+                <div style="font-size:11px;color:#8e8e93;margin-top:1px;">Keeps task active without affecting execution rate or showing as overdue</div>
+              </div>
+            </label>
+          </div>
           <div style="display:flex;gap:10px;padding:0 24px 20px;justify-content:flex-end;">
             <button onclick="closeEdit()" style="padding:9px 20px;border-radius:10px;border:1px solid #e5e5ea;background:#fff;color:#8e8e93;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Cancel</button>
             <button onclick="saveEdit()" style="padding:9px 20px;border-radius:10px;border:none;background:#7c3aed;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Save Changes</button>
@@ -602,9 +611,10 @@
                         ?`<button onclick="toggleStatus('${t.id}','${t.status}')" style="width:18px;height:18px;border-radius:50%;border:2px solid ${t.status==='done'?'#28a745':'#d1d1d6'};background:${t.status==='done'?'#28a745':'transparent'};cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">${t.status==='done'?'<svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</button>`
                         :`<div style="width:18px;height:18px;border-radius:50%;border:2px solid ${t.status==='done'?'#28a745':'#d1d1d6'};background:${t.status==='done'?'#28a745':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">${t.status==='done'?'<svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>`
                       }
-                      <span style="flex:1;font-size:13px;font-weight:600;color:${t.status==='done'?'#8e8e93':'#1c1c1e'};${t.status==='done'?'text-decoration:line-through;':''}word-break:break-word;min-width:0;line-height:1.4;">${esc(t.title)}</span>
+                      <span style="flex:1;font-size:13px;font-weight:600;color:${t.status==='done'?'#8e8e93':'#1c1c1e'};${t.status==='done'?'text-decoration:line-through;':''}word-break:break-word;min-width:0;line-height:1.4;">${t.status==='in_progress'?'<span title="Ongoing" style="font-size:9px;margin-right:4px;">🔁</span>':''}${esc(t.title)}</span>
                       <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:20px;flex-shrink:0;${t.priority==='urgent'?'background:#fff0ef;color:#ff3b30;':t.priority==='high'?'background:#fff8e1;color:#c47f00;':t.priority==='medium'?'background:#ede9fe;color:#7c3aed;':'background:#f2f2f7;color:#8e8e93;'}">${t.priority}</span>
-                      ${isOverdue(t)&&t.status!=='done'?'<span style="font-size:9px;font-weight:700;color:#ff3b30;flex-shrink:0;">overdue</span>':''}
+                      ${isOverdue(t)&&t.status!=='done'&&t.status!=='in_progress'?'<span style="font-size:9px;font-weight:700;color:#ff3b30;flex-shrink:0;">overdue</span>':''}
+                      ${canEdit?`<button onclick="openEdit('${t.id}')" title="Edit" style="background:none;border:none;cursor:pointer;color:#c4b5fd;font-size:13px;flex-shrink:0;padding:0 2px;line-height:1;" onmouseover="this.style.color='#7c3aed'" onmouseout="this.style.color='#c4b5fd'">✎</button>`:''}
                       ${canEdit?`<button onclick="deleteTask('${t.id}')" style="background:none;border:none;cursor:pointer;color:#d1d1d6;font-size:13px;flex-shrink:0;padding:0 2px;line-height:1;" onmouseover="this.style.color='#ff3b30'" onmouseout="this.style.color='#d1d1d6'">✕</button>`:''}
                     </div>
                   </div>`).join('')}
@@ -870,6 +880,7 @@
       document.getElementById('editPriority').value=t.priority||'medium';
       const asel=document.getElementById('editAssignee');
       asel.innerHTML=allMembers.map(m=>`<option value="${m.id}"${m.id===t.assigned_to?' selected':''}>${esc(m.full_name||m.email)}</option>`).join('');
+      document.getElementById('editOngoing').checked=t.status==='in_progress';
       document.getElementById('editAssigneeRow').style.display=isAdmin?'':'none';
       const modal=document.getElementById('editModal');
       modal.style.display='flex';
@@ -887,6 +898,10 @@
         priority:document.getElementById('editPriority').value,
       };
       if(isAdmin) updates.assigned_to=document.getElementById('editAssignee').value||null;
+      const ongoing=document.getElementById('editOngoing').checked;
+      const t=allTasks.find(t=>t.id===editingTaskId);
+      if(ongoing&&t?.status!=='in_progress') updates.status='in_progress';
+      else if(!ongoing&&t?.status==='in_progress') updates.status='todo';
       try {
         await api(`/api/tasks/${editingTaskId}`,{method:'PATCH',body:JSON.stringify(updates)});
         closeEdit();
