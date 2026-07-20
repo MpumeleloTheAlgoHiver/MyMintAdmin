@@ -9231,17 +9231,25 @@
             }
           }
 
-          /* Latest intraday price per symbol &mdash; chunked .in queries, first-write-wins on DESC timestamp */
+          /* Latest intraday price per symbol &mdash; chunked .in queries, first-write-wins on DESC timestamp.
+             stock_intraday_c accumulates ticks continuously (1000+ rows in just
+             2 days for a handful of symbols) &mdash; an unbounded scan per chunk was
+             slow/timing out and let a few frequently-ticking symbols exhaust the
+             row cap, starving the rest of the chunk of any match (shown as N/A).
+             Bounded to the last 2 days, always enough for a "latest" price. */
           const intradayBySymbol = {};
           const symbols = (rows || []).map(s => String(s.symbol || "")).filter(Boolean);
           const CHUNK = 50;
+          const intradaySinceIso = new Date(Date.now() - 2 * 86400000).toISOString();
           for (let i = 0; i < symbols.length; i += CHUNK) {
             const chunk = symbols.slice(i, i + CHUNK);
             const { data: rs } = await supabaseClient
               .from("stock_intraday_c")
               .select("symbol, current_price, timestamp")
               .in("symbol", chunk)
-              .order("timestamp", { ascending: false });
+              .gte("timestamp", intradaySinceIso)
+              .order("timestamp", { ascending: false })
+              .limit(2000);
             (rs || []).forEach(r => {
               if (r.symbol && intradayBySymbol[r.symbol] == null) {
                 intradayBySymbol[r.symbol] = Number(r.current_price);

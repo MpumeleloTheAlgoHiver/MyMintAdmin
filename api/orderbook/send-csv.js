@@ -511,8 +511,16 @@ module.exports = async (req, res) => {
       const securityRows = querySymbols.length ? await fetchSupabaseJson(
         `/rest/v1/securities_c?symbol=in.(${buildInFilter(querySymbols)})&select=id,symbol,last_price`
       ) : [];
+      // stock_intraday_c accumulates ticks continuously — an unbounded
+      // order-by-timestamp scan across the whole table's history for these
+      // symbols was timing out (the query only needs the LATEST row per
+      // symbol, but with no time filter Postgres has to sort far more rows
+      // than necessary). Bounded to the last 2 days, well inside the 24h
+      // freshness check below, so it can't silently miss a legitimately
+      // fresh price while staying fast regardless of total table size.
+      const intradaySinceIso = new Date(Date.now() - 2 * 86400000).toISOString();
       const intradayRows = querySymbols.length ? await fetchSupabaseJson(
-        `/rest/v1/stock_intraday_c?symbol=in.(${buildInFilter(querySymbols)})&select=symbol,current_price,timestamp&order=timestamp.desc`
+        `/rest/v1/stock_intraday_c?symbol=in.(${buildInFilter(querySymbols)})&timestamp=gte.${encodeURIComponent(intradaySinceIso)}&select=symbol,current_price,timestamp&order=timestamp.desc&limit=2000`
       ) : [];
       const norm = (value) => String(value || '').trim().toUpperCase().replace(/\.JO$/, '');
       const securityBySymbol = new Map();

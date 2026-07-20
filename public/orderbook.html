@@ -6205,12 +6205,20 @@
 
         // Fetch the latest intraday price per security from stock_intraday_c.
         // current_price is the live market price that drives Expected Fill.
+        // stock_intraday_c accumulates ticks continuously (1000+ rows in just
+        // 2 days for a handful of symbols) — an unbounded scan across every
+        // security ever held on this page load was slow/timing out and
+        // showing most prices as N/A once the row cap was exhausted by a few
+        // frequently-ticking symbols. Bounded to the last 2 days, which is
+        // always enough for a "latest" price.
         parallelQueries.push(
           supabaseClient
             .from('stock_intraday_c')
             .select('security_id, current_price, timestamp')
             .in('security_id', securityIds)
+            .gte('timestamp', new Date(Date.now() - 2 * 86400000).toISOString())
             .order('timestamp', { ascending: false })
+            .limit(5000)
             .then(({ data, error }) => {
               if (error) { console.error('Intraday prices load error:', error); return; }
               const seen = new Set();
