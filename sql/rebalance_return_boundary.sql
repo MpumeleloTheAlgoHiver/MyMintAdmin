@@ -100,6 +100,14 @@ begin
 
   update public.strategy_valuation_rules_c set status='SUPERSEDED'
    where strategy_id=v_batch.strategy_id and status='ACTIVE';
+  -- More than one settlement can legitimately land on the same calendar day
+  -- (e.g. a liquidation this morning, a separate buy this afternoon) — the
+  -- table's unique(strategy_id, effective_from) doesn't distinguish by status,
+  -- so a plain INSERT collides with the row the UPDATE above just superseded
+  -- (or any other historical row for that exact date). ON CONFLICT replaces
+  -- that day's row with the latest settlement's numbers, which is correct:
+  -- effective_from is daily granularity, so only the final value for that day
+  -- matters, and this settlement's batch is now the newest word on it.
   insert into public.strategy_valuation_rules_c(
     strategy_id,effective_from,securities_value_per_lot_cents,
     continuity_cash_per_lot_cents,status,methodology_version,source_evidence,
@@ -108,7 +116,17 @@ begin
     v_batch.strategy_id,v_effective_date,p_securities_value_cents,v_cash,'ACTIVE',
     'SETTLEMENT_CHAIN_V1',jsonb_build_object('batch_id',p_batch_id,'basis','actual_fill_and_guarded_prices'),
     p_actor,now(),p_actor,p_batch_id
-  ) returning id into v_rule_id;
+  )
+  on conflict (strategy_id, effective_from) do update set
+    securities_value_per_lot_cents = excluded.securities_value_per_lot_cents,
+    continuity_cash_per_lot_cents = excluded.continuity_cash_per_lot_cents,
+    status = 'ACTIVE',
+    methodology_version = excluded.methodology_version,
+    source_evidence = excluded.source_evidence,
+    approved_by = excluded.approved_by,
+    approved_at = excluded.approved_at,
+    source_batch_id = excluded.source_batch_id
+  returning id into v_rule_id;
 
   insert into public.strategy_return_publication_audit_c(
     strategy_id,as_of_date,securities_value_cents,continuity_cash_cents,
