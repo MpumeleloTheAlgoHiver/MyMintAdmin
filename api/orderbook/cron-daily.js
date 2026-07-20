@@ -153,8 +153,15 @@ module.exports = async (req, res) => {
       error_message: null
     };
 
+    // sql/orderbook_email_runs.sql later dropped the single-column unique on
+    // run_date in favour of a composite unique(run_date, sequence_number) —
+    // "allow multiple order books per day" — but this on_conflict target was
+    // never updated to match, so every upsert here failed with "there is no
+    // unique or exclusion constraint matching the ON CONFLICT specification"
+    // once that migration ran (visible as the whole cron 500ing after the
+    // return publishers had already run — a real, confirmed production bug).
     await requestSupabaseJson(
-      '/rest/v1/orderbook_email_runs?on_conflict=run_date',
+      '/rest/v1/orderbook_email_runs?on_conflict=run_date,sequence_number',
       {
         method: 'POST',
         body: upsertPayload,

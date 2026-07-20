@@ -7,7 +7,22 @@ const NIL = '00000000-0000-0000-0000-000000000000';
 const q = (value) => encodeURIComponent(String(value));
 const base = (symbol) => String(symbol || '').trim().toUpperCase().replace(/\.JO$/, '');
 const ownerKey = (userId, familyId, strategyId) => `${userId}|${familyId || NIL}|${strategyId}`;
-const sameSnapshot = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
+// A raw JSON.stringify comparison is brittle to object KEY ORDER — two
+// holdings snapshots with identical security_id/quantity pairs but different
+// property insertion order (e.g. the historical seed wrote {symbol,quantity,
+// security_id}; this file's own snapshot builder writes {security_id,symbol,
+// quantity}) serialize to different strings and register as "changed" even
+// though nothing did. That false positive made every client/strategy pair
+// fail with "composition changed without a settled rebalance boundary" on
+// every run after the very first (the first run has no previous snapshot to
+// compare against, so it never hit this path). Normalize to a canonical,
+// sorted, fixed-key-order shape — comparing only the fields that define
+// composition (security_id, quantity) — before comparing strings.
+const normalizeSnapshot = (rows) => (Array.isArray(rows) ? rows : [])
+  .map((row) => ({ security_id: String(row?.security_id || ''), quantity: Number(row?.quantity) || 0 }))
+  .filter((row) => row.security_id && row.quantity > 0)
+  .sort((a, b) => a.security_id.localeCompare(b.security_id));
+const sameSnapshot = (a, b) => JSON.stringify(normalizeSnapshot(a)) === JSON.stringify(normalizeSnapshot(b));
 
 async function publishClientEodReturns({ asOfDate, apply = false, includeUat = false, includeTestUsers = false } = {}) {
   const asOf = asOfDate || new Date().toISOString().slice(0, 10);
@@ -48,7 +63,11 @@ async function publishClientEodReturns({ asOfDate, apply = false, includeUat = f
   const symbols = [...new Set((securities || []).flatMap((row) => [base(row.symbol), `${base(row.symbol)}.JO`]))];
   const since = new Date(new Date(`${asOf}T23:59:59Z`).getTime() - 4 * 86400000).toISOString();
   const intraday = await requestSupabaseJson(
-    `/rest/v1/stock_intraday_c?select=symbol,current_price,timestamp&symbol=in.(${symbols.map(q).join(',')})&timestamp=gte.${q(since)}&order=timestamp.desc`,
+    // stock_intraday_c accumulates ticks continuously — an explicit limit
+    // stops a few frequently-ticking symbols from exhausting the row cap and
+    // starving other symbols' latest price out of the result (same class of
+    // bug fixed today in dashboard.html/orderbook.html/send-csv.js).
+    `/rest/v1/stock_intraday_c?select=symbol,current_price,timestamp&symbol=in.(${symbols.map(q).join(',')})&timestamp=gte.${q(since)}&order=timestamp.desc&limit=5000`,
     { method: 'GET' }
   ).catch(() => []);
   const priceBySymbol = new Map();
