@@ -205,7 +205,7 @@ const loadLiveOrderbookRows = async (sinceIso = null) => {
     : '';
 
   const holdings = await fetchSupabaseJson(
-    `/rest/v1/stock_holdings?select=id,user_id,security_id,quantity,avg_fill,market_value,unrealized_pnl,as_of_date,created_at,updated_at,%22Status%22,%22Fill_date%22,%22Exit_date%22,avg_exit,strategy_id&order=updated_at.desc${sinceFilter}`
+    `/rest/v1/stock_holdings_c?select=id,user_id,security_id,quantity,avg_fill,market_value,unrealized_pnl,as_of_date,created_at,updated_at,%22Status%22,%22Fill_date%22,%22Exit_date%22,avg_exit,strategy_id&order=updated_at.desc${sinceFilter}`
   );
 
   const securityIds = [...new Set((holdings || []).map((row) => row.security_id).filter(Boolean))];

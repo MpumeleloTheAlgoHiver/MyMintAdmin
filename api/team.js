@@ -1100,7 +1100,7 @@ module.exports = async (req, res) => {
           try {
             const targetHoldingId = row.payload?.holdingId || (row.payload?.ids && row.payload.ids[0]);
             if (targetHoldingId) {
-              const holdings = await supabaseRequest(`/rest/v1/stock_holdings?id=eq.${encodeURIComponent(targetHoldingId)}&select=user_id&limit=1`, { method: 'GET', useServiceRoleAuth: true });
+              const holdings = await supabaseRequest(`/rest/v1/stock_holdings_c?id=eq.${encodeURIComponent(targetHoldingId)}&select=user_id&limit=1`, { method: 'GET', useServiceRoleAuth: true });
               if (holdings && holdings[0]?.user_id) {
                 const profs = await supabaseRequest(`/rest/v1/profiles?id=eq.${encodeURIComponent(holdings[0].user_id)}&select=is_test&limit=1`, { method: 'GET', useServiceRoleAuth: true });
                 if (profs && profs[0]?.is_test) isTestUser = true;

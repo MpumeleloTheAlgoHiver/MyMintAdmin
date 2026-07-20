@@ -537,7 +537,7 @@ const auditMasterAction = async (member, section, field, details = {}) => {
       const profs = await supabaseRequest(`/rest/v1/profiles?id=eq.${encodeURIComponent(targetUserId)}&select=is_test&limit=1`, { method: 'GET', useServiceRoleAuth: true });
       if (profs && profs[0]?.is_test) isTestUser = true;
     } else if (targetHoldingId) {
-      const holdings = await supabaseRequest(`/rest/v1/stock_holdings?id=eq.${encodeURIComponent(targetHoldingId)}&select=user_id&limit=1`, { method: 'GET', useServiceRoleAuth: true });
+      const holdings = await supabaseRequest(`/rest/v1/stock_holdings_c?id=eq.${encodeURIComponent(targetHoldingId)}&select=user_id&limit=1`, { method: 'GET', useServiceRoleAuth: true });
       if (holdings && holdings[0]?.user_id) {
         const profs = await supabaseRequest(`/rest/v1/profiles?id=eq.${encodeURIComponent(holdings[0].user_id)}&select=is_test&limit=1`, { method: 'GET', useServiceRoleAuth: true });
         if (profs && profs[0]?.is_test) isTestUser = true;
