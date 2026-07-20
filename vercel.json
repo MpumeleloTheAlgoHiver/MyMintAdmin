@@ -14,12 +14,18 @@
     { "source": "/api/alliance-news", "destination": "/api/team?fwd=alliance-news" },
     { "source": "/api/tasks/:id", "destination": "/api/team?fwd=tasks&taskId=:id" },
     { "source": "/api/tasks", "destination": "/api/team?fwd=tasks" },
+    { "source": "/api/standup-log", "destination": "/api/team?fwd=standup-log" },
+    { "source": "/api/standup-log/snapshot", "destination": "/api/team?fwd=standup-log&action=snapshot" },
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ],
   "crons": [
     {
       "path": "/api/orderbook/cron-daily",
       "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/standup-log/snapshot",
+      "schedule": "0 22 * * *"
     }
   ]
 }
