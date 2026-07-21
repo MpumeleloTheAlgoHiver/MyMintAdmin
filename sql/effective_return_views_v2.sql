@@ -29,6 +29,15 @@
 -- through the view without RLS grants on the shadow tables.
 --
 -- Non-destructive: views only. Safe to run more than once.
+--
+-- v2.1: client_strategy_returns_effective_c now excludes test/UAT owners
+-- (profiles.is_test OR wallets.status='test') from ALL branches uniformly.
+-- The guarded client publisher already excludes them at write time, but the
+-- PROMOTED_REPAIR and LEGACY_PRODUCTION branches read shadow/legacy tables
+-- that were never filtered this way — a UAT wallet's fake balance (e.g. the
+-- Test Strategy UAT account used for rebalance/settlement testing) was
+-- leaking into any AUM/NAV total computed from this view (confirmed: ~R45k
+-- of a ~R65k apparent total AUM was this one UAT account).
 -- ============================================================
 
 begin;
@@ -121,7 +130,17 @@ select strategy_id, as_of_date,
 create view public.client_strategy_returns_effective_c
 with (security_invoker = false)
 as
-with selected_runs as (
+with test_owners as (
+  -- Same dual test/UAT classification the guarded client publisher already
+  -- enforces at write-time (publishClientEodReturns) — but the PROMOTED_REPAIR
+  -- and LEGACY_PRODUCTION branches below read shadow/legacy tables that were
+  -- never filtered this way, so a UAT wallet's fake balance (e.g. the Test
+  -- Strategy UAT account) could leak into AUM/NAV totals computed from this
+  -- view. Excluded uniformly here regardless of which branch a row came from.
+  select id as user_id from public.profiles where is_test = true
+  union
+  select user_id from public.wallets where status = 'test'
+), selected_runs as (
   select distinct on (c.user_id, coalesce(c.family_member_id,'00000000-0000-0000-0000-000000000000'::uuid), c.strategy_id)
          c.user_id, c.family_member_id, c.strategy_id, c.run_id
     from public.client_strategy_returns_shadow_c c
@@ -209,7 +228,8 @@ select user_id, family_member_id, strategy_id, as_of_date,
        case when cf_21 is null or cf_21 = 0 then null else round(((cf/cf_21)-1)*100,6) end as "1m_pct",
        case when cf_month_first is null or cf_month_first = 0 then null else round(((cf/cf_month_first)-1)*100,6) end as mtd_pct,
        source_kind, repair_run_id
-  from chained;
+  from chained
+ where user_id not in (select user_id from test_owners);
 
 -- ── Latest-per-key companions ────────────────────────────────────────────────
 create view public.strategy_returns_effective_latest_c
