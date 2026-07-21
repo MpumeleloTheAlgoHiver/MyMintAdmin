@@ -569,23 +569,58 @@
     }
 
     /* ─── Investor list ─── */
-    function renderList(investors) {
+    function ownerGroupKey(i) {
+      return `${i.userId}:${i.familyMemberId || ''}`;
+    }
+
+    function escapeAttr(v) {
+      return String(v ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function groupedInvestorList(investors) {
       const q = document.getElementById('investorSearch').value.toLowerCase();
       const f = document.getElementById('strategyFilter').value;
-      const list = investors.filter(i =>
+      const filtered = investors.filter(i =>
         i.type === activeView &&
         i.name.toLowerCase().includes(q) &&
         (activeView !== 'strategy' || !f || i.strategyId === f)
       );
+      if (activeView !== 'strategy') return filtered.map(i => ({ ...i, strategies:[i], groupCount:1 }));
+
+      const groups = new Map();
+      filtered.forEach(i => {
+        const key = ownerGroupKey(i);
+        if (!groups.has(key)) groups.set(key, { ...i, investorKey:key, ownerKey:key, strategies:[] });
+        groups.get(key).strategies.push(i);
+      });
+
+      return [...groups.values()].map(g => {
+        g.strategies.sort((a,b) => (b.value ?? b.current) - (a.value ?? a.current));
+        const selected = currentInvestor && ownerGroupKey(currentInvestor) === g.ownerKey
+          ? g.strategies.find(s => s.investorKey === currentInvestor.investorKey) || g.strategies[0]
+          : g.strategies[0];
+        const value = g.strategies.reduce((s,i)=>s+(i.value ?? i.current),0);
+        const invested = g.strategies.reduce((s,i)=>s+i.invested,0);
+        const pnl = g.strategies.reduce((s,i)=>s+i.pnl,0);
+        return { ...g, ...selected, investorKey:g.ownerKey, selectedInvestorKey:selected.investorKey, value, invested, pnl, retPct: invested > 0 ? (pnl / invested) * 100 : 0, groupCount:g.strategies.length, strategies:g.strategies };
+      }).sort((a,b) => (b.value ?? b.current) - (a.value ?? a.current));
+    }
+
+    function renderList(investors) {
+      const list = groupedInvestorList(investors);
       document.getElementById('investorCount').textContent = list.length;
       document.getElementById('investorList').innerHTML = list.map(i => `
-        <div onclick="selectInvestor('${i.investorKey}')"
+        <div onclick="selectInvestor('${i.selectedInvestorKey || i.investorKey}')"
           style="display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-radius:8px;cursor:pointer;
-            border-left:3px solid ${currentInvestor?.investorKey===i.investorKey?'#7c3aed':'transparent'};
-            background:${currentInvestor?.investorKey===i.investorKey?'#ede9fe':'transparent'};transition:background 0.12s;">
+            border-left:3px solid ${currentInvestor && (currentInvestor.investorKey===i.investorKey || ownerGroupKey(currentInvestor)===i.ownerKey)?'#7c3aed':'transparent'};
+            background:${currentInvestor && (currentInvestor.investorKey===i.investorKey || ownerGroupKey(currentInvestor)===i.ownerKey)?'#ede9fe':'transparent'};transition:background 0.12s;">
           <div style="min-width:0;flex:1;">
             <div style="font-size:12px;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${i.name}${i.isMinor ? '<span style="font-size:9px;font-weight:700;color:#5b21b6;background:#ede9fe;padding:2px 7px;border-radius:6px;text-transform:uppercase;letter-spacing:.04em;margin-left:6px;">Minor</span>' : ''}</div>
-            <div style="font-size:10px;color:#94a3b8;margin-top:1px;">${i.strategy}</div>
+            ${i.groupCount > 1 ? `
+              <select onclick="event.stopPropagation()" onchange="selectInvestor(this.value)" style="margin-top:5px;max-width:178px;border:1px solid #ddd6fe;border-radius:7px;background:#fff;color:#5b21b6;font-size:10.5px;font-weight:600;padding:3px 6px;outline:none;">
+                ${i.strategies.map(s => `<option value="${escapeAttr(s.investorKey)}" ${s.investorKey === i.selectedInvestorKey ? 'selected' : ''}>${escapeAttr(s.strategy)} - ${fmtR(s.value ?? s.current)}</option>`).join('')}
+              </select>
+            ` : `<div style="font-size:10px;color:#94a3b8;margin-top:1px;">${i.strategy}</div>`}
           </div>
           <div style="text-align:right;flex-shrink:0;">
             <div style="font-size:12px;font-weight:600;color:#0f172a;font-family:ui-monospace,monospace;">${fmtR(i.value ?? i.current)}</div>
@@ -612,6 +647,9 @@
         return;
       }
       const i = currentInvestor;
+      const siblingStrategies = allInvestors
+        .filter(x => i.type === 'strategy' && x.type === 'strategy' && ownerGroupKey(x) === ownerGroupKey(i))
+        .sort((a,b) => (b.value ?? b.current) - (a.value ?? a.current));
       const tabs = [
         { id:'performance',  l:'Performance' },
         { id:'risk',         l:'Risk & Drawdown' },
@@ -627,7 +665,12 @@
                 <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;">${(i.name[0]||'?').toUpperCase()}</div>
                 <div style="min-width:0;">
                   <div style="font-size:16px;font-weight:700;color:#0f172a;">${i.name}</div>
-                  <div style="font-size:11px;color:#64748b;margin-top:1px;">${i.strategy}${i.email?' &middot; '+i.email:''}</div>
+                  <div style="font-size:11px;color:#64748b;margin-top:1px;">${i.email || ''}</div>
+                  ${siblingStrategies.length > 1 ? `
+                    <select onchange="selectInvestor(this.value)" style="margin-top:7px;border:1px solid #ddd6fe;border-radius:8px;background:#fff;color:#5b21b6;font-size:11px;font-weight:700;padding:5px 8px;outline:none;">
+                      ${siblingStrategies.map(s => `<option value="${escapeAttr(s.investorKey)}" ${s.investorKey === i.investorKey ? 'selected' : ''}>${escapeAttr(s.strategy)} - ${fmtR2(s.value ?? s.current)} - ${fmtPct(s.retPct)}</option>`).join('')}
+                    </select>
+                  ` : `<div style="font-size:11px;color:#64748b;margin-top:1px;">${i.strategy}</div>`}
                   ${i.computershareNumber ? `<div style="font-size:11px;font-weight:600;color:#0e7490;margin-top:2px;font-family:ui-monospace,monospace;letter-spacing:0.04em;">${i.computershareNumber}</div>` : ''}
                 </div>
               </div>
