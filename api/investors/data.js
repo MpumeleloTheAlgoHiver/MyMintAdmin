@@ -34,15 +34,28 @@ module.exports = async (req, res) => {
       sbGet('strategies_c?select=id,name,short_name,description,risk_level,sector'),
     ]);
 
-    /* Exclude UAT/test accounts (profiles.is_test = true) from the investor list
-       entirely — they must never show on investors.html. Filtering holdings here
-       scopes userIds/secIds/famIds and everything fetched from them downstream. */
+    /* Exclude UAT/test accounts from the investor list entirely — they must
+       never show on investors.html or feed finances.html's AUM figures.
+       Filtering holdings here scopes userIds/secIds/famIds and everything
+       fetched from them downstream.
+       BOTH classifiers are required (matches the client return publisher's
+       dual check): profiles.is_test catches accounts explicitly flagged test,
+       but some internal team members test through their own real profile
+       with only wallets.status='test' set (confirmed live: a real-looking
+       profile with an active test-wallet position was inflating AUM here
+       because only is_test was checked). */
     let testIds = new Set();
     try {
-      const testRows = await sbGet('profiles?select=id&is_test=eq.true');
-      testIds = new Set((testRows || []).map((r) => r.id));
+      const [testProfileRows, testWalletRows] = await Promise.all([
+        sbGet('profiles?select=id&is_test=eq.true'),
+        sbGet('wallets?select=user_id&status=eq.test'),
+      ]);
+      testIds = new Set([
+        ...(testProfileRows || []).map((r) => r.id),
+        ...(testWalletRows || []).map((r) => r.user_id),
+      ]);
       if (testIds.size) holdings = (holdings || []).filter((h) => !testIds.has(h.user_id));
-    } catch (e) { /* is_test column absent -> no filtering */ }
+    } catch (e) { /* is_test/wallets query failed -> no filtering */ }
 
     /* Client cost basis per share, in CENTS, preferring Expected_fill (the price
        the client saw at buy time, in rands) over avg_fill (broker fill in cents,
