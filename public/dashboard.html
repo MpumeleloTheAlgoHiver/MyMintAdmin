@@ -9070,6 +9070,8 @@
       const REB_ALL_OWNERS = "__all__";
       const rebOwnerKey = (userId, familyMemberId = null) =>
         `${String(userId || "")}|${familyMemberId ? String(familyMemberId) : ""}`;
+      const rebPendingOwnerKey = (event) =>
+        rebOwnerKey(event?.user_id, event?.family_member_id);
       const rebScopeIsAll = () => rebSelectedFamilyMemberId === REB_ALL_OWNERS;
 
       async function rebLoadWalletBalances(strategyId, userIds) {
@@ -9975,15 +9977,25 @@
 
         if (!rebSelectedStep) {
           if (metaEl) metaEl.textContent = `${rebSelectedIsin.code} &middot; ${clients.length} clients &middot; select reduction step`;
-          const pendingUids = new Set();
-          if (rebPendingRebalance) rebPendingRebalance.events.forEach(ev => pendingUids.add(String(ev.user_id)));
+          const pendingEventsForSelected = rebPendingRebalance
+            ? rebPendingRebalance.events.filter(ev => String(ev.code || "") === String(rebSelectedIsin.code || ""))
+            : [];
+          const pendingOwnerKeys = new Set(
+            pendingEventsForSelected.map(rebPendingOwnerKey)
+          );
           tbody.innerHTML = clients.map(client => {
             const lots = Number(client.lots) || 0;
             const currentHolding = lots * rebSelectedIsin.unitsPerLot;
-            const isPend = pendingUids.has(String(client.id));
+            const isPend = pendingOwnerKeys.has(client.ownerKey);
             const rowCls = isPend ? 'bg-amber-50' : 'hover:bg-slate-50';
             const rowSty = isPend ? 'style="border-left:3px solid #f59e0b;"' : '';
-            const badge = isPend ? ' <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;">Pending</span>' : '';
+            const pendingSide = pendingEventsForSelected.some(ev =>
+              rebPendingOwnerKey(ev) === client.ownerKey &&
+              String(ev.trade_side).toUpperCase() === "SELL"
+            ) ? "SELL" : "BUY";
+            const badge = isPend
+              ? ` <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;">${rebSelectedIsin.code} ${pendingSide}</span>`
+              : '';
             const pnl = rebPnlForIsinClient(rebSelectedIsin, client);
             return `
           <tr class="${rowCls}" ${rowSty}>

@@ -55,6 +55,12 @@ check(
   'Pending labels show the actual security and trade side',
 );
 check(
+  dashboard.includes('const rebPendingOwnerKey = (event)') &&
+    dashboard.includes('pendingEventsForSelected.map(rebPendingOwnerKey)') &&
+    dashboard.includes('pendingOwnerKeys.has(client.ownerKey)'),
+  'Pending impact matching uses composite owner keys before a step is selected',
+);
+check(
   dashboard.includes('const ownerKey = rebOwnerKey(uid, fmId);') &&
     dashboard.includes('const residualTotalsByOwner = {};'),
   'Pending-order swaps retain owner-separated residuals',
