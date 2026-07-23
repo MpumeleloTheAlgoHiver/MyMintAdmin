@@ -1121,11 +1121,11 @@
                   <option value="">Select a strategy&hellip;</option>
                 </select>
               </div>
-              <!-- Family member scope: pick a specific child (or all combined) to rebalance only that owner's holdings. Defaults to parent-only. -->
+              <!-- Family member scope: all owners is the safe default; scoped options remain available for corrections. -->
               <div class="flex-1 min-w-[200px]">
                 <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Owner scope</label>
                 <select id="rebFamilyScopeSelect" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white" title="Restrict the rebalance to a single owner &mdash; parent's own holdings, a specific child's holdings, or every owner combined.">
-                  <option value="">Parent only (family_member_id IS NULL)</option>
+                  <option value="__all__">All owners (parent + children)</option>
                 </select>
               </div>
               <!-- Effective date: clients are affected only if they held the strategy on or before this date (workbook rule). Defaults to today. -->
@@ -8550,6 +8550,8 @@
 
         const baseClientAllocations = clients.map((c) => ({
           clientId: c.id,
+          ownerKey: c.ownerKey || rebOwnerKey(c.id, c.familyMemberId),
+          familyMemberId: c.familyMemberId || null,
           clientName: c.name,
           lots: c.lots,
           shares: buyPerLot * c.lots,
@@ -8601,6 +8603,8 @@
           const shares = alloc.shares + alloc.extraShares;
           return {
             clientId: alloc.clientId,
+            ownerKey: alloc.ownerKey,
+            familyMemberId: alloc.familyMemberId,
             clientName: alloc.clientName,
             lots: alloc.lots,
             shares,
@@ -8674,13 +8678,13 @@
         const totalCents = Math.max(0, Math.round(Number(totalAmount || 0) * 100));
         if (!totalLots || !totalCents) {
           return clients.reduce((acc, c) => {
-            acc[String(c.id)] = 0;
+            acc[c.ownerKey || rebOwnerKey(c.id, c.familyMemberId)] = 0;
             return acc;
           }, {});
         }
 
         const weighted = clients.map((c) => {
-          const userId = String(c.id);
+          const userId = c.ownerKey || rebOwnerKey(c.id, c.familyMemberId);
           const lotWeight = (Number(c.lots) || 0) / totalLots;
           const exactCents = totalCents * lotWeight;
           const floorCents = Math.floor(exactCents);
@@ -8894,9 +8898,12 @@
 
         const clientBudgets = clients.map((c) => {
           const userId = String(c.id);
-          const budget = Math.max(0, Number(capitalByClient?.[userId] || 0));
+          const ownerKey = c.ownerKey || rebOwnerKey(userId, c.familyMemberId);
+          const budget = Math.max(0, Number(capitalByClient?.[ownerKey] || 0));
           return {
             clientId: userId,
+            ownerKey,
+            familyMemberId: c.familyMemberId || null,
             clientName: c.name,
             lots: Number(c.lots) || 0,
             budget,
@@ -8925,6 +8932,8 @@
             residualCash: totalCapital,
             clientAllocations: clientBudgets.map((c) => ({
               clientId: c.clientId,
+              ownerKey: c.ownerKey,
+              familyMemberId: c.familyMemberId,
               clientName: c.clientName,
               lots: c.lots,
               shares: 0,
@@ -8951,6 +8960,8 @@
             residualCash: totalCapital,
             clientAllocations: clientBudgets.map((c) => ({
               clientId: c.clientId,
+              ownerKey: c.ownerKey,
+              familyMemberId: c.familyMemberId,
               clientName: c.clientName,
               lots: c.lots,
               shares: 0,
@@ -8998,9 +9009,12 @@
         const perShareActualCost = bufferedPrice * (1 + REB_BROKERAGE_RATE);
         const custodyByClient = rebDistributeMoneyByLots(appliedCustodyFee, clients);
         const clientAllocations = weightedShares.map((c) => {
-          const spent = (c.floor * perShareActualCost) + Number(custodyByClient[c.clientId] || 0);
+          const ownerKey = c.ownerKey || rebOwnerKey(c.clientId, c.familyMemberId);
+          const spent = (c.floor * perShareActualCost) + Number(custodyByClient[ownerKey] || 0);
           return {
             clientId: c.clientId,
+            ownerKey,
+            familyMemberId: c.familyMemberId || null,
             clientName: c.clientName,
             lots: c.lots,
             shares: c.floor,
@@ -9043,6 +9057,11 @@
         return data?.session?.access_token || null;
       }
 
+      const REB_ALL_OWNERS = "__all__";
+      const rebOwnerKey = (userId, familyMemberId = null) =>
+        `${String(userId || "")}|${familyMemberId ? String(familyMemberId) : ""}`;
+      const rebScopeIsAll = () => rebSelectedFamilyMemberId === REB_ALL_OWNERS;
+
       async function rebLoadWalletBalances(strategyId, userIds) {
         const ids = [...new Set((userIds || []).map((id) => String(id)).filter(Boolean))];
         if (!ids.length || !strategyId) return {};
@@ -9051,7 +9070,7 @@
            strategy_rebalance_residuals only lets a user read their OWN rows, so a
            direct browser read returned {} for every other client. The endpoint
            uses the service-role key and is scoped by the active owner
-           (rebSelectedFamilyMemberId; null = parent's own residuals). */
+           (rebSelectedFamilyMemberId; __all__ = every owner, null = parent's own residuals). */
         try {
           const token = await rebApiToken();
           if (!token) return {};
@@ -9061,13 +9080,14 @@
             body: JSON.stringify({
               strategyId,
               userIds: ids,
-              familyMemberId: rebSelectedFamilyMemberId || null,
+               familyMemberId: rebScopeIsAll() ? REB_ALL_OWNERS : (rebSelectedFamilyMemberId || null),
             }),
           });
           if (!resp.ok) throw new Error(`load failed: ${resp.status}`);
-          const { balances } = await resp.json();
-          return Object.entries(balances || {}).reduce((acc, [userId, rands]) => {
-            acc[userId] = rebRoundMoney(Number(rands) || 0);
+           const payload = await resp.json();
+           const balances = rebScopeIsAll() ? (payload.balancesByOwner || {}) : (payload.balances || {});
+           return Object.entries(balances || {}).reduce((acc, [ownerKey, rands]) => {
+             acc[ownerKey] = rebRoundMoney(Number(rands) || 0);
             return acc;
           }, {});
         } catch (err) {
@@ -9085,11 +9105,12 @@
           const resp = await fetch('/api/orderbook/send-csv?action=rebalance-load-reserves', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ strategyId, userIds: ids, familyMemberId: rebSelectedFamilyMemberId || null }),
+           body: JSON.stringify({ strategyId, userIds: ids, familyMemberId: rebScopeIsAll() ? REB_ALL_OWNERS : (rebSelectedFamilyMemberId || null) }),
           });
           if (!resp.ok) throw new Error(`load failed: ${resp.status}`);
-          const { reservesCentsByUser } = await resp.json();
-          return Object.fromEntries(Object.entries(reservesCentsByUser || {}).map(([uid, cents]) => [uid, Number(cents || 0) / 100]));
+           const payload = await resp.json();
+           const reserves = rebScopeIsAll() ? (payload.reservesCentsByOwner || {}) : (payload.reservesCentsByUser || {});
+           return Object.fromEntries(Object.entries(reserves || {}).map(([ownerKey, cents]) => [ownerKey, Number(cents || 0) / 100]));
         } catch (err) {
           console.warn('rebLoadReserveBalances failed', err);
           return {};
@@ -9112,7 +9133,9 @@
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({
             strategyId,
-            balancesByUser: Object.fromEntries(entries),
+            ...(familyMemberId === REB_ALL_OWNERS
+              ? { balancesByOwner: Object.fromEntries(entries) }
+              : { balancesByUser: Object.fromEntries(entries) }),
             familyMemberId: familyMemberId || null,
           }),
         });
@@ -9136,17 +9159,16 @@
       let rebBuySecuritiesPromise = null;
       let rebShowUnitPrice = false; // false = show total value by default
       let rebSelectedStrategyId = null;
-      let rebWalletByClient = {};   // userId -> stored credits balance
-      let rebReserveByClient = {};  // userId -> unused execution reserve (rands)
+       let rebWalletByClient = {};   // ownerKey (userId|familyMemberId) -> stored credits balance
+       let rebReserveByClient = {};  // ownerKey (userId|familyMemberId) -> unused execution reserve (rands)
       let rebImpactChangeView = false;
       let rebPendingRebalance = null; // {batchId, sellCode, buyCode, extraBuyCode, events[]}
-      /* Family-member scope for rebalance: NULL = parent only (default,
-         legacy behavior), a uuid = restrict to that child's holdings.
-         Filtering happens in rebRawHoldings and the value flows into every
-         rebalance_event insert as family_member_id so fill & settle hits
-         the right rows. */
-      let rebSelectedFamilyMemberId = null;
+       /* Family-member scope for rebalance: __all__ includes parent + children
+          by default, null is explicit parent-only, and a uuid restricts to one
+          child. Each loaded holding retains its own owner key. */
+       let rebSelectedFamilyMemberId = REB_ALL_OWNERS;
       let rebFamilyMembersForStrategy = []; // [{id, label}] populated per strategy
+       let rebFamilyMemberLabels = {};
       /* Effective date of the rebalance (workbook 05_Rebalance_Events col C).
          Eligibility is gated on "bought on/before this date" — a client who
          entered the strategy AFTER the effective date is NOT affected. Defaults
@@ -9160,6 +9182,8 @@
         return (rebRawHoldings[isin.code] || [])
           .map(r => ({
             id: r.userId,
+            ownerKey: r.ownerKey || rebOwnerKey(r.userId, r.familyMemberId),
+            familyMemberId: r.familyMemberId || null,
             name: r.name,
             // Use floor so a client with fewer shares than one full lot gets 0 lots
             // (not inflated to 1) &mdash; then filter those out entirely
@@ -9177,21 +9201,26 @@
           (rows || []).forEach((r) => {
             const qty = Number(r.quantity) || 0;
             if (qty <= 0) return;
-            if (!byClient[r.userId]) {
-              byClient[r.userId] = {
+            const ownerKey = r.ownerKey || rebOwnerKey(r.userId, r.familyMemberId);
+            if (!byClient[ownerKey]) {
+              byClient[ownerKey] = {
                 id: r.userId,
+                ownerKey,
+                familyMemberId: r.familyMemberId || null,
                 name: r.name,
                 instruments: new Set(),
                 totalCurrentHolding: 0,
               };
             }
-            byClient[r.userId].instruments.add(code);
-            byClient[r.userId].totalCurrentHolding += qty;
+            byClient[ownerKey].instruments.add(code);
+            byClient[ownerKey].totalCurrentHolding += qty;
           });
         });
         return Object.values(byClient)
           .map((c) => ({
             id: c.id,
+            ownerKey: c.ownerKey,
+            familyMemberId: c.familyMemberId,
             name: c.name,
             instrumentCount: c.instruments.size,
             totalCurrentHolding: c.totalCurrentHolding,
@@ -9202,6 +9231,8 @@
       function rebResidualClientsForStrategy() {
         return rebClientsForStrategy().map((client) => ({
           id: String(client.id),
+          ownerKey: client.ownerKey,
+          familyMemberId: client.familyMemberId || null,
           name: client.name,
           // Use total strategy holding as proportional weight base for residual split.
           lots: Math.max(1, Number(client.totalCurrentHolding) || 0),
@@ -9305,7 +9336,9 @@
         if (!fmSel || fmSel._bound) return;
         fmSel._bound = true;
         fmSel.addEventListener("change", () => {
-          rebSelectedFamilyMemberId = fmSel.value || null;
+           rebSelectedFamilyMemberId = fmSel.value === REB_ALL_OWNERS
+             ? REB_ALL_OWNERS
+             : (fmSel.value || null);
           if (rebSelectedStrategyId) {
             rebLoadStrategy(rebSelectedStrategyId).catch(err =>
               console.warn("Owner-scope reload failed:", err?.message || err));
@@ -9514,7 +9547,7 @@
                 const fmId = r.family_member_id ? String(r.family_member_id) : null;
                 /* Apply the active scope filter &mdash; only include rows that
                    match rebSelectedFamilyMemberId (NULL = parent's own rows). */
-                if ((rebSelectedFamilyMemberId || null) !== fmId) return;
+                if (!rebScopeIsAll() && (rebSelectedFamilyMemberId || null) !== fmId) return;
                 if (!rebRawHoldings[code]) rebRawHoldings[code] = [];
                 const uid = String(r.user_id);
                 const qty = Number(r.quantity) || 0;
@@ -9558,6 +9591,7 @@
                 } else {
                   rebRawHoldings[code].push({
                     userId: uid,
+                    ownerKey: rebOwnerKey(uid, fmId),
                     familyMemberId: fmId,
                     name: nameById[uid] || uid,
                     quantity: qty,
@@ -9576,14 +9610,15 @@
         try {
           const fmSel = document.getElementById("rebFamilyScopeSelect");
           if (fmSel) {
-            const prev = rebSelectedFamilyMemberId || "";
-            fmSel.innerHTML = '<option value="">Parent only</option>'
+            const prev = rebSelectedFamilyMemberId || REB_ALL_OWNERS;
+            fmSel.innerHTML = '<option value="__all__">All owners (parent + children)</option>'
+              + '<option value="">Parent only</option>'
               + rebFamilyMembersForStrategy.map(fm =>
                   `<option value="${fm.id}">${fm.label}</option>`
                 ).join("");
-            const stillValid = !prev || rebFamilyMembersForStrategy.some(fm => fm.id === prev);
-            fmSel.value = stillValid ? prev : "";
-            if (!stillValid) rebSelectedFamilyMemberId = null;
+            const stillValid = prev === REB_ALL_OWNERS || !prev || rebFamilyMembersForStrategy.some(fm => fm.id === prev);
+            fmSel.value = stillValid ? prev : REB_ALL_OWNERS;
+            if (!stillValid) rebSelectedFamilyMemberId = REB_ALL_OWNERS;
           }
         } catch (e) { /* harmless */ }
 
@@ -9846,10 +9881,10 @@
 
           if (rebImpactChangeView) {
             setChangeHeaders();
-            const totalWallet = strategyClients.reduce((sum, c) => sum + Number(rebWalletByClient[String(c.id)] || 0), 0);
+            const totalWallet = strategyClients.reduce((sum, c) => sum + Number(rebWalletByClient[c.ownerKey] || 0), 0);
             if (metaEl) metaEl.textContent = `Residual view &middot; ${strategyClients.length} clients &middot; wallet pool ${rebFmtZAR(totalWallet)}`;
             tbody.innerHTML = strategyClients.map(client => {
-              const wallet = Number(rebWalletByClient[String(client.id)] || 0);
+              const wallet = Number(rebWalletByClient[client.ownerKey] || 0);
               return `
               <tr class="hover:bg-slate-50">
                 <td class="px-4 py-2.5">
@@ -9958,11 +9993,11 @@
           const affectedClients = clients;
           const residualByClient = rebDistributeMoneyByLots(sellExec.netProceeds, affectedClients);
           const totalResidual = Object.values(residualByClient).reduce((sum, v) => sum + Number(v || 0), 0);
-          const totalWallet = affectedClients.reduce((sum, c) => sum + Number(rebWalletByClient[String(c.id)] || 0), 0);
+          const totalWallet = affectedClients.reduce((sum, c) => sum + Number(rebWalletByClient[c.ownerKey] || 0), 0);
           const totalAvailable = affectedClients.reduce((sum, c) => {
-            const userId = String(c.id);
-            const wallet = Number(rebWalletByClient[userId] || 0);
-            const residual = Number(residualByClient[userId] || 0);
+            const ownerKey = c.ownerKey;
+            const wallet = Number(rebWalletByClient[ownerKey] || 0);
+            const residual = Number(residualByClient[ownerKey] || 0);
             return sum + wallet + residual;
           }, 0);
           if (metaEl) {
@@ -9970,13 +10005,13 @@
           }
 
           tbody.innerHTML = affectedClients.map((client) => {
-            const userId = String(client.id);
+            const ownerKey = client.ownerKey;
             const soldQty = (rebRawHoldings[rebSelectedIsin.code] || [])
-              .filter((row) => String(row.userId) === userId)
+              .filter((row) => row.ownerKey === ownerKey)
               .reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
             const soldShares = Math.max(0, Math.round((Number(soldQty) || 0) * (Number(rebSelectedStep.reductionUnits || 0) / Math.max(1, Number(rebSelectedIsin.unitsPerLot || 1)))));
-            const residual = Number(residualByClient[userId] || 0);
-            const wallet = Number(rebWalletByClient[userId] || 0);
+            const residual = Number(residualByClient[ownerKey] || 0);
+            const wallet = Number(rebWalletByClient[ownerKey] || 0);
             const remaining = wallet + residual;
             return `
             <tr class="hover:bg-slate-50">
@@ -10137,7 +10172,7 @@
               selectedExecMessage = '<p class="text-xs text-amber-600">No price available for this instrument.</p>';
             } else {
               const sellExec = document.getElementById('rebSellModal')?._execData || {};
-              const totalReserve = clients.reduce((sum, c) => sum + Number(rebReserveByClient[String(c.id)] || 0), 0);
+              const totalReserve = clients.reduce((sum, c) => sum + Number(rebReserveByClient[c.ownerKey] || 0), 0);
               const sellFees = Number(sellExec.brokerage || 0) + Number(sellExec.offCustodyFee || 0);
               selectedExec = rebComputeBuyExecution(
                 selectedInstrument.code,
@@ -10154,8 +10189,8 @@
           }
 
           const walletBeforeByClient = residualClients.reduce((acc, c) => {
-            const userId = String(c.id);
-            acc[userId] = rebRoundMoney(rebWalletByClient[userId] || 0);
+            const ownerKey = c.ownerKey;
+            acc[ownerKey] = rebRoundMoney(rebWalletByClient[ownerKey] || 0);
             return acc;
           }, {});
 
@@ -10164,7 +10199,7 @@
             : {};
 
           const walletAfterMainByClient = residualClients.reduce((acc, c) => {
-            const userId = String(c.id);
+            const userId = c.ownerKey;
             const mainResidual = Number(residualSplitAfterMain[userId] || 0);
             acc[userId] = rebRoundMoney(Number(walletBeforeByClient[userId] || 0) + mainResidual);
             return acc;
@@ -10478,12 +10513,15 @@
 
         const clients = rebClientsForIsin(rebSelectedIsin);
         const totalLots = clients.reduce((sum, c) => sum + Number(c.lots || 0), 0) || 1;
-        const allocationById = Object.fromEntries((exec.clientAllocations || []).map(a => [String(a.clientId), a]));
+        const allocationById = Object.fromEntries((exec.clientAllocations || []).map(a => [
+          a.ownerKey || rebOwnerKey(a.clientId, a.familyMemberId),
+          a,
+        ]));
         const clientRows = clients.map((client) => {
-          const uid = String(client.id);
+          const ownerKey = client.ownerKey || rebOwnerKey(client.id, client.familyMemberId);
           const weight = Number(client.lots || 0) / totalLots;
-          const alloc = allocationById[uid] || {};
-          const reserveBefore = Number(rebReserveByClient[uid] || 0);
+          const alloc = allocationById[ownerKey] || {};
+          const reserveBefore = Number(rebReserveByClient[ownerKey] || 0);
           const sellGross = Number(sellExec.grossProceeds || 0) * weight;
           const sellFees = sellGross * REB_BROKERAGE_RATE + (sellGross > 0 ? REB_OFF_CUSTODY_FEE : 0);
           const buyGross = Number(alloc.shares || 0) * Number(exec.bufferedPrice || exec.pricePerShare || 0);
@@ -10886,7 +10924,7 @@
         /* ── Read existing active positions (read-only &mdash; to compute sell quantities) ── */
         const { data: existingRows, error: existingErr } = await supabaseClient
           .from("stock_holdings_c")
-          .select("id, user_id, security_id, quantity, trade_side, is_active, avg_fill, fill_date:\"Fill_date\"")
+          .select("id, user_id, family_member_id, security_id, quantity, trade_side, is_active, avg_fill, fill_date:\"Fill_date\"")
           .eq("strategy_id", strategyId)
           .eq("is_active", true)
           .eq("trade_side", "BUY")
@@ -10907,6 +10945,8 @@
         };
         const activeSellRows = (existingRows || []).filter((row) => {
           return String(row.security_id) === String(sellSecurityId)
+            && clients.some((client) =>
+              rebOwnerKey(client.id, client.familyMemberId) === rebOwnerKey(row.user_id, row.family_member_id))
             && Number(row.quantity || 0) > 0
             && Number(row.avg_fill || 0) > 0
             && isEligibleByDate(row);
@@ -10930,7 +10970,15 @@
         const _sellRowMeta = activeSellRows.map((row) => {
           const totalQty = Math.abs(Number(row.quantity || 0));
           const soldQty = isFullExit ? totalQty : Math.max(0, Math.round(totalQty * sellFraction));
-          return { holdingId: row.id, userId: row.user_id, soldQty, remaining: totalQty - soldQty, heldQty: totalQty };
+          return {
+            holdingId: row.id,
+            userId: row.user_id,
+            familyMemberId: row.family_member_id || null,
+            ownerKey: rebOwnerKey(row.user_id, row.family_member_id),
+            soldQty,
+            remaining: totalQty - soldQty,
+            heldQty: totalQty,
+          };
         });
 
         /* Sellability guard (workbook 05_Rebalance_Events col M, "Can_Execute").
@@ -10945,18 +10993,13 @@
           );
         }
 
-        /* The active owner scope is captured once here. Every event row
-           inserted by this rebalance carries the same family_member_id, so
-           fill & settle only touches the correct (user, family_member) rows. */
-        const familyMemberIdForEvents = rebSelectedFamilyMemberId || null;
-
         /* ── Build SELL events &rarr; rebalance_event ── */
         const sellEventRows = _sellRowMeta
           .filter((m) => m.soldQty > 0)
           .map((m) => ({
             batch_id: rebalanceBatchId,
             user_id: m.userId,
-            family_member_id: familyMemberIdForEvents,
+            family_member_id: m.familyMemberId,
             security_id: sellSecurityId,
             trade_side: "SELL",
             quantity: m.soldQty,
@@ -10974,7 +11017,7 @@
           .map((alloc) => ({
             batch_id: rebalanceBatchId,
             user_id: String(alloc.clientId),
-            family_member_id: familyMemberIdForEvents,
+            family_member_id: alloc.familyMemberId || null,
             security_id: buySecurityId,
             trade_side: "BUY",
             quantity: Number(alloc.shares || 0),
@@ -10995,7 +11038,7 @@
             .map((alloc) => ({
               batch_id: rebalanceBatchId,
               user_id: String(alloc.clientId),
-              family_member_id: familyMemberIdForEvents,
+              family_member_id: alloc.familyMemberId || null,
               security_id: extraBuySecurityId,
               trade_side: "BUY",
               quantity: Number(alloc.shares || 0),
@@ -11095,7 +11138,6 @@
            basket on the next broker run, and the order-book CSV updates now.
            ════════════════════════════════════════════════════════════════ */
         try {
-          const swapScopeFmId = familyMemberIdForEvents;
           let unfilledQuery = supabaseClient
             .from("stock_holdings_c")
             .select("id, user_id, family_member_id, quantity, avg_fill")
@@ -11103,20 +11145,25 @@
             .eq("security_id", sellSecurityId)
             .eq("is_active", true)
             .eq("trade_side", "BUY");
-          unfilledQuery = swapScopeFmId
-            ? unfilledQuery.eq("family_member_id", swapScopeFmId)
-            : unfilledQuery.is("family_member_id", null);
+          if (!rebScopeIsAll()) {
+            unfilledQuery = rebSelectedFamilyMemberId
+              ? unfilledQuery.eq("family_member_id", rebSelectedFamilyMemberId)
+              : unfilledQuery.is("family_member_id", null);
+          }
           const { data: unfilledSellRows, error: unfilledErr } = await unfilledQuery;
           if (unfilledErr) throw new Error(unfilledErr.message || "Failed to load unfilled orders for swap.");
 
           const swapRows = (unfilledSellRows || []).filter(
-            (r) => !Number(r.avg_fill) && Number(r.quantity || 0) > 0
+            (r) => !Number(r.avg_fill)
+              && Number(r.quantity || 0) > 0
+              && clients.some((client) =>
+                client.ownerKey === rebOwnerKey(r.user_id, r.family_member_id))
           );
 
           if (swapRows.length) {
             const sellLive = Number(rebSelectedIsin.currentPrice) || 0;   // rands
             const buyLive = Number(buyExec.pricePerShare) || 0;           // rands (committed buy price)
-            const residualTotalsByUser = {};   // userId → NEW total residual (rands) to SET (existing + leftover)
+            const residualTotalsByOwner = {};   // ownerKey → NEW total residual (rands) to SET
             const swapPlan = [];
 
             for (const row of swapRows) {
@@ -11125,22 +11172,24 @@
               const newQty = buyLive > 0 ? Math.floor(sliceRand / buyLive) : 0;
               const leftover = sliceRand - newQty * buyLive;
               const uid = String(row.user_id);
-              const baseResidual = residualTotalsByUser[uid] != null
-                ? residualTotalsByUser[uid]
-                : Number(rebWalletByClient[uid] || 0);
-              residualTotalsByUser[uid] = rebRoundMoney(baseResidual + leftover);
-              swapPlan.push({ row, qty, sliceRand, newQty, leftover, uid });
+              const fmId = row.family_member_id ? String(row.family_member_id) : null;
+              const ownerKey = rebOwnerKey(uid, fmId);
+              const baseResidual = residualTotalsByOwner[ownerKey] != null
+                ? residualTotalsByOwner[ownerKey]
+                : Number(rebWalletByClient[ownerKey] || 0);
+              residualTotalsByOwner[ownerKey] = rebRoundMoney(baseResidual + leftover);
+              swapPlan.push({ row, qty, sliceRand, newQty, leftover, uid, fmId, ownerKey });
             }
 
             if (rebSwapDryRun) {
               console.warn("⟦REB SWAP DRY-RUN⟧ no writes — planned unfilled-order swaps:");
               swapPlan.forEach((p) => console.warn(
-                `  user=${p.uid.slice(0, 8)} fm=${swapScopeFmId ? String(swapScopeFmId).slice(0, 8) : "—"}  ` +
+                `  user=${p.uid.slice(0, 8)} fm=${p.fmId ? p.fmId.slice(0, 8) : "—"}  ` +
                 `${sellIsinCode} ${p.qty}@R${sellLive.toFixed(2)} (R${p.sliceRand.toFixed(2)}) → ` +
                 `${buyIsinCode} ${p.newQty}@R${buyLive.toFixed(2)}  leftover→cash R${p.leftover.toFixed(2)}  ` +
                 `(would deactivate holdingId ${p.row.id})`
               ));
-              console.warn("⟦REB SWAP DRY-RUN⟧ residual totals it would SET (rands):", residualTotalsByUser);
+              console.warn("⟦REB SWAP DRY-RUN⟧ residual totals it would SET (rands):", residualTotalsByOwner);
             } else {
               const swapErrors = [];
               for (const p of swapPlan) {
@@ -11168,8 +11217,8 @@
                     .eq("is_active", true)
                     .eq("trade_side", "BUY")
                     .is("avg_fill", null);
-                  existsQ = swapScopeFmId
-                    ? existsQ.eq("family_member_id", swapScopeFmId)
+                  existsQ = p.fmId
+                    ? existsQ.eq("family_member_id", p.fmId)
                     : existsQ.is("family_member_id", null);
                   const { data: existingBuy } = await existsQ.maybeSingle();
 
@@ -11184,7 +11233,7 @@
                       .from("stock_holdings_c")
                       .insert({
                         user_id: p.uid,
-                        family_member_id: swapScopeFmId || null,
+                        family_member_id: p.fmId,
                         security_id: buySecurityId,
                         strategy_id: strategyId,
                         quantity: p.newQty,
@@ -11206,7 +11255,7 @@
                 /* 3. Audit txn (mirrors the filled rebalance history entry; R0, informational) */
                 const { error: txErr } = await supabaseClient.from("transactions").insert({
                   user_id: p.uid,
-                  family_member_id: swapScopeFmId || null,
+                  family_member_id: p.fmId,
                   direction: "credit",
                   name: `Rebalance: ${strategyNameSnapshot || "Strategy"}`,
                   description: `Pre-fill swap: ${p.qty} × ${sellIsinCode} → ${p.newQty} × ${buyIsinCode}`
@@ -11220,8 +11269,12 @@
               }
 
               /* 4. Residual upsert — SETs the new total (existing + leftover) per user */
-              if (Object.keys(residualTotalsByUser).length) {
-                await rebUpsertWalletBalances(strategyId, residualTotalsByUser, swapScopeFmId);
+              if (Object.keys(residualTotalsByOwner).length) {
+                await rebUpsertWalletBalances(
+                  strategyId,
+                  residualTotalsByOwner,
+                  rebScopeIsAll() ? REB_ALL_OWNERS : (rebSelectedFamilyMemberId || null),
+                );
               }
 
               if (swapErrors.length) console.error("⟦REB SWAP⟧ completed WITH ERRORS:", swapErrors);
@@ -11411,7 +11464,7 @@
         const userIds = [...new Set(clients.map((c) => String(c.id)))];
         const { data: existingRows, error: existingErr } = await supabaseClient
           .from("stock_holdings_c")
-          .select("id, user_id, security_id, quantity, trade_side, is_active, fill_date:\"Fill_date\"")
+          .select("id, user_id, family_member_id, security_id, quantity, trade_side, is_active, fill_date:\"Fill_date\"")
           .eq("strategy_id", strategyId)
           .eq("is_active", true)
           .eq("trade_side", "BUY")
@@ -11423,6 +11476,9 @@
            bought after the effective date; null Fill_date = legacy, kept. */
         const activeSellRows = (existingRows || []).filter((row) => {
           if (Number(row.quantity || 0) <= 0) return false;
+          if (!clients.some((client) =>
+            rebOwnerKey(client.id, client.familyMemberId) === rebOwnerKey(row.user_id, row.family_member_id)
+          )) return false;
           const fd = row.fill_date ? String(row.fill_date).slice(0, 10) : null;
           return !fd || fd <= effectiveDateStr;
         });
@@ -11437,7 +11493,13 @@
         const _sellRowMeta = activeSellRows.map((row) => {
           const totalQty = Math.abs(Number(row.quantity || 0));
           const soldQty = isFullExit ? totalQty : Math.max(0, Math.round(totalQty * sellFraction));
-          return { holdingId: row.id, userId: row.user_id, soldQty, heldQty: totalQty };
+          return {
+            holdingId: row.id,
+            userId: row.user_id,
+            familyMemberId: row.family_member_id || null,
+            soldQty,
+            heldQty: totalQty,
+          };
         });
 
         /* Sellability guard (workbook col M "Can_Execute") — never sell more than held. */
@@ -11450,13 +11512,12 @@
           );
         }
 
-        const familyMemberIdForLiquidateEvents = rebSelectedFamilyMemberId || null;
         const sellEventRows = _sellRowMeta
           .filter((m) => m.soldQty > 0)
           .map((m) => ({
             batch_id: rebalanceBatchId,
             user_id: m.userId,
-            family_member_id: familyMemberIdForLiquidateEvents,
+            family_member_id: m.familyMemberId,
             security_id: sellSecurityId,
             trade_side: "SELL",
             quantity: m.soldQty,
@@ -11564,7 +11625,7 @@
         let clientShareOverrides = {};
 
         const render = () => {
-          const totalWallet = strategyClients.reduce((s, c) => s + Number(rebWalletByClient[String(c.id)] || 0), 0);
+          const totalWallet = strategyClients.reduce((s, c) => s + Number(rebWalletByClient[c.ownerKey] || 0), 0);
           const testParticipants = strategyClients.filter((c) => testWalletUserIds.has(String(c.id)));
           const hasTestWallets = testParticipants.length > 0;
           const q = searchTerm.trim().toLowerCase();
@@ -11585,10 +11646,10 @@
              instead — used to escape the "always a multiple of my lot count"
              floor (e.g. a 6-lot client can't otherwise buy fewer than 6). */
           const perUserPlan = strategyClients.map((c) => {
-            const walletR = Number(rebWalletByClient[String(c.id)] || 0);
+            const walletR = Number(rebWalletByClient[c.ownerKey] || 0);
             const lots = Math.max(0, Number(c.totalCurrentHolding || 0));
             const uniformShares = lots * Math.max(0, Number(buyPerLot) || 0);
-            const override = clientShareOverrides[String(c.id)];
+            const override = clientShareOverrides[c.ownerKey];
             const hasOverride = override != null;
             const sharesNeeded = hasOverride ? Math.max(0, Math.floor(Number(override) || 0)) : uniformShares;
             const cost = sharesNeeded * perShareTradingCost + (sharesNeeded > 0 ? custodyFeePerClient : 0);
@@ -11650,10 +11711,10 @@
                           ${selectedInstrument ? `
                             <td class="px-3 py-2 text-right">
                               <div class="flex items-center justify-end gap-1">
-                                <input type="number" min="0" step="1" data-client-shares="${p.client.id}" value="${p.sharesNeeded}"
+                                <input type="number" min="0" step="1" data-client-shares="${p.client.ownerKey}" value="${p.sharesNeeded}"
                                   title="${p.hasOverride ? 'Custom quantity for this client only' : 'Default: lots &times; buy-per-lot'}"
                                   class="w-16 px-1.5 py-1 text-right font-mono text-xs border rounded-md focus:outline-none focus:ring-1 focus:ring-violet-300 ${p.hasOverride ? 'border-violet-300 bg-violet-50 text-violet-800 font-semibold' : 'border-slate-200 text-slate-600'}" />
-                                ${p.hasOverride ? `<button type="button" data-client-shares-reset="${p.client.id}" title="Reset to lots &times; buy-per-lot" class="text-slate-400 hover:text-slate-600 text-xs leading-none">&times;</button>` : ''}
+                                ${p.hasOverride ? `<button type="button" data-client-shares-reset="${p.client.ownerKey}" title="Reset to lots &times; buy-per-lot" class="text-slate-400 hover:text-slate-600 text-xs leading-none">&times;</button>` : ''}
                               </div>
                             </td>
                             <td class="px-3 py-2 text-right font-mono text-slate-600">${rebFmtZAR(p.cost)}</td>
@@ -11836,7 +11897,7 @@
         const buyEventRows = participants.map((p) => ({
           batch_id: rebalanceBatchId,
           user_id: String(p.client.id),
-          family_member_id: rebSelectedFamilyMemberId || null,
+          family_member_id: p.client.familyMemberId || null,
           security_id: buySecurityId,
           trade_side: "BUY",
           quantity: Number(p.sharesNeeded || 0),
