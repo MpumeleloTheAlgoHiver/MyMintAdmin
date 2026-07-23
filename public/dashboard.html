@@ -1077,6 +1077,7 @@
                     </div>
                     <input id="strategyIsPublic" name="is_public" type="checkbox" style="display:none;" />
                     <input id="strategyIsFeatured" name="is_featured" type="checkbox" style="display:none;" />
+                    <input id="strategyIsKid" name="is_kid_strategy" type="checkbox" style="display:none;" />
                     <p id="strategyFormMessage" style="font-size: 11px; color: #64748b; margin: 0; max-width: 160px;"></p>
                     <button
                       type="submit"
@@ -5441,7 +5442,7 @@
         const { data, error } = await supabaseClient
           .from("strategies_c")
           .select(
-            "id, slug, name, short_name, description, objective, risk_level, sector, min_investment, base_currency, is_featured, is_public, investor_environment, status, created_at, holdings, provider_name, tags",
+            "id, slug, name, short_name, description, objective, risk_level, sector, min_investment, base_currency, is_featured, is_kid_strategy, is_public, investor_environment, status, created_at, holdings, provider_name, tags",
           )
           .order("created_at", { ascending: false });
 
@@ -7422,8 +7423,8 @@
               </div>
 
               <!-- Toggles -->
-              <div style="display:flex;gap:0;border:1.5px solid #e2e8f0;border-radius:11px;overflow:hidden;margin-bottom:22px;">
-                <label style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 14px;cursor:pointer;gap:10px;border-right:1.5px solid #e2e8f0;">
+             <div style="display:flex;gap:0;border:1.5px solid #e2e8f0;border-radius:11px;overflow:hidden;margin-bottom:22px;">
+               <label style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 12px;cursor:pointer;gap:8px;border-right:1.5px solid #e2e8f0;min-width:0;">
                   <div>
                     <div style="font-size:13px;font-weight:600;color:#1e293b;">Public</div>
                     <div style="font-size:11px;color:#94a3b8;margin-top:1px;">Visible to clients</div>
@@ -7434,7 +7435,7 @@
                     <div id="_sdPublicThumb" style="position:absolute;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);transition:left 0.2s;left:${strategy.is_public?"21px":"3px"};"></div>
                   </div>
                 </label>
-                <label style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 14px;cursor:pointer;gap:10px;">
+               <label style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 12px;cursor:pointer;gap:8px;border-right:1.5px solid #e2e8f0;min-width:0;">
                   <div>
                     <div style="font-size:13px;font-weight:600;color:#1e293b;">Featured</div>
                     <div style="font-size:11px;color:#94a3b8;margin-top:1px;">Show on homepage</div>
@@ -7445,6 +7446,17 @@
                     <div id="_sdFeaturedThumb" style="position:absolute;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);transition:left 0.2s;left:${strategy.is_featured?"21px":"3px"};"></div>
                   </div>
                 </label>
+               <label style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 12px;cursor:pointer;gap:8px;min-width:0;">
+                 <div>
+                   <div style="font-size:13px;font-weight:600;color:#1e293b;">Child friendly</div>
+                   <div style="font-size:11px;color:#94a3b8;margin-top:1px;">Show on child dashboard</div>
+                 </div>
+                 <div id="_sdKidToggle" style="position:relative;width:40px;height:22px;flex-shrink:0;">
+                   <input id="_sdIsKid" type="checkbox" ${strategy.is_kid_strategy?"checked":""} style="opacity:0;position:absolute;inset:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1;" />
+                   <div id="_sdKidTrack" style="position:absolute;inset:0;border-radius:11px;transition:background 0.2s;background:${strategy.is_kid_strategy?"#7c3aed":"#e2e8f0"};"></div>
+                   <div id="_sdKidThumb" style="position:absolute;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);transition:left 0.2s;left:${strategy.is_kid_strategy?"21px":"3px"};"></div>
+                 </div>
+               </label>
               </div>
             </div>
 
@@ -7486,6 +7498,7 @@
         };
         wireToggle("#_sdIsPublic",   "#_sdPublicTrack",   "#_sdPublicThumb");
         wireToggle("#_sdIsFeatured", "#_sdFeaturedTrack", "#_sdFeaturedThumb");
+        wireToggle("#_sdIsKid", "#_sdKidTrack", "#_sdKidThumb");
 
         /* + Add sector */
         const addSectorBtn2 = overlay.querySelector("#_sdAddSector");
@@ -7542,6 +7555,7 @@
             investor_environment: overlay.querySelector("#_sdInvestorEnvironment").value || 'LIVE',
             is_public:   overlay.querySelector("#_sdIsPublic").checked,
             is_featured: overlay.querySelector("#_sdIsFeatured").checked,
+            is_kid_strategy: overlay.querySelector("#_sdIsKid").checked,
           };
 
           const { error } = await supabaseClient
@@ -7590,6 +7604,8 @@
               if (pubEl) pubEl.checked = payload.is_public;
               const featEl = f.querySelector("#strategyIsFeatured");
               if (featEl) featEl.checked = payload.is_featured;
+              const kidEl = f.querySelector("#strategyIsKid");
+              if (kidEl) kidEl.checked = payload.is_kid_strategy;
             }
           }
 

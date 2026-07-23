@@ -3,4 +3,5 @@
 - [Email patterns](email-patterns.md) — trade confirmation + EFT emails use inline table-based HTML; no CID attachments; Resend via plain fetch not SDK
 - [Server architecture](server-arch.md) — pure Node.js HTTP server (no Express); all API in api/ as CommonJS modules; frontend in public/; auth via Supabase JWT bearer token checked on every protected route
 - [x-data-spreadsheet crash rules](xspreadsheet-crash-rules.md) — formula engine throws non-Error strings inside rAF (uncatchable); fix: pre-compute all values, never use formula cells or format in styles
+- [Strategy child-friendly marker](strategy-child-friendly.md) — Mint uses strategies_c.is_kid_strategy to include strategies on child dashboards
 - [Rebalance owner scope](rebalance-owner-scope.md) — mixed parent/child strategies must key cash, allocations, and events by `(user_id, family_member_id)`; All owners is the default
