@@ -9889,6 +9889,11 @@
 
         const clients = rebClientsForIsin(rebSelectedIsin);
         const residualClients = rebResidualClientsForStrategy();
+        const pendingStrategyOwnerKeys = new Set(
+          rebPendingRebalance
+            ? rebClientsForStrategy().map(client => client.ownerKey)
+            : []
+        );
         if (!rebSelectedIsin) {
           const strategyClients = rebClientsForStrategy();
           const colSpan = 6;
@@ -9922,12 +9927,11 @@
             return;
           }
 
-          /* Build set of user IDs affected by pending rebalance */
-          const pendingUserIds = new Set();
-          if (rebPendingRebalance && rebPendingRebalance.events) {
-            rebPendingRebalance.events.forEach(ev => pendingUserIds.add(String(ev.user_id)));
-          }
-          const pendingLabel = pendingUserIds.size > 0 ? ` &middot; ${pendingUserIds.size} pending` : '';
+          /* A pending rebalance is strategy-level: every eligible owner in the
+             strategy is affected, even when the event table has no row for that
+             owner/security leg. */
+          const pendingOwnerKeys = pendingStrategyOwnerKeys;
+          const pendingLabel = pendingOwnerKeys.size > 0 ? ` &middot; ${pendingOwnerKeys.size} pending` : '';
           if (metaEl) metaEl.textContent = `Strategy-level preview &middot; ${strategyClients.length} clients${pendingLabel} &middot; select instrument + step for impact`;
           /* Total PnL per client across all securities they hold in this strategy */
           const isinByCode = Object.fromEntries((rebIsins || []).map(i => [i.code, i]));
@@ -9945,10 +9949,12 @@
             });
           });
           tbody.innerHTML = strategyClients.map(client => {
-            const isPendingClient = pendingUserIds.has(String(client.id));
+            const isPendingClient = pendingOwnerKeys.has(client.ownerKey);
             const rowBg = isPendingClient ? 'bg-amber-50' : 'hover:bg-slate-50';
             const rowStyle = isPendingClient ? 'style="border-left:3px solid #f59e0b;"' : '';
-            const nameBadge = isPendingClient ? ' <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;">Pending</span>' : '';
+            const nameBadge = isPendingClient
+              ? ` <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;">${rebPendingRebalance?.sellCode || 'REBALANCE'} SELL</span>`
+              : '';
             const pnl = totalPnlByClient[String(client.id)];
             const pnlVal = pnl != null ? pnl : null;
             return `
@@ -9967,7 +9973,7 @@
           return;
         }
 
-        if (!clients.length) {
+        if (!clients.length && !rebPendingRebalance) {
           tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">${
             "No clients hold this instrument"
           }</td></tr>`;
@@ -9976,14 +9982,26 @@
         }
 
         if (!rebSelectedStep) {
-          if (metaEl) metaEl.textContent = `${rebSelectedIsin.code} &middot; ${clients.length} clients &middot; select reduction step`;
+          const selectedClientsByOwnerKey = Object.fromEntries(
+            clients.map(client => [client.ownerKey, client])
+          );
+          const previewClients = rebPendingRebalance
+            ? rebClientsForStrategy().map(strategyClient =>
+                selectedClientsByOwnerKey[strategyClient.ownerKey] || ({
+                  ...strategyClient,
+                  lots: 0,
+                  quantity: 0,
+                  avgFillR: 0,
+                  costBasisR: 0,
+                })
+              )
+            : clients;
+          if (metaEl) metaEl.textContent = `${rebSelectedIsin.code} &middot; ${previewClients.length} clients &middot; select reduction step`;
           const pendingEventsForSelected = rebPendingRebalance
             ? rebPendingRebalance.events.filter(ev => String(ev.code || "") === String(rebSelectedIsin.code || ""))
             : [];
-          const pendingOwnerKeys = new Set(
-            pendingEventsForSelected.map(rebPendingOwnerKey)
-          );
-          tbody.innerHTML = clients.map(client => {
+          const pendingOwnerKeys = pendingStrategyOwnerKeys;
+          tbody.innerHTML = previewClients.map(client => {
             const lots = Number(client.lots) || 0;
             const currentHolding = lots * rebSelectedIsin.unitsPerLot;
             const isPend = pendingOwnerKeys.has(client.ownerKey);
@@ -10060,21 +10078,35 @@
           return;
         }
 
-        const impacts = rebComputeClientImpacts(clients, rebSelectedIsin.unitsPerLot, rebSelectedStep.newUnitsPerLot);
+        /* The pending batch is strategy-wide. Include every eligible strategy
+           owner in this preview, retaining zero lots for owners who do not
+           currently hold the selected instrument so they are still visibly
+           marked as part of the pending rebalance. */
+        const selectedClientsByOwnerKey = Object.fromEntries(
+          clients.map(client => [client.ownerKey, client])
+        );
+        const impactClients = rebPendingRebalance
+          ? rebClientsForStrategy().map(strategyClient => selectedClientsByOwnerKey[strategyClient.ownerKey] || ({
+              ...strategyClient,
+              lots: 0,
+              quantity: 0,
+              avgFillR: 0,
+              costBasisR: 0,
+            }))
+          : clients;
+        const impacts = rebComputeClientImpacts(impactClients, rebSelectedIsin.unitsPerLot, rebSelectedStep.newUnitsPerLot);
         const hasErrors = impacts.some(i => i.hasNegative);
         const selectedCode = String(rebSelectedIsin.code || "");
         const pendingEventsForSelected = rebPendingRebalance
           ? rebPendingRebalance.events.filter(ev => String(ev.code || "") === selectedCode)
           : [];
-        const pendingOwnerKeys = new Set(
-          pendingEventsForSelected.map(ev => rebOwnerKey(ev.user_id, ev.family_member_id))
-        );
+        const pendingOwnerKeys = pendingStrategyOwnerKeys;
         const pendingTradeLabel = pendingEventsForSelected.length
           ? ` &middot; ${selectedCode} ${pendingEventsForSelected.some(ev => String(ev.trade_side).toUpperCase() === "SELL") ? "SELL" : "BUY"}`
           : "";
         if (metaEl) metaEl.textContent = `${selectedCode}${pendingTradeLabel} &middot; ${impacts.length} clients${hasErrors ? " &middot; ⚠ Negative holdings" : ""}`;
 
-        const clientByOwnerKey = Object.fromEntries((clients || []).map(c => [
+        const clientByOwnerKey = Object.fromEntries((impactClients || []).map(c => [
           c.ownerKey || rebOwnerKey(c.id, c.familyMemberId),
           c,
         ]));
@@ -10085,7 +10117,7 @@
           const pendingSide = pendingEventsForSelected.some(ev =>
             rebOwnerKey(ev.user_id, ev.family_member_id) === imp.ownerKey &&
             String(ev.trade_side).toUpperCase() === "SELL"
-          ) ? "SELL" : "BUY";
+          ) || String(rebPendingRebalance?.sellCode || "") === selectedCode ? "SELL" : "BUY";
           const badge = isPend
             ? ` <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;">${selectedCode} ${pendingSide}</span>`
             : '';

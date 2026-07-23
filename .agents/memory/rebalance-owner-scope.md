@@ -8,3 +8,9 @@ All-owner rebalances must treat `(user_id, family_member_id)` as the owner ident
 **Why:** User-only maps and a single family-member value per batch caused parent/child holdings to be omitted or assigned to the wrong owner when one strategy contained both scopes.
 
 **How to apply:** Use an explicit All owners sentinel only for loading/filtering. Once holdings are loaded, preserve each row's family member and write that value on every sell, buy, liquidation, wallet-only, residual, reserve, and pending-order operation. Keep explicit parent-only and child-only scopes for targeted corrections.
+
+Pending rebalance previews are strategy-level: when a strategy has a pending batch, mark every eligible owner in the strategy as pending, even if that owner has no event row for the currently selected instrument. Keep event rows for trade-side labels, not for deciding who is affected.
+
+**Why:** A rebalance changes the strategy composition for all eligible owners; event-only highlighting incorrectly made some family members appear unaffected.
+
+**How to apply:** Build the preview pending set from the loaded strategy owners, preserve composite owner keys, and include zero-position owners in the preview when a pending batch exists.

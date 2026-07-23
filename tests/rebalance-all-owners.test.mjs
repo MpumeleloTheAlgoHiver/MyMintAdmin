@@ -46,8 +46,8 @@ check(
 );
 check(
   dashboard.includes("select('user_id, family_member_id, security_id, trade_side, quantity, closed_reason')") &&
-    dashboard.includes('pendingEventsForSelected.map(ev => rebOwnerKey(ev.user_id, ev.family_member_id))'),
-  'Pending impact rows match the correct owner and security',
+    dashboard.includes('pendingEventsForSelected = rebPendingRebalance'),
+  'Pending events still resolve the selected security and owner data',
 );
 check(
   dashboard.includes('${selectedCode} ${pendingSide}') &&
@@ -56,9 +56,17 @@ check(
 );
 check(
   dashboard.includes('const rebPendingOwnerKey = (event)') &&
-    dashboard.includes('pendingEventsForSelected.map(rebPendingOwnerKey)') &&
+    dashboard.includes('rebPendingOwnerKey(ev) === client.ownerKey') &&
     dashboard.includes('pendingOwnerKeys.has(client.ownerKey)'),
   'Pending impact matching uses composite owner keys before a step is selected',
+);
+check(
+  dashboard.includes('const pendingStrategyOwnerKeys = new Set(') &&
+    dashboard.includes('rebClientsForStrategy().map(client => client.ownerKey)') &&
+    dashboard.includes('const pendingOwnerKeys = pendingStrategyOwnerKeys;') &&
+    dashboard.includes('const impactClients = rebPendingRebalance') &&
+    dashboard.includes('if (!clients.length && !rebPendingRebalance)'),
+  'Pending impact preview marks every eligible owner in the strategy',
 );
 check(
   dashboard.includes('const ownerKey = rebOwnerKey(uid, fmId);') &&
