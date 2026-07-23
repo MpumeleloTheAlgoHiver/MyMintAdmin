@@ -6597,9 +6597,9 @@
             const isPending = isPendingSell || isPendingBuy;
             const rowBg = isPending ? 'background:#fffbeb;' : '';
             const pendingBadge = isPendingBuy
-              ? '<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:2px 7px;border-radius:6px;text-transform:uppercase;letter-spacing:.04em;">Pending Buy</span>'
+              ? `<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:2px 7px;border-radius:6px;text-transform:uppercase;letter-spacing:.04em;">${normalizeSymbol(pendingRebalance.buySymbol || code)} BUY</span>`
               : isPendingSell
-                ? '<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:2px 7px;border-radius:6px;text-transform:uppercase;letter-spacing:.04em;">Pending Sell</span>'
+                ? `<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:2px 7px;border-radius:6px;text-transform:uppercase;letter-spacing:.04em;">${normalizeSymbol(pendingRebalance.sellSymbol || code)} SELL</span>`
                 : '';
             return `<tr style="${rowBg}">
               <td>
@@ -8475,7 +8475,17 @@
           const currentHolding = c.lots * currentUnits;
           const newHolding = c.lots * newUnits;
           const delta = newHolding - currentHolding;
-          return { clientId: c.id, clientName: c.name, currentLots: c.lots, currentHolding, newHolding, delta, hasNegative: newHolding < 0 };
+          return {
+            clientId: c.id,
+            ownerKey: c.ownerKey || rebOwnerKey(c.id, c.familyMemberId),
+            familyMemberId: c.familyMemberId || null,
+            clientName: c.name,
+            currentLots: c.lots,
+            currentHolding,
+            newHolding,
+            delta,
+            hasNegative: newHolding < 0,
+          };
         });
       }
 
@@ -9593,7 +9603,13 @@
                     userId: uid,
                     ownerKey: rebOwnerKey(uid, fmId),
                     familyMemberId: fmId,
-                    name: nameById[uid] || uid,
+                    /* Family-member holdings belong to the child, not the
+                       account owner's profile. Keep parent names for
+                       family_member_id IS NULL and use the resolved child
+                       name for child-owned rows. */
+                    name: fmId
+                      ? (fmLabelsById[fmId] || `Child ${fmId.slice(0, 8)}`)
+                      : (nameById[uid] || uid),
                     quantity: qty,
                     avgFillCents: fillCents,
                     costBasisCents: cbCents,
@@ -9643,14 +9659,17 @@
             /* Fetch per-user events */
             const { data: pbEvents } = await supabaseClient
               .from('rebalance_event')
-              .select('user_id, security_id, trade_side, quantity, closed_reason')
+              .select('user_id, family_member_id, security_id, trade_side, quantity, closed_reason')
               .eq('batch_id', pb.id);
             rebPendingRebalance = {
               batchId: pb.id,
               sellCode: pbCodeMap[pb.sell_security_id] || '',
               buyCode: pbCodeMap[pb.buy_security_id] || '',
               extraBuyCode: pb.extra_buy_security_id ? (pbCodeMap[pb.extra_buy_security_id] || '') : null,
-              events: pbEvents || [],
+              events: (pbEvents || []).map(ev => ({
+                ...ev,
+                code: pbCodeMap[ev.security_id] || '',
+              })),
             };
           }
         } catch (e) { console.warn('rebLoadStrategy: pending rebalance fetch failed', e); }
@@ -9710,9 +9729,9 @@
           const isPending  = isPendSell || isPendBuy;
           const pendBg = isPending ? (isSelected ? 'bg-amber-100' : 'bg-amber-50 hover:bg-amber-100') : (isSelected ? 'bg-violet-50' : 'hover:bg-slate-50');
           const pendBadge = isPendBuy
-            ? '<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;margin-left:5px;">Pending Buy</span>'
+            ? `<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;margin-left:5px;">${escapeHtml(normalizeSymbol(rebPendingRebalance.buyCode || isin.code))} BUY</span>`
             : isPendSell
-              ? '<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;margin-left:5px;">Pending Sell</span>'
+              ? `<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;margin-left:5px;">${escapeHtml(normalizeSymbol(rebPendingRebalance.sellCode || isin.code))} SELL</span>`
               : '';
           const priceColor = isPending ? 'text-amber-700' : 'text-slate-700';
           const qtyColor   = isPending ? 'text-amber-800' : 'text-slate-800';
@@ -10031,17 +10050,34 @@
 
         const impacts = rebComputeClientImpacts(clients, rebSelectedIsin.unitsPerLot, rebSelectedStep.newUnitsPerLot);
         const hasErrors = impacts.some(i => i.hasNegative);
-        const pendingUids2 = new Set();
-        if (rebPendingRebalance) rebPendingRebalance.events.forEach(ev => pendingUids2.add(String(ev.user_id)));
-        if (metaEl) metaEl.textContent = `${rebSelectedIsin.code} &middot; ${impacts.length} clients${hasErrors ? " &middot; ⚠ Negative holdings" : ""}`;
+        const selectedCode = String(rebSelectedIsin.code || "");
+        const pendingEventsForSelected = rebPendingRebalance
+          ? rebPendingRebalance.events.filter(ev => String(ev.code || "") === selectedCode)
+          : [];
+        const pendingOwnerKeys = new Set(
+          pendingEventsForSelected.map(ev => rebOwnerKey(ev.user_id, ev.family_member_id))
+        );
+        const pendingTradeLabel = pendingEventsForSelected.length
+          ? ` &middot; ${selectedCode} ${pendingEventsForSelected.some(ev => String(ev.trade_side).toUpperCase() === "SELL") ? "SELL" : "BUY"}`
+          : "";
+        if (metaEl) metaEl.textContent = `${selectedCode}${pendingTradeLabel} &middot; ${impacts.length} clients${hasErrors ? " &middot; ⚠ Negative holdings" : ""}`;
 
-        const clientById = Object.fromEntries((clients || []).map(c => [String(c.id), c]));
+        const clientByOwnerKey = Object.fromEntries((clients || []).map(c => [
+          c.ownerKey || rebOwnerKey(c.id, c.familyMemberId),
+          c,
+        ]));
         tbody.innerHTML = impacts.map(imp => {
-          const isPend = pendingUids2.has(String(imp.clientId));
+          const isPend = pendingOwnerKeys.has(imp.ownerKey);
           const rowCls = imp.hasNegative ? "bg-red-50" : isPend ? "bg-amber-50" : "hover:bg-slate-50";
           const rowSty = isPend ? 'style="border-left:3px solid #f59e0b;"' : '';
-          const badge = isPend ? ' <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;">Pending</span>' : '';
-          const pnl = rebPnlForIsinClient(rebSelectedIsin, clientById[String(imp.clientId)]);
+          const pendingSide = pendingEventsForSelected.some(ev =>
+            rebOwnerKey(ev.user_id, ev.family_member_id) === imp.ownerKey &&
+            String(ev.trade_side).toUpperCase() === "SELL"
+          ) ? "SELL" : "BUY";
+          const badge = isPend
+            ? ` <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;">${selectedCode} ${pendingSide}</span>`
+            : '';
+          const pnl = rebPnlForIsinClient(rebSelectedIsin, clientByOwnerKey[imp.ownerKey]);
           return `
           <tr class="${rowCls}" ${rowSty}>
             <td class="px-4 py-2.5">

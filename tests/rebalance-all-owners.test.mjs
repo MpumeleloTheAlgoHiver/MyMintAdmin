@@ -29,6 +29,11 @@ check(
   'Commit-time holdings query preserves family-member ownership',
 );
 check(
+  dashboard.includes('name: fmId') &&
+    dashboard.includes('(fmLabelsById[fmId] || `Child ${fmId.slice(0, 8)}`)'),
+  'Child-owned impact rows use the child name instead of the parent profile',
+);
+check(
   dashboard.includes('family_member_id: m.familyMemberId,') &&
     dashboard.includes('family_member_id: alloc.familyMemberId || null,') &&
     dashboard.includes('family_member_id: p.client.familyMemberId || null,'),
@@ -38,6 +43,16 @@ check(
   !dashboard.includes('family_member_id: familyMemberIdForEvents,') &&
     !dashboard.includes('family_member_id: familyMemberIdForLiquidateEvents,'),
   'All-owner commits do not stamp one global family-member ID',
+);
+check(
+  dashboard.includes("select('user_id, family_member_id, security_id, trade_side, quantity, closed_reason')") &&
+    dashboard.includes('pendingEventsForSelected.map(ev => rebOwnerKey(ev.user_id, ev.family_member_id))'),
+  'Pending impact rows match the correct owner and security',
+);
+check(
+  dashboard.includes('${selectedCode} ${pendingSide}') &&
+    dashboard.includes('${escapeHtml(normalizeSymbol(rebPendingRebalance.sellCode || isin.code))} SELL'),
+  'Pending labels show the actual security and trade side',
 );
 check(
   dashboard.includes('const ownerKey = rebOwnerKey(uid, fmId);') &&
