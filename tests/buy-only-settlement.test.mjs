@@ -42,7 +42,7 @@ check('commit does not deduct an estimated wallet balance', () => {
 
 check('wallet-buy events preserve parent/child ownership scope', () => {
   assert.match(dashboard, /closed_reason: "REBALANCE_EVENT_BUY_WALLET"/);
-  assert.match(dashboard, /family_member_id: rebSelectedFamilyMemberId \|\| null/);
+  assert.match(dashboard, /family_member_id: p\.client\.familyMemberId \|\| null/);
 });
 
 check('actual-fill preflight runs before atomic settlement claim', () => {

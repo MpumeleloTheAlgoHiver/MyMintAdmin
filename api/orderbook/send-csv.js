@@ -295,17 +295,21 @@ module.exports = async (req, res) => {
       if (!strategyId) return sendJson(res, 400, { error: 'strategyId required' });
       if (!userIds.length) return sendJson(res, 200, { reservesCentsByUser: {} });
       const familyMemberId = body.familyMemberId ? String(body.familyMemberId).trim() : null;
-      const fmFilter = familyMemberId
+      const allOwners = familyMemberId === '__all__';
+      const fmFilter = allOwners
+        ? ''
+        : familyMemberId
         ? `&family_member_id=eq.${encodeURIComponent(familyMemberId)}`
         : '&family_member_id=is.null';
       const holdings = await fetchSupabaseJson(
         `/rest/v1/stock_holdings_c?strategy_id=eq.${encodeURIComponent(strategyId)}` +
         `&user_id=in.(${buildInFilter(userIds)})${fmFilter}&transaction_id=not.is.null` +
-        '&select=user_id,transaction_id'
+        '&select=user_id,family_member_id,transaction_id'
       );
       const transactionIds = [...new Set((holdings || []).map((h) => h.transaction_id).filter(Boolean))];
       const reservesCentsByUser = Object.fromEntries(userIds.map((uid) => [uid, 0]));
-      if (!transactionIds.length) return sendJson(res, 200, { reservesCentsByUser });
+      const reservesCentsByOwner = {};
+      if (!transactionIds.length) return sendJson(res, 200, { reservesCentsByUser, reservesCentsByOwner });
       const txns = await fetchSupabaseJson(
         `/rest/v1/transactions?id=in.(${buildInFilter(transactionIds)})` +
         '&status=eq.posted&reversed=eq.false&select=id,buffer_cents,buffer_consumed_cents'
@@ -319,10 +323,12 @@ module.exports = async (req, res) => {
         const key = `${h.user_id}|${h.transaction_id}`;
         if (seen.has(key)) return;
         seen.add(key);
-        reservesCentsByUser[String(h.user_id)] = (reservesCentsByUser[String(h.user_id)] || 0)
-          + (availableByTxn[String(h.transaction_id)] || 0);
+         const amount = availableByTxn[String(h.transaction_id)] || 0;
+         reservesCentsByUser[String(h.user_id)] = (reservesCentsByUser[String(h.user_id)] || 0) + amount;
+         const ownerKey = `${String(h.user_id)}|${h.family_member_id ? String(h.family_member_id) : ''}`;
+         reservesCentsByOwner[ownerKey] = (reservesCentsByOwner[ownerKey] || 0) + amount;
       });
-      return sendJson(res, 200, { reservesCentsByUser });
+       return sendJson(res, 200, { reservesCentsByUser, reservesCentsByOwner });
     }
 
     // Read-only lookup of already-applied strategy_rebalance_cash_events_c
@@ -402,19 +408,26 @@ module.exports = async (req, res) => {
         : [];
       if (!userIds.length) return sendJson(res, 200, { balances: {} });
       const familyMemberId = body.familyMemberId ? String(body.familyMemberId).trim() : null;
-      const fmFilter = familyMemberId
+      const allOwners = familyMemberId === '__all__';
+      const fmFilter = allOwners
+        ? ''
+        : familyMemberId
         ? `&family_member_id=eq.${encodeURIComponent(familyMemberId)}`
         : `&family_member_id=is.null`;
 
       const rows = await fetchSupabaseJson(
-        `/rest/v1/strategy_rebalance_residuals?select=user_id,balance_cents&strategy_id=eq.${encodeURIComponent(strategyId)}&user_id=in.(${buildInFilter(userIds)})${fmFilter}`
+        `/rest/v1/strategy_rebalance_residuals?select=user_id,family_member_id,balance_cents&strategy_id=eq.${encodeURIComponent(strategyId)}&user_id=in.(${buildInFilter(userIds)})${fmFilter}`
       );
       const balances = {};
+      const balancesByOwner = {};
       (rows || []).forEach((r) => {
         const uid = String(r.user_id || '');
-        if (uid) balances[uid] = (Number(r.balance_cents) || 0) / 100;
+        if (!uid) return;
+        const value = (Number(r.balance_cents) || 0) / 100;
+        balances[uid] = value;
+        balancesByOwner[`${uid}|${r.family_member_id ? String(r.family_member_id) : ''}`] = value;
       });
-      return sendJson(res, 200, { balances });
+      return sendJson(res, 200, { balances, balancesByOwner });
     }
 
     // Upsert strategy_rebalance_residuals with the service-role key. The table has
@@ -426,19 +439,25 @@ module.exports = async (req, res) => {
       const strategyId = String(body.strategyId || '').trim();
       if (!strategyId) return sendJson(res, 400, { error: 'strategyId required' });
       const familyMemberId = body.familyMemberId ? String(body.familyMemberId).trim() : null;
-      const fmFilter = familyMemberId
+      const allOwners = familyMemberId === '__all__';
+      const fmFilter = allOwners
+        ? ''
+        : familyMemberId
         ? `&family_member_id=eq.${encodeURIComponent(familyMemberId)}`
         : `&family_member_id=is.null`;
       // New callers should send integer cents explicitly. balancesByUser is
       // retained for older dashboard/reversal callers whose values are rands.
       const hasDeltasCents = body.residualDeltasCentsByUser && typeof body.residualDeltasCentsByUser === 'object';
       const hasExplicitCents = !hasDeltasCents && body.balancesCentsByUser && typeof body.balancesCentsByUser === 'object';
-      const balancesByUser = hasDeltasCents
+      const balancesInput = hasDeltasCents
         ? body.residualDeltasCentsByUser
         : hasExplicitCents
         ? body.balancesCentsByUser
         : (body.balancesByUser && typeof body.balancesByUser === 'object' ? body.balancesByUser : {});
-      const entries = Object.entries(balancesByUser).filter(([uid]) => uid);
+      const ownerBalances = allOwners && body.balancesByOwner && typeof body.balancesByOwner === 'object'
+        ? body.balancesByOwner
+        : null;
+      const entries = Object.entries(ownerBalances || balancesInput).filter(([key]) => key);
       if (!entries.length) return sendJson(res, 200, { ok: true, upserted: 0 });
 
       const nowIso = new Date().toISOString();
@@ -451,11 +470,22 @@ module.exports = async (req, res) => {
       let upserted = 0;
       // Manual read-then-update-or-insert per user — PostgREST on_conflict can't
       // target the COALESCE(family_member_id, sentinel) unique index.
-      for (const [userId, balance] of entries) {
+      for (const [ownerOrUserKey, balance] of entries) {
+        const [ownerUserId, ownerFamilyMemberId = ''] = String(ownerOrUserKey).split('|');
+        const userId = allOwners ? ownerUserId : ownerOrUserKey;
+        const rowFamilyMemberId = allOwners
+          ? (ownerFamilyMemberId || null)
+          : familyMemberId;
+        if (!userId) continue;
         const requestedCents = (hasExplicitCents || hasDeltasCents)
           ? Math.round(Number(balance) || 0)
           : Math.round((Number(balance) || 0) * 100);
-        const scope = `user_id=eq.${encodeURIComponent(userId)}&strategy_id=eq.${encodeURIComponent(strategyId)}${fmFilter}`;
+        const rowFmFilter = allOwners
+          ? (rowFamilyMemberId
+            ? `&family_member_id=eq.${encodeURIComponent(rowFamilyMemberId)}`
+            : '&family_member_id=is.null')
+          : fmFilter;
+        const scope = `user_id=eq.${encodeURIComponent(userId)}&strategy_id=eq.${encodeURIComponent(strategyId)}${rowFmFilter}`;
         if (hasDeltasCents && batchId && eventType) {
           await requestSupabaseJson('/rest/v1/rpc/apply_strategy_rebalance_cash_event', {
             method: 'POST',
@@ -463,7 +493,7 @@ module.exports = async (req, res) => {
               p_batch_id: batchId,
               p_strategy_id: strategyId,
               p_user_id: userId,
-              p_family_member_id: familyMemberId || null,
+              p_family_member_id: rowFamilyMemberId,
               p_event_type: eventType,
               p_amount_cents: requestedCents,
               p_effective_at: effectiveAt,
@@ -490,7 +520,7 @@ module.exports = async (req, res) => {
         if (!Array.isArray(updated) || !updated.length) {
           await requestSupabaseJson('/rest/v1/strategy_rebalance_residuals', {
             method: 'POST',
-            body: { user_id: userId, strategy_id: strategyId, family_member_id: familyMemberId || null, balance_cents: balanceCents, updated_at: nowIso },
+            body: { user_id: userId, strategy_id: strategyId, family_member_id: rowFamilyMemberId, balance_cents: balanceCents, updated_at: nowIso },
           });
         }
         upserted += 1;
