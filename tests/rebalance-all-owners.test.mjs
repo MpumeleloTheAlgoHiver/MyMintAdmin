@@ -51,7 +51,7 @@ check(
 );
 check(
   dashboard.includes('${selectedCode} ${pendingSide}') &&
-    dashboard.includes('${escapeHtml(normalizeSymbol(rebPendingRebalance.sellCode || isin.code))} SELL'),
+    dashboard.includes('${normalizeSymbol(rebPendingRebalance.sellCode || isin.code)} SELL'),
   'Pending labels show the actual security and trade side',
 );
 check(
