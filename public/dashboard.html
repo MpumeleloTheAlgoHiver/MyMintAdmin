@@ -9617,17 +9617,20 @@
                     : 0;
                   existing.quantity = totalQty;
                 } else {
+                  /* A child's row must show the CHILD's own name, not the
+                     parent/owner's — fmLabelsById is already resolved from
+                     family_members above (used for the scope dropdown); reuse
+                     it here so the Strategy Composition / Client impact /
+                     Wallet Pool tables agree with the dropdown instead of
+                     silently showing the parent's name for a child's holding. */
+                  const displayName = fmId
+                    ? (fmLabelsById[fmId] || `Child ${fmId.slice(0, 8)}`)
+                    : (nameById[uid] || uid);
                   rebRawHoldings[code].push({
                     userId: uid,
                     ownerKey: rebOwnerKey(uid, fmId),
                     familyMemberId: fmId,
-                    /* Family-member holdings belong to the child, not the
-                       account owner's profile. Keep parent names for
-                       family_member_id IS NULL and use the resolved child
-                       name for child-owned rows. */
-                    name: fmId
-                      ? (fmLabelsById[fmId] || `Child ${fmId.slice(0, 8)}`)
-                      : (nameById[uid] || uid),
+                    name: displayName,
                     quantity: qty,
                     avgFillCents: fillCents,
                     costBasisCents: cbCents,
@@ -10935,12 +10938,20 @@
         const extraBuySelection = buySelection.extraBuy || null;
         const extraBuyExec = extraBuySelection?.exec || null;
 
-        /* ── Guard: block if a PENDING batch already exists for this strategy ── */
-        const { data: pendingBatches, error: pendingErr } = await supabaseClient
+        /* ── Guard: block if a PENDING batch already exists for THIS owner (parent
+           or this specific child) on this strategy — scoped by family_member_id
+           so one owner's pending batch never blocks a different owner sharing
+           the same strategy. ── */
+        const rebGuardFmId1 = rebSelectedFamilyMemberId || null;
+        let pendingBatchesQuery1 = supabaseClient
           .from("rebalance_batch")
           .select("id, status, sell_isin_code, buy_isin_code, created_at")
           .eq("strategy_id", strategyId)
           .eq("status", "PENDING");
+        pendingBatchesQuery1 = rebGuardFmId1
+          ? pendingBatchesQuery1.eq("family_member_id", rebGuardFmId1)
+          : pendingBatchesQuery1.is("family_member_id", null);
+        const { data: pendingBatches, error: pendingErr } = await pendingBatchesQuery1;
         if (pendingErr) throw new Error(pendingErr.message || "Failed to check pending batches.");
         if (pendingBatches && pendingBatches.length > 0) {
           const existing = pendingBatches[0];
@@ -11232,6 +11243,7 @@
           .insert({
             id: rebalanceBatchId,
             strategy_id: strategyId,
+            family_member_id: familyMemberIdForEvents,
             status: "PENDING",
             effective_date: effectiveDateStr,
             holdings_snapshot_before: holdingsSnapshotBefore,
@@ -11557,12 +11569,18 @@
         const clients = rebClientsForIsin(rebSelectedIsin);
         if (!clients.length) throw new Error("No client holdings available for this instrument.");
 
-        /* Guard: block if a PENDING batch already exists for this strategy */
-        const { data: pendingBatches, error: pendingErr } = await supabaseClient
+        /* Guard: block if a PENDING batch already exists for THIS owner on this
+           strategy — scoped by family_member_id (see buy-commit path above). */
+        const rebGuardFmId2 = rebSelectedFamilyMemberId || null;
+        let pendingBatchesQuery2 = supabaseClient
           .from("rebalance_batch")
           .select("id, status, sell_isin_code, buy_isin_code, created_at")
           .eq("strategy_id", strategyId)
           .eq("status", "PENDING");
+        pendingBatchesQuery2 = rebGuardFmId2
+          ? pendingBatchesQuery2.eq("family_member_id", rebGuardFmId2)
+          : pendingBatchesQuery2.is("family_member_id", null);
+        const { data: pendingBatches, error: pendingErr } = await pendingBatchesQuery2;
         if (pendingErr) throw new Error(pendingErr.message || "Failed to check pending batches.");
         if (pendingBatches && pendingBatches.length > 0) {
           const existing = pendingBatches[0];
@@ -11682,6 +11700,7 @@
           .insert({
             id: rebalanceBatchId,
             strategy_id: strategyId,
+            family_member_id: familyMemberIdForLiquidateEvents,
             status: "PENDING",
             effective_date: effectiveDateStr,
             holdings_snapshot_before: holdingsSnapshotBefore,
@@ -11980,12 +11999,18 @@
         if (!(pricePerShare > 0)) throw new Error("Buy security has no live price.");
         const strategyId = rebSelectedStrategyId;
 
-        /* Block if a PENDING batch already exists for this strategy */
-        const { data: pendingBatches, error: pendingErr } = await supabaseClient
+        /* Block if a PENDING batch already exists for THIS owner on this
+           strategy — scoped by family_member_id (see buy-commit path above). */
+        const rebGuardFmId3 = rebSelectedFamilyMemberId || null;
+        let pendingBatchesQuery3 = supabaseClient
           .from("rebalance_batch")
           .select("id, created_at, status")
           .eq("strategy_id", strategyId)
           .eq("status", "PENDING");
+        pendingBatchesQuery3 = rebGuardFmId3
+          ? pendingBatchesQuery3.eq("family_member_id", rebGuardFmId3)
+          : pendingBatchesQuery3.is("family_member_id", null);
+        const { data: pendingBatches, error: pendingErr } = await pendingBatchesQuery3;
         if (pendingErr) throw new Error(pendingErr.message || "Failed to check pending batches.");
         if (pendingBatches && pendingBatches.length > 0) {
           const existing = pendingBatches[0];
@@ -12058,6 +12083,7 @@
           .insert({
             id: rebalanceBatchId,
             strategy_id: strategyId,
+            family_member_id: rebSelectedFamilyMemberId || null,
             status: "PENDING",
             effective_date: effectiveDateStr,
             holdings_snapshot_before: holdingsSnapshotBefore,
