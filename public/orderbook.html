@@ -6183,7 +6183,14 @@
       const strategiesMap = {};
       const orderEmailsMap = {};
       const familyMembersMap = {};
-      const familyMemberIds = [...new Set(holdings.map((row) => row.family_member_id).filter(Boolean))];
+      // Rebalance events can belong to a family member even when there is no
+      // current stock_holdings_c row for that child (for example, before
+      // settlement). Include event owners so the Rebalances tab can resolve the
+      // child's name instead of falling back to the parent's profile.
+      const familyMemberIds = [...new Set([
+        ...holdings.map((row) => row.family_member_id),
+        ...rebEvents.map((event) => event.family_member_id),
+      ].filter(Boolean))];
       const strategyIds = [...new Set([
         ...holdings.map((row) => row.strategy_id),
         ...rebBatches.map((b) => b.strategy_id),
@@ -6616,14 +6623,22 @@
         const liveValue = Number.isFinite(livePriceValue)
           ? Math.abs(quantityValue) * livePriceValue
           : 0;
+        const familyMember = evt.family_member_id ? (familyMembersMap[evt.family_member_id] || null) : null;
+        const familyMemberName = familyMember
+          ? [familyMember.first_name, familyMember.last_name].filter(Boolean).join(' ').trim()
+          : '';
         const profileName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
-        const clientName = profileName || extractNameFromPackDetails(packDetails) || 'Unknown Client';
+        const clientName = familyMemberName || profileName || extractNameFromPackDetails(packDetails) || 'Unknown Client';
+        const familyMintNumber = String(familyMember?.mint_number || '').trim();
         const profileMintNumber = String(profile.mint_number || '').trim();
         const accountSeed = deterministicNumberFromText(evt.user_id || evt.id || `reb-${idx}`);
-        const clientAccountId = profileMintNumber || `MINT-${String(accountSeed % 1000000).padStart(6, '0')}`;
+        const clientAccountId = familyMintNumber || profileMintNumber || `MINT-${String(accountSeed % 1000000).padStart(6, '0')}`;
         return {
           sourceId: `reb-${evt.id}`,
           userId: evt.user_id || '',
+          familyMemberId: evt.family_member_id || null,
+          familyMemberName: familyMemberName || null,
+          familyMemberRelationship: familyMember?.relationship || null,
           securityId: evt.security_id || '',
           line: 0,
           instrumentName: security.name || isin || '-',
@@ -6632,7 +6647,7 @@
           clientAccountId,
           orderbookSequence: activeOrderbookSequence,
           bndReference: '-',
-          clientIdRegNo: String(profile.id_number || profile.mint_number || '-'),
+          clientIdRegNo: String(familyMember?.id_number || profile.id_number || familyMintNumber || profileMintNumber || '-'),
           profileAddress: String(profile.address || ''),
           packDetails,
           countryCode: 'ZAF',
@@ -6715,7 +6730,12 @@
           const evtRows = batchEvents.map((evt, idx) => {
             const sec = securitiesMap[evt.security_id] || {};
             const prof = profilesMap[evt.user_id] || {};
-            const profName = [prof.first_name, prof.last_name].filter(Boolean).join(' ').trim() || 'Unknown';
+            const familyMember = evt.family_member_id ? (familyMembersMap[evt.family_member_id] || null) : null;
+            const familyMemberName = familyMember
+              ? [familyMember.first_name, familyMember.last_name].filter(Boolean).join(' ').trim()
+              : '';
+            const profName = [prof.first_name, prof.last_name].filter(Boolean).join(' ').trim();
+            const clientName = familyMemberName || profName || 'Unknown';
             const fillCents = evt.avg_fill != null ? Number(evt.avg_fill) : (evt.price_at_commit != null ? Number(evt.price_at_commit) : null);
             return {
               line: idx + 1,
@@ -6724,7 +6744,9 @@
               side: String(evt.trade_side || '').toUpperCase(),
               totalQuantity: Number(evt.quantity || 0),
               avgFill: fillCents != null ? `R ${(fillCents / 100).toFixed(2)}` : '-',
-              clientName: profName,
+              clientName,
+              userId: evt.user_id || '',
+              familyMemberId: evt.family_member_id || null,
               closedReason: evt.closed_reason || '',
             };
           });
@@ -6741,7 +6763,7 @@
             extraBuyIsin: b.extra_buy_isin_code || null,
             isLiquidation: !b.buy_isin_code && !b.extra_buy_isin_code,
             events: evtRows,
-            clientCount: [...new Set(batchEvents.map((e) => e.user_id))].length,
+            clientCount: [...new Set(batchEvents.map((e) => `${e.user_id || ''}|${e.family_member_id || ''}`))].length,
           };
         })
         .sort((a, b) => new Date(b.displayAt || 0).getTime() - new Date(a.displayAt || 0).getTime());
