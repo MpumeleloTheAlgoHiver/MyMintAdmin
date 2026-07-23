@@ -9556,10 +9556,19 @@
                     : 0;
                   existing.quantity = totalQty;
                 } else {
+                  /* A child's row must show the CHILD's own name, not the
+                     parent/owner's — fmLabelsById is already resolved from
+                     family_members above (used for the scope dropdown); reuse
+                     it here so the Strategy Composition / Client impact /
+                     Wallet Pool tables agree with the dropdown instead of
+                     silently showing the parent's name for a child's holding. */
+                  const displayName = fmId
+                    ? (fmLabelsById[fmId] || `Child ${fmId.slice(0, 8)}`)
+                    : (nameById[uid] || uid);
                   rebRawHoldings[code].push({
                     userId: uid,
                     familyMemberId: fmId,
-                    name: nameById[uid] || uid,
+                    name: displayName,
                     quantity: qty,
                     avgFillCents: fillCents,
                     costBasisCents: cbCents,
