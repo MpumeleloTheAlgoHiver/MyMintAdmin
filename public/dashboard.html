@@ -10989,14 +10989,6 @@
           : null;
         const walletSnapshotBefore = { ...rebWalletByClient };
 
-        await rebReplaceStrategyHoldingAfterBuy({
-          strategyId,
-          soldIsin: rebSelectedIsin,
-          sellStep: rebSelectedStep,
-          buySelection,
-          buyExec,
-        });
-
         /* ── Generate batch ID & metadata ── */
         const rebalanceBatchId = (window.crypto && typeof window.crypto.randomUUID === "function")
           ? window.crypto.randomUUID()
@@ -11018,14 +11010,19 @@
         ])];
 
         /* ── Read existing active positions (read-only &mdash; to compute sell quantities) ── */
-        const { data: existingRows, error: existingErr } = await supabaseClient
+        let existingRowsQuery = supabaseClient
           .from("stock_holdings_c")
           .select("id, user_id, family_member_id, security_id, quantity, trade_side, is_active, avg_fill, fill_date:\"Fill_date\"")
           .eq("strategy_id", strategyId)
           .eq("is_active", true)
           .eq("trade_side", "BUY")
-          .in("user_id", userIds)
           .in("security_id", securityIds);
+        // In All owners mode, do not limit this verification query to the
+        // owners already present in the UI allocation. That would allow a
+        // missing child row to pass through as if the strategy were complete.
+        // Scoped rebalances retain their explicit user filter.
+        if (!rebScopeIsAll()) existingRowsQuery = existingRowsQuery.in("user_id", userIds);
+        const { data: existingRows, error: existingErr } = await existingRowsQuery;
         if (existingErr) throw new Error(existingErr.message || "Failed to load existing holdings.");
 
         const nowIso = new Date().toISOString();
@@ -11048,9 +11045,53 @@
             && isEligibleByDate(row);
         });
 
+        if (rebScopeIsAll()) {
+          // Validate the complete live owner set before any strategy/event
+          // writes. A parent profile's environment applies to its child rows.
+          const ownerUserIds = [...new Set((existingRows || []).map((row) => row.user_id).filter(Boolean).map(String))];
+          const { data: ownerProfiles, error: ownerProfilesErr } = ownerUserIds.length
+            ? await supabaseClient.from("profiles").select("id, is_test").in("id", ownerUserIds)
+            : { data: [], error: null };
+          if (ownerProfilesErr) throw new Error(ownerProfilesErr.message || "Failed to verify rebalance owners.");
+          const profileIsTest = new Map((ownerProfiles || []).map((profile) => [String(profile.id), profile.is_test === true]));
+          const investorEnvironment = String(strategyRef?.investor_environment || "LIVE").toUpperCase();
+          const isInSelectedEnvironment = (row) => {
+            const isTest = profileIsTest.get(String(row.user_id)) === true;
+            return investorEnvironment === "UAT" ? isTest : !isTest;
+          };
+          const eligibleOwnerKeys = new Set((existingRows || [])
+            .filter((row) =>
+              String(row.security_id) === String(sellSecurityId)
+              && isInSelectedEnvironment(row)
+              && Number(row.quantity || 0) > 0
+              && Number(row.avg_fill || 0) > 0
+              && isEligibleByDate(row)
+            )
+            .map((row) => rebOwnerKey(row.user_id, row.family_member_id)));
+          const loadedOwnerKeys = new Set(clients.map((client) => client.ownerKey));
+          const missingOwnerKeys = [...eligibleOwnerKeys].filter((ownerKey) => !loadedOwnerKeys.has(ownerKey));
+          if (missingOwnerKeys.length) {
+            throw new Error(
+              `All owners could not be loaded for this rebalance (${missingOwnerKeys.length} eligible owner${missingOwnerKeys.length === 1 ? "" : "s"} missing). ` +
+              "Refresh the strategy and try again; no trade data was written."
+            );
+          }
+        }
+
         if (!activeSellRows.length) {
           throw new Error("No active position found for the selected sell instrument that is eligible on the effective date (" + effectiveDateStr + ").");
         }
+
+        // Keep all validation above the first strategy/database write. In
+        // particular, an All owners completeness failure must not leave the
+        // strategy template showing the new basket while no batch was created.
+        await rebReplaceStrategyHoldingAfterBuy({
+          strategyId,
+          soldIsin: rebSelectedIsin,
+          sellStep: rebSelectedStep,
+          buySelection,
+          buyExec,
+        });
 
         const reductionUnits = Number(rebSelectedStep.reductionUnits || 0);
         const unitsPerLot = Math.max(1, Number(rebSelectedIsin.unitsPerLot || 1));
