@@ -20,3 +20,9 @@ The Rebalances tab must resolve display names from the same composite owner key:
 **Why:** A pending test-strategy batch showed the parent name for child events and duplicated one owner because the UI only loaded family members from current holdings.
 
 **How to apply:** Preserve `family_member_id` through event normalization and use `(user_id, family_member_id)` for client counts and display grouping.
+
+When repairing or creating a pending batch, every eligible owner needs a matching event pair for the sell and buy legs. Never treat a strategy-level batch as complete from its event rows alone; compare event owner keys with eligible active holdings.
+
+**Why:** A live MyGrowthFund batch was created for one owner while another eligible child owner still held the sold instrument, which would have produced incomplete settlement.
+
+**How to apply:** Validate All owners coverage before changing the strategy template or inserting a batch, and surface missing owner names in the Rebalances tab.

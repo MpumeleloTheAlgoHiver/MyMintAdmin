@@ -11082,17 +11082,6 @@
           throw new Error("No active position found for the selected sell instrument that is eligible on the effective date (" + effectiveDateStr + ").");
         }
 
-        // Keep all validation above the first strategy/database write. In
-        // particular, an All owners completeness failure must not leave the
-        // strategy template showing the new basket while no batch was created.
-        await rebReplaceStrategyHoldingAfterBuy({
-          strategyId,
-          soldIsin: rebSelectedIsin,
-          sellStep: rebSelectedStep,
-          buySelection,
-          buyExec,
-        });
-
         const reductionUnits = Number(rebSelectedStep.reductionUnits || 0);
         const unitsPerLot = Math.max(1, Number(rebSelectedIsin.unitsPerLot || 1));
         const sellFraction = reductionUnits / unitsPerLot;
@@ -11220,6 +11209,18 @@
             );
           }
         }
+
+        // Keep all validation above the first strategy/database write. In
+        // particular, an All owners completeness or funding failure must not
+        // leave the strategy template showing the new basket while no batch
+        // was created.
+        await rebReplaceStrategyHoldingAfterBuy({
+          strategyId,
+          soldIsin: rebSelectedIsin,
+          sellStep: rebSelectedStep,
+          buySelection,
+          buyExec,
+        });
 
         /* ── Get current admin user ID ── */
         const { data: sessionData } = await supabaseClient.auth.getSession();
