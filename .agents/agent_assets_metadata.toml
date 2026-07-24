@@ -6,3 +6,9 @@ id = "VArYh8qDoEQalI3_h6QsL"
 uri = "file://public/App_jsx.zip"
 type = "unspecified"
 title = "App.jsx (magic link fix — replace src/App.jsx in Mint repo)"
+
+[[outputs]]
+id = "cJi5VW2ySF_lx03dtb6UD"
+uri = "file://attached_assets/UAT_Test_Strategy_Luli_Fill_2026-07-23_corrected.xlsx"
+type = "table"
+title = "Corrected UAT broker fills workbook"

@@ -5290,12 +5290,19 @@
               <span>${operationLabel} &mdash; ${escapeHtml(sb.strategyName)} (${escapeHtml(sb.sellIsin)} &rarr; ${escapeHtml(destinationLabel)}${sb.extraBuyIsin ? ' + ' + escapeHtml(sb.extraBuyIsin) : ''})</span>
               <span class="filled-orderbook-meta">
                 ${rebalanceStatusPill(sb.batchStatus, sb.settlementState)}
-                <span>${sb.clientCount} client${sb.clientCount !== 1 ? 's' : ''}</span>
+                <span>${sb.missingOwnerNames.length
+                  ? `${sb.clientCount} recorded / ${sb.eligibleClientCount} eligible`
+                  : `${sb.clientCount} client${sb.clientCount !== 1 ? 's' : ''}`}</span>
                 <span>${escapeHtml(dateLabel)}</span>
                 ${actionHtml}
               </span>
             </summary>
             <div class="filled-orderbook-details">
+              ${sb.missingOwnerNames.length ? `
+                <div style="margin:12px 12px 0;padding:10px 12px;border:1px solid #fbbf24;background:#fffbeb;color:#92400e;border-radius:8px;font-size:12px;">
+                  <strong>Incomplete owner coverage:</strong>
+                  ${escapeHtml(sb.missingOwnerNames.join(', '))} has an eligible holding but no rebalance event was recorded in this batch.
+                </div>` : ''}
               <div class="orderbook-table-wrap">
                 <table class="orderbook-table">
                   <thead>
@@ -6108,7 +6115,7 @@
           .order('created_at', { ascending: false }),
         supabaseClient
           .from('rebalance_batch')
-          .select('id, strategy_id, status, settlement_state, settlement_error, settlement_started_at, sell_isin_code, buy_isin_code, extra_buy_isin_code, net_proceeds, strategy_name_snapshot, created_at, created_by, settled_at, updated_at, is_reversed, reversed_at, reversed_reason, holdings_snapshot_before, holdings_snapshot_planned, min_investment_planned, wallet_snapshot_before')
+          .select('id, strategy_id, status, settlement_state, settlement_error, settlement_started_at, effective_date, sell_security_id, buy_security_id, sell_isin_code, buy_isin_code, extra_buy_isin_code, net_proceeds, strategy_name_snapshot, created_at, created_by, settled_at, updated_at, is_reversed, reversed_at, reversed_reason, holdings_snapshot_before, holdings_snapshot_planned, min_investment_planned, wallet_snapshot_before')
           .order('created_at', { ascending: false }),
       ]);
 
@@ -6183,7 +6190,14 @@
       const strategiesMap = {};
       const orderEmailsMap = {};
       const familyMembersMap = {};
-      const familyMemberIds = [...new Set(holdings.map((row) => row.family_member_id).filter(Boolean))];
+      // Rebalance events can belong to a family member even when there is no
+      // current stock_holdings_c row for that child (for example, before
+      // settlement). Include event owners so the Rebalances tab can resolve the
+      // child's name instead of falling back to the parent's profile.
+      const familyMemberIds = [...new Set([
+        ...holdings.map((row) => row.family_member_id),
+        ...rebEvents.map((event) => event.family_member_id),
+      ].filter(Boolean))];
       const strategyIds = [...new Set([
         ...holdings.map((row) => row.strategy_id),
         ...rebBatches.map((b) => b.strategy_id),
@@ -6616,14 +6630,22 @@
         const liveValue = Number.isFinite(livePriceValue)
           ? Math.abs(quantityValue) * livePriceValue
           : 0;
+        const familyMember = evt.family_member_id ? (familyMembersMap[evt.family_member_id] || null) : null;
+        const familyMemberName = familyMember
+          ? [familyMember.first_name, familyMember.last_name].filter(Boolean).join(' ').trim()
+          : '';
         const profileName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
-        const clientName = profileName || extractNameFromPackDetails(packDetails) || 'Unknown Client';
+        const clientName = familyMemberName || profileName || extractNameFromPackDetails(packDetails) || 'Unknown Client';
+        const familyMintNumber = String(familyMember?.mint_number || '').trim();
         const profileMintNumber = String(profile.mint_number || '').trim();
         const accountSeed = deterministicNumberFromText(evt.user_id || evt.id || `reb-${idx}`);
-        const clientAccountId = profileMintNumber || `MINT-${String(accountSeed % 1000000).padStart(6, '0')}`;
+        const clientAccountId = familyMintNumber || profileMintNumber || `MINT-${String(accountSeed % 1000000).padStart(6, '0')}`;
         return {
           sourceId: `reb-${evt.id}`,
           userId: evt.user_id || '',
+          familyMemberId: evt.family_member_id || null,
+          familyMemberName: familyMemberName || null,
+          familyMemberRelationship: familyMember?.relationship || null,
           securityId: evt.security_id || '',
           line: 0,
           instrumentName: security.name || isin || '-',
@@ -6632,7 +6654,7 @@
           clientAccountId,
           orderbookSequence: activeOrderbookSequence,
           bndReference: '-',
-          clientIdRegNo: String(profile.id_number || profile.mint_number || '-'),
+          clientIdRegNo: String(familyMember?.id_number || profile.id_number || familyMintNumber || profileMintNumber || '-'),
           profileAddress: String(profile.address || ''),
           packDetails,
           countryCode: 'ZAF',
@@ -6712,10 +6734,41 @@
         .map((b) => {
           const batchEvents = rebEvents.filter((e) => e.batch_id === b.id);
           const strategy = b.strategy_id ? (strategiesMap[b.strategy_id] || null) : null;
+          const eventOwnerKeys = new Set(batchEvents.map((event) =>
+            `${event.user_id || ''}|${event.family_member_id || ''}`
+          ));
+          const eligibleOwnerRows = String(b.status || '').toUpperCase() === 'PENDING' && b.sell_security_id
+            ? holdings.filter((holding) => {
+                if (String(holding.strategy_id || '') !== String(b.strategy_id || '')) return false;
+                if (String(holding.security_id || '') !== String(b.sell_security_id || '')) return false;
+                if (holding.is_active !== true || String(holding.trade_side || '').toUpperCase() !== 'BUY') return false;
+                if (!(Number(holding.quantity) > 0) || !(Number(holding.avg_fill) > 0)) return false;
+                const effectiveDate = b.effective_date ? String(b.effective_date).slice(0, 10) : '';
+                const fillDate = holding.fill_date ? String(holding.fill_date).slice(0, 10) : '';
+                return !effectiveDate || !fillDate || fillDate <= effectiveDate;
+              })
+            : [];
+          const missingOwnerNames = [...new Set(eligibleOwnerRows
+            .filter((holding) =>
+              !eventOwnerKeys.has(`${holding.user_id || ''}|${holding.family_member_id || ''}`)
+            )
+            .map((holding) => {
+              const familyMember = holding.family_member_id ? familyMembersMap[holding.family_member_id] : null;
+              const profile = profilesMap[holding.user_id] || {};
+              return familyMember
+                ? [familyMember.first_name, familyMember.last_name].filter(Boolean).join(' ').trim()
+                : [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+            })
+            .filter(Boolean))];
           const evtRows = batchEvents.map((evt, idx) => {
             const sec = securitiesMap[evt.security_id] || {};
             const prof = profilesMap[evt.user_id] || {};
-            const profName = [prof.first_name, prof.last_name].filter(Boolean).join(' ').trim() || 'Unknown';
+            const familyMember = evt.family_member_id ? (familyMembersMap[evt.family_member_id] || null) : null;
+            const familyMemberName = familyMember
+              ? [familyMember.first_name, familyMember.last_name].filter(Boolean).join(' ').trim()
+              : '';
+            const profName = [prof.first_name, prof.last_name].filter(Boolean).join(' ').trim();
+            const clientName = familyMemberName || profName || 'Unknown';
             const fillCents = evt.avg_fill != null ? Number(evt.avg_fill) : (evt.price_at_commit != null ? Number(evt.price_at_commit) : null);
             return {
               line: idx + 1,
@@ -6724,7 +6777,9 @@
               side: String(evt.trade_side || '').toUpperCase(),
               totalQuantity: Number(evt.quantity || 0),
               avgFill: fillCents != null ? `R ${(fillCents / 100).toFixed(2)}` : '-',
-              clientName: profName,
+              clientName,
+              userId: evt.user_id || '',
+              familyMemberId: evt.family_member_id || null,
               closedReason: evt.closed_reason || '',
             };
           });
@@ -6741,7 +6796,9 @@
             extraBuyIsin: b.extra_buy_isin_code || null,
             isLiquidation: !b.buy_isin_code && !b.extra_buy_isin_code,
             events: evtRows,
-            clientCount: [...new Set(batchEvents.map((e) => e.user_id))].length,
+            clientCount: [...new Set(batchEvents.map((e) => `${e.user_id || ''}|${e.family_member_id || ''}`))].length,
+            eligibleClientCount: [...new Set(eligibleOwnerRows.map((e) => `${e.user_id || ''}|${e.family_member_id || ''}`))].length,
+            missingOwnerNames,
           };
         })
         .sort((a, b) => new Date(b.displayAt || 0).getTime() - new Date(a.displayAt || 0).getTime());
