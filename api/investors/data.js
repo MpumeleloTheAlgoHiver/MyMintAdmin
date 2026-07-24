@@ -66,19 +66,78 @@ module.exports = async (req, res) => {
     const secIds   = [...new Set((holdings || []).map((r) => r.security_id).filter(Boolean))];
     const famIds   = [...new Set((holdings || []).map((r) => r.family_member_id).filter(Boolean))];
 
+    /* 2026-07-24: kicked off here, awaited later (right before it's destructured)
+       — none of these 15 queries depend on stratHist/repairPreview below, only on
+       userIds/secIds/famIds which are already known at this point. Previously this
+       whole block ran AFTER the stratHist fetch + repair-preview processing had
+       fully completed, making two independent stages fully sequential instead of
+       concurrent — a meaningful chunk of this endpoint's ~6s runtime (see the
+       stratHist comment below for the other half of the timeout fix). */
+    const restPromise = Promise.all([
+      userIds.length
+        ? sbGet(`profiles?select=id,first_name,last_name,email,mint_number,computershare_number&id=in.(${userIds.join(',')})`)
+        : Promise.resolve([]),
+      secIds.length
+        ? sbGet(`securities_c?select=id,symbol,name,sector,logo_url&id=in.(${secIds.join(',')})`)
+        : Promise.resolve([]),
+      secIds.length
+        ? sbGet(`stock_returns_c?select=security_id,symbol,current_price,1d_pct,ytd_pct,1y_pct,as_of_date&security_id=in.(${secIds.join(',')})&order=as_of_date.desc`)
+        : Promise.resolve([]),
+      secIds.length
+        ? sbGet(`stock_intraday_c?select=security_id,current_price,timestamp&security_id=in.(${secIds.join(',')})&order=timestamp.desc`)
+        : Promise.resolve([]),
+      userIds.length
+        ? sbGet(`transactions?select=id,user_id,family_member_id,amount,direction,name,description,status,transaction_date,broker_fee_cents,isin_fee_cents,transaction_fee_cents,base_amount_cents,buffer_cents,buffer_consumed_cents&user_id=in.(${userIds.join(',')})&order=transaction_date.desc`)
+        : Promise.resolve([]),
+      famIds.length
+        ? sbGet(`family_members?select=id,first_name,last_name,computershare_number&id=in.(${famIds.join(',')})`)
+        : Promise.resolve([]),
+      userIds.length
+        ? sbGet(`buffer_drawdowns_c?select=transaction_id,holding_id,user_id,family_member_id,event_type,delta_cents,expected_fill_cents,actual_fill_cents,quantity,created_at&user_id=in.(${userIds.join(',')})&order=created_at.desc`)
+        : Promise.resolve([]),
+      userIds.length
+        ? sbGet(`strategy_rebalance_residuals?select=user_id,strategy_id,family_member_id,balance_cents&user_id=in.(${userIds.join(',')})`)
+        : Promise.resolve([]),
+      userIds.length
+        ? sbGet(`rebalance_event?select=id,user_id,family_member_id,batch_id,security_id,trade_side,quantity,price_at_commit,avg_fill,fill_date,closed_reason,strategy_name_snapshot,created_at,updated_at&user_id=in.(${userIds.join(',')})`)
+        : Promise.resolve([]),
+      sbGet(`rebalance_batch?select=id,strategy_id,status,effective_date,sell_security_id,buy_security_id,extra_buy_security_id,sell_isin_code,buy_isin_code,extra_buy_isin_code,net_proceeds,strategy_name_snapshot,created_at,settled_at,settlement_effective_at,updated_at,is_reversed,holdings_snapshot_before,holdings_snapshot_planned,holdings_snapshot_after,wallet_snapshot_before`),
+      userIds.length
+        ? sbGet(`stock_holdings_c?select=user_id,family_member_id,strategy_id,quantity,avg_fill,avg_exit&is_active=eq.false&user_id=in.(${userIds.join(',')})`)
+        : Promise.resolve([]),
+      userIds.length
+        ? sbGet(`strategy_aum_fee_state?select=user_id,family_member_id,strategy_id,aum_fee_consumed_cents,aum_fee_receivable_cents,low_cash_flag&user_id=in.(${userIds.join(',')})`)
+        : Promise.resolve([]),
+      userIds.length
+        ? sbGet(`aum_fee_transactions?select=user_id,family_member_id,strategy_id,fee_amount_cents,deducted_from_cash_cents,fee_receivable_cents,period_start,period_end,settled_at&user_id=in.(${userIds.join(',')})`)
+        : Promise.resolve([]),
+      userIds.length
+        ? sbGet(`aum_fee_accrual_segments?select=user_id,family_member_id,strategy_id,period_month,accrued_fee_cents,days_in_segment,value_basis_cents,segment_end_date&user_id=in.(${userIds.join(',')})&segment_end_date=is.null`)
+        : Promise.resolve([]),
+      userIds.length
+        ? sbGet(`wallets?select=user_id,balance,status&user_id=in.(${userIds.join(',')})`)
+        : Promise.resolve([]),
+    ]);
+
     /* Fetch per-investor NAV history from client_strategy_returns_c — keyed by user_id */
     // Fail closed: only the canonical effective view may feed client returns.
     // An outage must not silently resurrect drift-prone legacy percentages.
     let stratHist = [];
     let canonicalEffective = false;
     try {
-      const effectiveArrays = userIds.length
-        ? await Promise.all(userIds.map(uid => sbGet(
-            `client_strategy_returns_effective_c?select=user_id,family_member_id,strategy_id,as_of_date,basket_value_cents,1d_pct,5d_pct,1m_pct,ytd_pct,inception_pct,inception_pnl_cents,securities_value_cents,residual_cash_cents,unused_reserve_cents,accrued_liability_cents,source_kind,repair_run_id&user_id=eq.${uid}&order=as_of_date.asc`
-          )))
+      // 2026-07-24: was one request PER investor (Promise.all(userIds.map(...))) against
+      // this view — a 3-way UNION with window functions, so N investors meant N redundant
+      // full computations of the same view instead of one. With just 9 investors this was
+      // already ~6s end-to-end and tipping over Vercel's function timeout under any added
+      // Supabase latency (exactly what "constant timeouts" looks like). One batched
+      // user_id=in.(...) request does the same work once.
+      const effectiveRows = userIds.length
+        ? await sbGet(
+            `client_strategy_returns_effective_c?select=user_id,family_member_id,strategy_id,as_of_date,basket_value_cents,1d_pct,5d_pct,1m_pct,ytd_pct,inception_pct,inception_pnl_cents,securities_value_cents,residual_cash_cents,unused_reserve_cents,accrued_liability_cents,source_kind,repair_run_id&user_id=in.(${userIds.join(',')})&order=as_of_date.asc`
+          )
         : [];
-      if (effectiveArrays.every(Array.isArray)) {
-        stratHist = effectiveArrays.flat().map(row => ({
+      if (Array.isArray(effectiveRows)) {
+        stratHist = effectiveRows.map(row => ({
           ...row,
           basket_value: row.basket_value_cents,
           inception_pnl: row.inception_pnl_cents,
@@ -178,84 +237,7 @@ module.exports = async (req, res) => {
        page; historical percentages remain exactly as stored until the
        chain-linked complete-NAV return engine replaces them. */
 
-    const [profiles, secMeta, secReturns, secIntraday, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches, closedHoldings, aumFeeState, aumFeeTxns, aumSegments, wallets] = await Promise.all([
-      userIds.length
-        ? sbGet(`profiles?select=id,first_name,last_name,email,mint_number,computershare_number&id=in.(${userIds.join(',')})`)
-        : Promise.resolve([]),
-      secIds.length
-        ? sbGet(`securities_c?select=id,symbol,name,sector,logo_url&id=in.(${secIds.join(',')})`)
-        : Promise.resolve([]),
-      secIds.length
-        ? sbGet(`stock_returns_c?select=security_id,symbol,current_price,1d_pct,ytd_pct,1y_pct,as_of_date&security_id=in.(${secIds.join(',')})&order=as_of_date.desc`)
-        : Promise.resolve([]),
-      /* Live intraday prices — same source the orderbook uses for its Live
-         Price + Client PnL columns. First-write-wins per security_id with
-         desc ordering gives us the latest tick. */
-      secIds.length
-        ? sbGet(`stock_intraday_c?select=security_id,current_price,timestamp&security_id=in.(${secIds.join(',')})&order=timestamp.desc`)
-        : Promise.resolve([]),
-      /* Pull the fee + buffer breakdown columns too so the investors page
-         can show the negative side of each client's activity: fees paid,
-         buffer consumed, etc. — not just deposits. base_amount_cents +
-         buffer_cents = the cash held during a buy; buffer_consumed_cents is
-         how much of that buffer the actual fill needed. */
-      userIds.length
-        ? sbGet(`transactions?select=id,user_id,family_member_id,amount,direction,name,description,status,transaction_date,broker_fee_cents,isin_fee_cents,transaction_fee_cents,base_amount_cents,buffer_cents,buffer_consumed_cents&user_id=in.(${userIds.join(',')})&order=transaction_date.desc`)
-        : Promise.resolve([]),
-      famIds.length
-        ? sbGet(`family_members?select=id,first_name,last_name,computershare_number&id=in.(${famIds.join(',')})`)
-        : Promise.resolve([]),
-      /* Execution-reserve (8% buffer) ledger — the per-event audit trail of how
-         each transaction's buffer was consumed (slippage_drawdown / shortfall)
-         or returned (cancel_refund / sale_refund). Admin-only on the CRM; the
-         user-facing app never shows slippage. */
-      userIds.length
-        ? sbGet(`buffer_drawdowns_c?select=transaction_id,holding_id,user_id,family_member_id,event_type,delta_cents,expected_fill_cents,actual_fill_cents,quantity,created_at&user_id=in.(${userIds.join(',')})&order=created_at.desc`)
-        : Promise.resolve([]),
-      /* Per-strategy residual cash from rebalances. balance_cents is the leftover
-         cash that stays in the strategy after a position swap. The investors page
-         adds this to each client's value so the portfolio total isn't understated,
-         and shows it broken out (holdings vs cash) in the detail. Service-role read
-         bypasses the owner-only SELECT RLS so the admin sees every client's row. */
-      userIds.length
-        ? sbGet(`strategy_rebalance_residuals?select=user_id,strategy_id,family_member_id,balance_cents&user_id=in.(${userIds.join(',')})`)
-        : Promise.resolve([]),
-      /* Rebalance events + batch statuses — so the admin reconciliation can show
-         rebalance fees (sell/buy brokerage + custody), which aren't written to the
-         transactions table (a rebalance posts a R0 audit row). Admin-only. */
-      userIds.length
-        ? sbGet(`rebalance_event?select=id,user_id,family_member_id,batch_id,security_id,trade_side,quantity,price_at_commit,avg_fill,fill_date,closed_reason,strategy_name_snapshot,created_at,updated_at&user_id=in.(${userIds.join(',')})`)
-        : Promise.resolve([]),
-      sbGet(`rebalance_batch?select=id,strategy_id,status,effective_date,sell_security_id,buy_security_id,extra_buy_security_id,sell_isin_code,buy_isin_code,extra_buy_isin_code,net_proceeds,strategy_name_snapshot,created_at,settled_at,settlement_effective_at,updated_at,is_reversed,holdings_snapshot_before,holdings_snapshot_planned,holdings_snapshot_after,wallet_snapshot_before`),
-      /* Closed positions (rebalance sells) carry REALISED P&L: (avg_exit −
-         avg_fill) × qty. Needed so a client's live P&L row stays stable across
-         rebalances instead of shrinking when sold shares leave the cost basis. */
-      userIds.length
-        ? sbGet(`stock_holdings_c?select=user_id,family_member_id,strategy_id,quantity,avg_fill,avg_exit&is_active=eq.false&user_id=in.(${userIds.join(',')})`)
-        : Promise.resolve([]),
-      /* AUM management fee taken from each strategy's cash sleeve (cumulative).
-         Subtracted from the held 8% buffer when valuing a position so the CRM's
-         portfolio value matches the app. Kept separate from broker slippage. */
-      userIds.length
-        ? sbGet(`strategy_aum_fee_state?select=user_id,family_member_id,strategy_id,aum_fee_consumed_cents,aum_fee_receivable_cents,low_cash_flag&user_id=in.(${userIds.join(',')})`)
-        : Promise.resolve([]),
-      /* Settled AUM fee ledger — one row per user/strategy/month. Source for the
-         Finances "AUM fee collected" card + per-investor AUM totals. */
-      userIds.length
-        ? sbGet(`aum_fee_transactions?select=user_id,family_member_id,strategy_id,fee_amount_cents,deducted_from_cash_cents,fee_receivable_cents,period_start,period_end,settled_at&user_id=in.(${userIds.join(',')})`)
-        : Promise.resolve([]),
-      /* In-progress accrual segments — the fee building up THIS month before it
-         settles. Open segments (segment_end_date is null) hold the running accrual. */
-      userIds.length
-        ? sbGet(`aum_fee_accrual_segments?select=user_id,family_member_id,strategy_id,period_month,accrued_fee_cents,days_in_segment,value_basis_cents,segment_end_date&user_id=in.(${userIds.join(',')})&segment_end_date=is.null`)
-        : Promise.resolve([]),
-      /* Spendable wallet cash per investor (RANDS) — the free cash outside of
-         invested positions / the 8% sleeve / rebalance residual. Powers the
-         per-investor balance breakdown on Finances. */
-      userIds.length
-        ? sbGet(`wallets?select=user_id,balance,status&user_id=in.(${userIds.join(',')})`)
-        : Promise.resolve([]),
-    ]);
+    const [profiles, secMeta, secReturns, secIntraday, txns, familyMembers, drawdowns, residuals, rebEvents, rebBatches, closedHoldings, aumFeeState, aumFeeTxns, aumSegments, wallets] = await restPromise;
 
     /* Merge intraday current_price (cents) into secLive rows so the client
        gets one shape. Intraday wins when present; stock_returns_c fills the
