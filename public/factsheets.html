@@ -608,6 +608,30 @@
       return out;
     };
 
+    /* 2026-07-24: display-only de-spike for chart series. Pre-guarded-system
+       ("LEGACY_PRODUCTION") basket_value history has no cash-neutral or
+       composition-boundary handling, so an admin composition edit or a big
+       cash movement can show up in the stored history as an impossible
+       single-day move (confirmed: MINT Diversified Basket shows -58.6% in
+       one day, 2026-06-02 -> 2026-06-03, both LEGACY_PRODUCTION — no real
+       diversified basket does that). Does NOT touch the underlying stored
+       return records — only filters what gets plotted, by dropping any
+       single-step change beyond a threshold no genuine basket move should
+       ever cross, rather than either fabricating a "corrected" value or
+       plotting a fake crash. */
+    const CHART_SPIKE_THRESHOLD_PCT = 30;
+    const despikeSeries = (values) => {
+      if (!Array.isArray(values) || values.length < 2) return values;
+      const out = [values[0]];
+      for (let i = 1; i < values.length; i++) {
+        const prev = out[out.length - 1];
+        const cur = values[i];
+        if (prev > 0 && Math.abs((cur / prev - 1) * 100) > CHART_SPIKE_THRESHOLD_PCT) continue;
+        out.push(cur);
+      }
+      return out;
+    };
+
     /* ── State ── */
     let _allStrategies = [];
     let _ytdMap = {};
@@ -945,7 +969,7 @@
       const isUp = ytdVal == null ? true : ytdVal >= 0;
 
       /* Chart data from basket_value */
-      const chartData = (retRows||[]).map(r=>Number(r.basket_value)).filter(v=>!Number.isNaN(v)&&v!=null);
+      const chartData = despikeSeries((retRows||[]).map(r=>Number(r.basket_value)).filter(v=>!Number.isNaN(v)&&v!=null));
       const sparkForDetail = chartData.length>=2 ? expandSpark(chartData,60) : null;
 
       /* Holdings with metrics */
@@ -1232,6 +1256,7 @@
           if(r.basket_value!=null) sparks[r.strategy_id].push(Number(r.basket_value));
         });
         for(const [strategyId,rows] of Object.entries(_repairStrategyMap))sparks[strategyId]=rows.slice(-90).map(r=>Number(r.basket_value)).filter(Number.isFinite);
+        Object.keys(sparks).forEach(sid => { sparks[sid] = despikeSeries(sparks[sid]); });
         _sparkMap=sparks;
       } catch(_){}
 
