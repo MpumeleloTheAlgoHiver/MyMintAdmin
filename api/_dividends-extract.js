@@ -174,6 +174,54 @@ module.exports = async function dividendsExtractHandler(req, res) {
   totalNetCash = Math.round(totalNetCash * 100) / 100;
   const previewRows = extractedRows.map(r => r.raw_row).slice(0, 20);
 
+  // Attempt to detect and parse payment date from extracted rows if not explicitly provided
+  if (!paymentDate && extractedRows.length > 0) {
+    for (const item of extractedRows) {
+      const row = item.raw_row || {};
+      for (const key of Object.keys(row)) {
+        if (/payment\s*date|pay\s*date|date/i.test(key)) {
+          const val = row[key];
+          if (val != null && String(val).trim() !== '') {
+            try {
+              let pDate = null;
+              const num = Number(val);
+              if (!isNaN(num) && num > 20000 && num < 100000) {
+                const d = new Date(Math.round((num - 25569) * 86400 * 1000));
+                if (!isNaN(d.getTime())) pDate = d;
+              } else {
+                const str = String(val).trim().split('T')[0];
+                const parts = str.split(/[/\-\.]/);
+                if (parts.length === 3) {
+                  let y = Number(parts[0].length === 4 ? parts[0] : parts[2]);
+                  let m = Number(parts[1]) - 1;
+                  let d = Number(parts[0].length === 4 ? parts[2] : parts[0]);
+                  if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+                    const parsed = new Date(Date.UTC(y, m, d));
+                    if (!isNaN(parsed.getTime())) pDate = parsed;
+                  }
+                }
+                if (!pDate) {
+                  const nat = new Date(val);
+                  if (!isNaN(nat.getTime())) pDate = nat;
+                }
+              }
+              if (pDate) {
+                const yy = pDate.getUTCFullYear() || pDate.getFullYear();
+                const mm = String((pDate.getUTCMonth() >= 0 ? pDate.getUTCMonth() : pDate.getMonth()) + 1).padStart(2, '0');
+                const dd = String(pDate.getUTCDate() || pDate.getDate()).padStart(2, '0');
+                paymentDate = `${yy}-${mm}-${dd}`;
+                break;
+              }
+            } catch (e) {
+              // ignore
+            }
+          }
+        }
+      }
+      if (paymentDate) break;
+    }
+  }
+
   // ── 4. Save metadata + staging rows ─────────────────────────────────────────
   let savedRun = null;
   try {
