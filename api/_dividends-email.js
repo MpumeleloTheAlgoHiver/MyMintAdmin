@@ -64,10 +64,12 @@ function getDividendMeta(paymentDateStr) {
       const parts = String(paymentDateStr).split('T')[0].split('-');
       if (parts.length === 3) {
         const pDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        isFuture = pDate > today;
-        formattedDate = pDate.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' });
+        if (!isNaN(pDate.getTime())) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          isFuture = pDate > today;
+          formattedDate = pDate.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' });
+        }
       }
     } catch (e) {
       // fallback if date parsing fails
@@ -313,14 +315,33 @@ module.exports = async function dividendsEmailHandler(req, res) {
     // 4. Fetch logos
     const securitiesMap = await getSecuritiesData();
 
-    // 5. Fetch sent_client_codes and payment_date
+    // 5. Fetch sent_client_codes and payment_date across all runs with the same payment date
     let sentCodes = [];
+    let currentRunSentCodes = [];
     let paymentDate = null;
     try {
       const runData = await supabaseRequest(`/rest/v1/dividend_runs?select=sent_client_codes,payment_date&id=eq.${Number(runId)}`);
       if (runData && runData[0]) {
-        if (runData[0].sent_client_codes) sentCodes = runData[0].sent_client_codes;
+        if (runData[0].sent_client_codes) {
+          currentRunSentCodes = Array.isArray(runData[0].sent_client_codes) ? runData[0].sent_client_codes : [];
+          sentCodes = [...currentRunSentCodes];
+        }
         if (runData[0].payment_date) paymentDate = runData[0].payment_date;
+      }
+
+      // If a payment_date exists, fetch sent_client_codes from all other runs sharing this date to prevent cross-file duplicates
+      if (paymentDate) {
+        try {
+          const dateRuns = await supabaseRequest(`/rest/v1/dividend_runs?select=sent_client_codes&payment_date=eq.${paymentDate}&id=neq.${Number(runId)}`);
+          (dateRuns || []).forEach(r => {
+            if (r.sent_client_codes && Array.isArray(r.sent_client_codes)) {
+              sentCodes.push(...r.sent_client_codes);
+            }
+          });
+          sentCodes = Array.from(new Set(sentCodes)); // Deduplicate
+        } catch (subErr) {
+          // ignore error if secondary fetch fails
+        }
       }
     } catch (e) {
       // column might not exist yet, ignore
@@ -328,11 +349,12 @@ module.exports = async function dividendsEmailHandler(req, res) {
 
     async function appendSentClientCodes(codesArray) {
       if (!codesArray || !codesArray.length) return;
-      const newSent = Array.from(new Set([...sentCodes, ...codesArray]));
+      currentRunSentCodes = Array.from(new Set([...currentRunSentCodes, ...codesArray]));
+      sentCodes = Array.from(new Set([...sentCodes, ...codesArray]));
       try {
         await supabaseRequest(`/rest/v1/dividend_runs?id=eq.${Number(runId)}`, {
           method: 'PATCH',
-          body: { sent_client_codes: newSent }
+          body: { sent_client_codes: currentRunSentCodes }
         });
       } catch (e) {
         console.error('Failed to update sent_client_codes', e.message);
