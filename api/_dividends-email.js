@@ -368,18 +368,20 @@ module.exports = async function dividendsEmailHandler(req, res) {
     // 4. Fetch logos
     const securitiesMap = await getSecuritiesData();
 
-    // 5. Fetch sent_client_codes and payment_date across all runs with the same payment date
+    // 5. Fetch sent_client_codes, file_name, and payment_date across all runs with matching date or filename
     let sentCodes = [];
     let currentRunSentCodes = [];
     let paymentDate = null;
+    let runFileName = null;
     try {
-      const runData = await supabaseRequest(`/rest/v1/dividend_runs?select=sent_client_codes,payment_date&id=eq.${Number(runId)}`);
+      const runData = await supabaseRequest(`/rest/v1/dividend_runs?select=file_name,sent_client_codes,payment_date&id=eq.${Number(runId)}`);
       if (runData && runData[0]) {
         if (runData[0].sent_client_codes) {
           currentRunSentCodes = Array.isArray(runData[0].sent_client_codes) ? runData[0].sent_client_codes : [];
           sentCodes = [...currentRunSentCodes];
         }
         if (runData[0].payment_date) paymentDate = runData[0].payment_date;
+        if (runData[0].file_name) runFileName = runData[0].file_name;
       }
     } catch (e) {
       // column might not exist yet, ignore
@@ -389,7 +391,7 @@ module.exports = async function dividendsEmailHandler(req, res) {
       paymentDate = findPaymentDate(payouts, null);
     }
 
-    // If a payment_date exists, fetch sent_client_codes from all other runs sharing this date to prevent cross-file duplicates
+    // 1. Check duplicate runs with matching payment_date
     if (paymentDate) {
       let dateStrForQuery = paymentDate;
       const parsed = parsePaymentDate(paymentDate);
@@ -406,11 +408,25 @@ module.exports = async function dividendsEmailHandler(req, res) {
             sentCodes.push(...r.sent_client_codes);
           }
         });
-        sentCodes = Array.from(new Set(sentCodes)); // Deduplicate
       } catch (subErr) {
         // ignore error if secondary fetch fails
       }
     }
+
+    // 2. Check duplicate runs with matching file_name (critical fallback for older uploads or identical re-uploaded workbooks)
+    if (runFileName && runFileName.trim() !== '' && runFileName !== 'unknown') {
+      try {
+        const fileRuns = await supabaseRequest(`/rest/v1/dividend_runs?select=sent_client_codes&file_name=eq.${encodeURIComponent(runFileName)}&id=neq.${Number(runId)}`);
+        (fileRuns || []).forEach(r => {
+          if (r.sent_client_codes && Array.isArray(r.sent_client_codes)) {
+            sentCodes.push(...r.sent_client_codes);
+          }
+        });
+      } catch (subErr) {
+        // ignore
+      }
+    }
+    sentCodes = Array.from(new Set(sentCodes)); // Deduplicate across sibling runs
 
     async function appendSentClientCodes(codesArray) {
       if (!codesArray || !codesArray.length) return;
