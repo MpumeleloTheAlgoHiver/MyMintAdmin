@@ -427,7 +427,39 @@ module.exports = async (req, res) => {
         balances[uid] = value;
         balancesByOwner[`${uid}|${r.family_member_id ? String(r.family_member_id) : ''}`] = value;
       });
-      return sendJson(res, 200, { balances, balancesByOwner });
+
+      // Held 8% buffer (reserve) per owner, in rands — same convention as
+      // investors.html: Σ over the active holdings' funding transactions of
+      // (buffer_cents − buffer_consumed_cents), each transaction counted once
+      // per owner. RLS blocks anon reads of transactions, so the dashboard
+      // needs it from this service-role endpoint alongside the residuals.
+      const buffersByOwner = {};
+      try {
+        const holdRows = await fetchSupabaseJson(
+          `/rest/v1/stock_holdings_c?select=user_id,family_member_id,transaction_id&strategy_id=eq.${encodeURIComponent(strategyId)}&user_id=in.(${buildInFilter(userIds)})&is_active=eq.true&trade_side=eq.BUY${fmFilter}`
+        );
+        const txnIds = [...new Set((holdRows || []).map((h) => h.transaction_id).filter(Boolean))];
+        const bufferByTxn = {};
+        if (txnIds.length) {
+          const txns = await fetchSupabaseJson(
+            `/rest/v1/transactions?select=id,buffer_cents,buffer_consumed_cents&id=in.(${buildInFilter(txnIds)})`
+          );
+          (txns || []).forEach((t) => {
+            bufferByTxn[t.id] = (Number(t.buffer_cents) || 0) - (Number(t.buffer_consumed_cents) || 0);
+          });
+        }
+        const bufSeen = {};
+        (holdRows || []).forEach((h) => {
+          if (!h.user_id || !h.transaction_id) return;
+          const key = `${h.user_id}|${h.family_member_id ? String(h.family_member_id) : ''}`;
+          if (!bufSeen[key]) bufSeen[key] = new Set();
+          if (bufSeen[key].has(h.transaction_id)) return;
+          bufSeen[key].add(h.transaction_id);
+          buffersByOwner[key] = (buffersByOwner[key] || 0) + (bufferByTxn[h.transaction_id] || 0) / 100;
+        });
+      } catch (_) { /* buffer is best-effort; residuals still return */ }
+
+      return sendJson(res, 200, { balances, balancesByOwner, buffersByOwner });
     }
 
     // Upsert strategy_rebalance_residuals with the service-role key. The table has

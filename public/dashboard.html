@@ -5955,7 +5955,11 @@
            leftover proceeds in strategy_rebalance_residuals; without including
            it the strategy card makes the portfolio look smaller by that amount.
            Read via the service-role endpoint (RLS blocks direct browser reads). */
-        let residualByUid = {};
+        /* Keyed by `${user_id}|${family_member_id||''}` so a child's residual
+           never lands on the parent's card (and vice versa). '__all__' scope
+           returns every owner's rows, not just parent-scope (fm null) ones. */
+        let residualByOwner = {};
+        let bufferByOwner = {};
         try {
           const allUids = investRows.length
             ? [...new Set(investRows.map(r => r.user_id).filter(Boolean))]
@@ -5966,9 +5970,13 @@
               const resp = await fetch('/api/orderbook/send-csv?action=rebalance-load-residuals', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
-                body: JSON.stringify({ strategyId: strat.id, userIds: allUids, familyMemberId: null }),
+                body: JSON.stringify({ strategyId: strat.id, userIds: allUids, familyMemberId: '__all__' }),
               });
-              if (resp.ok) { const { balances } = await resp.json(); residualByUid = balances || {}; }
+              if (resp.ok) {
+                const { balancesByOwner, buffersByOwner } = await resp.json();
+                residualByOwner = balancesByOwner || {};
+                bufferByOwner = buffersByOwner || {};
+              }
             }
           }
         } catch (_) { /* residuals are best-effort; don't block the card render */ }
@@ -6020,7 +6028,7 @@
         window.__dbgBreadcrumb('ovSelect:render-holdings');
         ovRenderHoldings(holdings, secMap, pendingRebalance);
         window.__dbgBreadcrumb('ovSelect:render-investors');
-        ovRenderInvestors(investRows, profiles, strat, analytics, txnInceptionMap, secPriceMap, pendingRebalance, familyMembers, residualByUid);
+        ovRenderInvestors(investRows, profiles, strat, analytics, txnInceptionMap, secPriceMap, pendingRebalance, familyMembers, residualByOwner, bufferByOwner);
         fetchNewsInsights();
         window.__dbgBreadcrumb('ovSelect:done');
         } catch (err) {
@@ -6627,7 +6635,7 @@
         </tr></tfoot></table>`;
       };
 
-      const ovRenderInvestors = (investRows, profiles, strat, analytics, txnInceptionMap = {}, secPriceMap = {}, pendingRebalance = null, familyMembers = {}, residualByUid = {}) => {
+      const ovRenderInvestors = (investRows, profiles, strat, analytics, txnInceptionMap = {}, secPriceMap = {}, pendingRebalance = null, familyMembers = {}, residualByOwner = {}, bufferByOwner = {}) => {
         const el = document.getElementById('ovInvestorsTable');
         const badge = document.getElementById('ovInvestorCountBadge');
         const aumLabel = document.getElementById('ovInvestorsTotalAUM');
@@ -6740,18 +6748,28 @@
           const inceptionDate = data.inception ? data.inception.split('T')[0] : (txnInceptionMap[uid] || null);
           const days = inceptionDate ? Math.floor((Date.now() - new Date(inceptionDate)) / 86400000) : 0;
 
-          /* Use live current value + residual cash from rebalances.
-             Without the residual, a position swap leaves the strategy looking
-             smaller by the leftover cash amount. Falls back to cost basis if
-             no live prices are available. */
-          const residual = Number(residualByUid[uid] || 0);
+          /* Value = live positions + cash (rebalance residual + held 8%
+             buffer), the same complete-value basis as investors.html. The
+             residual keeps a position swap from shrinking the card by the
+             leftover cash; the buffer is the client's reserved cash sitting
+             in the strategy. Both are scoped per (user, family member) so a
+             child's cash never lands on the parent's card. Falls back to
+             cost basis if no live prices are available. */
+          const ownerKey = `${uid}|${data.familyMemberId || ''}`;
+          const residual = Number(residualByOwner[ownerKey] || 0);
+          const buffer   = Number(bufferByOwner[ownerKey] || 0);
           const positionsVal = data.currentVal > 0 ? data.currentVal : data.costBasis;
-          const currentVal = positionsVal + residual;
-          const returnPct  = data.costBasis > 0 ? (currentVal - data.costBasis) / data.costBasis * 100 : 0;
-          const pnl        = currentVal - data.costBasis;
+          const currentVal = positionsVal + residual + buffer;
+          /* The buffer is contributed cash, not a gain — P&L compares only
+             positions + residual against the fill cost, and Invested is
+             derived (value − P&L = cost basis + buffer) so Invested + P&L
+             always equals Value, matching investors.html. */
+          const pnl        = (positionsVal + residual) - data.costBasis;
+          const invested   = currentVal - pnl;
+          const returnPct  = invested > 0 ? (pnl / invested) * 100 : 0;
           const pending    = !!data.pending;
 
-          return { uid, familyMemberId: data.familyMemberId, name, isMinor, invested: data.costBasis, currentVal, pnl, returnPct, days, inceptionDate, pending };
+          return { uid, familyMemberId: data.familyMemberId, name, isMinor, invested, currentVal, pnl, returnPct, days, inceptionDate, pending };
         }).sort((a, b) => b.currentVal - a.currentVal);
 
         if (badge) badge.textContent = rows.length;
