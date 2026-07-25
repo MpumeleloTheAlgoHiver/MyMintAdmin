@@ -56,35 +56,88 @@ async function getSecuritiesData() {
   return map;
 }
 
+function findPaymentDate(payouts, explicitDate) {
+  if (explicitDate) return explicitDate;
+  if (!payouts || !payouts.length) return null;
+  for (const p of payouts) {
+    const row = p.raw_row || {};
+    for (const key of Object.keys(row)) {
+      if (/payment\s*date|pay\s*date|date/i.test(key)) {
+        const val = row[key];
+        if (val != null && String(val).trim() !== '') {
+          return val;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function parsePaymentDate(val) {
+  if (!val || val === '') return null;
+  try {
+    // 1. Check for Excel numeric serial date (e.g. 46195 -> June 22, 2026)
+    const num = Number(val);
+    if (!isNaN(num) && num > 20000 && num < 100000) {
+      const date = new Date(Math.round((num - 25569) * 86400 * 1000));
+      if (!isNaN(date.getTime())) {
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      }
+    }
+
+    // 2. Check string formats: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, YYYY/MM/DD
+    const str = String(val).trim().split('T')[0];
+    const parts = str.split(/[/\-\.]/);
+    if (parts.length === 3) {
+      let y, m, d;
+      if (parts[0].length === 4) {
+        y = Number(parts[0]);
+        m = Number(parts[1]) - 1;
+        d = Number(parts[2]);
+      } else if (parts[2].length === 4) {
+        y = Number(parts[2]);
+        m = Number(parts[1]) - 1;
+        d = Number(parts[0]);
+      } else {
+        const fallback = new Date(val);
+        if (!isNaN(fallback.getTime())) return fallback;
+      }
+      if (y != null && !isNaN(y) && !isNaN(m) && !isNaN(d)) {
+        const parsed = new Date(y, m, d);
+        if (!isNaN(parsed.getTime())) return parsed;
+      }
+    }
+
+    // 3. Fallback to native Date constructor
+    const nat = new Date(val);
+    if (!isNaN(nat.getTime())) return nat;
+  } catch (e) {
+    // ignore
+  }
+  return null;
+}
+
 function getDividendMeta(paymentDateStr) {
   let isFuture = false;
   let formattedDate = '';
-  if (paymentDateStr) {
-    try {
-      const parts = String(paymentDateStr).split('T')[0].split('-');
-      if (parts.length === 3) {
-        const pDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-        if (!isNaN(pDate.getTime())) {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          isFuture = pDate > today;
-          formattedDate = pDate.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' });
-        }
-      }
-    } catch (e) {
-      // fallback if date parsing fails
-    }
+  const pDate = parsePaymentDate(paymentDateStr);
+  if (pDate && !isNaN(pDate.getTime())) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    isFuture = pDate > today;
+    formattedDate = pDate.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' });
   }
   const subject = isFuture
     ? "You've got dividends coming up"
     : "Your investments are paying you";
 
-  return { isFuture, formattedDate, subject };
+  return { isFuture, formattedDate, subject, parsedDate: pDate };
 }
 
 function buildEmailHtml(profile, payouts, securitiesMap, paymentDate) {
   const name = profile.first_name || 'Valued Client';
-  const { isFuture, formattedDate, subject } = getDividendMeta(paymentDate);
+  const effectiveDate = findPaymentDate(payouts, paymentDate);
+  const { isFuture, formattedDate, subject } = getDividendMeta(effectiveDate);
   let rowsHtml = '';
 
   let totalCash = 0;
@@ -328,23 +381,35 @@ module.exports = async function dividendsEmailHandler(req, res) {
         }
         if (runData[0].payment_date) paymentDate = runData[0].payment_date;
       }
-
-      // If a payment_date exists, fetch sent_client_codes from all other runs sharing this date to prevent cross-file duplicates
-      if (paymentDate) {
-        try {
-          const dateRuns = await supabaseRequest(`/rest/v1/dividend_runs?select=sent_client_codes&payment_date=eq.${paymentDate}&id=neq.${Number(runId)}`);
-          (dateRuns || []).forEach(r => {
-            if (r.sent_client_codes && Array.isArray(r.sent_client_codes)) {
-              sentCodes.push(...r.sent_client_codes);
-            }
-          });
-          sentCodes = Array.from(new Set(sentCodes)); // Deduplicate
-        } catch (subErr) {
-          // ignore error if secondary fetch fails
-        }
-      }
     } catch (e) {
       // column might not exist yet, ignore
+    }
+
+    if (!paymentDate) {
+      paymentDate = findPaymentDate(payouts, null);
+    }
+
+    // If a payment_date exists, fetch sent_client_codes from all other runs sharing this date to prevent cross-file duplicates
+    if (paymentDate) {
+      let dateStrForQuery = paymentDate;
+      const parsed = parsePaymentDate(paymentDate);
+      if (parsed && !isNaN(parsed.getTime())) {
+        const y = parsed.getFullYear();
+        const m = String(parsed.getMonth() + 1).padStart(2, '0');
+        const d = String(parsed.getDate()).padStart(2, '0');
+        dateStrForQuery = `${y}-${m}-${d}`;
+      }
+      try {
+        const dateRuns = await supabaseRequest(`/rest/v1/dividend_runs?select=sent_client_codes&payment_date=eq.${dateStrForQuery}&id=neq.${Number(runId)}`);
+        (dateRuns || []).forEach(r => {
+          if (r.sent_client_codes && Array.isArray(r.sent_client_codes)) {
+            sentCodes.push(...r.sent_client_codes);
+          }
+        });
+        sentCodes = Array.from(new Set(sentCodes)); // Deduplicate
+      } catch (subErr) {
+        // ignore error if secondary fetch fails
+      }
     }
 
     async function appendSentClientCodes(codesArray) {
