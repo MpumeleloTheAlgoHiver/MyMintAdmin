@@ -5870,6 +5870,25 @@
           .eq('strategy_id', strat.id);
         const investRows = investorRows || [];
 
+        /* Realized P&L from closed holdings (rebalance sells), keyed by
+           `${user_id}|${family_member_id||''}` — mirrors investors.html's
+           realizedByKey so the card's P&L stays stable across rebalances
+           instead of counting sell proceeds (residual) as gain. */
+        const realizedByOwner = {};
+        try {
+          const { data: closedRows } = await supabaseClient
+            .from('stock_holdings_c')
+            .select('user_id, family_member_id, quantity, avg_fill, avg_exit')
+            .eq('is_active', false)
+            .eq('strategy_id', strat.id);
+          (closedRows || []).forEach(h => {
+            const fill = Number(h.avg_fill || 0), exit = Number(h.avg_exit || 0), qty = Number(h.quantity || 0);
+            if (!fill || !exit || !qty) return;
+            const key = `${h.user_id}|${h.family_member_id || ''}`;
+            realizedByOwner[key] = (realizedByOwner[key] || 0) + ((exit - fill) / 100) * qty;
+          });
+        } catch (_) { /* realized P&L is best-effort */ }
+
         window.__dbgBreadcrumb('ovSelect:fetch-profiles');
         let profiles = {};
         let familyMembers = {};    /* family_member_id &rarr; { first_name, last_name, relationship } */
@@ -6028,7 +6047,7 @@
         window.__dbgBreadcrumb('ovSelect:render-holdings');
         ovRenderHoldings(holdings, secMap, pendingRebalance);
         window.__dbgBreadcrumb('ovSelect:render-investors');
-        ovRenderInvestors(investRows, profiles, strat, analytics, txnInceptionMap, secPriceMap, pendingRebalance, familyMembers, residualByOwner, bufferByOwner);
+        ovRenderInvestors(investRows, profiles, strat, analytics, txnInceptionMap, secPriceMap, pendingRebalance, familyMembers, residualByOwner, bufferByOwner, realizedByOwner);
         fetchNewsInsights();
         window.__dbgBreadcrumb('ovSelect:done');
         } catch (err) {
@@ -6635,7 +6654,7 @@
         </tr></tfoot></table>`;
       };
 
-      const ovRenderInvestors = (investRows, profiles, strat, analytics, txnInceptionMap = {}, secPriceMap = {}, pendingRebalance = null, familyMembers = {}, residualByOwner = {}, bufferByOwner = {}) => {
+      const ovRenderInvestors = (investRows, profiles, strat, analytics, txnInceptionMap = {}, secPriceMap = {}, pendingRebalance = null, familyMembers = {}, residualByOwner = {}, bufferByOwner = {}, realizedByOwner = {}) => {
         const el = document.getElementById('ovInvestorsTable');
         const badge = document.getElementById('ovInvestorCountBadge');
         const aumLabel = document.getElementById('ovInvestorsTotalAUM');
@@ -6758,13 +6777,15 @@
           const ownerKey = `${uid}|${data.familyMemberId || ''}`;
           const residual = Number(residualByOwner[ownerKey] || 0);
           const buffer   = Number(bufferByOwner[ownerKey] || 0);
+          const realized = Number(realizedByOwner[ownerKey] || 0);
           const positionsVal = data.currentVal > 0 ? data.currentVal : data.costBasis;
           const currentVal = positionsVal + residual + buffer;
-          /* The buffer is contributed cash, not a gain — P&L compares only
-             positions + residual against the fill cost, and Invested is
-             derived (value − P&L = cost basis + buffer) so Invested + P&L
-             always equals Value, matching investors.html. */
-          const pnl        = (positionsVal + residual) - data.costBasis;
+          /* P&L = unrealised on open positions + realised from closed
+             (rebalanced-away) holdings. The residual and buffer are the
+             client's cash, not gains — sell proceeds are already accounted
+             for via realised. Invested is derived (value − P&L) so the card
+             identity Invested + P&L = Value holds, matching investors.html. */
+          const pnl        = (positionsVal - data.costBasis) + realized;
           const invested   = currentVal - pnl;
           const returnPct  = invested > 0 ? (pnl / invested) * 100 : 0;
           const pending    = !!data.pending;
