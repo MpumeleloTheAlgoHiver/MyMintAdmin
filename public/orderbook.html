@@ -1581,6 +1581,31 @@
     let _testUserIdSet = null;
     const getTestUserIdSet = async () => {
       if (_testUserIdSet) return _testUserIdSet;
+      // Primary source: the service-role endpoint. RLS hard-denies the
+      // browser's wallets read (42501), so a direct client-side read silently
+      // reduces the dual classifier (profiles.is_test OR wallets.status='test')
+      // to profiles-only and leaks wallet-flagged test users into the live book.
+      try {
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        const tok = sessionData?.session?.access_token;
+        if (tok) {
+          const resp = await fetch('/api/orderbook/send-csv?action=list-test-users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+            body: '{}',
+          });
+          if (resp.ok) {
+            const { userIds } = await resp.json();
+            if (Array.isArray(userIds)) {
+              _testUserIdSet = new Set(userIds.filter(Boolean));
+              return _testUserIdSet;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[UAT] service-role test-account load failed, falling back:', err?.message || err);
+      }
+      // Fallback: direct reads (profiles works in-browser; wallets usually 42501s).
       try {
         const [profilesRes, walletsRes] = await Promise.all([
           supabaseClient.from('profiles').select('id').eq('is_test', true),
@@ -1596,12 +1621,13 @@
           console.error('[UAT] could not load test accounts:', profilesRes.error?.message || walletsRes.error?.message);
           return new Set();
         }
-        _testUserIdSet = new Set([...profileIds, ...walletUserIds]);
+        // Do NOT cache the fallback set: it may be missing wallet-flagged test
+        // users (RLS), so let the next call retry the service-role endpoint.
+        return new Set([...profileIds, ...walletUserIds]);
       } catch (err) {
         console.error('[UAT] could not load test accounts:', err?.message || err);
         return new Set(); // transient — do NOT cache, so the next call retries
       }
-      return _testUserIdSet;
     };
     // Every user id that owns any part of an aggregated/archived book row. The row
     // is aggregated by security, so owners live in the nested strategyUsers /

@@ -797,6 +797,23 @@ module.exports = async (req, res) => {
       return sendJson(res, 200, { statuses });
     }
 
+    // Test-account ids for the UAT/live orderbook split — dual classifier:
+    // profiles.is_test OR wallets.status='test'. Served with the service-role
+    // key because RLS hard-denies the browser's wallets read (42501), which
+    // silently reduced the client-side check to profiles-only and leaked
+    // wallet-flagged test users (e.g. Tsie) into the live book.
+    if (action === 'list-test-users') {
+      const [profRows, walletRows] = await Promise.all([
+        fetchSupabaseJson('/rest/v1/profiles?select=id&is_test=eq.true'),
+        fetchSupabaseJson('/rest/v1/wallets?select=user_id&status=eq.test'),
+      ]);
+      const ids = new Set([
+        ...(Array.isArray(profRows) ? profRows : []).map((r) => r.id).filter(Boolean),
+        ...(Array.isArray(walletRows) ? walletRows : []).map((r) => r.user_id).filter(Boolean),
+      ]);
+      return sendJson(res, 200, { userIds: [...ids] });
+    }
+
     // List every book that has been moved to "Closed Books" (shared across all
     // admins). Read with the service-role key so each admin sees the same closed
     // set regardless of who clicked "Move to Closed Book". A book maps 1:1 to an
