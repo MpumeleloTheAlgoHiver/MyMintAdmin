@@ -56,8 +56,88 @@ async function getSecuritiesData() {
   return map;
 }
 
-function buildEmailHtml(profile, payouts, securitiesMap) {
+function findPaymentDate(payouts, explicitDate) {
+  if (explicitDate) return explicitDate;
+  if (!payouts || !payouts.length) return null;
+  for (const p of payouts) {
+    const row = p.raw_row || {};
+    for (const key of Object.keys(row)) {
+      if (/payment\s*date|pay\s*date|date/i.test(key)) {
+        const val = row[key];
+        if (val != null && String(val).trim() !== '') {
+          return val;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function parsePaymentDate(val) {
+  if (!val || val === '') return null;
+  try {
+    // 1. Check for Excel numeric serial date (e.g. 46195 -> June 22, 2026)
+    const num = Number(val);
+    if (!isNaN(num) && num > 20000 && num < 100000) {
+      const date = new Date(Math.round((num - 25569) * 86400 * 1000));
+      if (!isNaN(date.getTime())) {
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      }
+    }
+
+    // 2. Check string formats: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, YYYY/MM/DD
+    const str = String(val).trim().split('T')[0];
+    const parts = str.split(/[/\-\.]/);
+    if (parts.length === 3) {
+      let y, m, d;
+      if (parts[0].length === 4) {
+        y = Number(parts[0]);
+        m = Number(parts[1]) - 1;
+        d = Number(parts[2]);
+      } else if (parts[2].length === 4) {
+        y = Number(parts[2]);
+        m = Number(parts[1]) - 1;
+        d = Number(parts[0]);
+      } else {
+        const fallback = new Date(val);
+        if (!isNaN(fallback.getTime())) return fallback;
+      }
+      if (y != null && !isNaN(y) && !isNaN(m) && !isNaN(d)) {
+        const parsed = new Date(y, m, d);
+        if (!isNaN(parsed.getTime())) return parsed;
+      }
+    }
+
+    // 3. Fallback to native Date constructor
+    const nat = new Date(val);
+    if (!isNaN(nat.getTime())) return nat;
+  } catch (e) {
+    // ignore
+  }
+  return null;
+}
+
+function getDividendMeta(paymentDateStr) {
+  let isFuture = false;
+  let formattedDate = '';
+  const pDate = parsePaymentDate(paymentDateStr);
+  if (pDate && !isNaN(pDate.getTime())) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    isFuture = pDate > today;
+    formattedDate = pDate.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  const subject = isFuture
+    ? "You've got dividends coming up"
+    : "Your investments are paying you";
+
+  return { isFuture, formattedDate, subject, parsedDate: pDate };
+}
+
+function buildEmailHtml(profile, payouts, securitiesMap, paymentDate) {
   const name = profile.first_name || 'Valued Client';
+  const effectiveDate = findPaymentDate(payouts, paymentDate);
+  const { isFuture, formattedDate, subject } = getDividendMeta(effectiveDate);
   let rowsHtml = '';
 
   let totalCash = 0;
@@ -181,19 +261,27 @@ function buildEmailHtml(profile, payouts, securitiesMap) {
   <!-- HEADER -->
   <div class="header">
     <div class="header-logo">MINT Platforms</div>
-    <h1>Your investments are paying you</h1>
-    <p class="header-sub">We have successfully processed dividend payouts for your portfolio.</p>
+    <h1>${subject}</h1>
+    <p class="header-sub">${
+      isFuture
+        ? `We have processed upcoming dividend payouts for your portfolio, scheduled for ${formattedDate || 'soon'}.`
+        : 'We have successfully processed dividend payouts for your portfolio.'
+    }</p>
     <div class="header-meta">MINT BASKETS &middot; INVESTOR STATEMENT &middot; ${new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()}</div>
   </div>
 
   <!-- BODY -->
   <div class="body">
 
-    <p class="lead">Hi ${name},<br><br>When you invested with MINT, you became a shareholder in real companies. And shareholders get paid.<br><br>Since you started investing, the companies in your basket have shared their profits with you:</p>
+    <p class="lead">Hi ${name},<br><br>When you invested with MINT, you became a shareholder in real companies. And shareholders get paid.<br><br>${
+      isFuture
+        ? `The companies in your basket have declared upcoming dividends. Here is what you will be earning${formattedDate ? ` on <strong>${formattedDate}</strong>` : ''}:`
+        : 'Since you started investing, the companies in your basket have shared their profits with you:'
+    }</p>
 
     <!-- TABLE -->
     <div class="section">
-      <h2>COMPANY DIVIDENDS EARNED</h2>
+      <h2>${isFuture ? 'UPCOMING DIVIDENDS' : 'COMPANY DIVIDENDS EARNED'}</h2>
       <table class="snap">
         <thead>
           <tr>
@@ -204,7 +292,7 @@ function buildEmailHtml(profile, payouts, securitiesMap) {
         <tbody>
           ${rowsHtml}
           <tr>
-            <td class="label" style="padding-top:20px; font-weight:700;">Total earned since investing</td>
+            <td class="label" style="padding-top:20px; font-weight:700;">${isFuture ? 'Total upcoming payout' : 'Total earned since investing'}</td>
             <td class="num r pos" style="padding-top:20px; font-size: 16px; font-weight:800; color:#31005E;">${formatMoney(totalCash)}</td>
           </tr>
         </tbody>
@@ -214,7 +302,11 @@ function buildEmailHtml(profile, payouts, securitiesMap) {
 
   <!-- CLOSE -->
   <div class="close">
-    <p>Every cent has been credited to your bank account. No forms, no waiting, no admin. That’s what ownership looks like: your money working while you live your life.<br><br>And this is just the beginning. The more you invest, the bigger your slice of the profits next time these companies pay out.</p>
+    <p>${
+      isFuture
+        ? 'Every cent will be automatically credited to your bank account on the payment date. No forms, no waiting, no admin. That’s what ownership looks like: your money working while you live your life.<br><br>And this is just the beginning. The more you invest, the bigger your slice of the profits next time these companies pay out.'
+        : 'Every cent has been credited to your bank account. No forms, no waiting, no admin. That’s what ownership looks like: your money working while you live your life.<br><br>And this is just the beginning. The more you invest, the bigger your slice of the profits next time these companies pay out.'
+    }</p>
     <a href="https://app.mymint.co.za">Grow my portfolio &rarr;</a>
   </div>
 
@@ -276,24 +368,74 @@ module.exports = async function dividendsEmailHandler(req, res) {
     // 4. Fetch logos
     const securitiesMap = await getSecuritiesData();
 
-    // 5. Fetch sent_client_codes
+    // 5. Fetch sent_client_codes, file_name, and payment_date across all runs with matching date or filename
     let sentCodes = [];
+    let currentRunSentCodes = [];
+    let paymentDate = null;
+    let runFileName = null;
     try {
-      const runData = await supabaseRequest(`/rest/v1/dividend_runs?select=sent_client_codes&id=eq.${Number(runId)}`);
-      if (runData && runData[0] && runData[0].sent_client_codes) {
-        sentCodes = runData[0].sent_client_codes;
+      const runData = await supabaseRequest(`/rest/v1/dividend_runs?select=file_name,sent_client_codes,payment_date&id=eq.${Number(runId)}`);
+      if (runData && runData[0]) {
+        if (runData[0].sent_client_codes) {
+          currentRunSentCodes = Array.isArray(runData[0].sent_client_codes) ? runData[0].sent_client_codes : [];
+          sentCodes = [...currentRunSentCodes];
+        }
+        if (runData[0].payment_date) paymentDate = runData[0].payment_date;
+        if (runData[0].file_name) runFileName = runData[0].file_name;
       }
     } catch (e) {
       // column might not exist yet, ignore
     }
 
+    if (!paymentDate) {
+      paymentDate = findPaymentDate(payouts, null);
+    }
+
+    // 1. Check duplicate runs with matching payment_date
+    if (paymentDate) {
+      let dateStrForQuery = paymentDate;
+      const parsed = parsePaymentDate(paymentDate);
+      if (parsed && !isNaN(parsed.getTime())) {
+        const y = parsed.getFullYear();
+        const m = String(parsed.getMonth() + 1).padStart(2, '0');
+        const d = String(parsed.getDate()).padStart(2, '0');
+        dateStrForQuery = `${y}-${m}-${d}`;
+      }
+      try {
+        const dateRuns = await supabaseRequest(`/rest/v1/dividend_runs?select=sent_client_codes&payment_date=eq.${dateStrForQuery}&id=neq.${Number(runId)}`);
+        (dateRuns || []).forEach(r => {
+          if (r.sent_client_codes && Array.isArray(r.sent_client_codes)) {
+            sentCodes.push(...r.sent_client_codes);
+          }
+        });
+      } catch (subErr) {
+        // ignore error if secondary fetch fails
+      }
+    }
+
+    // 2. Check duplicate runs with matching file_name (critical fallback for older uploads or identical re-uploaded workbooks)
+    if (runFileName && runFileName.trim() !== '' && runFileName !== 'unknown') {
+      try {
+        const fileRuns = await supabaseRequest(`/rest/v1/dividend_runs?select=sent_client_codes&file_name=eq.${encodeURIComponent(runFileName)}&id=neq.${Number(runId)}`);
+        (fileRuns || []).forEach(r => {
+          if (r.sent_client_codes && Array.isArray(r.sent_client_codes)) {
+            sentCodes.push(...r.sent_client_codes);
+          }
+        });
+      } catch (subErr) {
+        // ignore
+      }
+    }
+    sentCodes = Array.from(new Set(sentCodes)); // Deduplicate across sibling runs
+
     async function appendSentClientCodes(codesArray) {
       if (!codesArray || !codesArray.length) return;
-      const newSent = Array.from(new Set([...sentCodes, ...codesArray]));
+      currentRunSentCodes = Array.from(new Set([...currentRunSentCodes, ...codesArray]));
+      sentCodes = Array.from(new Set([...sentCodes, ...codesArray]));
       try {
         await supabaseRequest(`/rest/v1/dividend_runs?id=eq.${Number(runId)}`, {
           method: 'PATCH',
-          body: { sent_client_codes: newSent }
+          body: { sent_client_codes: currentRunSentCodes }
         });
       } catch (e) {
         console.error('Failed to update sent_client_codes', e.message);
@@ -313,6 +455,8 @@ module.exports = async function dividendsEmailHandler(req, res) {
         };
       });
 
+      const { subject } = getDividendMeta(paymentDate);
+
       // Specific client HTML preview
       if (clientCode) {
         if (!profileMap[clientCode]) {
@@ -320,8 +464,8 @@ module.exports = async function dividendsEmailHandler(req, res) {
         }
         const profile = profileMap[clientCode];
         const userPayouts = grouped[clientCode];
-        const html = buildEmailHtml(profile, userPayouts, securitiesMap);
-        return sendJson(res, 200, { ok: true, html, profile, count: userPayouts.length, allClients });
+        const html = buildEmailHtml(profile, userPayouts, securitiesMap, paymentDate);
+        return sendJson(res, 200, { ok: true, html, subject, profile, count: userPayouts.length, allClients });
       }
 
       // Default: Find the first mapped profile to use for preview, but return allClients
@@ -332,14 +476,16 @@ module.exports = async function dividendsEmailHandler(req, res) {
 
       const profile = profileMap[previewCode];
       const userPayouts = grouped[previewCode];
-      const html = buildEmailHtml(profile, userPayouts, securitiesMap);
+      const html = buildEmailHtml(profile, userPayouts, securitiesMap, paymentDate);
 
-      return sendJson(res, 200, { ok: true, html, profile, count: userPayouts.length, allClients, previewCode });
+      return sendJson(res, 200, { ok: true, html, subject, profile, count: userPayouts.length, allClients, previewCode });
     }
 
     // ── POST: Send Emails ─────────────────────────────────────────────
     if (req.method === 'POST') {
       let { testEmail, sendAll } = req.body || {};
+
+      const { subject } = getDividendMeta(paymentDate);
 
       if (testEmail) {
         // Send a single test email
@@ -347,8 +493,8 @@ module.exports = async function dividendsEmailHandler(req, res) {
         const profile = targetCode ? profileMap[targetCode] : { first_name: 'Test', email: testEmail };
         const userPayouts = targetCode ? grouped[targetCode] : payouts.slice(0, 3);
 
-        const html = buildEmailHtml(profile, userPayouts, securitiesMap);
-        await sendViaResend({ to: testEmail, subject: 'Your investments are paying you', html });
+        const html = buildEmailHtml(profile, userPayouts, securitiesMap, paymentDate);
+        await sendViaResend({ to: testEmail, subject, html });
         return sendJson(res, 200, { ok: true, message: 'Test email sent successfully' });
       }
 
@@ -359,9 +505,9 @@ module.exports = async function dividendsEmailHandler(req, res) {
         if (sentCodes.includes(clientCode)) return sendJson(res, 400, { ok: false, error: 'Email already sent to this user for this run' });
 
         const userPayouts = grouped[clientCode];
-        const html = buildEmailHtml(profile, userPayouts, securitiesMap);
+        const html = buildEmailHtml(profile, userPayouts, securitiesMap, paymentDate);
         try {
-          await sendViaResend({ to: profile.email, subject: 'Your investments are paying you', html });
+          await sendViaResend({ to: profile.email, subject, html });
           await appendSentClientCodes([clientCode]);
           await writeAudit({
             action: 'send_dividend_emails_single',
@@ -393,10 +539,10 @@ module.exports = async function dividendsEmailHandler(req, res) {
           }
 
           const userPayouts = grouped[code];
-          const html = buildEmailHtml(profile, userPayouts, securitiesMap);
+          const html = buildEmailHtml(profile, userPayouts, securitiesMap, paymentDate);
 
           try {
-            await sendViaResend({ to: profile.email, subject: 'Your investments are paying you', html });
+            await sendViaResend({ to: profile.email, subject, html });
             sent++;
             newlySentCodes.push(code);
           } catch (e) {
