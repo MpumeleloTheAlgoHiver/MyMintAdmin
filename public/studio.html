@@ -315,6 +315,37 @@
         document.getElementById('inspectorTransactions').innerHTML = '<div class="placeholder">No client selected</div>';
       }
 
+      /* Test accounts (dual classifier: profiles.is_test OR wallets.status='test')
+         are excluded from both client lists. Loaded via the service-role
+         send-csv action because RLS hard-denies the browser's wallets read —
+         a direct client-side read would silently miss wallet-flagged test
+         users (same leak the orderbook had). */
+      let _studioTestIdSet = null;
+      async function getTestUserIdSet() {
+        if (_studioTestIdSet) return _studioTestIdSet;
+        try {
+          const { data: sessionData } = await supabaseClient.auth.getSession();
+          const tok = sessionData?.session?.access_token;
+          if (tok) {
+            const resp = await fetch('/api/orderbook/send-csv?action=list-test-users', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+              body: '{}',
+            });
+            if (resp.ok) {
+              const { userIds } = await resp.json();
+              if (Array.isArray(userIds)) { _studioTestIdSet = new Set(userIds.filter(Boolean)); return _studioTestIdSet; }
+            }
+          }
+        } catch (_) { /* fall through */ }
+        // Fallback: profiles-only (wallets is RLS-blocked in-browser). Don't
+        // cache — the next call retries the full service-role set.
+        try {
+          const { data: p } = await supabaseClient.from('profiles').select('id').eq('is_test', true);
+          return new Set((p || []).map(r => r.id).filter(Boolean));
+        } catch (_) { return new Set(); }
+      }
+
       async function loadClientsInStrategies() {
         const loading    = document.getElementById('clientListLoading');
         const countBadge = document.getElementById('clientCountBadge');
@@ -322,10 +353,12 @@
         loading.style.display = 'block';
         countBadge.textContent = '…';
         try {
-          const { data: holdings, error: holdingsErr } = await supabaseClient
-            .from('stock_holdings_c').select('user_id,strategy_id').eq('is_active',true).eq('trade_side','BUY');
+          const [{ data: holdings, error: holdingsErr }, testIds] = await Promise.all([
+            supabaseClient.from('stock_holdings_c').select('user_id,strategy_id').eq('is_active',true).eq('trade_side','BUY'),
+            getTestUserIdSet(),
+          ]);
           if (holdingsErr) throw holdingsErr;
-          const userIds     = [...new Set((holdings||[]).map(h=>h.user_id).filter(Boolean))];
+          const userIds     = [...new Set((holdings||[]).map(h=>h.user_id).filter(Boolean))].filter(id=>!testIds.has(id));
           const strategyIds = [...new Set((holdings||[]).map(h=>h.strategy_id).filter(Boolean))];
           if (!userIds.length) { loading.style.display='none'; countBadge.textContent='0'; scrollArea.innerHTML='<div class="client-empty">No clients found.</div>'; return; }
           const { data: strategies } = await supabaseClient.from('strategies_c').select('id,name,short_name').in('id',strategyIds);
@@ -390,6 +423,7 @@
         scrollArea.innerHTML = '<div class="client-loading">Loading…</div>';
         countBadge.textContent = '…';
         try {
+          const testIds = await getTestUserIdSet();
           const results = [];
           let from = 0;
           const PAGE = 1000;
@@ -400,7 +434,7 @@
               .order('first_name', { ascending: true })
               .range(from, from + PAGE - 1);
             if (error) throw error;
-            if (data) results.push(...data);
+            if (data) results.push(...data.filter(p => !testIds.has(p.id)));
             if (!data || data.length < PAGE) break;
             from += PAGE;
           }
