@@ -669,7 +669,18 @@ module.exports = async (req, res) => {
           p_actor: authUser.id,
         },
       });
-      return sendJson(res, 200, { ok: true, boundary: result, valuation });
+      // Final checkpoint: model CA must equal explicit one-lot capital minus
+      // actual securities, and every affected client's residual must match its
+      // immutable cash-event closing balance. Reserve is verified separately
+      // and can never be folded into CA.
+      const caReconciliation = await requestSupabaseJson('/rest/v1/rpc/reconcile_rebalance_ca', {
+        method: 'POST',
+        body: {
+          p_batch_id: batchId,
+          p_actor: authUser.id,
+        },
+      });
+      return sendJson(res, 200, { ok: true, boundary: result, caReconciliation, valuation });
     }
 
     // Rebalance settlement creates immutable holding/audit rows and an activity
