@@ -1402,6 +1402,7 @@
         <button class="orderbook-tab-btn" id="closedBooksTab" type="button" role="tab" aria-selected="false" aria-controls="closedBooksPanel">Closed Books</button>
         <button class="orderbook-tab-btn" id="pendingRebalancesTab" type="button" role="tab" aria-selected="false" aria-controls="pendingRebalancesPanel">Rebalances</button>
         <button class="orderbook-tab-btn" id="strateBirTab" type="button" role="tab" aria-selected="false" aria-controls="strateBirPanel">Strate BIR</button>
+        <button class="orderbook-tab-btn" id="giftsTab" type="button" role="tab" aria-selected="false" aria-controls="giftsPanel">Gifts<span id="giftsTabBadge" style="display:none;background:#ef4444;color:#fff;font-size:9px;font-weight:700;min-width:15px;height:15px;border-radius:999px;padding:0 3px;line-height:15px;text-align:center;margin-left:5px;vertical-align:middle;"></span></button>
         <div class="orderbook-tab-search">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13 11a5 5 0 10-1.41 1.41l3.54 3.55 1.41-1.42L13 11zm-5 1a4 4 0 110-8 4 4 0 010 8z"/></svg>
           <input id="orderbookSearch" type="search" placeholder="Search instrument, ticker, side&hellip;" aria-label="Search orderbook">
@@ -1532,8 +1533,142 @@
         </div>
       </div>
 
+      <!-- ═══════════════════════════════════════════════════════════ GIFTS TAB -->
+      <style>
+        .gifts-card { background: #fff; border: 1px solid #e8e6f0; border-radius: 16px; overflow: hidden; }
+        .gifts-stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1px; background: #e8e6f0; border-bottom: 1px solid #e8e6f0; }
+        @media (max-width: 1100px) { .gifts-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        .gifts-stat { background: #fff; padding: 14px 16px; }
+        .gifts-stat-alert { background: #fefce8; }
+        .gifts-stat-label { font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: #94a3b8; margin-bottom: 6px; }
+        .gifts-stat-value { font-size: 22px; font-weight: 700; }
+        .gifts-v-purple { color: #6c5ce7; } .gifts-v-blue { color: #185fa5; } .gifts-v-amber { color: #854f0b; }
+        .gifts-v-green  { color: #0f6e56; } .gifts-v-slate  { color: #475569; }
+        .gifts-filter-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+        .gifts-pill { font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 999px; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; cursor: pointer; transition: all 0.12s; }
+        .gifts-pill:hover { border-color: #6c5ce7; color: #6c5ce7; }
+        .gifts-pill.active { background: #ede9fe; border-color: #6c5ce7; color: #5b21b6; font-weight: 600; }
+        .gifts-person-cell { display: flex; align-items: center; gap: 8px; }
+        .gifts-avatar { width: 28px; height: 28px; border-radius: 50%; background: #6c5ce7; color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .gifts-person-name { font-size: 13px; color: #0f172a; font-weight: 500; line-height: 1.3; }
+        .gifts-person-email { font-size: 11px; color: #94a3b8; }
+        .gifts-asset-cell { display: flex; flex-direction: column; gap: 2px; }
+        .gifts-asset-name { font-size: 13px; color: #0f172a; font-weight: 500; }
+        .gifts-isin { font-size: 11px; color: #94a3b8; font-family: monospace; }
+        .gifts-type-badge { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 6px; border-radius: 999px; width: fit-content; }
+        .gifts-type-share  { background: #ede9fe; color: #5b21b6; }
+        .gifts-type-etf    { background: #e0f2fe; color: #0369a1; }
+        .gifts-type-basket { background: #fef3c7; color: #92400e; }
+        .gifts-type-legacy { background: #f1f5f9; color: #64748b; }
+        .gifts-row-alert { background: #fffbeb !important; }
+        .gifts-row-alert:hover { background: #fef9e7 !important; }
+        .gifts-action-btn { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 6px; border: 1px solid; cursor: pointer; transition: all 0.12s; }
+        .gifts-btn-fill    { background: #ede9fe; border-color: #6c5ce7; color: #5b21b6; }
+        .gifts-btn-fill:hover { background: #6c5ce7; color: #fff; }
+        .gifts-btn-approve { background: #dcfce7; border-color: #16a34a; color: #15803d; }
+        .gifts-btn-approve:hover { background: #16a34a; color: #fff; }
+        .gifts-btn-cancel  { background: #fee2e2; border-color: #ef4444; color: #b91c1c; }
+        .gifts-btn-cancel:hover { background: #ef4444; color: #fff; }
+        .gifts-btn-reject  { background: #fef3c7; border-color: #f59e0b; color: #92400e; }
+        .gifts-btn-reject:hover { background: #f59e0b; color: #fff; }
+        .gifts-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        /* Fill modal */
+        .gifts-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.55); z-index: 9000; display: none; align-items: center; justify-content: center; }
+        .gifts-modal { background: #fff; border-radius: 16px; padding: 28px; width: 380px; max-width: calc(100vw - 40px); box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+        .gifts-modal h3 { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+        .gifts-modal-sub { font-size: 12px; color: #94a3b8; margin-bottom: 20px; }
+        .gifts-modal-field { margin-bottom: 14px; }
+        .gifts-modal-field label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 5px; }
+        .gifts-modal-field input { width: 100%; padding: 8px 11px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.12s; }
+        .gifts-modal-field input:focus { border-color: #6c5ce7; }
+        .gifts-modal-max { font-size: 11px; color: #94a3b8; margin-top: 3px; }
+        .gifts-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+        .gifts-modal-btn { font-size: 13px; font-weight: 600; padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer; }
+        .gifts-modal-btn-cancel { background: #f1f5f9; color: #64748b; }
+        .gifts-modal-btn-cancel:hover { background: #e2e8f0; }
+        .gifts-modal-btn-confirm { background: #6c5ce7; color: #fff; }
+        .gifts-modal-btn-confirm:hover { background: #5b21b6; }
+        .gifts-modal-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+      </style>
+
+      <div class="orderbook-tab-panel" id="giftsPanel" role="tabpanel" aria-labelledby="giftsTab">
+        <div class="gifts-card">
+          <!-- Stats strip -->
+          <div class="gifts-stats" id="giftsStats">
+            <div class="gifts-stat"><div class="gifts-stat-label">Total Gifts</div><div class="gifts-stat-value gifts-v-purple">—</div></div>
+            <div class="gifts-stat"><div class="gifts-stat-label">Pending Fill</div><div class="gifts-stat-value gifts-v-blue">—</div></div>
+            <div class="gifts-stat gifts-stat-alert"><div class="gifts-stat-label">⚠ Needs Approval</div><div class="gifts-stat-value gifts-v-amber">—</div></div>
+            <div class="gifts-stat"><div class="gifts-stat-label">Filled</div><div class="gifts-stat-value gifts-v-green">—</div></div>
+            <div class="gifts-stat"><div class="gifts-stat-label">Cancelled / Expired</div><div class="gifts-stat-value gifts-v-slate">—</div></div>
+            <div class="gifts-stat"><div class="gifts-stat-label">Total Reserved</div><div class="gifts-stat-value gifts-v-purple" style="font-size:14px;margin-top:4px;">—</div></div>
+          </div>
+          <!-- Toolbar -->
+          <div class="orderbook-toolbar" style="flex-wrap:wrap;gap:8px;padding:12px 16px;border-bottom:1px solid #f0eef8;">
+            <div class="gifts-filter-pills" id="giftsFilterPills">
+              <button class="gifts-pill active" data-filter="all">All</button>
+              <button class="gifts-pill" data-filter="pending">Pending fill</button>
+              <button class="gifts-pill" data-filter="approval">Needs approval</button>
+              <button class="gifts-pill" data-filter="filled">Filled</button>
+              <button class="gifts-pill" data-filter="cancelled">Cancelled / Expired</button>
+            </div>
+            <div class="orderbook-toolbar-actions">
+              <div class="orderbook-tab-search" style="margin:0;">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13 11a5 5 0 10-1.41 1.41l3.54 3.55 1.41-1.42L13 11zm-5 1a4 4 0 110-8 4 4 0 010 8z"/></svg>
+                <input id="giftsSearch" type="search" placeholder="Search gifter, recipient, asset…" aria-label="Search gifts">
+              </div>
+              <button class="orderbook-export-btn" id="giftsRefreshBtn" type="button">↻ Refresh</button>
+            </div>
+          </div>
+          <!-- Table -->
+          <div class="orderbook-table-wrap">
+            <table class="orderbook-table" style="min-width:1100px;">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Gifter</th>
+                  <th>Recipient</th>
+                  <th>Asset</th>
+                  <th style="text-align:right;">Qty</th>
+                  <th style="text-align:right;">Live Price</th>
+                  <th style="text-align:right;">Max Fill</th>
+                  <th style="text-align:right;">Avg Fill</th>
+                  <th style="text-align:right;">Reserved</th>
+                  <th style="text-align:right;">Paid</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="giftsTableBody">
+                <tr><td colspan="12" class="orderbook-empty-row">Select the Gifts tab to load data.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </section>
   </main>
+
+  <!-- Fill / Approve modal -->
+  <div class="gifts-modal-overlay" id="giftsFillOverlay">
+    <div class="gifts-modal">
+      <h3 id="giftsFillModalTitle">Fill Gift Order</h3>
+      <p class="gifts-modal-sub">Enter the actual fill details from the broker confirmation.</p>
+      <div class="gifts-modal-field">
+        <label for="giftsFillPrice">Fill Price (ZAR per unit)</label>
+        <input type="number" id="giftsFillPrice" min="0.01" step="0.01" placeholder="e.g. 142.50" />
+        <div class="gifts-modal-max" id="giftsFillMaxLabel"></div>
+      </div>
+      <div class="gifts-modal-field">
+        <label for="giftsFillQty">Quantity Filled</label>
+        <input type="number" id="giftsFillQty" min="1" step="1" placeholder="e.g. 5" />
+      </div>
+      <div class="gifts-modal-actions">
+        <button class="gifts-modal-btn gifts-modal-btn-cancel" id="giftsFillCancelBtn" type="button">Cancel</button>
+        <button class="gifts-modal-btn gifts-modal-btn-confirm" id="giftsFillConfirmBtn" type="button">Confirm</button>
+      </div>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- SheetJS (xlsx parsing) — used by the broker-fills uploader to read the
@@ -1569,6 +1704,8 @@
     const strateBirTypeFilter = document.getElementById('strateBirTypeFilter');
     const strateBirPreviewHead = document.getElementById('strateBirPreviewHead');
     const strateBirPreviewBody = document.getElementById('strateBirPreviewBody');
+    const giftsTab = document.getElementById('giftsTab');
+    const giftsPanel = document.getElementById('giftsPanel');
     let allOrderbookRows = [];
     // ── UAT mode ──────────────────────────────────────────────────────────────
     // The live orderbook hides orders owned by dedicated TEST accounts
@@ -4412,12 +4549,13 @@
     };
 
     const setActiveTab = (tabName) => {
-      const validTabs = ['closed', 'strate-bir', 'pending-rebalances'];
+      const validTabs = ['closed', 'strate-bir', 'pending-rebalances', 'gifts'];
       const normalizedTab = validTabs.includes(tabName) ? tabName : 'active';
       const isActiveBooks = normalizedTab === 'active';
       const isClosedBooks = normalizedTab === 'closed';
       const isStrateBir = normalizedTab === 'strate-bir';
       const isPendingRebalances = normalizedTab === 'pending-rebalances';
+      const isGifts = normalizedTab === 'gifts';
 
       if (activeBooksTab) {
         activeBooksTab.classList.toggle('active', isActiveBooks);
@@ -4435,6 +4573,10 @@
         strateBirTab.classList.toggle('active', isStrateBir);
         strateBirTab.setAttribute('aria-selected', isStrateBir ? 'true' : 'false');
       }
+      if (giftsTab) {
+        giftsTab.classList.toggle('active', isGifts);
+        giftsTab.setAttribute('aria-selected', isGifts ? 'true' : 'false');
+      }
       if (activeBooksPanel) {
         activeBooksPanel.classList.toggle('active', isActiveBooks);
       }
@@ -4446,6 +4588,9 @@
       }
       if (pendingRebalancesPanel) {
         pendingRebalancesPanel.classList.toggle('active', isPendingRebalances);
+      }
+      if (giftsPanel) {
+        giftsPanel.classList.toggle('active', isGifts);
       }
     };
 
@@ -6961,6 +7106,13 @@
 
     if (strateBirTab) {
       strateBirTab.addEventListener('click', () => setActiveTab('strate-bir'));
+    }
+
+    if (giftsTab) {
+      giftsTab.addEventListener('click', () => {
+        setActiveTab('gifts');
+        if (window.loadGifts) window.loadGifts();
+      });
     }
 
     const fmtRand = (cents) => {
@@ -10103,6 +10255,290 @@
     </div>
   </div>
 </div>
+
+<script>
+// ═══════════════════════════════════════════════════════ GIFTS TAB LOGIC
+(function () {
+  'use strict';
+
+  var fmtR = function (cents) {
+    if (cents == null || cents === '') return '—';
+    return 'R\u00a0' + (Number(cents) / 100).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+  var fmtDate = function (iso) {
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', dateStyle: 'medium', timeStyle: 'short' }); }
+    catch (e) { return String(iso); }
+  };
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  };
+
+  var STATUS_LABELS = {
+    AUTHORIZED: 'Authorized', PARKED: 'Parked', WORKING: 'Working',
+    PENDING_GIFTER_APPROVAL: 'Needs Approval', FILLED: 'Filled',
+    CANCELLED: 'Cancelled', AUTO_CANCELLED: 'Auto-cancelled',
+    EXPIRED: 'Expired', REJECTED: 'Rejected', FAILED: 'Failed',
+  };
+  // Map to existing orderbook filled-status-pill CSS classes
+  var STATUS_CLASS = {
+    AUTHORIZED: 'is-open', PARKED: 'is-open', WORKING: 'is-open',
+    PENDING_GIFTER_APPROVAL: 'is-pending-approval',
+    FILLED: 'is-filled',
+    CANCELLED: '', AUTO_CANCELLED: '',
+    EXPIRED: '', REJECTED: '', FAILED: '',
+  };
+
+  var allGifts = [];
+  var currentFilter = 'all';
+  var currentSearch = '';
+
+  function getToken() {
+    var key = Object.keys(localStorage).find(function (k) { return k.startsWith('sb-') && k.endsWith('-auth-token'); });
+    if (!key) return null;
+    try { return JSON.parse(localStorage.getItem(key)).access_token || null; }
+    catch (e) { return null; }
+  }
+
+  function apiFetch(action, body) {
+    var tok = getToken();
+    if (!tok) return Promise.reject(new Error('Not authenticated'));
+    var isPost = !!body;
+    return fetch('/api/gifting?action=' + action, {
+      method: isPost ? 'POST' : 'GET',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+      body: isPost ? JSON.stringify(body) : undefined,
+    }).then(function (resp) {
+      return resp.json().catch(function () { return {}; }).then(function (json) {
+        if (!resp.ok) throw new Error(json.error || 'HTTP ' + resp.status);
+        return json;
+      });
+    });
+  }
+
+  function renderStats(stats) {
+    var el = document.getElementById('giftsStats');
+    if (!el || !stats) return;
+    el.innerHTML =
+      '<div class="gifts-stat"><div class="gifts-stat-label">Total Gifts</div><div class="gifts-stat-value gifts-v-purple">' + stats.total + '</div></div>' +
+      '<div class="gifts-stat"><div class="gifts-stat-label">Pending Fill</div><div class="gifts-stat-value gifts-v-blue">' + stats.pending + '</div></div>' +
+      '<div class="gifts-stat gifts-stat-alert"><div class="gifts-stat-label">⚠ Needs Approval</div><div class="gifts-stat-value gifts-v-amber">' + stats.needs_approval + '</div></div>' +
+      '<div class="gifts-stat"><div class="gifts-stat-label">Filled</div><div class="gifts-stat-value gifts-v-green">' + stats.filled + '</div></div>' +
+      '<div class="gifts-stat"><div class="gifts-stat-label">Cancelled / Expired</div><div class="gifts-stat-value gifts-v-slate">' + (stats.cancelled + stats.expired) + '</div></div>' +
+      '<div class="gifts-stat"><div class="gifts-stat-label">Total Reserved</div><div class="gifts-stat-value gifts-v-purple" style="font-size:14px;margin-top:4px;">' + fmtR(stats.total_reserved_cents) + '</div></div>';
+  }
+
+  function filterGifts() {
+    var rows = allGifts;
+    if (currentFilter !== 'all') {
+      rows = rows.filter(function (g) {
+        var s = g.status;
+        if (currentFilter === 'pending')    return ['AUTHORIZED','PARKED','WORKING'].indexOf(s) !== -1;
+        if (currentFilter === 'approval')   return s === 'PENDING_GIFTER_APPROVAL';
+        if (currentFilter === 'filled')     return s === 'FILLED';
+        if (currentFilter === 'cancelled')  return ['CANCELLED','AUTO_CANCELLED','EXPIRED','REJECTED','FAILED'].indexOf(s) !== -1;
+        return true;
+      });
+    }
+    if (currentSearch) {
+      var q = currentSearch.toLowerCase();
+      rows = rows.filter(function (g) {
+        return [g.gifter_name, g.gifter_email, g.recipient_name, g.asset_name, g.isin, STATUS_LABELS[g.status] || g.status]
+          .some(function (v) { return String(v || '').toLowerCase().indexOf(q) !== -1; });
+      });
+    }
+    return rows;
+  }
+
+  function buildActionsHtml(g) {
+    if (g._source !== 'authorization') return '<span style="color:#a0aec0;font-size:11px;">Legacy</span>';
+    var s = g.status;
+    var parts = [];
+    if (['AUTHORIZED','PARKED','WORKING'].indexOf(s) !== -1) {
+      parts.push('<button class="gifts-action-btn gifts-btn-fill" data-id="' + esc(g.id) + '" data-max="' + (g.max_acceptable_fill_cents || '') + '">Fill</button>');
+      parts.push('<button class="gifts-action-btn gifts-btn-cancel" data-id="' + esc(g.id) + '">Cancel</button>');
+    }
+    if (s === 'PENDING_GIFTER_APPROVAL') {
+      parts.push('<button class="gifts-action-btn gifts-btn-approve" data-id="' + esc(g.id) + '" data-max="' + (g.max_acceptable_fill_cents || '') + '">Approve</button>');
+      parts.push('<button class="gifts-action-btn gifts-btn-reject" data-id="' + esc(g.id) + '">Reject</button>');
+    }
+    return parts.length ? parts.join('\u00a0') : '<span style="color:#a0aec0;font-size:11px;">—</span>';
+  }
+
+  function renderTable() {
+    var tbody = document.getElementById('giftsTableBody');
+    if (!tbody) return;
+    var rows = filterGifts();
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="12" class="orderbook-empty-row">No gifts match this filter.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(function (g) {
+      var statusLabel = STATUS_LABELS[g.status] || g.status;
+      var statusCls   = STATUS_CLASS[g.status] || 'ob-status-parked';
+      var instType    = String(g.instrument_type || '').toLowerCase();
+      var typeBadge   = g.instrument_type
+        ? '<span class="gifts-type-badge gifts-type-' + esc(instType) + '">' + esc(g.instrument_type) + '</span>'
+        : (g._source === 'claim' ? '<span class="gifts-type-badge gifts-type-legacy">Legacy</span>' : '');
+      var assetHtml =
+        '<div class="gifts-asset-cell">' +
+          '<span class="gifts-asset-name">' + esc(g.asset_name || g.isin || '—') + '</span>' +
+          typeBadge +
+          (g.isin ? '<span class="gifts-isin">' + esc(g.isin) + '</span>' : '') +
+        '</div>';
+      var rowCls = g.status === 'PENDING_GIFTER_APPROVAL' ? ' class="gifts-row-alert"' : '';
+      var fillStyle = g.fill_price_cents ? 'color:#0f6e56;font-weight:600;' : '';
+      var paidStyle = g.paid_amount_cents ? 'color:#0f6e56;font-weight:600;' : '';
+      return '<tr' + rowCls + '>' +
+        '<td style="white-space:nowrap;color:#64748b;font-size:12px;">' + fmtDate(g.created_at) + '</td>' +
+        '<td><div class="gifts-person-cell">' +
+          '<div class="gifts-avatar">' + esc(String(g.gifter_name || '?').substring(0,2).toUpperCase()) + '</div>' +
+          '<div><div class="gifts-person-name">' + esc(g.gifter_name || '—') + '</div>' +
+          (g.gifter_email ? '<div class="gifts-person-email">' + esc(g.gifter_email) + '</div>' : '') +
+          '</div></div></td>' +
+        '<td>' + (g.recipient_name
+          ? '<div class="gifts-person-name">' + esc(g.recipient_name) + '</div>'
+          : '<span style="color:#a0aec0;font-size:12px;">Unclaimed</span>') + '</td>' +
+        '<td>' + assetHtml + '</td>' +
+        '<td style="text-align:right;">' + (g.quantity != null ? Number(g.quantity).toLocaleString('en-ZA') : '—') + '</td>' +
+        '<td style="text-align:right;font-variant-numeric:tabular-nums;">' + fmtR(g.live_price_cents) + '</td>' +
+        '<td style="text-align:right;font-variant-numeric:tabular-nums;">' + fmtR(g.max_acceptable_fill_cents) + '</td>' +
+        '<td style="text-align:right;font-variant-numeric:tabular-nums;' + fillStyle + '">' + fmtR(g.fill_price_cents) + '</td>' +
+        '<td style="text-align:right;font-variant-numeric:tabular-nums;">' + fmtR(g.reserved_amount_cents) + '</td>' +
+        '<td style="text-align:right;font-variant-numeric:tabular-nums;' + paidStyle + '">' + fmtR(g.paid_amount_cents) + '</td>' +
+        '<td><span class="filled-status-pill ' + statusCls + '">' + esc(statusLabel) + '</span></td>' +
+        '<td style="white-space:nowrap;">' + buildActionsHtml(g) + '</td>' +
+        '</tr>';
+    }).join('');
+    bindActionButtons();
+  }
+
+  function showFillModal(opts) {
+    var overlay = document.getElementById('giftsFillOverlay');
+    if (!overlay) return;
+    document.getElementById('giftsFillModalTitle').textContent = opts.title;
+    document.getElementById('giftsFillPrice').value = '';
+    document.getElementById('giftsFillQty').value = '';
+    var maxLabel = document.getElementById('giftsFillMaxLabel');
+    if (maxLabel) maxLabel.textContent = opts.maxCents ? 'Gifter ceiling: ' + fmtR(opts.maxCents) : '';
+    overlay.dataset.id = opts.id;
+    overlay.dataset.action = opts.action;
+    overlay.style.display = 'flex';
+    setTimeout(function () { document.getElementById('giftsFillPrice').focus(); }, 60);
+  }
+
+  function hideFillModal() {
+    var overlay = document.getElementById('giftsFillOverlay');
+    if (overlay) overlay.style.display = 'none';
+  }
+
+  function bindActionButtons() {
+    document.querySelectorAll('.gifts-btn-fill').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        showFillModal({ id: btn.dataset.id, maxCents: btn.dataset.max, title: 'Fill Gift Order', action: 'fill' });
+      });
+    });
+    document.querySelectorAll('.gifts-btn-approve').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        showFillModal({ id: btn.dataset.id, maxCents: btn.dataset.max, title: 'Approve Fill (above gifter ceiling)', action: 'approve' });
+      });
+    });
+    document.querySelectorAll('.gifts-btn-cancel').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (!confirm('Cancel this gift? The gifter\'s wallet reservation will be released. This cannot be undone.')) return;
+        btn.disabled = true; btn.textContent = '…';
+        apiFetch('cancel', { id: btn.dataset.id })
+          .then(function () { return window.loadGifts(); })
+          .catch(function (err) { alert('Cancel failed: ' + err.message); btn.disabled = false; btn.textContent = 'Cancel'; });
+      });
+    });
+    document.querySelectorAll('.gifts-btn-reject').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (!confirm('Reject this fill and cancel the gift? The gifter will not be charged. This cannot be undone.')) return;
+        btn.disabled = true; btn.textContent = '…';
+        apiFetch('reject', { id: btn.dataset.id })
+          .then(function () { return window.loadGifts(); })
+          .catch(function (err) { alert('Reject failed: ' + err.message); btn.disabled = false; btn.textContent = 'Reject'; });
+      });
+    });
+  }
+
+  function loadGifts() {
+    var tbody = document.getElementById('giftsTableBody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="12" class="orderbook-empty-row">Loading gifts…</td></tr>';
+    return apiFetch('list')
+      .then(function (data) {
+        allGifts = data.gifts || [];
+        renderStats(data.stats);
+        renderTable();
+        // Badge on tab button
+        var badge = document.getElementById('giftsTabBadge');
+        var needsApproval = (data.stats && data.stats.needs_approval) || 0;
+        if (badge) {
+          badge.textContent = needsApproval || '';
+          badge.style.display = needsApproval > 0 ? 'inline-flex' : 'none';
+        }
+      })
+      .catch(function (err) {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="12" class="orderbook-empty-row" style="color:#b42318;">Failed to load gifts: ' + esc(err.message) + '</td></tr>';
+        console.error('[giftsTab] load error:', err);
+      });
+  }
+
+  // Expose globally so the tab click listener (defined above) can call it
+  window.loadGifts = loadGifts;
+
+  // Wire up controls once DOM is ready
+  document.addEventListener('DOMContentLoaded', function () {
+    // Filter pills
+    document.querySelectorAll('.gifts-pill').forEach(function (pill) {
+      pill.addEventListener('click', function () {
+        document.querySelectorAll('.gifts-pill').forEach(function (p) { p.classList.remove('active'); });
+        pill.classList.add('active');
+        currentFilter = pill.dataset.filter;
+        renderTable();
+      });
+    });
+
+    // Search
+    var searchEl = document.getElementById('giftsSearch');
+    if (searchEl) searchEl.addEventListener('input', function () { currentSearch = searchEl.value.trim(); renderTable(); });
+
+    // Refresh
+    var refreshBtn = document.getElementById('giftsRefreshBtn');
+    if (refreshBtn) refreshBtn.addEventListener('click', function () { loadGifts(); });
+
+    // Fill modal confirm
+    var fillConfirmBtn = document.getElementById('giftsFillConfirmBtn');
+    if (fillConfirmBtn) {
+      fillConfirmBtn.addEventListener('click', function () {
+        var overlay  = document.getElementById('giftsFillOverlay');
+        var id       = overlay && overlay.dataset.id;
+        var action   = (overlay && overlay.dataset.action) || 'fill';
+        var priceRaw = parseFloat(document.getElementById('giftsFillPrice').value);
+        var qty      = parseInt(document.getElementById('giftsFillQty').value, 10);
+        if (!id || isNaN(priceRaw) || priceRaw <= 0 || isNaN(qty) || qty <= 0) {
+          alert('Please enter a valid fill price (ZAR) and quantity.'); return;
+        }
+        var orig = fillConfirmBtn.textContent;
+        fillConfirmBtn.disabled = true; fillConfirmBtn.textContent = 'Saving…';
+        apiFetch(action, { id: id, fill_price_cents: Math.round(priceRaw * 100), fill_quantity: qty })
+          .then(function () { hideFillModal(); return loadGifts(); })
+          .catch(function (err) { alert('Action failed: ' + err.message); })
+          .finally(function () { fillConfirmBtn.disabled = false; fillConfirmBtn.textContent = orig; });
+      });
+    }
+
+    // Fill modal cancel / backdrop
+    var fillCancelBtn = document.getElementById('giftsFillCancelBtn');
+    if (fillCancelBtn) fillCancelBtn.addEventListener('click', hideFillModal);
+    var overlay = document.getElementById('giftsFillOverlay');
+    if (overlay) overlay.addEventListener('click', function (e) { if (e.target === overlay) hideFillModal(); });
+  });
+})();
+</script>
 
 <script>
 (function(){

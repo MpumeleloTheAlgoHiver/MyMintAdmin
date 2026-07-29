@@ -14,6 +14,7 @@ const cyberComplianceHandler = require('./api/cyber-compliance');
 const sendEftEmailHandler = require('./api/send-eft-email');
 const orderbookUpdatePriceHandler = require('./api/orderbook/update-price');
 const orderbookSendCsvHandler = require('./api/orderbook/send-csv');
+const giftingHandler = require('./api/gifting');
 const dividendsExtractHandler  = require('./api/_dividends-extract');
 const dividendsRunsHandler     = require('./api/_dividends-runs'); // also handles /payouts + /alliance-news
 const { runHealthCheck } = require('./api/monitor/_health-check');
@@ -1166,6 +1167,17 @@ const server = http.createServer((req, res) => {
           error: 'Could not send trade confirmation',
           details: error?.message || 'Unknown error'
         });
+      }
+    })();
+    return;
+  }
+
+  if (req.url.startsWith('/api/gifting')) {
+    (async () => {
+      try {
+        await giftingHandler(req, res);
+      } catch (err) {
+        if (!res.headersSent) sendJson(res, 500, { error: err.message });
       }
     })();
     return;
