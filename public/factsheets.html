@@ -608,44 +608,36 @@
       return out;
     };
 
-    /* Build a cash-flow-neutral wealth index from the canonical daily return
-       chain. Rebalance proceeds and composition changes must never be inferred
-       as gains or losses from absolute basket_value movements. */
+    /* Plot the canonical cumulative YTD field directly. Re-compounding 1d_pct
+       is unsafe across legacy year resets (and was the remaining source of
+       visible rebalance/reset cliffs). The publisher already chain-links YTD
+       through composition changes, including continuity cash. */
     const canonicalReturnSeries = rows => {
       const ordered = [...(rows || [])]
-        .filter(r => r.as_of_date)
+        .filter(r => r.as_of_date && Number.isFinite(Number(r.ytd_pct)))
         .sort((a,b)=>String(a.as_of_date).localeCompare(String(b.as_of_date)));
       if (!ordered.length) return [];
-      let value = 100;
-      return ordered.map((row,index)=>{
-        if (index > 0) {
-          let daily = Number(row['1d_pct']);
-          if (!Number.isFinite(daily)) {
-            const current = Number(row.ytd_pct);
-            const previous = Number(ordered[index-1]?.ytd_pct);
-            daily = Number.isFinite(current) && Number.isFinite(previous) && previous !== -100
-              ? (((1 + current / 100) / (1 + previous / 100)) - 1) * 100
-              : 0;
-          }
-          value *= 1 + daily / 100;
-        }
-        return value;
-      });
+      const latestYear = String(ordered.at(-1).as_of_date).slice(0,4);
+      return ordered
+        .filter(row=>String(row.as_of_date).startsWith(latestYear))
+        .map(row=>100*(1+Number(row.ytd_pct)/100));
     };
 
     const canonicalCalendarReturns = rows => {
-      const monthly = {};
+      const monthEnds = {};
       for (const row of rows || []) {
-        if (!row.as_of_date) continue;
-        const daily = Number(row['1d_pct']);
-        if (!Number.isFinite(daily)) continue;
+        if (!row.as_of_date || !Number.isFinite(Number(row.ytd_pct))) continue;
         const ym = String(row.as_of_date).slice(0,7);
-        monthly[ym] = (monthly[ym] ?? 1) * (1 + daily / 100);
+        monthEnds[ym] = 1 + Number(row.ytd_pct) / 100;
       }
       const out = {};
-      for (const [ym,factor] of Object.entries(monthly)) {
+      let previousYear = null, previousFactor = 1;
+      for (const [ym,factor] of Object.entries(monthEnds).sort(([a],[b])=>a.localeCompare(b))) {
         const [year,month] = ym.split('-');
-        (out[year] ||= {})[month] = factor - 1;
+        if (year !== previousYear) previousFactor = 1;
+        (out[year] ||= {})[month] = previousFactor ? factor / previousFactor - 1 : null;
+        previousYear = year;
+        previousFactor = factor;
       }
       return out;
     };
@@ -1001,7 +993,7 @@
       /* Returns */
       const { data: productionRetRows } = await supabaseClient
         .from('strategy_returns_effective_c')
-        .select('strategy_id,ytd_pct,all_pct,"1d_pct",basket_value,continuity_cash_cents,securities_value_cents,as_of_date')
+        .select('strategy_id,ytd_pct,all_pct,"1d_pct",basket_value,continuity_cash_cents,securities_value_cents,source_kind,as_of_date')
         .eq('strategy_id',strategyId)
         .order('as_of_date',{ascending:true});
       const retRows = _repairStrategyMap[strategyId] || productionRetRows || [];

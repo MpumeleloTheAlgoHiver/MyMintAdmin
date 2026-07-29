@@ -3520,6 +3520,9 @@
                   '5y_pct': null,
                   basket_value: row.chain_nav_cents,
                   complete_value_cents: row.complete_value_cents,
+                  continuity_cash_cents: row.continuity_cash_cents,
+                  securities_value_cents: row.securities_value_cents,
+                  all_pct: row.all_pct ?? null,
                   as_of_date: row.as_of_date,
                   repair_run_id: preview.run.id
                 };
@@ -3547,7 +3550,7 @@
         const results = await Promise.all(
           chunks.map(chunk =>
             supabaseClient.from('strategy_returns_effective_latest_c')
-              .select('strategy_id, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct, basket_value, as_of_date')
+              .select('strategy_id, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct, all_pct, basket_value, continuity_cash_cents, securities_value_cents, as_of_date')
               .in('strategy_id', chunk)
           )
         );
@@ -5081,7 +5084,7 @@
             for (let i = 0; i < ids.length; i += 50) chunks90.push(ids.slice(i, i + 50));
             const sparkResults = await Promise.all(chunks90.map(chunk =>
               supabaseClient.from('strategy_returns_effective_c')
-                .select('strategy_id,basket_value,as_of_date')
+                .select('strategy_id,ytd_pct,as_of_date')
                 .in('strategy_id', chunk)
                 .gte('as_of_date', d90str)
                 .order('as_of_date', { ascending: true })
@@ -5089,9 +5092,9 @@
             const sparks = {};
             sparkResults.forEach(({ data: retRows }) => {
               (retRows || []).forEach(r => {
-                if (r.basket_value == null) return;
+                if (r.ytd_pct == null) return;
                 if (!sparks[r.strategy_id]) sparks[r.strategy_id] = [];
-                sparks[r.strategy_id].push(Number(r.basket_value));
+                sparks[r.strategy_id].push(100 * (1 + Number(r.ytd_pct) / 100));
               });
             });
             window._fsSparkMap = sparks;
@@ -5194,7 +5197,10 @@
         );
         const minInvestment =
           calculateMinInvestmentFromHoldings(holdings, securitiesMap) || null;
-        const cashAmount = minInvestment ? minInvestment * 0.08 : null;
+        const cashAmount = Math.max(0, Number(stratReturns.continuity_cash_cents || 0) / 100);
+        const canonicalSecurities = Math.max(0, Number(stratReturns.securities_value_cents || 0) / 100);
+        const canonicalTotal = canonicalSecurities + cashAmount;
+        const cashWeight = canonicalTotal > 0 ? (cashAmount / canonicalTotal) * 100 : 0;
 
         const holdingsWithMetrics = holdings.map((h) => {
           const rawSym3 =
@@ -5205,7 +5211,7 @@
             securitiesMap.get(sym) || securitiesMap.get(normalizeSymbol(sym));
           const rawWeight = Number(h.weight) || 0;
           const weightNorm =
-            totalWeight > 0 ? (rawWeight / totalWeight) * 100 : rawWeight;
+            (totalWeight > 0 ? (rawWeight / totalWeight) * 100 : rawWeight) * (1 - cashWeight / 100);
           const price = sec?.last_price ? Number(sec.last_price) : 0;
           const shares = Number(h.shares || h.quantity || 1);
           const mv = shares * price;
@@ -5224,20 +5230,21 @@
         });
 
         const nonCashHoldings = holdingsWithMetrics.filter(
-          (h) => h.symbol.toUpperCase() !== "CASH",
+          (h) => !["CASH","CA"].includes(h.symbol.toUpperCase()),
         );
         const formattedCashAmount = cashAmount
           ? formatCurrencyDetailed(cashAmount, strategy.base_currency || "ZAR")
           : null;
-        nonCashHoldings.push({
-          symbol: "CASH",
-          name: formattedCashAmount ? `Cash (${formattedCashAmount})` : "Cash",
-          weight: 8,
-          weightNorm: 8,
+        if (cashAmount > 0) nonCashHoldings.push({
+          symbol: "CA",
+          name: formattedCashAmount ? `Cash asset (${formattedCashAmount})` : "Cash asset",
+          weight: cashWeight,
+          weightNorm: cashWeight,
           logoUrl: null,
           dailyChange: null,
           shares: 0,
-          marketValue: cashAmount || 0,
+          marketValue: cashAmount,
+          isCash: true,
         });
 
         let html = "";
@@ -5320,8 +5327,8 @@
                     ${
                       h.logoUrl
                         ? `<img src="${h.logoUrl}" alt="${h.symbol}" class="w-full h-full object-cover" />`
-                        : h.symbol === "CASH"
-                          ? `<svg class="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="currentColor"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>`
+                        : h.isCash
+                          ? `<span class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px] font-bold">CA</span>`
                           : `<span class="text-[10px] font-semibold text-slate-500">${(h.symbol || "").slice(0, 2)}</span>`
                     }
                   </div>
@@ -5370,8 +5377,8 @@
                   ${
                     h.logoUrl
                       ? `<img src="${h.logoUrl}" alt="${h.symbol}" class="w-full h-full object-cover" />`
-                      : h.symbol === "CASH"
-                        ? `<svg class="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="currentColor"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>`
+                      : h.isCash
+                        ? `<span class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px] font-bold">CA</span>`
                         : `<span class="text-xs font-semibold text-slate-400">${(h.symbol || "").slice(0, 2)}</span>`
                   }
                 </div>
@@ -5808,7 +5815,7 @@
         window.__dbgBreadcrumb('ovSelect:fetch-analytics');
         const { data: _stratRetHistory } = await supabaseClient
           .from('strategy_returns_effective_c')
-          .select('strategy_id, as_of_date, basket_value, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct')
+          .select('strategy_id, as_of_date, basket_value, continuity_cash_cents, securities_value_cents, all_pct, 1d_pct, 5d_pct, 1m_pct, 6m_pct, ytd_pct, 1y_pct, 5y_pct')
           .eq('strategy_id', strat.id)
           .order('as_of_date', { ascending: true });
         const _stratRetRow = (_stratRetHistory && _stratRetHistory.length)
@@ -5825,8 +5832,11 @@
             const variance = dailyPcts.reduce((s, v) => s + (v - mean) ** 2, 0) / (dailyPcts.length - 1);
             calcVolatility = Math.sqrt(variance) * Math.sqrt(252);
           }
-          /* ── Compute max drawdown from basket_value series ── */
-          const navs = _stratRetHistory.map(r => Number(r.basket_value)).filter(v => v > 0);
+          /* Drawdown from canonical cumulative returns, never basket value. */
+          const latestYear = String(_stratRetHistory.at(-1)?.as_of_date || '').slice(0, 4);
+          const navs = _stratRetHistory
+            .filter(r => String(r.as_of_date || '').startsWith(latestYear) && Number.isFinite(Number(r.ytd_pct)))
+            .map(r => 100 * (1 + Number(r.ytd_pct) / 100));
           if (navs.length >= 2) {
             let peak = navs[0], maxDD = 0;
             navs.forEach(v => {
@@ -5838,8 +5848,12 @@
           }
         }
 
+        const latestReturnYear = String(_stratRetRow?.as_of_date || '').slice(0, 4);
+        const canonicalCurve = (_stratRetHistory || [])
+          .filter(r => String(r.as_of_date || '').startsWith(latestReturnYear) && Number.isFinite(Number(r.ytd_pct)))
+          .map(r => ({ date: r.as_of_date, value: Number(r.ytd_pct) }));
         const analytics = _stratRetRow
-          ? { ..._stratRetRow, ytd_return: _stratRetRow.ytd_pct ?? null, latest_value: _stratRetRow.basket_value ?? null }
+          ? { ..._stratRetRow, ytd_return: _stratRetRow.ytd_pct ?? null, latest_value: _stratRetRow.basket_value ?? null, curves: canonicalCurve }
           : null;
         const stratRet = _stratRetRow || null;
 
@@ -6007,7 +6021,11 @@
         window.__dbgBreadcrumb('ovSelect:render-perfchart');
         ovRenderPerfChart(analytics, strat.name || 'Strategy');
         window.__dbgBreadcrumb('ovSelect:render-sectorchart');
-        ovRenderSectorChart(holdings, secMap);
+        const strategyCashAsset = {
+          amount: Math.max(0, Number(_stratRetRow?.continuity_cash_cents || 0) / 100),
+          securities: Math.max(0, Number(_stratRetRow?.securities_value_cents || 0) / 100),
+        };
+        ovRenderSectorChart(holdings, secMap, strategyCashAsset);
         /* ── Fetch pending rebalance batches for this strategy ── */
         window.__dbgBreadcrumb('ovSelect:fetch-pending-rebalance');
         let pendingRebalance = null;
@@ -6045,7 +6063,7 @@
         } catch (e) { console.warn('[Overview] pending rebalance fetch failed:', e); }
 
         window.__dbgBreadcrumb('ovSelect:render-holdings');
-        ovRenderHoldings(holdings, secMap, pendingRebalance);
+        ovRenderHoldings(holdings, secMap, pendingRebalance, strategyCashAsset);
         window.__dbgBreadcrumb('ovSelect:render-investors');
         ovRenderInvestors(investRows, profiles, strat, analytics, txnInceptionMap, secPriceMap, pendingRebalance, familyMembers, residualByOwner, bufferByOwner, realizedByOwner);
         fetchNewsInsights();
@@ -6460,22 +6478,8 @@
         }
 
         if (!stratDates.length) {
-          const ytd = analytics?.ytd_return != null ? Number(analytics.ytd_return) : 0;
-          const now = new Date(); const soy = new Date(now.getFullYear(), 0, 2);
-          let sv = 100, bv = 100;
-          for (let d = new Date(soy); d <= now; d.setDate(d.getDate() + 1)) {
-            if (d.getDay() === 0 || d.getDay() === 6) continue;
-            stratDates.push(d.toISOString().split('T')[0]);
-            sv *= (1 + (Math.random() - 0.46) * 1.5);
-            bv *= (1 + (Math.random() - 0.48) * 1.2);
-            stratVals.push(+(sv - 100).toFixed(2));
-            benchVals.push(+(bv - 100).toFixed(2));
-          }
-          if (ytd && stratVals.length) {
-            const last = stratVals[stratVals.length - 1];
-            const sc = last !== 0 ? (ytd * 100) / last : 1;
-            for (let i = 0; i < stratVals.length; i++) stratVals[i] = +(stratVals[i] * sc).toFixed(2);
-          }
+          el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:12px;color:#94a3b8;">Canonical performance history unavailable</div>';
+          return;
         }
 
         try { _ovPerfChartInst = echarts.init(el, null, { renderer: 'canvas' }); } catch(e) { console.error('[Overview] ECharts init failed:', e); return; }
@@ -6524,7 +6528,7 @@
         _ovPerfResizeObs.observe(el);
       };
 
-      const ovRenderSectorChart = (holdings, secMap) => {
+      const ovRenderSectorChart = (holdings, secMap, cashAsset = {}) => {
         const el = document.getElementById('ovSectorChart');
         const legend = document.getElementById('ovSectorLegend');
         if (!el) return;
@@ -6539,11 +6543,19 @@
           const sector = sec?.sector || sym.replace('.JO', '') || 'Other';
           sectorMap[sector] = (sectorMap[sector] || 0) + (Number(h.weight) || 0);
         });
+        const cashAmount = Math.max(0, Number(cashAsset.amount || 0));
+        const securitiesAmount = Math.max(0, Number(cashAsset.securities || 0));
+        const cashWeight = cashAmount + securitiesAmount > 0 ? cashAmount / (cashAmount + securitiesAmount) * 100 : 0;
+        if (cashWeight > 0) {
+          Object.keys(sectorMap).forEach(key => { sectorMap[key] *= (1 - cashWeight / 100); });
+          sectorMap.CA = cashWeight;
+        }
 
+        const adjustedTotalWeight = Object.values(sectorMap).reduce((sum, value) => sum + Number(value || 0), 0);
         const colors = ['#2563eb', '#059669', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#65a30d', '#db2777'];
         const pieData = Object.entries(sectorMap).sort((a, b) => b[1] - a[1]).map(([name, val], i) => ({
-          name, value: totalWeight > 0 ? +((val / totalWeight) * 100).toFixed(1) : +val.toFixed(1),
-          itemStyle: { color: colors[i % colors.length] },
+          name, value: adjustedTotalWeight > 0 ? +((val / adjustedTotalWeight) * 100).toFixed(1) : +val.toFixed(1),
+          itemStyle: { color: name === 'CA' ? '#10b981' : colors[i % colors.length] },
         }));
 
         try { _ovSectorChartInst = echarts.init(el, null, { renderer: 'canvas' }); } catch(e) { console.error('[Overview] Sector chart init failed:', e); return; }
@@ -6578,10 +6590,11 @@
         el.__sectorResizeObs.observe(el);
       };
 
-      const ovRenderHoldings = (holdings, secMap, pendingRebalance) => {
+      const ovRenderHoldings = (holdings, secMap, pendingRebalance, cashAsset = {}) => {
         const el = document.getElementById('ovHoldingsTable');
         if (!el) return;
-        if (!holdings.length) {
+        const cashAmount = Math.max(0, Number(cashAsset.amount || 0));
+        if (!holdings.length && cashAmount <= 0) {
           el.innerHTML = '<div style="font-size:12px;color:#94a3b8;padding:12px 0;">No holdings configured for this strategy.</div>';
           return;
         }
@@ -6605,6 +6618,11 @@
           return { h, sym, sec, price, qty, mv, change, isPendingSell, isPendingBuy,
                    code: sym.replace('.JO', ''),
                    name: h.name || sec?.name || sym };
+        });
+        if (cashAmount > 0) enriched.push({
+          h: {}, sym: 'CA', sec: null, price: null, qty: 0, mv: cashAmount,
+          change: null, isPendingSell: false, isPendingBuy: false,
+          code: 'CA', name: 'Cash asset',
         });
 
         /* Total market value from live prices (fallback to 0) */
