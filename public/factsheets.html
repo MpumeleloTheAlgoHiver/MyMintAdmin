@@ -608,6 +608,48 @@
       return out;
     };
 
+    /* Build a cash-flow-neutral wealth index from the canonical daily return
+       chain. Rebalance proceeds and composition changes must never be inferred
+       as gains or losses from absolute basket_value movements. */
+    const canonicalReturnSeries = rows => {
+      const ordered = [...(rows || [])]
+        .filter(r => r.as_of_date)
+        .sort((a,b)=>String(a.as_of_date).localeCompare(String(b.as_of_date)));
+      if (!ordered.length) return [];
+      let value = 100;
+      return ordered.map((row,index)=>{
+        if (index > 0) {
+          let daily = Number(row['1d_pct']);
+          if (!Number.isFinite(daily)) {
+            const current = Number(row.ytd_pct);
+            const previous = Number(ordered[index-1]?.ytd_pct);
+            daily = Number.isFinite(current) && Number.isFinite(previous) && previous !== -100
+              ? (((1 + current / 100) / (1 + previous / 100)) - 1) * 100
+              : 0;
+          }
+          value *= 1 + daily / 100;
+        }
+        return value;
+      });
+    };
+
+    const canonicalCalendarReturns = rows => {
+      const monthly = {};
+      for (const row of rows || []) {
+        if (!row.as_of_date) continue;
+        const daily = Number(row['1d_pct']);
+        if (!Number.isFinite(daily)) continue;
+        const ym = String(row.as_of_date).slice(0,7);
+        monthly[ym] = (monthly[ym] ?? 1) * (1 + daily / 100);
+      }
+      const out = {};
+      for (const [ym,factor] of Object.entries(monthly)) {
+        const [year,month] = ym.split('-');
+        (out[year] ||= {})[month] = factor - 1;
+      }
+      return out;
+    };
+
     /* 2026-07-24: display-only de-spike for chart series. Pre-guarded-system
        ("LEGACY_PRODUCTION") basket_value history has no cash-neutral or
        composition-boundary handling, so an admin composition edit or a big
@@ -654,7 +696,7 @@
         const grouped = {};
         for (const row of preview.shadow || []) {
           if (!grouped[row.strategy_id]) grouped[row.strategy_id] = [];
-          grouped[row.strategy_id].push({strategy_id:row.strategy_id,as_of_date:row.as_of_date,basket_value:row.chain_nav_cents,complete_value_cents:row.complete_value_cents,ytd_pct:row.ytd_pct,repair_preview:true});
+          grouped[row.strategy_id].push({strategy_id:row.strategy_id,as_of_date:row.as_of_date,basket_value:row.chain_nav_cents,complete_value_cents:row.complete_value_cents,continuity_cash_cents:row.continuity_cash_cents,securities_value_cents:row.securities_value_cents,ytd_pct:row.ytd_pct,'1d_pct':row['1d_pct'],repair_preview:true});
         }
         for (const rows of Object.values(grouped)) rows.sort((a,b)=>String(a.as_of_date).localeCompare(String(b.as_of_date)));
         _repairStrategyMap = grouped;
@@ -959,7 +1001,7 @@
       /* Returns */
       const { data: productionRetRows } = await supabaseClient
         .from('strategy_returns_effective_c')
-        .select('strategy_id,ytd_pct,basket_value,as_of_date')
+        .select('strategy_id,ytd_pct,all_pct,"1d_pct",basket_value,continuity_cash_cents,securities_value_cents,as_of_date')
         .eq('strategy_id',strategyId)
         .order('as_of_date',{ascending:true});
       const retRows = _repairStrategyMap[strategyId] || productionRetRows || [];
@@ -968,13 +1010,13 @@
       const ytdVal = latestRet?.ytd_pct != null ? Number(latestRet.ytd_pct) : null;
       const isUp = ytdVal == null ? true : ytdVal >= 0;
 
-      /* Chart data from basket_value */
-      const chartData = despikeSeries((retRows||[]).map(r=>Number(r.basket_value)).filter(v=>!Number.isNaN(v)&&v!=null));
+      /* Canonical return chain: rebalance-safe and cash-flow neutral. */
+      const chartData = canonicalReturnSeries(retRows);
       const sparkForDetail = chartData.length>=2 ? expandSpark(chartData,60) : null;
 
       /* Holdings with metrics */
       const totalWeight = holdings.reduce((s,h)=>s+(Number(h.weight)||0),0);
-      const holdingsWithMetrics = holdings.map(h=>{
+      let holdingsWithMetrics = holdings.map(h=>{
         const sym = h.ticker||h.symbol||h;
         const sec = securitiesMap.get(sym)||securitiesMap.get(normalizeSymbol(sym));
         const rawW = Number(h.weight)||0;
@@ -998,39 +1040,23 @@
         const priceCents = intradayBySymbol[sym] ?? null;
         if (priceCents != null) { totalCents += shares * priceCents; hasIntraday = true; }
       });
-      let minInv, cashAmt;
-      if (hasIntraday && totalCents > 0) {
-        const equitiesR = totalCents / 100;
-        cashAmt = null;
-        minInv = equitiesR;
-      } else {
-        minInv = strategy.min_investment ? strategy.min_investment / 100 : null;
-        cashAmt = minInv ? minInv * 0.08 : null;
+      const latestCanonical = retRows.at(-1) || {};
+      const cashAmt = Math.max(0, Number(latestCanonical.continuity_cash_cents || 0) / 100);
+      const canonicalSecurities = Math.max(0, Number(latestCanonical.securities_value_cents || 0) / 100);
+      const canonicalTotal = canonicalSecurities + cashAmt;
+      let minInv = canonicalTotal > 0
+        ? canonicalTotal
+        : hasIntraday && totalCents > 0
+          ? totalCents / 100
+          : strategy.min_investment ? strategy.min_investment / 100 : null;
+      const cashWeight = canonicalTotal > 0 ? (cashAmt / canonicalTotal) * 100 : 0;
+      holdingsWithMetrics = holdingsWithMetrics.map(h=>({...h,weightPct:h.weightPct*(1-cashWeight/100)}));
+      if (cashAmt > 0) {
+        holdingsWithMetrics.push({sym:'CA',name:`Cash asset (${formatCurrency(cashAmt,strategy.base_currency||'ZAR')})`,weight:cashWeight,weightPct:cashWeight,logoUrl:null,change:null,mv:cashAmt,isCash:true});
       }
-      holdingsWithMetrics.push({sym:'CASH',name:cashAmt?`Cash (${formatCurrency(cashAmt,strategy.base_currency||'ZAR')})`: 'Cash',weight:8,weightPct:8,logoUrl:null,change:null,mv:cashAmt||0});
 
-      /* Calendar returns from basket_value */
-      const calendarData = {};
-      if (retRows && retRows.length>1) {
-        const monthlyLast = {};
-        retRows.forEach(r=>{
-          if(r.basket_value==null||!r.as_of_date) return;
-          const ym=r.as_of_date.slice(0,7);
-          monthlyLast[ym]=Number(r.basket_value);
-        });
-        const sortedM = Object.keys(monthlyLast).sort();
-        const createdYm = strategy.created_at?strategy.created_at.slice(0,7):null;
-        for(let i=1;i<sortedM.length;i++){
-          const ym=sortedM[i], prevYm=sortedM[i-1];
-          if(createdYm&&(ym<createdYm||prevYm<createdYm)) continue;
-          const [year,month]=ym.split('-');
-          const end=monthlyLast[ym], start=monthlyLast[prevYm];
-          if(start&&start!==0){
-            if(!calendarData[year]) calendarData[year]={};
-            calendarData[year][month]=(end/start)-1;
-          }
-        }
-      }
+      /* Calendar returns from the same canonical daily chain. */
+      const calendarData = canonicalCalendarReturns(retRows);
       const calYears = Object.keys(calendarData).sort();
       let currentCalYear = calYears.length>0?calYears[calYears.length-1]:new Date().getFullYear().toString();
 
@@ -1042,7 +1068,7 @@
       const renderCal = yr=>`<div class="cal-grid">${monthNames.map((m,i)=>calCell(m,(calendarData[yr]||{})[String(i+1).padStart(2,'0')])).join('')}</div>`;
 
       /* Ticker cards */
-      const nonCash = holdingsWithMetrics.filter(h=>h.sym!=='CASH');
+      const nonCash = holdingsWithMetrics.filter(h=>!h.isCash);
       const tickerCards = nonCash.map(h=>`
         <div class="ticker-card">
           <div style="display:flex;align-items:center;gap:10px">
@@ -1122,7 +1148,7 @@
             <div style="display:flex;flex-direction:column;gap:4px">
               ${holdingsWithMetrics.map(h=>`
                 <div class="holding-row">
-                  <div class="h-logo">${h.logoUrl?`<img src="${h.logoUrl}" style="width:24px;height:24px;object-fit:contain;border-radius:4px;">`:h.sym.slice(0,2)}</div>
+                  <div class="h-logo"${h.isCash?' style="background:linear-gradient(135deg,#16a34a,#34d399);color:white;border-color:rgba(52,211,153,.55)"':''}>${h.isCash?'●':h.logoUrl?`<img src="${h.logoUrl}" style="width:24px;height:24px;object-fit:contain;border-radius:4px;">`:h.sym.slice(0,2)}</div>
                   <div style="flex:1;min-width:0">
                     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
                       <div style="min-width:0">
@@ -1241,22 +1267,22 @@
         }
         for(const [strategyId,rows] of Object.entries(_repairStrategyMap)){const latest=rows.at(-1);if(latest?.ytd_pct!=null)latestYtd[strategyId]=latest.ytd_pct;}
         _ytdMap=latestYtd;
-        /* Step 3: fetch last 90 days of basket_value for sparklines (well within row limit) */
+        /* Fetch the canonical daily chain for cash-flow-neutral sparklines. */
         const sparks={};
         const d90=new Date(); d90.setDate(d90.getDate()-90);
         const d90str=d90.toISOString().slice(0,10);
         const { data: sparkRows } = await supabaseClient
           .from('strategy_returns_effective_c')
-          .select('strategy_id,basket_value,as_of_date')
+          .select('strategy_id,ytd_pct,"1d_pct",as_of_date')
           .in('strategy_id',ids)
           .gte('as_of_date',d90str)
           .order('as_of_date',{ascending:true});
         (sparkRows||[]).forEach(r=>{
           if(!sparks[r.strategy_id]) sparks[r.strategy_id]=[];
-          if(r.basket_value!=null) sparks[r.strategy_id].push(Number(r.basket_value));
+          sparks[r.strategy_id].push(r);
         });
-        for(const [strategyId,rows] of Object.entries(_repairStrategyMap))sparks[strategyId]=rows.slice(-90).map(r=>Number(r.basket_value)).filter(Number.isFinite);
-        Object.keys(sparks).forEach(sid => { sparks[sid] = despikeSeries(sparks[sid]); });
+        for(const [strategyId,rows] of Object.entries(_repairStrategyMap))sparks[strategyId]=rows.slice(-90);
+        Object.keys(sparks).forEach(sid => { sparks[sid] = canonicalReturnSeries(sparks[sid]); });
         _sparkMap=sparks;
       } catch(_){}
 
