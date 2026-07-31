@@ -633,6 +633,7 @@ module.exports = {
   recoverPasswordViaSupabase,
   updateAuthUserEmail,
   sendResendEmail,
+  emailShell,
   sendInviteEmail,
   sendWelcomeEmail,
   sendResetEmail,

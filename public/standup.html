@@ -243,6 +243,9 @@
         </div>
       </div>
 
+      <!-- ASSIGN POPOVER (singleton) -->
+      <div id="assignPop" style="display:none;position:fixed;background:#fff;border:1px solid #e5e5ea;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:300;min-width:180px;overflow:hidden;"></div>
+
       <!-- VIEW TASKS MODAL -->
       <div id="vtModal" onclick="if(event.target===this)closeVt()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;padding:24px;">
         <div style="background:#fff;border-radius:20px;width:100%;max-width:600px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.2);">
@@ -615,6 +618,7 @@
                       ${t.status==='in_progress'?'<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;background:#fff3cd;color:#7a4d00;flex-shrink:0;white-space:nowrap;">🔁 Ongoing</span>':''}
                       <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:20px;flex-shrink:0;${t.priority==='urgent'?'background:#fff0ef;color:#ff3b30;':t.priority==='high'?'background:#fff8e1;color:#c47f00;':t.priority==='medium'?'background:#ede9fe;color:#7c3aed;':'background:#f2f2f7;color:#8e8e93;'}">${t.priority}</span>
                       ${isOverdue(t)&&t.status!=='done'&&t.status!=='in_progress'?'<span style="font-size:9px;font-weight:700;color:#ff3b30;flex-shrink:0;">overdue</span>':''}
+                      ${canEdit?`<button data-assign-btn onclick="event.stopPropagation();showHelpPopover('${t.id}',this)" title="Need help from a coworker?" style="display:flex;align-items:center;gap:3px;background:none;border:1px solid #e5e5ea;border-radius:7px;cursor:pointer;color:#8e8e93;font-size:10px;flex-shrink:0;padding:2px 7px;line-height:1.4;font-weight:700;font-family:inherit;" onmouseover="this.style.borderColor='#c4b5fd';this.style.color='#7c3aed'" onmouseout="this.style.borderColor='#e5e5ea';this.style.color='#8e8e93'">🙋 Help</button>`:''}
                       ${canEdit?`<button onclick="openEdit('${t.id}')" title="Edit" style="background:none;border:none;cursor:pointer;color:#c4b5fd;font-size:13px;flex-shrink:0;padding:0 2px;line-height:1;" onmouseover="this.style.color='#7c3aed'" onmouseout="this.style.color='#c4b5fd'">✎</button>`:''}
                       ${canEdit?`<button onclick="deleteTask('${t.id}')" style="background:none;border:none;cursor:pointer;color:#d1d1d6;font-size:13px;flex-shrink:0;padding:0 2px;line-height:1;" onmouseover="this.style.color='#ff3b30'" onmouseout="this.style.color='#d1d1d6'">✕</button>`:''}
                     </div>
@@ -943,6 +947,99 @@
       modal.style.display='flex';
     }
     function closeVt(){document.getElementById('vtModal').style.display='none';}
+
+    /* ── Request help from coworker ── */
+    let helpPopTaskId = null;
+
+    function showHelpPopover(taskId, btn) {
+      helpPopTaskId = taskId;
+      const others = allMembers.filter(m => m.id !== myMember?.id);
+      const pop = document.getElementById('assignPop');
+      pop.innerHTML = `
+        <div style="padding:12px 14px 8px;">
+          <div style="font-size:11px;font-weight:700;color:#1c1c1e;margin-bottom:2px;">Need help from…</div>
+          <div style="font-size:11px;color:#8e8e93;margin-bottom:10px;">They'll get an email notification.</div>
+          <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;">
+            ${others.map(m => `
+              <button onclick="selectHelper('${m.id}','${esc(m.full_name||m.email)}')"
+                id="helper-${m.id}"
+                style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px;border:1.5px solid #e5e5ea;border-radius:9px;background:#fff;cursor:pointer;font-family:inherit;font-size:13px;color:#1c1c1e;text-align:left;transition:all .1s;">
+                <div style="width:22px;height:22px;border-radius:50%;background:#e8e0fd;color:#7c3aed;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${initials(m.full_name)}</div>
+                ${esc(m.full_name||m.email)}
+              </button>`).join('')}
+          </div>
+          <textarea id="helpNote" rows="2" placeholder="What do you need help with? (optional)"
+            style="width:100%;resize:none;border:1px solid #e5e5ea;border-radius:9px;padding:8px 10px;font-size:12px;font-family:inherit;color:#1c1c1e;outline:none;margin-bottom:8px;"
+            onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#e5e5ea'"></textarea>
+          <button onclick="sendHelpRequest()" id="helpSendBtn" disabled
+            style="width:100%;padding:9px;border-radius:9px;border:none;background:#e5e5ea;color:#8e8e93;font-size:13px;font-weight:700;cursor:not-allowed;font-family:inherit;transition:all .15s;">
+            Send Request
+          </button>
+        </div>`;
+      pop.style.display = 'block';
+      const rect = btn.getBoundingClientRect();
+      const popW = 230;
+      let left = rect.right - popW;
+      if (left < 8) left = 8;
+      pop.style.left = left + 'px';
+      pop.style.top = (rect.bottom + 6) + 'px';
+    }
+
+    let selectedHelpMemberId = null, selectedHelpMemberName = null;
+
+    function selectHelper(memberId, memberName) {
+      selectedHelpMemberId = memberId;
+      selectedHelpMemberName = memberName;
+      document.querySelectorAll('[id^="helper-"]').forEach(b => {
+        b.style.borderColor = '#e5e5ea';
+        b.style.background = '#fff';
+        b.style.color = '#1c1c1e';
+      });
+      const btn = document.getElementById('helper-' + memberId);
+      if (btn) { btn.style.borderColor = '#7c3aed'; btn.style.background = '#faf7ff'; }
+      const sendBtn = document.getElementById('helpSendBtn');
+      if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.style.background = '#7c3aed';
+        sendBtn.style.color = '#fff';
+        sendBtn.style.cursor = 'pointer';
+      }
+    }
+
+    async function sendHelpRequest() {
+      if (!helpPopTaskId || !selectedHelpMemberId) return;
+      const note = (document.getElementById('helpNote')?.value || '').trim();
+      document.getElementById('assignPop').style.display = 'none';
+      try {
+        await api(`/api/tasks/${helpPopTaskId}?action=request_help`, {
+          method: 'POST',
+          body: JSON.stringify({ notify_member_id: selectedHelpMemberId, note: note || null })
+        });
+        showHelpToast(`Help request sent to ${selectedHelpMemberName}`);
+      } catch(e) { alert('Failed to send request: ' + e.message); }
+      selectedHelpMemberId = null; selectedHelpMemberName = null;
+    }
+
+    function showHelpToast(msg) {
+      let t = document.getElementById('assignToast');
+      if (!t) {
+        t = document.createElement('div');
+        t.id = 'assignToast';
+        t.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#1c1c1e;color:#fff;padding:10px 22px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;transition:opacity .3s;pointer-events:none;white-space:nowrap;';
+        document.body.appendChild(t);
+      }
+      t.textContent = msg;
+      t.style.opacity = '1';
+      clearTimeout(t._tid);
+      t._tid = setTimeout(() => { t.style.opacity = '0'; }, 2500);
+    }
+
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#assignPop') && !e.target.closest('[data-assign-btn]')) {
+        document.getElementById('assignPop').style.display = 'none';
+        selectedHelpMemberId = null; selectedHelpMemberName = null;
+      }
+    });
 
     /* ── Drill-down: team board overdue → standup date ── */
     function drillToDate(memberId) {

@@ -1,4 +1,4 @@
-const { sendJson, requireAuth, supabaseRequest } = require('./_team');
+const { sendJson, requireAuth, supabaseRequest, sendResendEmail, emailShell, baseUrlFromReq } = require('./_team');
 
 function localDate(offsetDays = 0) {
   const now = new Date();
@@ -86,6 +86,59 @@ module.exports = async (req, res) => {
       body: updates
     });
     return sendJson(res, 200, Array.isArray(row) ? row[0] : row);
+  }
+
+  // POST /api/tasks/:id?action=request_help — notify a coworker that their help is needed
+  if (req.method === 'POST' && taskId && url.searchParams.get('action') === 'request_help') {
+    const { notify_member_id, note } = req.body || {};
+    if (!notify_member_id) return sendJson(res, 400, { error: 'notify_member_id is required' });
+
+    const [tasks, members] = await Promise.all([
+      supabaseRequest(`/rest/v1/tasks?id=eq.${encodeURIComponent(taskId)}&select=*&limit=1`, { method: 'GET' }),
+      supabaseRequest(`/rest/v1/admin_team?id=eq.${encodeURIComponent(notify_member_id)}&select=email,full_name&limit=1`, { method: 'GET' }),
+    ]);
+
+    const task = Array.isArray(tasks) ? tasks[0] : null;
+    const helper = Array.isArray(members) ? members[0] : null;
+    if (!task) return sendJson(res, 404, { error: 'Task not found' });
+    if (!helper?.email) return sendJson(res, 404, { error: 'Team member not found' });
+
+    const requesterName = auth.member.full_name || auth.member.email || 'A teammate';
+    const greeting = helper.full_name ? `Hi ${helper.full_name.split(' ')[0]},` : 'Hi there,';
+    const baseUrl = baseUrlFromReq(req);
+
+    await sendResendEmail({
+      to: helper.email,
+      subject: `${requesterName} needs your help: ${task.title}`,
+      text: `${greeting}\n\n${requesterName} needs your help with a task in today's standup.\n\nTask: ${task.title}\n${note ? `Note: ${note}\n` : ''}\nView it here: ${baseUrl}/standup.html\n\n— Mint Hub`,
+      html: emailShell({
+        preheader: `${requesterName} needs your help with "${task.title}" in today's standup.`,
+        heading: 'Your help is needed',
+        intro: `${greeting} <strong>${requesterName}</strong> needs your help with a task in today's daily standup.`,
+        body: `
+          <div style="background:#faf7ff;border:1px solid #ede5ff;border-radius:12px;padding:16px 18px;margin:4px 0 8px 0;">
+            <div style="font-size:11px;font-weight:600;color:#5b21b6;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Task</div>
+            <div style="font-size:15px;font-weight:700;color:#1c1c1e;">${task.title}</div>
+            ${task.description ? `<div style="font-size:13px;color:#3c3c43;margin-top:6px;">${task.description}</div>` : ''}
+            <div style="margin-top:10px;display:flex;gap:12px;flex-wrap:wrap;">
+              <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#ede9fe;color:#5b21b6;">${task.priority || 'medium'}</span>
+              ${task.due_date ? `<span style="font-size:12px;color:#8e8e93;">Due: ${task.due_date}</span>` : ''}
+            </div>
+          </div>
+          ${note ? `
+          <div style="background:#fff8e1;border:1px solid #fde68a;border-radius:12px;padding:14px 18px;margin:12px 0 4px 0;">
+            <div style="font-size:11px;font-weight:600;color:#c47f00;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:4px;">Note from ${requesterName}</div>
+            <div style="font-size:14px;color:#1c1c1e;">${note}</div>
+          </div>` : ''}
+        `,
+        ctaLabel: 'Open Daily Standup',
+        ctaUrl: `${baseUrl}/standup.html`,
+        fallbackUrl: `${baseUrl}/standup.html`,
+        footer: `You received this because ${requesterName} flagged this task in Mint Hub.`
+      })
+    });
+
+    return sendJson(res, 200, { ok: true });
   }
 
   // DELETE /api/tasks/:id
