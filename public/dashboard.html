@@ -9445,7 +9445,7 @@
 
       function rebClientsForStrategy() {
         const byClient = {};
-        Object.entries(rebRawHoldings || {}).forEach(([code, rows]) => {
+        const collectRows = (source, pending) => Object.entries(source || {}).forEach(([code, rows]) => {
           (rows || []).forEach((r) => {
             const qty = Number(r.quantity) || 0;
             if (qty <= 0) return;
@@ -9458,12 +9458,21 @@
                 name: r.name,
                 instruments: new Set(),
                 totalCurrentHolding: 0,
+                hasFilledHolding: false,
+                hasPendingHolding: false,
               };
             }
             byClient[ownerKey].instruments.add(code);
             byClient[ownerKey].totalCurrentHolding += qty;
+            if (pending) byClient[ownerKey].hasPendingHolding = true;
+            else byClient[ownerKey].hasFilledHolding = true;
           });
         });
+        /* Pending-only owners are still strategy members. A model-wide
+           buy-only rebalance must include them even before their initial
+           broker fill; previously only avg_fill > 0 rows were collected. */
+        collectRows(rebRawHoldings, false);
+        collectRows(rebUnfilledHoldings, true);
         return Object.values(byClient)
           .map((c) => ({
             id: c.id,
@@ -9472,6 +9481,8 @@
             name: c.name,
             instrumentCount: c.instruments.size,
             totalCurrentHolding: c.totalCurrentHolding,
+            hasFilledHolding: c.hasFilledHolding,
+            hasPendingHolding: c.hasPendingHolding,
           }))
           .sort((a, b) => a.name.localeCompare(b.name));
       }
@@ -9811,7 +9822,11 @@
                     holdingId: r.id,
                     securityId: r.security_id,
                     userId: uid,
+                    ownerKey: rebOwnerKey(uid, fmId),
                     familyMemberId: fmId,
+                    name: fmId
+                      ? (fmLabelsById[fmId] || `Child ${fmId.slice(0, 8)}`)
+                      : (nameById[uid] || uid),
                     quantity: qty,
                     expectedFill: Number(r.expected_fill) || 0,
                   });
@@ -12424,7 +12439,7 @@
                         return `
                         <tr class="${selectedInstrument && !p.afford && p.sharesNeeded > 0 ? 'bg-red-50' : 'hover:bg-slate-50'}">
                           <td class="px-3 py-2 text-slate-800 truncate max-w-[180px]" title="${p.client.id}">
-                            ${p.client.name}${isTest ? ' <span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:0.04em;background:#fef3c7;color:#d97706;vertical-align:middle;">TEST</span>' : ''}
+                            ${p.client.name}${p.client.hasPendingHolding && !p.client.hasFilledHolding ? ' <span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:0.04em;background:#eff6ff;color:#1d4ed8;vertical-align:middle;">PENDING INITIAL FILL</span>' : ''}${isTest ? ' <span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:0.04em;background:#fef3c7;color:#d97706;vertical-align:middle;">TEST</span>' : ''}
                           </td>
                           <td class="px-3 py-2 text-right font-mono text-slate-500">${p.lots.toLocaleString()}</td>
                           <td class="px-3 py-2 text-right font-mono ${p.walletR > 0 ? 'text-violet-700 font-semibold' : 'text-slate-400'}">${rebFmtZAR(p.walletR)}</td>
@@ -12556,6 +12571,7 @@
          updated to add or increase the bought security. */
       async function rebPersistWalletOnlyBuy({ instrument, buyPerLot, perUserPlan, pricePerShare }) {
         await rebEnsureFeesLoaded(); // no write may proceed on unloaded/fallback fees
+        await rebEnsurePendingSwapSnapshotSchema(); // also verifies sequential predecessor support
         if (!instrument || !rebSelectedStrategyId) throw new Error("Missing strategy or buy instrument.");
         const buyQtyPerLot = Math.max(0, Math.floor(Number(buyPerLot) || 0));
         if (buyQtyPerLot <= 0) throw new Error("Buy per lot must be ≥ 1.");
@@ -12628,7 +12644,7 @@
           .insert({
             id: rebalanceBatchId,
             strategy_id: strategyId,
-            family_member_id: rebSelectedFamilyMemberId || null,
+            family_member_id: rebScopeIsAll() ? null : (rebSelectedFamilyMemberId || null),
             status: "PENDING",
             effective_date: effectiveDateStr,
             holdings_snapshot_before: holdingsSnapshotBefore,
@@ -12647,16 +12663,67 @@
             net_proceeds: 0,
             strategy_name_snapshot: strategyNameSnapshot,
             created_by: currentUserId,
+            predecessor_batch_id: predecessorBatch?.id || null,
             created_at: nowIso,
             updated_at: nowIso,
           });
         if (batchErr) throw new Error(batchErr.message || "Failed to create rebalance batch.");
 
-        if (buyEventRows.length) {
-          const { error: evtErr } = await supabaseClient
-            .from("rebalance_event")
-            .insert(buyEventRows);
-          if (evtErr) throw new Error(evtErr.message || "Failed to insert rebalance events.");
+        /* Pending-only owners need the same immediate order-book treatment as
+           the pre-fill swap path. Materialise their new model leg now as an
+           avg_fill=NULL holding tied to this batch. It is still only an order:
+           CA/reserve are rechecked and moved from ACTUAL fill cents at batch
+           settlement. Filled owners continue through the normal event path. */
+        const pendingOnlyParticipants = participants.filter((p) =>
+          p.client.hasPendingHolding && !p.client.hasFilledHolding
+        );
+        const insertedPendingHoldingIds = [];
+        try {
+          for (const p of pendingOnlyParticipants) {
+            const pendingResult = await rebPendingHoldingInsert({
+              user_id: String(p.client.id),
+              family_member_id: p.client.familyMemberId || null,
+              security_id: buySecurityId,
+              strategy_id: strategyId,
+              quantity: Number(p.sharesNeeded || 0),
+              trade_side: "BUY",
+              is_active: true,
+              Status: "active",
+              avg_fill: null,
+              "Expected_fill": pricePerShare,
+              transaction_id: null,
+              rebalance_batch_id: rebalanceBatchId,
+              market_value: 0,
+              as_of_date: null,
+              strategy_name_snapshot: strategyNameSnapshot,
+              created_at: nowIso,
+              updated_at: nowIso,
+            });
+            const pendingHoldingId = pendingResult?.row?.id || null;
+            if (!pendingHoldingId) throw new Error(`Pending MTN-style order was not created for ${p.client.name}.`);
+            insertedPendingHoldingIds.push(pendingHoldingId);
+          }
+
+          if (buyEventRows.length) {
+            const { error: evtErr } = await supabaseClient
+              .from("rebalance_event")
+              .insert(buyEventRows);
+            if (evtErr) throw new Error(evtErr.message || "Failed to insert rebalance events.");
+          }
+        } catch (error) {
+          for (const holdingId of insertedPendingHoldingIds) {
+            await rebPendingHoldingDelete(holdingId).catch(() => null);
+          }
+          await supabaseClient.from("rebalance_batch").update({
+            status: "REVERSED",
+            is_reversed: true,
+            settlement_state: "REVERSED",
+            settlement_error: `Buy-only commit rolled back: ${error?.message || error}`.slice(0, 4000),
+            reversed_at: new Date().toISOString(),
+            reversed_reason: `Buy-only commit rolled back: ${error?.message || error}`.slice(0, 1000),
+            updated_at: new Date().toISOString(),
+          }).eq("id", rebalanceBatchId);
+          throw error;
         }
 
         /* Do not deduct an estimate here. Settlement debits the exact actual
@@ -12665,6 +12732,7 @@
 
         return {
           batchId: rebalanceBatchId,
+          predecessorBatchId: predecessorBatch?.id || null,
           rows: totalBuyQty > 0 ? [{ side: "BUY", code: buyIsinCode, nominal: totalBuyQty }] : [],
         };
       }

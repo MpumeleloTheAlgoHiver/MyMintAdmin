@@ -562,8 +562,8 @@ module.exports = async (req, res) => {
 
     if (action === 'rebalance-pending-snapshot-capability') {
       if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
-      await fetchSupabaseJson('/rest/v1/rebalance_batch?select=pending_swap_snapshot&limit=1');
-      return sendJson(res, 200, { ok: true, pendingSwapSnapshot: true });
+      await fetchSupabaseJson('/rest/v1/rebalance_batch?select=pending_swap_snapshot,predecessor_batch_id&limit=1');
+      return sendJson(res, 200, { ok: true, pendingSwapSnapshot: true, sequentialBatches: true });
     }
 
     // Pending-order adjustments are privileged accounting writes. Browser RLS
@@ -590,6 +590,16 @@ module.exports = async (req, res) => {
         if (!Number.isFinite(quantity) || quantity <= 0) return sendJson(res, 400, { error: 'quantity must be positive' });
         const expectedFill = Number(requested.Expected_fill);
         if (!Number.isFinite(expectedFill) || expectedFill <= 0) return sendJson(res, 400, { error: 'Expected_fill must be positive' });
+        const rebalanceBatchId = requested.rebalance_batch_id ? String(requested.rebalance_batch_id) : null;
+        if (rebalanceBatchId) {
+          const pendingBatches = await fetchSupabaseJson(
+            `/rest/v1/rebalance_batch?id=eq.${encodeURIComponent(rebalanceBatchId)}&status=eq.PENDING&select=id,strategy_id&limit=1`
+          );
+          const pendingBatch = Array.isArray(pendingBatches) ? pendingBatches[0] : null;
+          if (!pendingBatch || String(pendingBatch.strategy_id) !== String(requested.strategy_id)) {
+            return sendJson(res, 409, { error: 'Pending buy-only holding must reference a PENDING batch for the same strategy' });
+          }
+        }
         const row = {
           user_id: String(requested.user_id),
           family_member_id: requested.family_member_id ? String(requested.family_member_id) : null,
@@ -602,6 +612,7 @@ module.exports = async (req, res) => {
           avg_fill: null,
           Expected_fill: expectedFill,
           transaction_id: requested.transaction_id ? String(requested.transaction_id) : null,
+          rebalance_batch_id: rebalanceBatchId,
           market_value: 0,
           as_of_date: null,
           strategy_name_snapshot: String(requested.strategy_name_snapshot || ''),
@@ -825,6 +836,24 @@ module.exports = async (req, res) => {
       if (!['PENDING', 'PAUSED'].includes(priorState)) {
         return sendJson(res, 400, { error: 'priorState must be PENDING or PAUSED' });
       }
+      const targetRows = await fetchSupabaseJson(
+        `/rest/v1/rebalance_batch?id=eq.${encodeURIComponent(batchId)}&select=id,predecessor_batch_id&limit=1`
+      );
+      const target = Array.isArray(targetRows) ? targetRows[0] : null;
+      if (!target) return sendJson(res, 404, { error: 'Rebalance batch not found' });
+      if (target.predecessor_batch_id) {
+        const predecessorRows = await fetchSupabaseJson(
+          `/rest/v1/rebalance_batch?id=eq.${encodeURIComponent(target.predecessor_batch_id)}&select=id,status,settlement_state&limit=1`
+        );
+        const predecessor = Array.isArray(predecessorRows) ? predecessorRows[0] : null;
+        if (!predecessor || String(predecessor.status || '').toUpperCase() !== 'SETTLED') {
+          return sendJson(res, 409, {
+            error: `This is a parked secondary rebalance. Settle predecessor ${String(target.predecessor_batch_id).slice(0, 8)} first.`,
+            predecessorBatchId: target.predecessor_batch_id,
+            predecessorStatus: predecessor?.status || 'MISSING',
+          });
+        }
+      }
       const now = new Date().toISOString();
       const claimed = await requestSupabaseJson(
         `/rest/v1/rebalance_batch?id=eq.${encodeURIComponent(batchId)}&status=eq.PENDING&settlement_state=eq.${priorState}&select=id,settlement_state`,
@@ -882,7 +911,8 @@ module.exports = async (req, res) => {
       if (!holdingId) return sendJson(res, 400, { error: 'holdingId required' });
       const allowedFields = new Set([
         'is_active', 'closed_reason', 'closed_at', 'updated_at', 'avg_exit',
-        'Exit_date', 'quantity', 'Status',
+        'Exit_date', 'quantity', 'Status', 'avg_fill', 'Fill_date', 'as_of_date',
+        'Expected_fill',
       ]);
       const requestedPatch = body.patch && typeof body.patch === 'object' ? body.patch : {};
       const patch = Object.fromEntries(Object.entries(requestedPatch).filter(([key]) => allowedFields.has(key)));
