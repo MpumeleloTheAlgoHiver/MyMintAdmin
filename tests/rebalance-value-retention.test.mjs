@@ -11,7 +11,7 @@ assert.match(migration, /strategy_rebalance_cash_events_c/);
 assert.match(migration, /closing_balance_cents = opening_balance_cents \+ amount_cents/);
 assert.match(migration, /apply_strategy_rebalance_cash_event/);
 assert.match(migration, /for update/);
-assert.match(orderbook, /holdings_snapshot_after: settledStrategy\?\.holdings \|\| null/);
+assert.match(orderbook, /holdings_snapshot_after: boundaryHoldings\.length \? boundaryHoldings : null/);
 assert.match(orderbook, /eventType: 'LIQUIDATION_PROCEEDS'/);
 assert.match(endpoint, /rpc\/apply_strategy_rebalance_cash_event/);
 assert.match(orderbook, /const settleRebalanceCashBridge = async/);

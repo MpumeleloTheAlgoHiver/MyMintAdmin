@@ -17,6 +17,12 @@ assert.notEqual(currentCash, previous.cash, 'fixture must prove cash changed');
 
 assert.match(publisher, /securitiesCents \+ previousCash/);
 assert.match(publisher, /composition changed without a settled rebalance boundary/);
+assert.match(publisher, /select=id,strategy_id,status,settled_at,settlement_effective_at,pending_swap_snapshot/,
+  'settled batch lookup must include unfilled-order swap owners');
+assert.match(publisher, /for \(const swap of \(Array\.isArray\(batch\.pending_swap_snapshot\)/,
+  'pending swap owners must participate in the personal return boundary');
+assert.match(publisher, /addBoundaryBatch\(ownerKey\(swap\.userId, swap\.familyMemberId, batch\.strategy_id\), batch\)/,
+  'pending owner boundary must retain user, family and strategy scope');
 assert.match(publisher, /includeTestUsers/);
 assert.match(publisher, /is_test=eq\.true/);
 assert.match(publisher, /status=eq\.test/);

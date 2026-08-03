@@ -94,7 +94,7 @@ async function publishClientEodReturns({ asOfDate, apply = false, includeUat = f
     requestSupabaseJson(`/rest/v1/aum_fee_accrual_segments?select=user_id,family_member_id,strategy_id,accrued_fee_cents&user_id=in.(${userIds.map(q).join(',')})&strategy_id=in.(${strategyIds.map(q).join(',')})&segment_end_date=is.null`, { method: 'GET' }).catch(() => []),
     requestSupabaseJson(`/rest/v1/client_strategy_return_publication_audit_c?select=*&user_id=in.(${userIds.map(q).join(',')})&strategy_id=in.(${strategyIds.map(q).join(',')})&order=as_of_date.desc`, { method: 'GET' }).catch(() => []),
     requestSupabaseJson(`/rest/v1/client_strategy_returns_effective_latest_c?select=*&user_id=in.(${userIds.map(q).join(',')})&strategy_id=in.(${strategyIds.map(q).join(',')})`, { method: 'GET' }).catch(() => []),
-    requestSupabaseJson(`/rest/v1/rebalance_batch?select=id,strategy_id,status,settled_at,settlement_effective_at&strategy_id=in.(${strategyIds.map(q).join(',')})&status=eq.SETTLED&order=updated_at.desc&limit=200`, { method: 'GET' }).catch(() => []),
+    requestSupabaseJson(`/rest/v1/rebalance_batch?select=id,strategy_id,status,settled_at,settlement_effective_at,pending_swap_snapshot&strategy_id=in.(${strategyIds.map(q).join(',')})&status=eq.SETTLED&order=updated_at.desc&limit=200`, { method: 'GET' }).catch(() => []),
     requestSupabaseJson(`/rest/v1/rebalance_event?select=batch_id,user_id,family_member_id&user_id=in.(${userIds.map(q).join(',')})&order=updated_at.desc&limit=1000`, { method: 'GET' }).catch(() => [])
   ]);
 
@@ -113,12 +113,29 @@ async function publishClientEodReturns({ asOfDate, apply = false, includeUat = f
   const seedByKey = new Map((seedRows || []).map((row) => [ownerKey(row.user_id, row.family_member_id, row.strategy_id), row]));
   const batchById = new Map((recentBatches || []).map((row) => [row.id, row]));
   const boundaryBatchesByOwner = new Map();
+  const addBoundaryBatch = (key, batch) => {
+    if (!key || !batch) return;
+    if (!boundaryBatchesByOwner.has(key)) boundaryBatchesByOwner.set(key, []);
+    const rows = boundaryBatchesByOwner.get(key);
+    if (!rows.some((row) => row.id === batch.id)) rows.push(batch);
+  };
   for (const event of (recentEvents || [])) {
     const batch = batchById.get(event.batch_id);
     if (!batch || batch.status !== 'SETTLED') continue;
     const key = ownerKey(event.user_id, event.family_member_id, batch.strategy_id);
-    if (!boundaryBatchesByOwner.has(key)) boundaryBatchesByOwner.set(key, []);
-    boundaryBatchesByOwner.get(key).push(batch);
+    addBoundaryBatch(key, batch);
+  }
+  // An owner whose original order was still unfilled has no SELL/BUY
+  // rebalance_event: commit rewrites that pending order in place and records
+  // the change only in pending_swap_snapshot. Include those owners in the
+  // canonical boundary map or their post-settlement composition is rejected
+  // as an unexplained change and their personal return row stays stale.
+  for (const batch of (recentBatches || [])) {
+    if (batch.status !== 'SETTLED') continue;
+    for (const swap of (Array.isArray(batch.pending_swap_snapshot) ? batch.pending_swap_snapshot : [])) {
+      if (!swap?.userId) continue;
+      addBoundaryBatch(ownerKey(swap.userId, swap.familyMemberId, batch.strategy_id), batch);
+    }
   }
 
   const results = [];
