@@ -12713,11 +12713,61 @@
           });
         if (batchErr) throw new Error(batchErr.message || "Failed to create rebalance batch.");
 
-        if (buyEventRows.length) {
-          const { error: evtErr } = await supabaseClient
-            .from("rebalance_event")
-            .insert(buyEventRows);
-          if (evtErr) throw new Error(evtErr.message || "Failed to insert rebalance events.");
+        /* Pending-only owners need the same immediate order-book treatment as
+           the pre-fill swap path. Materialise their new model leg now as an
+           avg_fill=NULL holding tied to this batch. It is still only an order:
+           CA/reserve are rechecked and moved from ACTUAL fill cents at batch
+           settlement. Filled owners continue through the normal event path. */
+        const pendingOnlyParticipants = participants.filter((p) =>
+          p.client.hasPendingHolding && !p.client.hasFilledHolding
+        );
+        const insertedPendingHoldingIds = [];
+        try {
+          for (const p of pendingOnlyParticipants) {
+            const pendingResult = await rebPendingHoldingInsert({
+              user_id: String(p.client.id),
+              family_member_id: p.client.familyMemberId || null,
+              security_id: buySecurityId,
+              strategy_id: strategyId,
+              quantity: Number(p.sharesNeeded || 0),
+              trade_side: "BUY",
+              is_active: true,
+              Status: "active",
+              avg_fill: null,
+              "Expected_fill": pricePerShare,
+              transaction_id: null,
+              rebalance_batch_id: rebalanceBatchId,
+              market_value: 0,
+              as_of_date: null,
+              strategy_name_snapshot: strategyNameSnapshot,
+              created_at: nowIso,
+              updated_at: nowIso,
+            });
+            const pendingHoldingId = pendingResult?.row?.id || null;
+            if (!pendingHoldingId) throw new Error(`Pending MTN-style order was not created for ${p.client.name}.`);
+            insertedPendingHoldingIds.push(pendingHoldingId);
+          }
+
+          if (buyEventRows.length) {
+            const { error: evtErr } = await supabaseClient
+              .from("rebalance_event")
+              .insert(buyEventRows);
+            if (evtErr) throw new Error(evtErr.message || "Failed to insert rebalance events.");
+          }
+        } catch (error) {
+          for (const holdingId of insertedPendingHoldingIds) {
+            await rebPendingHoldingDelete(holdingId).catch(() => null);
+          }
+          await supabaseClient.from("rebalance_batch").update({
+            status: "REVERSED",
+            is_reversed: true,
+            settlement_state: "REVERSED",
+            settlement_error: `Buy-only commit rolled back: ${error?.message || error}`.slice(0, 4000),
+            reversed_at: new Date().toISOString(),
+            reversed_reason: `Buy-only commit rolled back: ${error?.message || error}`.slice(0, 1000),
+            updated_at: new Date().toISOString(),
+          }).eq("id", rebalanceBatchId);
+          throw error;
         }
 
         /* Do not deduct an estimate here. Settlement debits the exact actual

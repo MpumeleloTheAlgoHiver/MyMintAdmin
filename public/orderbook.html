@@ -8076,7 +8076,7 @@
 
             let settledBuyQuery = supabaseClient
               .from('stock_holdings_c')
-              .select('id')
+              .select('id, avg_fill')
               .eq('rebalance_batch_id', batch.id)
               .eq('user_id', evt.user_id)
               .eq('security_id', evt.security_id)
@@ -8088,6 +8088,28 @@
             if (settledBuyErr) { errors.push(`${label} resume check: ${settledBuyErr.message}`); continue; }
             if (settledBuyRows?.length) {
               const settledId = settledBuyRows[0].id;
+              /* Pending-only strategy members receive the buy-only leg at
+                 commit time (avg_fill=NULL), like the pre-fill swap. On actual
+                 settlement, promote that exact row instead of inserting a
+                 duplicate holding. A non-zero avg_fill means this is merely an
+                 idempotent resume after the holding checkpoint completed. */
+              if (!(Number(settledBuyRows[0].avg_fill) > 0)) {
+                try {
+                  await settlementUpdateHolding(settledId, {
+                    avg_fill: fillCentsForUser,
+                    "Expected_fill": evt.price_at_commit ? Number(evt.price_at_commit) / 100 : null,
+                    "Fill_date": fillDateStr,
+                    as_of_date: fillDateStr,
+                    Status: 'active',
+                    is_active: true,
+                    closed_reason: evt.closed_reason || 'REBALANCE_EVENT_BUY_WALLET',
+                    updated_at: nowIso,
+                  });
+                } catch (pendingFillErr) {
+                  errors.push(`${label} pending-row fill ${evt.user_id}: ${pendingFillErr.message}`);
+                  continue;
+                }
+              }
               const { error: evtResumeErr } = await supabaseClient.from('rebalance_event').update({
                 avg_fill: fillCentsForUser, fill_date: fillDateStr, updated_at: nowIso, settled_holding_id: settledId,
               }).eq('id', evt.id);

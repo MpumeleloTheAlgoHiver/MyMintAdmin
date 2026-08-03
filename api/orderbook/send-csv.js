@@ -590,6 +590,16 @@ module.exports = async (req, res) => {
         if (!Number.isFinite(quantity) || quantity <= 0) return sendJson(res, 400, { error: 'quantity must be positive' });
         const expectedFill = Number(requested.Expected_fill);
         if (!Number.isFinite(expectedFill) || expectedFill <= 0) return sendJson(res, 400, { error: 'Expected_fill must be positive' });
+        const rebalanceBatchId = requested.rebalance_batch_id ? String(requested.rebalance_batch_id) : null;
+        if (rebalanceBatchId) {
+          const pendingBatches = await fetchSupabaseJson(
+            `/rest/v1/rebalance_batch?id=eq.${encodeURIComponent(rebalanceBatchId)}&status=eq.PENDING&select=id,strategy_id&limit=1`
+          );
+          const pendingBatch = Array.isArray(pendingBatches) ? pendingBatches[0] : null;
+          if (!pendingBatch || String(pendingBatch.strategy_id) !== String(requested.strategy_id)) {
+            return sendJson(res, 409, { error: 'Pending buy-only holding must reference a PENDING batch for the same strategy' });
+          }
+        }
         const row = {
           user_id: String(requested.user_id),
           family_member_id: requested.family_member_id ? String(requested.family_member_id) : null,
@@ -602,6 +612,7 @@ module.exports = async (req, res) => {
           avg_fill: null,
           Expected_fill: expectedFill,
           transaction_id: requested.transaction_id ? String(requested.transaction_id) : null,
+          rebalance_batch_id: rebalanceBatchId,
           market_value: 0,
           as_of_date: null,
           strategy_name_snapshot: String(requested.strategy_name_snapshot || ''),
@@ -900,7 +911,8 @@ module.exports = async (req, res) => {
       if (!holdingId) return sendJson(res, 400, { error: 'holdingId required' });
       const allowedFields = new Set([
         'is_active', 'closed_reason', 'closed_at', 'updated_at', 'avg_exit',
-        'Exit_date', 'quantity', 'Status',
+        'Exit_date', 'quantity', 'Status', 'avg_fill', 'Fill_date', 'as_of_date',
+        'Expected_fill',
       ]);
       const requestedPatch = body.patch && typeof body.patch === 'object' ? body.patch : {};
       const patch = Object.fromEntries(Object.entries(requestedPatch).filter(([key]) => allowedFields.has(key)));
