@@ -7640,9 +7640,17 @@
             is_kid_strategy: overlay.querySelector("#_sdIsKid").checked,
           };
 
+          const { data: _sdSessionData } = await supabaseClient.auth.getSession();
+          const _sdToken = _sdSessionData?.session?.access_token;
+          if (!_sdToken) {
+            alert("Not authenticated — please sign in again.");
+            saveBtn.textContent = "Save changes";
+            saveBtn.disabled = false;
+            return;
+          }
           const saveResp = await fetch(`/api/strategies/${encodeURIComponent(strategy.id)}`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_sdToken}` },
             body: JSON.stringify(payload)
           });
           if (!saveResp.ok) {
