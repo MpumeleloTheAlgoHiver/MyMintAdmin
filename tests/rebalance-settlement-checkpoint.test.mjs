@@ -13,6 +13,8 @@ assert.match(api, /settlement_state: 'PROCESSING'/);
 assert.match(api, /action === 'rebalance-settlement-pause'/);
 assert.match(orderbook, /loadRebFeeConfigStrict\(settlementToken\)/);
 assert.match(orderbook, /action=rebalance-settlement-claim/);
+assert.match(orderbook, /Settlement claim failed:/);
+assert.match(orderbook, /Current state:/);
 assert.match(orderbook, /action=rebalance-settlement-pause/);
 assert.match(orderbook, /settlement_state: 'COMPLETE'/);
 assert.match(orderbook, /settledSellQuery/);
@@ -23,4 +25,4 @@ const claimAt = orderbook.indexOf('action=rebalance-settlement-claim');
 const finalAt = orderbook.indexOf("status: 'SETTLED'", claimAt);
 assert.ok(claimAt >= 0 && finalAt > claimAt, 'SETTLED must only appear in finalization after checkpoint claim');
 
-console.log('rebalance settlement checkpoint: 14/14 green');
+console.log('rebalance settlement checkpoint: 16/16 green');

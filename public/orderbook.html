@@ -7927,7 +7927,20 @@
         });
         const claimResult = await claimResponse.json().catch(() => ({}));
         if (!claimResponse.ok) {
-          throw new Error('This batch is no longer pending — it has already been settled or reversed. Settlement skipped to prevent duplicate holdings.');
+          const claimDetail = claimResult.details || claimResult.error || `HTTP ${claimResponse.status}`;
+          let liveState = null;
+          try {
+            const { data } = await supabaseClient
+              .from('rebalance_batch')
+              .select('status, settlement_state')
+              .eq('id', batch.id)
+              .single();
+            liveState = data || null;
+          } catch (_) { /* retain the server's original claim error */ }
+          const stateSuffix = liveState
+            ? ` Current state: ${liveState.status || '?'} / ${liveState.settlement_state || '?'}.`
+            : '';
+          throw new Error(`Settlement claim failed: ${claimDetail}.${stateSuffix}`);
         }
         const isLiquidationOnly = sellEvts.length > 0 && buyEvts.length === 0 && walletBuyEvts.length === 0;
         let actualLiquidationNetProceeds = null;
