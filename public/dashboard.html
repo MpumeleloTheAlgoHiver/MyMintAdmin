@@ -6031,30 +6031,37 @@
           securities: Math.max(0, Number(_stratRetRow?.securities_value_cents || 0) / 100),
         };
         ovRenderSectorChart(holdings, secMap, strategyCashAsset);
-        /* ── Fetch pending rebalance batches for this strategy ── */
+        /* ── Fetch ALL pending rebalance batches for this strategy ── */
         window.__dbgBreadcrumb('ovSelect:fetch-pending-rebalance');
-        let pendingRebalance = null;
+        let pendingRebalance = null;       // first batch (compat)
+        let pendingRebalances = [];        // all batches
         try {
           const { data: pendingBatches } = await supabaseClient
             .from('rebalance_batch')
             .select('id, sell_security_id, buy_security_id, extra_buy_security_id, sell_isin_code, buy_isin_code, extra_buy_isin_code')
             .eq('strategy_id', strat.id)
             .eq('status', 'PENDING')
-            .order('created_at', { ascending: false })
-            .limit(1);
+            .order('created_at', { ascending: false });
           if (pendingBatches && pendingBatches.length) {
-            const pb = pendingBatches[0];
-            const { data: events } = await supabaseClient
-              .from('rebalance_event')
-              .select('user_id, security_id, trade_side, quantity, closed_reason')
-              .eq('batch_id', pb.id);
-            const rebSecIds = [pb.sell_security_id, pb.buy_security_id, pb.extra_buy_security_id].filter(Boolean);
+            const allSecIds = [...new Set(
+              pendingBatches.flatMap(pb => [pb.sell_security_id, pb.buy_security_id, pb.extra_buy_security_id].filter(Boolean))
+            )];
             let rebSecSymMap = {};
-            if (rebSecIds.length) {
-              const { data: rebSecs } = await supabaseClient.from('securities_c').select('id, symbol').in('id', rebSecIds);
+            if (allSecIds.length) {
+              const { data: rebSecs } = await supabaseClient.from('securities_c').select('id, symbol').in('id', allSecIds);
               (rebSecs || []).forEach(s => { rebSecSymMap[s.id] = s.symbol; });
             }
-            pendingRebalance = {
+            const batchIds = pendingBatches.map(pb => pb.id);
+            const { data: allEvents } = await supabaseClient
+              .from('rebalance_event')
+              .select('batch_id, user_id, security_id, trade_side, quantity, closed_reason')
+              .in('batch_id', batchIds);
+            const eventsByBatch = {};
+            (allEvents || []).forEach(ev => {
+              if (!eventsByBatch[ev.batch_id]) eventsByBatch[ev.batch_id] = [];
+              eventsByBatch[ev.batch_id].push(ev);
+            });
+            pendingRebalances = pendingBatches.map(pb => ({
               batchId: pb.id,
               sellSecurityId: pb.sell_security_id,
               buySecurityId: pb.buy_security_id,
@@ -6062,8 +6069,9 @@
               sellSymbol: rebSecSymMap[pb.sell_security_id] || pb.sell_isin_code || '',
               buySymbol: rebSecSymMap[pb.buy_security_id] || pb.buy_isin_code || '',
               extraBuySymbol: pb.extra_buy_security_id ? (rebSecSymMap[pb.extra_buy_security_id] || pb.extra_buy_isin_code || '') : null,
-              events: events || [],
-            };
+              events: eventsByBatch[pb.id] || [],
+            }));
+            pendingRebalance = pendingRebalances[0];
           }
         } catch (e) { console.warn('[Overview] pending rebalance fetch failed:', e); }
 
@@ -9401,7 +9409,8 @@
        let rebWalletByClient = {};   // ownerKey (userId|familyMemberId) -> stored credits balance
        let rebReserveByClient = {};  // ownerKey (userId|familyMemberId) -> unused execution reserve (rands)
       let rebImpactChangeView = false;
-      let rebPendingRebalance = null; // {batchId, sellCode, buyCode, extraBuyCode, events[]}
+      let rebPendingRebalance = null;   // {batchId, sellCode, buyCode, extraBuyCode, events[]} — first batch, kept for compat
+      let rebPendingRebalances = [];   // all PENDING batches for the loaded strategy
        /* Family-member scope for rebalance: __all__ includes parent + children
           by default, null is explicit parent-only, and a uuid restricts to one
           child. Each loaded holding retains its own owner key. */
@@ -9611,6 +9620,7 @@
         rebWalletByClient = {};
         rebReserveByClient = {};
         rebPendingRebalance = null;
+        rebPendingRebalances = [];
         rebSelectedStrategyId = strategyId ? String(strategyId) : null;
         const strategy = (allStrategiesFullData || []).find(s => String(s.id) === String(strategyId));
         if (!strategy) { rebIsins = []; rebRenderAll(); return; }
@@ -9871,39 +9881,43 @@
           }
         } catch (e) { /* harmless */ }
 
-        /* ── Fetch pending rebalance batch for this strategy ── */
+        /* ── Fetch ALL pending rebalance batches for this strategy ── */
         try {
           const { data: pendingBatches } = await supabaseClient
             .from('rebalance_batch')
             .select('id, sell_security_id, buy_security_id, extra_buy_security_id')
             .eq('strategy_id', strategyId)
             .eq('status', 'PENDING')
-            .order('created_at', { ascending: false })
-            .limit(1);
+            .order('created_at', { ascending: false });
           if (pendingBatches && pendingBatches.length) {
-            const pb = pendingBatches[0];
-            /* Resolve security IDs &rarr; codes for matching rebIsins */
-            const pbSecIds = [pb.sell_security_id, pb.buy_security_id, pb.extra_buy_security_id].filter(Boolean);
+            /* Resolve all security IDs → codes across all batches */
+            const allSecIds = [...new Set(
+              pendingBatches.flatMap(pb => [pb.sell_security_id, pb.buy_security_id, pb.extra_buy_security_id].filter(Boolean))
+            )];
             let pbCodeMap = {};
-            if (pbSecIds.length) {
-              const { data: pbSecs } = await supabaseClient.from('securities_c').select('id, symbol').in('id', pbSecIds);
+            if (allSecIds.length) {
+              const { data: pbSecs } = await supabaseClient.from('securities_c').select('id, symbol').in('id', allSecIds);
               (pbSecs || []).forEach(s => { pbCodeMap[s.id] = (s.symbol || '').replace(/\.[A-Z]+$/, ''); });
             }
-            /* Fetch per-user events */
-            const { data: pbEvents } = await supabaseClient
+            /* Fetch per-user events for all batches in one query */
+            const batchIds = pendingBatches.map(pb => pb.id);
+            const { data: allPbEvents } = await supabaseClient
               .from('rebalance_event')
-              .select('user_id, family_member_id, security_id, trade_side, quantity, closed_reason')
-              .eq('batch_id', pb.id);
-            rebPendingRebalance = {
+              .select('batch_id, user_id, family_member_id, security_id, trade_side, quantity, closed_reason')
+              .in('batch_id', batchIds);
+            const eventsByBatch = {};
+            (allPbEvents || []).forEach(ev => {
+              if (!eventsByBatch[ev.batch_id]) eventsByBatch[ev.batch_id] = [];
+              eventsByBatch[ev.batch_id].push({ ...ev, code: pbCodeMap[ev.security_id] || '' });
+            });
+            rebPendingRebalances = pendingBatches.map(pb => ({
               batchId: pb.id,
               sellCode: pbCodeMap[pb.sell_security_id] || '',
               buyCode: pbCodeMap[pb.buy_security_id] || '',
               extraBuyCode: pb.extra_buy_security_id ? (pbCodeMap[pb.extra_buy_security_id] || '') : null,
-              events: (pbEvents || []).map(ev => ({
-                ...ev,
-                code: pbCodeMap[ev.security_id] || '',
-              })),
-            };
+              events: eventsByBatch[pb.id] || [],
+            }));
+            rebPendingRebalance = rebPendingRebalances[0];
           }
         } catch (e) { console.warn('rebLoadStrategy: pending rebalance fetch failed', e); }
 
@@ -9956,15 +9970,18 @@
           const holderCount = holders.filter(r => r.quantity > 0).length;
           const positionValue = isin.currentPrice > 0 && totalQty > 0 ? isin.currentPrice * totalQty : 0;
           const displayPrice = rebShowUnitPrice ? isin.currentPrice : positionValue;
-          /* Pending rebalance detection */
-          const isPendSell = rebPendingRebalance && isin.code === rebPendingRebalance.sellCode;
-          const isPendBuy  = rebPendingRebalance && (isin.code === rebPendingRebalance.buyCode || isin.code === rebPendingRebalance.extraBuyCode);
+          /* Pending rebalance detection — check across all parked batches */
+          const _pendBatchForIsin = rebPendingRebalances.find(pb =>
+            pb.sellCode === isin.code || pb.buyCode === isin.code || pb.extraBuyCode === isin.code
+          );
+          const isPendSell = !!_pendBatchForIsin && isin.code === _pendBatchForIsin.sellCode;
+          const isPendBuy  = !!_pendBatchForIsin && (isin.code === _pendBatchForIsin.buyCode || isin.code === _pendBatchForIsin.extraBuyCode);
           const isPending  = isPendSell || isPendBuy;
           const pendBg = isPending ? (isSelected ? 'bg-amber-100' : 'bg-amber-50 hover:bg-amber-100') : (isSelected ? 'bg-violet-50' : 'hover:bg-slate-50');
           const pendBadge = isPendBuy
-            ? `<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;margin-left:5px;">${normalizeSymbol(rebPendingRebalance.buyCode || isin.code)} BUY</span>`
+            ? `<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;margin-left:5px;">${normalizeSymbol(_pendBatchForIsin.buyCode || isin.code)} BUY</span>`
             : isPendSell
-              ? `<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;margin-left:5px;">${normalizeSymbol(rebPendingRebalance.sellCode || isin.code)} SELL</span>`
+              ? `<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;margin-left:5px;">${normalizeSymbol(_pendBatchForIsin.sellCode || isin.code)} SELL</span>`
               : '';
           const priceColor = isPending ? 'text-amber-700' : 'text-slate-700';
           const qtyColor   = isPending ? 'text-amber-800' : 'text-slate-800';
@@ -10228,9 +10245,9 @@
               )
             : clients;
           if (metaEl) metaEl.textContent = `${rebSelectedIsin.code} &middot; ${previewClients.length} clients &middot; select reduction step`;
-          const pendingEventsForSelected = rebPendingRebalance
-            ? rebPendingRebalance.events.filter(ev => String(ev.code || "") === String(rebSelectedIsin.code || ""))
-            : [];
+          const pendingEventsForSelected = rebPendingRebalances.flatMap(pb =>
+            pb.events.filter(ev => String(ev.code || "") === String(rebSelectedIsin.code || ""))
+          );
           const pendingOwnerKeys = pendingStrategyOwnerKeys;
           tbody.innerHTML = previewClients.map(client => {
             const lots = Number(client.lots) || 0;
@@ -10328,9 +10345,9 @@
         const impacts = rebComputeClientImpacts(impactClients, rebSelectedIsin.unitsPerLot, rebSelectedStep.newUnitsPerLot);
         const hasErrors = impacts.some(i => i.hasNegative);
         const selectedCode = String(rebSelectedIsin.code || "");
-        const pendingEventsForSelected = rebPendingRebalance
-          ? rebPendingRebalance.events.filter(ev => String(ev.code || "") === selectedCode)
-          : [];
+        const pendingEventsForSelected = rebPendingRebalances.flatMap(pb =>
+          pb.events.filter(ev => String(ev.code || "") === selectedCode)
+        );
         const pendingOwnerKeys = pendingStrategyOwnerKeys;
         const pendingTradeLabel = pendingEventsForSelected.length
           ? ` &middot; ${selectedCode} ${pendingEventsForSelected.some(ev => String(ev.trade_side).toUpperCase() === "SELL") ? "SELL" : "BUY"}`
@@ -10348,7 +10365,7 @@
           const pendingSide = pendingEventsForSelected.some(ev =>
             rebOwnerKey(ev.user_id, ev.family_member_id) === imp.ownerKey &&
             String(ev.trade_side).toUpperCase() === "SELL"
-          ) || String(rebPendingRebalance?.sellCode || "") === selectedCode ? "SELL" : "BUY";
+          ) || rebPendingRebalances.some(pb => String(pb.sellCode || "") === selectedCode) ? "SELL" : "BUY";
           const badge = isPend
             ? ` <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em;">${selectedCode} ${pendingSide}</span>`
             : '';
@@ -11971,24 +11988,6 @@
         ]);
         if (!targetOwnerKeys.size) throw new Error("No client holdings or pending orders are available for this instrument.");
 
-        /* Guard: block if a PENDING batch already exists for THIS owner on this
-           strategy — scoped by family_member_id (see buy-commit path above). */
-        const batchFamilyMemberId = rebScopeIsAll() ? null : (rebSelectedFamilyMemberId || null);
-        let pendingBatchesQuery2 = supabaseClient
-          .from("rebalance_batch")
-          .select("id, status, sell_isin_code, buy_isin_code, created_at")
-          .eq("strategy_id", strategyId)
-          .eq("status", "PENDING");
-        pendingBatchesQuery2 = batchFamilyMemberId
-          ? pendingBatchesQuery2.eq("family_member_id", batchFamilyMemberId)
-          : pendingBatchesQuery2.is("family_member_id", null);
-        const { data: pendingBatches, error: pendingErr } = await pendingBatchesQuery2;
-        if (pendingErr) throw new Error(pendingErr.message || "Failed to check pending batches.");
-        if (pendingBatches && pendingBatches.length > 0) {
-          const existing = pendingBatches[0];
-          throw new Error(`A pending rebalance already exists for this strategy (batch ${existing.id.slice(0, 8)}&hellip; created ${new Date(existing.created_at).toLocaleString()}). Please settle or reverse it before committing a new one.`);
-        }
-
         /* Resolve sell security ID */
         const { data: secRows, error: secErr } = await supabaseClient
           .from("securities_c")
@@ -12558,24 +12557,6 @@
         if (buyQtyPerLot <= 0) throw new Error("Buy per lot must be ≥ 1.");
         if (!(pricePerShare > 0)) throw new Error("Buy security has no live price.");
         const strategyId = rebSelectedStrategyId;
-
-        /* Block if a PENDING batch already exists for THIS owner on this
-           strategy — scoped by family_member_id (see buy-commit path above). */
-        const rebGuardFmId3 = rebSelectedFamilyMemberId || null;
-        let pendingBatchesQuery3 = supabaseClient
-          .from("rebalance_batch")
-          .select("id, created_at, status")
-          .eq("strategy_id", strategyId)
-          .eq("status", "PENDING");
-        pendingBatchesQuery3 = rebGuardFmId3
-          ? pendingBatchesQuery3.eq("family_member_id", rebGuardFmId3)
-          : pendingBatchesQuery3.is("family_member_id", null);
-        const { data: pendingBatches, error: pendingErr } = await pendingBatchesQuery3;
-        if (pendingErr) throw new Error(pendingErr.message || "Failed to check pending batches.");
-        if (pendingBatches && pendingBatches.length > 0) {
-          const existing = pendingBatches[0];
-          throw new Error(`A pending rebalance already exists for this strategy (batch ${existing.id.slice(0, 8)}&hellip;). Settle or reverse it first.`);
-        }
 
         /* Uniformity check &mdash; every funded client must afford their allocation */
         const blocked = (perUserPlan || []).filter((p) => p.sharesNeeded > 0 && !p.afford);
