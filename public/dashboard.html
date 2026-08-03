@@ -1078,6 +1078,7 @@
                     <input id="strategyIsPublic" name="is_public" type="checkbox" style="display:none;" />
                     <input id="strategyIsFeatured" name="is_featured" type="checkbox" style="display:none;" />
                     <input id="strategyIsKid" name="is_kid_strategy" type="checkbox" style="display:none;" />
+                    <input id="strategyIsTest" name="is_test_strategy" type="checkbox" style="display:none;" />
                     <p id="strategyFormMessage" style="font-size: 11px; color: #64748b; margin: 0; max-width: 160px;"></p>
                     <button
                       type="submit"
@@ -4780,6 +4781,10 @@
           is_public: isPublic,
           is_featured:
             strategyForm.querySelector("#strategyIsFeatured")?.checked || false,
+          is_kid_strategy:
+            strategyForm.querySelector("#strategyIsKid")?.checked || false,
+          investor_environment:
+            strategyForm.querySelector("#strategyIsTest")?.checked ? 'UAT' : 'LIVE',
           status: "active",
           holdings: holdingsPayload.length > 0 ? holdingsPayload : null,
           ...(editingStrategyId ? {} : { provider_name: chosenStrategist || null }),
@@ -7461,15 +7466,11 @@
                 </div>
               </div>
 
-              <!-- Investor environment -->
-              <div style="margin-bottom:16px;">
-                <label style="display:block;font-size:11px;font-weight:700;color:#64748b;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:6px;">Investor Environment</label>
-                <select id="_sdInvestorEnvironment" style="width:100%;border:1.5px solid #e2e8f0;border-radius:9px;padding:9px 13px;font-size:13.5px;color:#1e293b;outline:none;background:#f8fafc;cursor:pointer;box-sizing:border-box;">
-                  <option value="LIVE" ${String(strategy.investor_environment || 'LIVE').toUpperCase()==='LIVE'?'selected':''}>LIVE — real investors only</option>
-                  <option value="UAT" ${String(strategy.investor_environment || 'LIVE').toUpperCase()==='UAT'?'selected':''}>UAT — test investors only</option>
-                </select>
-                <div style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.45;">This boundary also controls which holdings the rebalance engine may touch.</div>
-              </div>
+              <!-- Investor environment (hidden — driven by Test Strategy toggle below) -->
+              <select id="_sdInvestorEnvironment" style="display:none;">
+                <option value="LIVE" ${String(strategy.investor_environment || 'LIVE').toUpperCase()==='LIVE'?'selected':''}>LIVE</option>
+                <option value="UAT" ${String(strategy.investor_environment || 'LIVE').toUpperCase()==='UAT'?'selected':''}>UAT</option>
+              </select>
 
               <!-- Sector display order (category ordering in the app) -->
               <div style="margin-bottom:16px;">
@@ -7503,7 +7504,7 @@
                     <div id="_sdFeaturedThumb" style="position:absolute;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);transition:left 0.2s;left:${strategy.is_featured?"21px":"3px"};"></div>
                   </div>
                 </label>
-               <label style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 12px;cursor:pointer;gap:8px;min-width:0;">
+               <label style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 12px;cursor:pointer;gap:8px;border-right:1.5px solid #e2e8f0;min-width:0;">
                  <div>
                    <div style="font-size:13px;font-weight:600;color:#1e293b;">Child friendly</div>
                    <div style="font-size:11px;color:#94a3b8;margin-top:1px;">Show on child dashboard</div>
@@ -7512,6 +7513,17 @@
                    <input id="_sdIsKid" type="checkbox" ${strategy.is_kid_strategy?"checked":""} style="opacity:0;position:absolute;inset:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1;" />
                    <div id="_sdKidTrack" style="position:absolute;inset:0;border-radius:11px;transition:background 0.2s;background:${strategy.is_kid_strategy?"#7c3aed":"#e2e8f0"};"></div>
                    <div id="_sdKidThumb" style="position:absolute;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);transition:left 0.2s;left:${strategy.is_kid_strategy?"21px":"3px"};"></div>
+                 </div>
+               </label>
+               <label style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 12px;cursor:pointer;gap:8px;min-width:0;">
+                 <div>
+                   <div style="font-size:13px;font-weight:600;color:#1e293b;">Test strategy</div>
+                   <div style="font-size:11px;color:#94a3b8;margin-top:1px;">UAT — test investors only</div>
+                 </div>
+                 <div id="_sdTestToggle" style="position:relative;width:40px;height:22px;flex-shrink:0;">
+                   <input id="_sdIsTest" type="checkbox" ${String(strategy.investor_environment||'LIVE').toUpperCase()==='UAT'?"checked":""} style="opacity:0;position:absolute;inset:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1;" />
+                   <div id="_sdTestTrack" style="position:absolute;inset:0;border-radius:11px;transition:background 0.2s;background:${String(strategy.investor_environment||'LIVE').toUpperCase()==='UAT'?"#f59e0b":"#e2e8f0"};"></div>
+                   <div id="_sdTestThumb" style="position:absolute;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);transition:left 0.2s;left:${String(strategy.investor_environment||'LIVE').toUpperCase()==='UAT'?"21px":"3px"};"></div>
                  </div>
                </label>
               </div>
@@ -7556,6 +7568,19 @@
         wireToggle("#_sdIsPublic",   "#_sdPublicTrack",   "#_sdPublicThumb");
         wireToggle("#_sdIsFeatured", "#_sdFeaturedTrack", "#_sdFeaturedThumb");
         wireToggle("#_sdIsKid", "#_sdKidTrack", "#_sdKidThumb");
+        /* Test strategy toggle — amber colour, also drives the hidden environment select */
+        const _sdIsTestEl  = overlay.querySelector("#_sdIsTest");
+        const _sdTestTrackEl = overlay.querySelector("#_sdTestTrack");
+        const _sdTestThumbEl = overlay.querySelector("#_sdTestThumb");
+        const _sdEnvSel = overlay.querySelector("#_sdInvestorEnvironment");
+        if (_sdIsTestEl) {
+          _sdIsTestEl.addEventListener("change", () => {
+            const on = _sdIsTestEl.checked;
+            if (_sdTestTrackEl) _sdTestTrackEl.style.background = on ? "#f59e0b" : "#e2e8f0";
+            if (_sdTestThumbEl) _sdTestThumbEl.style.left = on ? "21px" : "3px";
+            if (_sdEnvSel) _sdEnvSel.value = on ? "UAT" : "LIVE";
+          });
+        }
 
         /* + Add sector */
         const addSectorBtn2 = overlay.querySelector("#_sdAddSector");
@@ -7663,6 +7688,8 @@
               if (featEl) featEl.checked = payload.is_featured;
               const kidEl = f.querySelector("#strategyIsKid");
               if (kidEl) kidEl.checked = payload.is_kid_strategy;
+              const testSyncEl = f.querySelector("#strategyIsTest");
+              if (testSyncEl) testSyncEl.checked = String(payload.investor_environment || 'LIVE').toUpperCase() === 'UAT';
             }
           }
 
@@ -8201,8 +8228,9 @@
             strategy.risk_level || ""
           ).toLowerCase();
           f.querySelector("#strategyIsPublic").checked = !!strategy.is_public;
-          f.querySelector("#strategyIsFeatured").checked =
-            !!strategy.is_featured;
+          f.querySelector("#strategyIsFeatured").checked = !!strategy.is_featured;
+          const testEl = f.querySelector("#strategyIsTest");
+          if (testEl) testEl.checked = String(strategy.investor_environment || 'LIVE').toUpperCase() === 'UAT';
 
           const sectorSelect = f.querySelector("#strategySector");
           if (sectorSelect && strategy.sector) {
