@@ -28,6 +28,7 @@ const dividendsEmailHandler = require('./_dividends-email');
 const { applyApprovedPriceUpdate } = require('./orderbook/update-price');
 const tasksHandler = require('./_tasks');
 const standupLogHandler = require('./_standup-log');
+const giftingHandler = require('./_gifting');
 
 const normEmail = (e) => String(e || '').trim().toLowerCase();
 
@@ -77,6 +78,10 @@ module.exports = async (req, res) => {
       if (fwd === 'standup-log') {
         req.url = '/api/standup-log' + url.search;
         return await standupLogHandler(req, res);
+      }
+      if (fwd === 'gifting') {
+        req.url = '/api/gifting' + url.search;
+        return await giftingHandler(req, res);
       }
     }
 

@@ -16,6 +16,7 @@
     { "source": "/api/tasks", "destination": "/api/team?fwd=tasks" },
     { "source": "/api/standup-log", "destination": "/api/team?fwd=standup-log" },
     { "source": "/api/standup-log/snapshot", "destination": "/api/team?fwd=standup-log&action=snapshot" },
+    { "source": "/api/gifting", "destination": "/api/team?fwd=gifting" },
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ],
   "crons": [
