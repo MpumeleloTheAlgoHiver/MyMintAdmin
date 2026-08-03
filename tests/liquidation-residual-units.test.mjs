@@ -14,7 +14,7 @@ assert.match(dashboard, /acc\[item\.userId\] = item\.floorCents \/ 100/, 'client
 assert.match(dashboard, /const mainResidual = Number\(residualSplitAfterMain\[userId\] \|\| 0\)/, 'wallet preview must not divide rand allocations twice');
 assert.match(dashboard, /const affectedClients = clients;/, 'sale preview must use selected-instrument holders');
 assert.match(dashboard, /rebDistributeMoneyByLots\(sellExec\.netProceeds, affectedClients\)/, 'sale proceeds must use selected-instrument weights');
-assert.match(dashboard, /select\("id, user_id, family_member_id, security_id, quantity, avg_fill, trade_side/, 'liquidation must read fill state before deciding what can be sold');
+assert.match(dashboard, /select\("id, user_id, family_member_id, security_id, quantity, avg_fill, expected_fill:/, 'liquidation must read fill and committed-price state before deciding what can be sold');
 assert.match(dashboard, /const activeSellRows = eligibleRows\.filter\(\(row\) => Number\(row\.avg_fill \|\| 0\) > 0\)/, 'only broker-filled positions may create liquidation SELL events');
 assert.match(dashboard, /const unfilledSellRows = eligibleRows\.filter\(\(row\) => Number\(row\.avg_fill \|\| 0\) <= 0\)/, 'unfilled positions must use the pending-order path');
 assert.match(dashboard, /closed_reason: "REBALANCE_PENDING_LIQUIDATION"/, 'unfilled liquidation orders must be retired explicitly');

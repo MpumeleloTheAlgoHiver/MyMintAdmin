@@ -9186,6 +9186,29 @@
         return data?.session?.access_token || null;
       }
 
+      async function rebServerWrite(action, body) {
+        const token = await rebApiToken();
+        if (!token) throw new Error("Authenticated CRM session required for rebalance accounting writes.");
+        const response = await fetch(`/api/orderbook/send-csv?action=${encodeURIComponent(action)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(body || {}),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.details || result.error || `CRM rebalance write failed (HTTP ${response.status}).`);
+        return result;
+      }
+
+      const rebPendingHoldingUpdate = (holdingId, patch) => rebServerWrite("rebalance-pending-holding-write", {
+        operation: "update", holdingId, patch,
+      });
+      const rebPendingHoldingInsert = (row) => rebServerWrite("rebalance-pending-holding-write", {
+        operation: "insert", row,
+      });
+      const rebPendingHoldingDelete = (holdingId) => rebServerWrite("rebalance-pending-holding-write", {
+        operation: "delete", holdingId,
+      });
+
       const REB_ALL_OWNERS = "__all__";
       const rebOwnerKey = (userId, familyMemberId = null) =>
         `${String(userId || "")}|${familyMemberId ? String(familyMemberId) : ""}`;
@@ -9275,6 +9298,80 @@
           try { const j = await resp.json(); detail = j.details || j.error || detail; } catch (_) {}
           throw new Error(`Residual upsert failed: ${detail}`);
         }
+      }
+
+      /* Apply per-owner CA movements through the idempotent canonical cash-event
+         RPC. A failed response is checked against the immutable event ledger,
+         preventing a lost acknowledgement from applying the same cents twice. */
+      async function rebApplyResidualCashDeltas(strategyId, deltasCentsByOwner, batchId, eventType, metadataByOwner = {}, compensateOnFailure = true) {
+        const entries = Object.entries(deltasCentsByOwner || {})
+          .map(([ownerKey, cents]) => [ownerKey, Math.round(Number(cents) || 0)])
+          .filter(([ownerKey, cents]) => ownerKey && cents !== 0);
+        if (!entries.length) return [];
+        if (!strategyId || !batchId || !eventType) throw new Error("Canonical CA movement is missing strategy, batch, or event type.");
+        const token = await rebApiToken();
+        if (!token) throw new Error("No session token for canonical CA movement.");
+        const applied = [];
+
+        try {
+        for (const [ownerKey, cents] of entries) {
+          const [userId, familyMemberId = ""] = String(ownerKey).split("|");
+          if (!userId) throw new Error(`Invalid CA owner key: ${ownerKey}`);
+          let appliedOk = false;
+          let lastError = null;
+          for (let attempt = 0; attempt < 2 && !appliedOk; attempt += 1) {
+            try {
+              const response = await fetch("/api/orderbook/send-csv?action=rebalance-upsert-residuals", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                  strategyId,
+                  familyMemberId: familyMemberId || null,
+                  residualDeltasCentsByUser: { [userId]: cents },
+                  batchId,
+                  eventType,
+                  effectiveAt: new Date().toISOString(),
+                  metadataByUser: { [userId]: metadataByOwner[ownerKey] || {} },
+                }),
+              });
+              if (!response.ok) {
+                const detail = await response.json().catch(() => ({}));
+                throw new Error(detail.details || detail.error || `HTTP ${response.status}`);
+              }
+              appliedOk = true;
+            } catch (error) {
+              lastError = error;
+              const check = await fetch("/api/orderbook/send-csv?action=rebalance-load-cash-events", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ strategyId, familyMemberId: familyMemberId || null, userIds: [userId], batchId, eventType }),
+              }).catch(() => null);
+              const checkBody = check?.ok ? await check.json().catch(() => ({})) : {};
+              appliedOk = (checkBody.appliedUserIds || []).map(String).includes(userId);
+            }
+          }
+          if (!appliedOk) throw new Error(`Canonical CA movement failed for ${ownerKey}: ${lastError?.message || lastError || "unknown error"}`);
+          applied.push({ ownerKey, cents });
+        }
+        } catch (error) {
+          if (compensateOnFailure && applied.length) {
+            const reversal = Object.fromEntries(applied.map(({ ownerKey, cents }) => [ownerKey, -cents]));
+            try {
+              await rebApplyResidualCashDeltas(
+                strategyId,
+                reversal,
+                batchId,
+                `${eventType}_ROLLBACK`,
+                Object.fromEntries(applied.map(({ ownerKey }) => [ownerKey, { reverses_event_type: eventType }])),
+                false,
+              );
+            } catch (rollbackError) {
+              throw new Error(`${error.message} CA compensation also failed: ${rollbackError.message}`);
+            }
+          }
+          throw error;
+        }
+        return applied;
       }
 
       /* ── State ── */
@@ -9695,6 +9792,7 @@
                     userId: uid,
                     familyMemberId: fmId,
                     quantity: qty,
+                    expectedFill: Number(r.expected_fill) || 0,
                   });
                   return;
                 }
@@ -11324,18 +11422,6 @@
           }
         }
 
-        // Keep all validation above the first strategy/database write. In
-        // particular, an All owners completeness or funding failure must not
-        // leave the strategy template showing the new basket while no batch
-        // was created.
-        await rebReplaceStrategyHoldingAfterBuy({
-          strategyId,
-          soldIsin: rebSelectedIsin,
-          sellStep: rebSelectedStep,
-          buySelection,
-          buyExec,
-        });
-
         /* ── Get current admin user ID ── */
         const { data: sessionData } = await supabaseClient.auth.getSession();
         const currentUserId = sessionData?.session?.user?.id || null;
@@ -11390,10 +11476,12 @@
            so fill & settle never touches them — they simply fill into the new
            basket on the next broker run, and the order-book CSV updates now.
            ════════════════════════════════════════════════════════════════ */
+        let committedSwapSnapshot = [];
+        let pendingSwapCashApplied = false;
         try {
           let unfilledQuery = supabaseClient
             .from("stock_holdings_c")
-            .select("id, user_id, family_member_id, quantity, avg_fill")
+            .select("id, user_id, family_member_id, quantity, avg_fill, expected_fill:\"Expected_fill\", transaction_id")
             .eq("strategy_id", strategyId)
             .eq("security_id", sellSecurityId)
             .eq("is_active", true)
@@ -11441,36 +11529,51 @@
           if (swapRows.length) {
             const sellLive = Number(rebSelectedIsin.currentPrice) || 0;   // rands
             const buyLive = Number(buyExec.pricePerShare) || 0;           // rands (committed buy price)
-            const residualTotalsByOwner = {};   // ownerKey → NEW total residual (rands) to SET
+            const buyPriceCents = Math.round(buyLive * 100);
+            if (!(buyPriceCents > 0)) throw new Error("Pending-order rebalance has no valid committed buy price.");
             const swapPlan = [];
 
             for (const row of swapRows) {
-              const qty = Number(row.quantity || 0);
-              const sliceRand = qty * sellLive;
-              const newQty = buyLive > 0 ? Math.floor(sliceRand / buyLive) : 0;
-              const leftover = sliceRand - newQty * buyLive;
+              const originalQuantity = Math.abs(Number(row.quantity || 0));
+              const soldQty = isFullExit ? originalQuantity : Math.max(0, Math.round(originalQuantity * sellFraction));
+              if (!(soldQty > 0)) continue;
+              let expectedSellRands = Number(row.expected_fill) || 0;
+              if (expectedSellRands > 0 && sellLive > 0 && expectedSellRands > sellLive * 5) expectedSellRands /= 100;
+              if (!(expectedSellRands > 0)) {
+                throw new Error(`Pending order ${row.id} has no authoritative Expected_fill. Rebalance stopped before changing that client.`);
+              }
+              const committedCents = Math.round(soldQty * expectedSellRands * 100);
+              const newQty = Math.floor(committedCents / buyPriceCents);
+              const leftoverCents = committedCents - (newQty * buyPriceCents);
+              if (committedCents !== (newQty * buyPriceCents) + leftoverCents || leftoverCents < 0) {
+                throw new Error(`Pending-order funding does not reconcile for ${row.id}.`);
+              }
               const uid = String(row.user_id);
               const fmId = row.family_member_id ? String(row.family_member_id) : null;
               const ownerKey = rebOwnerKey(uid, fmId);
-              const baseResidual = residualTotalsByOwner[ownerKey] != null
-                ? residualTotalsByOwner[ownerKey]
-                : Number(rebWalletByClient[ownerKey] || 0);
-              residualTotalsByOwner[ownerKey] = rebRoundMoney(baseResidual + leftover);
-              swapPlan.push({ row, qty, sliceRand, newQty, leftover, uid, fmId, ownerKey });
+              swapPlan.push({
+                row, uid, fmId, ownerKey, originalQuantity, soldQty,
+                remainingQuantity: Math.max(0, originalQuantity - soldQty),
+                expectedSellRands, committedCents, newQty, buyPriceCents,
+                leftoverCents, leftover: leftoverCents / 100,
+              });
             }
 
             if (rebSwapDryRun) {
               console.warn("⟦REB SWAP DRY-RUN⟧ no writes — planned unfilled-order swaps:");
               swapPlan.forEach((p) => console.warn(
                 `  user=${p.uid.slice(0, 8)} fm=${p.fmId ? p.fmId.slice(0, 8) : "—"}  ` +
-                `${sellIsinCode} ${p.qty}@R${sellLive.toFixed(2)} (R${p.sliceRand.toFixed(2)}) → ` +
+                `${sellIsinCode} ${p.soldQty}@R${p.expectedSellRands.toFixed(2)} (R${(p.committedCents / 100).toFixed(2)}) → ` +
                 `${buyIsinCode} ${p.newQty}@R${buyLive.toFixed(2)}  leftover→cash R${p.leftover.toFixed(2)}  ` +
                 `(would deactivate holdingId ${p.row.id})`
               ));
-              console.warn("⟦REB SWAP DRY-RUN⟧ residual totals it would SET (rands):", residualTotalsByOwner);
+              console.warn("⟦REB SWAP DRY-RUN⟧ canonical CA deltas (cents):", swapPlan.reduce((acc, p) => {
+                acc[p.ownerKey] = (acc[p.ownerKey] || 0) + p.leftoverCents;
+                return acc;
+              }, {}));
             } else {
               const swapErrors = [];
-              const swapSnapshot = [];
+              const swapSnapshot = committedSwapSnapshot;
               for (const p of swapPlan) {
                 /* 1. Create the replacement FIRST.
                       Deactivating first meant a failed insert left the client
@@ -11484,7 +11587,7 @@
                 if (p.newQty > 0) {
                   let existsQ = supabaseClient
                     .from("stock_holdings_c")
-                    .select("id, quantity")
+                    .select("id, quantity, expected_fill:\"Expected_fill\"")
                     .eq("strategy_id", strategyId)
                     .eq("security_id", buySecurityId)
                     .eq("user_id", p.uid)
@@ -11497,17 +11600,23 @@
                   const { data: existingBuy } = await existsQ.maybeSingle();
 
                   if (existingBuy) {
-                    const { error: upErr } = await supabaseClient
-                      .from("stock_holdings_c")
-                      .update({ quantity: Number(existingBuy.quantity || 0) + p.newQty, updated_at: nowIso })
-                      .eq("id", existingBuy.id);
-                    if (upErr) { swapErrors.push(`merge buy ${p.uid}: ${upErr.message}`); continue; }
+                    const mergedOriginalQuantity = Number(existingBuy.quantity || 0);
+                    const mergedOriginalExpectedFill = Number(existingBuy.expected_fill || buyLive);
+                    const mergedQuantity = mergedOriginalQuantity + p.newQty;
+                    const mergedExpectedFill = mergedQuantity > 0
+                      ? ((mergedOriginalQuantity * mergedOriginalExpectedFill) + (p.newQty * buyLive)) / mergedQuantity
+                      : buyLive;
+                    try {
+                      await rebPendingHoldingUpdate(existingBuy.id, { quantity: mergedQuantity, "Expected_fill": mergedExpectedFill });
+                    } catch (error) { swapErrors.push(`merge buy ${p.uid}: ${error.message}`); continue; }
                     mergedIntoId = existingBuy.id;
                     mergedAddedQty = p.newQty;
+                    p.mergedOriginalQuantity = mergedOriginalQuantity;
+                    p.mergedOriginalExpectedFill = mergedOriginalExpectedFill;
                   } else {
-                    const { data: insertedBuy, error: insErr } = await supabaseClient
-                      .from("stock_holdings_c")
-                      .insert({
+                    let insertedBuy = null;
+                    try {
+                      const insertedResult = await rebPendingHoldingInsert({
                         user_id: p.uid,
                         family_member_id: p.fmId,
                         security_id: buySecurityId,
@@ -11518,15 +11627,15 @@
                         Status: "active",
                         avg_fill: null,                 // still PENDING — fills via the order book
                         "Expected_fill": buyLive,       // rands, the committed buy price
+                        transaction_id: p.row.transaction_id || null,
                         market_value: 0,
                         as_of_date: null,
                         strategy_name_snapshot: strategyNameSnapshot,
                         created_at: nowIso,
                         updated_at: nowIso,
-                      })
-                      .select("id")
-                      .maybeSingle();
-                    if (insErr) { swapErrors.push(`insert buy ${p.uid}: ${insErr.message}`); continue; }
+                      });
+                      insertedBuy = insertedResult?.row || null;
+                    } catch (error) { swapErrors.push(`insert buy ${p.uid}: ${error.message}`); continue; }
                     newHoldingId = insertedBuy?.id || null;
                   }
                 }
@@ -11534,28 +11643,26 @@
                 /* 2. Only now retire the old pending holding. If this fails,
                       roll the replacement back — otherwise the client would
                       hold BOTH the old and the new position. */
-                const { error: deErr } = await supabaseClient
-                  .from("stock_holdings_c")
-                  .update({
-                    is_active: false,
-                    Status: "inactive",
-                    closed_reason: "REBALANCE_PENDING_SWAP",
-                    closed_at: nowIso,
-                    updated_at: nowIso,
-                  })
-                  .eq("id", p.row.id);
-                if (deErr) {
-                  swapErrors.push(`deactivate ${p.row.id}: ${deErr.message}`);
+                const pendingSellUpdate = p.remainingQuantity > 0
+                  ? { quantity: p.remainingQuantity, updated_at: nowIso }
+                  : {
+                      is_active: false,
+                      Status: "inactive",
+                      closed_reason: "REBALANCE_PENDING_SWAP",
+                      closed_at: nowIso,
+                      updated_at: nowIso,
+                    };
+                try {
+                  await rebPendingHoldingUpdate(p.row.id, pendingSellUpdate);
+                } catch (error) {
+                  swapErrors.push(`deactivate ${p.row.id}: ${error.message}`);
                   if (newHoldingId) {
-                    await supabaseClient.from("stock_holdings_c").delete().eq("id", newHoldingId);
+                    await rebPendingHoldingDelete(newHoldingId).catch(() => null);
                   } else if (mergedIntoId) {
-                    const { data: cur } = await supabaseClient
-                      .from("stock_holdings_c").select("quantity").eq("id", mergedIntoId).maybeSingle();
-                    if (cur) {
-                      await supabaseClient.from("stock_holdings_c")
-                        .update({ quantity: Math.max(0, Number(cur.quantity || 0) - mergedAddedQty), updated_at: nowIso })
-                        .eq("id", mergedIntoId);
-                    }
+                    await rebPendingHoldingUpdate(mergedIntoId, {
+                        quantity: p.mergedOriginalQuantity,
+                        "Expected_fill": p.mergedOriginalExpectedFill,
+                      }).catch(() => null);
                   }
                   continue;
                 }
@@ -11568,57 +11675,66 @@
                   newHoldingId,
                   mergedIntoId,
                   mergedAddedQty,
+                  mergedOriginalQuantity: p.mergedOriginalQuantity ?? null,
+                  mergedOriginalExpectedFill: p.mergedOriginalExpectedFill ?? null,
                   userId: p.uid,
                   familyMemberId: p.fmId,
-                  sellQty: p.qty,
+                  sellQty: p.soldQty,
+                  originalQuantity: p.originalQuantity,
+                  remainingQuantity: p.remainingQuantity,
+                  committedCents: p.committedCents,
+                  leftoverCents: p.leftoverCents,
                   newQty: p.newQty,
                   leftover: p.leftover,
                 });
 
                 /* 3. Audit txn (mirrors the filled rebalance history entry; R0, informational) */
-                const { error: txErr } = await supabaseClient.from("transactions").insert({
+                try {
+                  await rebServerWrite("rebalance-pending-audit-write", { operation: "insert", batchId: rebalanceBatchId, row: {
                   user_id: p.uid,
                   family_member_id: p.fmId,
                   direction: "credit",
                   name: `Rebalance: ${strategyNameSnapshot || "Strategy"}`,
-                  description: `Pre-fill swap: ${p.qty} × ${sellIsinCode} → ${p.newQty} × ${buyIsinCode}`
+                  description: `Pre-fill swap: ${p.soldQty} × ${sellIsinCode} → ${p.newQty} × ${buyIsinCode}`
                     + (p.leftover > 0 ? `, R${p.leftover.toFixed(2)} to cash` : ""),
                   amount: 0,
                   status: "posted",
+                  store_reference: `PENDING-REBALANCE-${rebalanceBatchId}-${p.row.id}`,
                   transaction_date: nowIso,
                   created_at: nowIso,
-                });
-                if (txErr) swapErrors.push(`audit txn ${p.uid}: ${txErr.message}`);
+                  }});
+                } catch (error) { swapErrors.push(`audit txn ${p.uid}: ${error.message}`); }
               }
 
               /* 4. Residual upsert — SETs the new total (existing + leftover).
                     Built from swapSnapshot (SUCCESSFUL swaps only) rather than
                     from swapPlan, so a swap that failed or was rolled back above
                     never credits the client phantom cash. */
-              const appliedResidualByOwner = {};
-              swapSnapshot.forEach((s) => {
-                const ownerKey = rebOwnerKey(s.userId, s.familyMemberId);
-                const base = appliedResidualByOwner[ownerKey] != null
-                  ? appliedResidualByOwner[ownerKey]
-                  : Number(rebWalletByClient[ownerKey] || 0);
-                appliedResidualByOwner[ownerKey] = rebRoundMoney(base + s.leftover);
-              });
-              if (Object.keys(appliedResidualByOwner).length) {
-                await rebUpsertWalletBalances(
-                  strategyId,
-                  appliedResidualByOwner,
-                  rebScopeIsAll() ? REB_ALL_OWNERS : (rebSelectedFamilyMemberId || null),
-                );
+              if (swapErrors.length) {
+                throw new Error(`Pre-fill swap failed for ${swapErrors.length} write(s): ${swapErrors.join("; ")}`);
               }
-
-              /* 5. Persist the swap ledger on the batch so Reverse can undo it. */
               if (swapSnapshot.length) {
                 const { error: snapErr } = await supabaseClient
                   .from("rebalance_batch")
                   .update({ pending_swap_snapshot: swapSnapshot, updated_at: nowIso })
                   .eq("id", rebalanceBatchId);
-                if (snapErr) swapErrors.push(`swap snapshot: ${snapErr.message}`);
+                if (snapErr) throw new Error(`Pre-fill reversal ledger failed: ${snapErr.message}`);
               }
+              const residualDeltasCentsByOwner = {};
+              const residualMetadataByOwner = {};
+              swapSnapshot.forEach((s) => {
+                const ownerKey = rebOwnerKey(s.userId, s.familyMemberId);
+                residualDeltasCentsByOwner[ownerKey] = (residualDeltasCentsByOwner[ownerKey] || 0) + Number(s.leftoverCents || 0);
+                residualMetadataByOwner[ownerKey] = { source: "CRM_PENDING_REBALANCE", sell_isin: sellIsinCode, buy_isin: buyIsinCode };
+              });
+              await rebApplyResidualCashDeltas(
+                strategyId,
+                residualDeltasCentsByOwner,
+                rebalanceBatchId,
+                "PENDING_REBALANCE_RESIDUAL",
+                residualMetadataByOwner,
+              );
+              pendingSwapCashApplied = true;
 
               /* 6. Tell the admin. These used to be console-only, so a swap that
                     silently failed — or that left a client with no securities at
@@ -11634,7 +11750,7 @@
                     `  • ${String(s.userId).slice(0, 8)}${s.familyMemberId ? " / child " + String(s.familyMemberId).slice(0, 8) : ""}` +
                     ` — ${s.sellQty} × ${sellIsinCode} → R${Number(s.leftover).toFixed(2)} cash`
                   ).join("\n") +
-                  `\n\nTheir 8% execution reserve and CA were NOT touched (they were never filled).`
+                  `\n\nTheir execution reserve was not touched; the unreinvested committed cents became strategy CA.`
                 );
               }
               if (swapErrors.length) {
@@ -11648,16 +11764,81 @@
               }
             }
           }
+          /* Publish the model composition only after every filled event,
+             pending-order rewrite, reversal ledger and CA movement succeeded. */
+          await rebReplaceStrategyHoldingAfterBuy({
+            strategyId,
+            soldIsin: rebSelectedIsin,
+            sellStep: rebSelectedStep,
+            buySelection,
+            buyExec,
+          });
         } catch (swapErr) {
-          /* The filled batch already committed; surface the swap problem without
-             unwinding the filled rebalance. Alert as well as log — a silent
-             console error here previously looked like a clean commit. */
-          console.error("⟦REB SWAP⟧ failed:", swapErr?.message || swapErr);
-          alert(
-            "Rebalance committed, but the pre-fill swap of unfilled orders FAILED:\n\n" +
-            (swapErr?.message || swapErr) +
-            "\n\nUnfilled clients may still be on the OLD composition — check the order book before filling."
-          );
+          const rollbackErrors = [];
+          if (pendingSwapCashApplied) {
+            const cashRollback = {};
+            committedSwapSnapshot.forEach((snapshot) => {
+              const ownerKey = rebOwnerKey(snapshot.userId, snapshot.familyMemberId);
+              cashRollback[ownerKey] = (cashRollback[ownerKey] || 0) - Number(snapshot.leftoverCents || 0);
+            });
+            try {
+              await rebApplyResidualCashDeltas(strategyId, cashRollback, rebalanceBatchId, "PENDING_REBALANCE_RESIDUAL_ROLLBACK", {}, false);
+            } catch (error) { rollbackErrors.push(`CA: ${error.message}`); }
+          }
+          for (const snapshot of committedSwapSnapshot) {
+            try {
+              await rebPendingHoldingUpdate(snapshot.oldHoldingId, {
+                quantity: snapshot.originalQuantity,
+                is_active: true,
+                Status: "active",
+                closed_reason: null,
+                closed_at: null,
+              });
+            } catch (error) { rollbackErrors.push(`old order ${snapshot.oldHoldingId}: ${error.message}`); }
+            if (snapshot.newHoldingId) {
+              try { await rebPendingHoldingDelete(snapshot.newHoldingId); }
+              catch (error) { rollbackErrors.push(`new order ${snapshot.newHoldingId}: ${error.message}`); }
+            } else if (snapshot.mergedIntoId) {
+              try {
+                await rebPendingHoldingUpdate(snapshot.mergedIntoId, {
+                  quantity: snapshot.mergedOriginalQuantity,
+                  "Expected_fill": snapshot.mergedOriginalExpectedFill,
+                });
+              } catch (error) { rollbackErrors.push(`merged order ${snapshot.mergedIntoId}: ${error.message}`); }
+            }
+          }
+          try {
+            const token = await rebApiToken();
+            const restoreResponse = await fetch("/api/orderbook/send-csv?action=rebalance-update-strategy-holdings", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({
+                strategyId,
+                holdings: holdingsSnapshotBefore || [],
+                minInvestment: Math.max(0, Number(strategyRef?.min_investment) || 0),
+              }),
+            });
+            if (!restoreResponse.ok) throw new Error(`HTTP ${restoreResponse.status}`);
+          } catch (error) { rollbackErrors.push(`strategy: ${error.message}`); }
+          try {
+            await rebServerWrite("rebalance-pending-audit-write", { operation: "delete", batchId: rebalanceBatchId });
+          } catch (error) { rollbackErrors.push(`audit transactions: ${error.message}`); }
+          const { error: eventsRollbackErr } = await supabaseClient.from("rebalance_event")
+            .update({ closed_reason: "COMMIT_ROLLED_BACK", updated_at: new Date().toISOString() })
+            .eq("batch_id", rebalanceBatchId);
+          if (eventsRollbackErr) rollbackErrors.push(`events: ${eventsRollbackErr.message}`);
+          const { error: batchRollbackErr } = await supabaseClient.from("rebalance_batch").update({
+            status: "REVERSED",
+            is_reversed: true,
+            reversed_at: new Date().toISOString(),
+            reversed_reason: `Commit rolled back: ${swapErr?.message || swapErr}`.slice(0, 1000),
+            updated_at: new Date().toISOString(),
+          }).eq("id", rebalanceBatchId);
+          if (batchRollbackErr) rollbackErrors.push(`batch: ${batchRollbackErr.message}`);
+          if (rollbackErrors.length) {
+            throw new Error(`Rebalance stopped and rollback needs attention: ${swapErr?.message || swapErr}. ${rollbackErrors.join("; ")}`);
+          }
+          throw new Error(`Rebalance stopped and was fully rolled back: ${swapErr?.message || swapErr}`);
         }
 
         /* ── stock_holdings_c is NOT touched ──
@@ -11845,7 +12026,7 @@
         ].filter(Boolean))];
         const { data: existingRows, error: existingErr } = await supabaseClient
           .from("stock_holdings_c")
-          .select("id, user_id, family_member_id, security_id, quantity, avg_fill, trade_side, is_active, fill_date:\"Fill_date\"")
+          .select("id, user_id, family_member_id, security_id, quantity, avg_fill, expected_fill:\"Expected_fill\", transaction_id, trade_side, is_active, fill_date:\"Fill_date\"")
           .eq("strategy_id", strategyId)
           .eq("is_active", true)
           .eq("trade_side", "BUY")
@@ -11884,11 +12065,20 @@
         const unfilledLiquidationPlan = unfilledSellRows.map((row) => {
           const originalQuantity = Math.abs(Number(row.quantity || 0));
           const soldQty = isFullExit ? originalQuantity : Math.max(0, Math.round(originalQuantity * sellFraction));
+          let expectedSellRands = Number(row.expected_fill) || 0;
+          const sellReference = Number(rebSelectedIsin.currentPrice) || 0;
+          if (expectedSellRands > 0 && sellReference > 0 && expectedSellRands > sellReference * 5) expectedSellRands /= 100;
+          if (soldQty > 0 && !(expectedSellRands > 0)) {
+            throw new Error(`Pending order ${row.id} has no authoritative Expected_fill. Liquidation stopped before changing that client.`);
+          }
+          const committedCents = Math.round(soldQty * expectedSellRands * 100);
           return {
             row,
             originalQuantity,
             soldQty,
             remainingQuantity: Math.max(0, originalQuantity - soldQty),
+            expectedSellRands,
+            committedCents,
           };
         }).filter((item) => item.soldQty > 0);
 
@@ -11976,6 +12166,7 @@
            event or proceeds, and persist their ids in the reversible swap ledger.
            Strategy composition changes only after every order write succeeds. */
         const pendingLiquidationSnapshot = [];
+        let pendingLiquidationCashApplied = false;
         try {
           for (const plan of unfilledLiquidationPlan) {
             const row = plan.row;
@@ -11988,11 +12179,11 @@
                   closed_at: nowIso,
                   updated_at: nowIso,
                 };
-            const { error: closeErr } = await supabaseClient
-              .from("stock_holdings_c")
-              .update(pendingUpdate)
-              .eq("id", row.id);
-            if (closeErr) throw new Error(closeErr.message || `Failed to retire pending order ${row.id}.`);
+            try {
+              await rebPendingHoldingUpdate(row.id, pendingUpdate);
+            } catch (error) {
+              throw new Error(error.message || `Failed to retire pending order ${row.id}.`);
+            }
             pendingLiquidationSnapshot.push({
               oldHoldingId: row.id,
               newHoldingId: null,
@@ -12003,8 +12194,12 @@
               sellQty: plan.soldQty,
               originalQuantity: plan.originalQuantity,
               remainingQuantity: plan.remainingQuantity,
+              committedCents: plan.committedCents,
+              cashDeltaCents: plan.committedCents,
+              expectedSellRands: plan.expectedSellRands,
               newQty: 0,
-              leftover: 0,
+              leftoverCents: plan.committedCents,
+              leftover: plan.committedCents / 100,
               liquidationToCash: true,
             });
           }
@@ -12017,23 +12212,86 @@
             if (ledgerErr) throw new Error(ledgerErr.message || "Failed to save pending-order liquidation ledger.");
           }
 
+          const liquidationCashDeltas = {};
+          const liquidationCashMetadata = {};
+          pendingLiquidationSnapshot.forEach((snapshot) => {
+            const ownerKey = rebOwnerKey(snapshot.userId, snapshot.familyMemberId);
+            liquidationCashDeltas[ownerKey] = (liquidationCashDeltas[ownerKey] || 0) + Number(snapshot.cashDeltaCents || 0);
+            liquidationCashMetadata[ownerKey] = {
+              source: "CRM_PENDING_LIQUIDATION",
+              sell_isin: sellIsinCode,
+              pending_order_principal: true,
+            };
+          });
+          await rebApplyResidualCashDeltas(
+            strategyId,
+            liquidationCashDeltas,
+            rebalanceBatchId,
+            "PENDING_LIQUIDATION_PRINCIPAL",
+            liquidationCashMetadata,
+          );
+          pendingLiquidationCashApplied = true;
+
           await rebRemoveStrategyHoldingForLiquidation({ strategyId, soldIsin: rebSelectedIsin, sellStep: rebSelectedStep });
         } catch (commitErr) {
-          /* Best-effort compensation keeps a failed commit retryable and avoids
-             leaving clients with vanished pending orders. */
+          const rollbackErrors = [];
           for (const snapshot of pendingLiquidationSnapshot) {
-            await supabaseClient.from("stock_holdings_c").update({
-              is_active: true,
-              Status: "active",
-              ...(snapshot.originalQuantity != null ? { quantity: snapshot.originalQuantity } : {}),
-              closed_reason: null,
-              closed_at: null,
-              updated_at: new Date().toISOString(),
-            }).eq("id", snapshot.oldHoldingId);
+            try {
+              await rebPendingHoldingUpdate(snapshot.oldHoldingId, {
+                is_active: true,
+                Status: "active",
+                ...(snapshot.originalQuantity != null ? { quantity: snapshot.originalQuantity } : {}),
+                closed_reason: null,
+                closed_at: null,
+              });
+            } catch (error) { rollbackErrors.push(`pending order ${snapshot.oldHoldingId}: ${error.message}`); }
           }
-          await supabaseClient.from("rebalance_event").delete().eq("batch_id", rebalanceBatchId);
-          await supabaseClient.from("rebalance_batch").delete().eq("id", rebalanceBatchId);
-          throw commitErr;
+          if (pendingLiquidationCashApplied) {
+            const rollbackCash = {};
+            pendingLiquidationSnapshot.forEach((snapshot) => {
+              const ownerKey = rebOwnerKey(snapshot.userId, snapshot.familyMemberId);
+              rollbackCash[ownerKey] = (rollbackCash[ownerKey] || 0) - Number(snapshot.cashDeltaCents || 0);
+            });
+            try {
+              await rebApplyResidualCashDeltas(
+                strategyId,
+                rollbackCash,
+                rebalanceBatchId,
+                "PENDING_LIQUIDATION_PRINCIPAL_ROLLBACK",
+                {},
+                false,
+              );
+            } catch (error) { rollbackErrors.push(`CA: ${error.message}`); }
+          }
+          try {
+            const token = await rebApiToken();
+            const restoreResponse = await fetch("/api/orderbook/send-csv?action=rebalance-update-strategy-holdings", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({
+                strategyId,
+                holdings: holdingsSnapshotBefore || [],
+                minInvestment: Math.max(0, Number(strategyRef?.min_investment) || 0),
+              }),
+            });
+            if (!restoreResponse.ok) throw new Error(`HTTP ${restoreResponse.status}`);
+          } catch (error) { rollbackErrors.push(`strategy: ${error.message}`); }
+          const { error: eventRollbackErr } = await supabaseClient.from("rebalance_event")
+            .update({ closed_reason: "COMMIT_ROLLED_BACK", updated_at: new Date().toISOString() })
+            .eq("batch_id", rebalanceBatchId);
+          if (eventRollbackErr) rollbackErrors.push(`events: ${eventRollbackErr.message}`);
+          const { error: batchRollbackErr } = await supabaseClient.from("rebalance_batch").update({
+            status: "REVERSED",
+            is_reversed: true,
+            reversed_at: new Date().toISOString(),
+            reversed_reason: `Commit rolled back: ${commitErr?.message || commitErr}`.slice(0, 1000),
+            updated_at: new Date().toISOString(),
+          }).eq("id", rebalanceBatchId);
+          if (batchRollbackErr) rollbackErrors.push(`batch: ${batchRollbackErr.message}`);
+          if (rollbackErrors.length) {
+            throw new Error(`Liquidation stopped; rollback needs attention: ${commitErr?.message || commitErr}. ${rollbackErrors.join("; ")}`);
+          }
+          throw new Error(`Liquidation stopped and was fully rolled back: ${commitErr?.message || commitErr}`);
         }
 
         /* Do not credit estimated proceeds yet. The batch keeps the pre-trade

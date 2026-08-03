@@ -71,7 +71,7 @@ check(
 );
 check(
   dashboard.includes('const ownerKey = rebOwnerKey(uid, fmId);') &&
-    dashboard.includes('const residualTotalsByOwner = {};'),
+    dashboard.includes('const residualDeltasCentsByOwner = {};'),
   'Pending-order swaps retain owner-separated residuals',
 );
 check(endpoint.includes("const allOwners = familyMemberId === '__all__';"), 'API recognizes All owners');

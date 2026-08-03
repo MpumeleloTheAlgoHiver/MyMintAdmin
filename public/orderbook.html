@@ -8339,24 +8339,27 @@
           const nowIso = new Date().toISOString();
           const { data: batch, error: bErr } = await supabaseClient
             .from('rebalance_batch')
-            .select('id, strategy_id, holdings_snapshot_before, wallet_snapshot_before, pending_swap_snapshot')
+            .select('id, strategy_id, status, holdings_snapshot_before, wallet_snapshot_before, pending_swap_snapshot')
             .eq('id', batchId).single();
           if (bErr) throw new Error(bErr.message);
+          if (String(batch.status || '').toUpperCase() !== 'PENDING') {
+            throw new Error('Only a pending, unexecuted rebalance can be reversed from this control.');
+          }
 
           const errors = [];
-
-          // 1. Mark all events as REVERSED
-          const { error: evtErr } = await supabaseClient.from('rebalance_event')
-            .update({ closed_reason: 'REVERSED', updated_at: nowIso })
-            .eq('batch_id', batchId);
-          if (evtErr) errors.push('Events: ' + evtErr.message);
-
-          // 2. Mark batch as REVERSED
-          const { error: rErr } = await supabaseClient.from('rebalance_batch').update({
-            status: 'REVERSED', is_reversed: true, reversed_at: nowIso,
-            reversed_reason: reason.trim() || 'Manual reversal', updated_at: nowIso,
-          }).eq('id', batchId);
-          if (rErr) errors.push('Batch: ' + rErr.message);
+          const { data: { session: reverseSession } } = await supabaseClient.auth.getSession();
+          const reverseToken = reverseSession?.access_token;
+          if (!reverseToken) throw new Error('Authenticated CRM session required for reversal.');
+          const reverseServerWrite = async (action, body) => {
+            const response = await fetch(`/api/orderbook/send-csv?action=${encodeURIComponent(action)}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${reverseToken}` },
+              body: JSON.stringify(body || {}),
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.details || result.error || `HTTP ${response.status}`);
+            return result;
+          };
 
           // 3. Restore strategy composition from snapshot
           if (batch.strategy_id && batch.holdings_snapshot_before) {
@@ -8368,19 +8371,8 @@
           }
 
           // 4. Restore rebalance_residual balances from snapshot.
-          // Snapshot stores Rand amounts (as seen in-app); the column itself
-          // is stored in cents, so we &times;100 on write.
-          if (batch.wallet_snapshot_before && typeof batch.wallet_snapshot_before === 'object') {
-            await Promise.all(Object.entries(batch.wallet_snapshot_before).map(async ([userId, balance]) => {
-              if (!userId) return;
-              const cents = Math.round((Number(balance) || 0) * 100);
-              const { error: walletErr } = await supabaseClient
-                .from('wallets')
-                .update({ rebalance_residual: cents, updated_at: nowIso })
-                .eq('user_id', userId);
-              if (walletErr) errors.push('Wallet restore: ' + walletErr.message);
-            }));
-          }
+          // Pending commit does not mutate the legacy wallets residual. Do not
+          // overwrite it from a stale snapshot and erase later client activity.
 
           // 4b. Restore the PER-STRATEGY residual table (strategy_rebalance_residuals)
           //     — the one the app/card actually reads. Step 4 above only restores the
@@ -8390,39 +8382,34 @@
           //     scoped by family_member_id, via the service-role endpoint.
           if (batch.strategy_id) {
             try {
-              const { data: evRows } = await supabaseClient
-                .from('rebalance_event')
-                .select('user_id, family_member_id')
-                .eq('batch_id', batchId);
-              const snap = (batch.wallet_snapshot_before && typeof batch.wallet_snapshot_before === 'object')
-                ? batch.wallet_snapshot_before : {};
-              const byScope = new Map(); // family_member_id ('' = parent) -> { userId: rands }
-              (evRows || []).forEach((e) => {
-                const uid = e.user_id ? String(e.user_id) : '';
-                if (!uid) return;
-                const fm = e.family_member_id ? String(e.family_member_id) : '';
-                if (!byScope.has(fm)) byScope.set(fm, {});
-                byScope.get(fm)[uid] = Number(snap[uid] || 0); // rands; 0 = had no prior residual
-              });
-              /* Pre-fill swapped clients raise NO rebalance_event, so they were
-                 absent from evRows above and their leftover cash survived the
-                 reversal as phantom residual. Fold them in from the batch's own
-                 swap ledger. */
+              const byScope = new Map(); // family_member_id -> negative CA deltas in cents
               (Array.isArray(batch.pending_swap_snapshot) ? batch.pending_swap_snapshot : []).forEach((s) => {
                 const uid = s?.userId ? String(s.userId) : '';
                 if (!uid) return;
                 const fm = s.familyMemberId ? String(s.familyMemberId) : '';
                 if (!byScope.has(fm)) byScope.set(fm, {});
-                byScope.get(fm)[uid] = Number(snap[uid] || 0);
+                const creditedCents = s.cashDeltaCents != null
+                  ? Math.round(Number(s.cashDeltaCents) || 0)
+                  : s.leftoverCents != null
+                  ? Math.round(Number(s.leftoverCents) || 0)
+                  : Math.round((Number(s.leftover) || 0) * 100);
+                byScope.get(fm)[uid] = (byScope.get(fm)[uid] || 0) - creditedCents;
               });
               if (byScope.size) {
                 const { data: { session } } = await supabaseClient.auth.getSession();
                 const token = session?.access_token;
-                for (const [fm, balancesByUser] of byScope.entries()) {
+                for (const [fm, residualDeltasCentsByUser] of byScope.entries()) {
                   const resp = await fetch('/api/orderbook/send-csv?action=rebalance-upsert-residuals', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                    body: JSON.stringify({ strategyId: batch.strategy_id, balancesByUser, familyMemberId: fm || null }),
+                    body: JSON.stringify({
+                      strategyId: batch.strategy_id,
+                      residualDeltasCentsByUser,
+                      familyMemberId: fm || null,
+                      batchId,
+                      eventType: 'PENDING_ADJUSTMENT_REVERSAL',
+                      effectiveAt: nowIso,
+                    }),
                   });
                   if (!resp.ok) errors.push('Strategy residual restore: HTTP ' + resp.status);
                 }
@@ -8434,11 +8421,9 @@
 
           // 5. Delete any stock_holdings_c rows that were created by this batch's settlement
           //    (in case the batch was settled before reversal &mdash; safety net)
-          const { error: holdingsDelErr } = await supabaseClient
-            .from('stock_holdings_c')
-            .delete()
-            .eq('rebalance_batch_id', batchId);
-          if (holdingsDelErr) errors.push('Holdings cleanup: ' + holdingsDelErr.message);
+          try {
+            await reverseServerWrite('rebalance-pending-batch-holdings-cleanup', { batchId });
+          } catch (error) { errors.push('Holdings cleanup: ' + error.message); }
 
           // 5b. Undo pre-fill swaps.
           //     Unfilled clients are rewritten in place at commit and raise NO
@@ -8450,48 +8435,56 @@
           const swapLedger = Array.isArray(batch.pending_swap_snapshot) ? batch.pending_swap_snapshot : [];
           for (const s of swapLedger) {
             if (s?.oldHoldingId) {
-              const { error: reErr } = await supabaseClient
-                .from('stock_holdings_c')
-                .update({
+              try {
+                await reverseServerWrite('rebalance-pending-holding-write', {
+                  operation: 'update', holdingId: s.oldHoldingId, patch: {
                   is_active: true,
                   Status: 'active',
                   ...(s.originalQuantity != null ? { quantity: Number(s.originalQuantity) } : {}),
                   closed_reason: null,
                   closed_at: null,
-                  updated_at: nowIso,
-                })
-                .eq('id', s.oldHoldingId);
-              if (reErr) errors.push(`Swap restore ${String(s.oldHoldingId).slice(0, 8)}: ${reErr.message}`);
+                  },
+                });
+              } catch (error) { errors.push(`Swap restore ${String(s.oldHoldingId).slice(0, 8)}: ${error.message}`); }
             }
             if (s?.newHoldingId) {
-              const { error: delErr } = await supabaseClient
-                .from('stock_holdings_c')
-                .delete()
-                .eq('id', s.newHoldingId);
-              if (delErr) errors.push(`Swap cleanup ${String(s.newHoldingId).slice(0, 8)}: ${delErr.message}`);
+              try {
+                await reverseServerWrite('rebalance-pending-holding-write', { operation: 'delete', holdingId: s.newHoldingId });
+              } catch (error) { errors.push(`Swap cleanup ${String(s.newHoldingId).slice(0, 8)}: ${error.message}`); }
             } else if (s?.mergedIntoId && Number(s.mergedAddedQty) > 0) {
               // The replacement was merged into a pre-existing pending row —
               // subtract only what this swap added, never delete the whole row.
-              const { data: cur } = await supabaseClient
-                .from('stock_holdings_c').select('quantity').eq('id', s.mergedIntoId).maybeSingle();
-              if (cur) {
-                const restored = Math.max(0, Number(cur.quantity || 0) - Number(s.mergedAddedQty));
-                const { error: unmergeErr } = await supabaseClient
-                  .from('stock_holdings_c')
-                  .update({ quantity: restored, updated_at: nowIso })
-                  .eq('id', s.mergedIntoId);
-                if (unmergeErr) errors.push(`Swap unmerge ${String(s.mergedIntoId).slice(0, 8)}: ${unmergeErr.message}`);
+              if (s.mergedOriginalQuantity != null) {
+                const restored = Math.max(0, Number(s.mergedOriginalQuantity));
+                try {
+                  await reverseServerWrite('rebalance-pending-holding-write', {
+                    operation: 'update', holdingId: s.mergedIntoId, patch: {
+                    quantity: restored,
+                    ...(s.mergedOriginalExpectedFill != null ? { "Expected_fill": Number(s.mergedOriginalExpectedFill) } : {}),
+                    },
+                  });
+                } catch (error) { errors.push(`Swap unmerge ${String(s.mergedIntoId).slice(0, 8)}: ${error.message}`); }
+              } else {
+                errors.push(`Swap unmerge ${String(s.mergedIntoId).slice(0, 8)}: original quantity missing from reversal ledger`);
               }
             }
           }
 
-          loadOrderbook().catch(console.error);
-
           if (errors.length) {
-            alert('Batch reversed with warnings:\n' + errors.join('\n'));
-          } else {
-            alert('Batch reversed successfully. Strategy composition and wallets restored.');
+            throw new Error('Reversal paused before final status:\n' + errors.join('\n'));
           }
+          const { error: evtErr } = await supabaseClient.from('rebalance_event')
+            .update({ closed_reason: 'REVERSED', updated_at: nowIso })
+            .eq('batch_id', batchId);
+          if (evtErr) throw new Error('Events: ' + evtErr.message);
+          const { data: reversedRows, error: rErr } = await supabaseClient.from('rebalance_batch').update({
+            status: 'REVERSED', is_reversed: true, reversed_at: nowIso,
+            reversed_reason: reason.trim() || 'Manual reversal', updated_at: nowIso,
+          }).eq('id', batchId).eq('status', 'PENDING').select('id');
+          if (rErr || !reversedRows?.length) throw new Error(rErr?.message || 'Batch could not be finalized as reversed.');
+
+          loadOrderbook().catch(console.error);
+          alert('Batch reversed successfully. Strategy composition, pending orders and CA movements were restored.');
         } catch (err) {
           alert('Reversal failed: ' + err.message);
         }

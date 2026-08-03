@@ -560,6 +560,129 @@ module.exports = async (req, res) => {
       return sendJson(res, 200, { ok: true, upserted });
     }
 
+    // Pending-order adjustments are privileged accounting writes. Browser RLS
+    // intentionally blocks stock_holdings_c mutations, so rebalance commit and
+    // reversal must use this narrow, permission-gated service path.
+    if (action === 'rebalance-pending-holding-write') {
+      if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const operation = String(body.operation || '').trim().toLowerCase();
+      const now = new Date().toISOString();
+      const allowedPatchFields = new Set([
+        'quantity', 'is_active', 'Status', 'closed_reason', 'closed_at',
+        'Expected_fill', 'updated_at',
+      ]);
+
+      if (operation === 'insert') {
+        const requested = body.row && typeof body.row === 'object' && !Array.isArray(body.row) ? body.row : null;
+        if (!requested) return sendJson(res, 400, { error: 'row required for insert' });
+        const required = ['user_id', 'security_id', 'strategy_id', 'quantity'];
+        if (required.some((field) => !requested[field])) {
+          return sendJson(res, 400, { error: 'user_id, security_id, strategy_id and quantity are required' });
+        }
+        const quantity = Number(requested.quantity);
+        if (!Number.isFinite(quantity) || quantity <= 0) return sendJson(res, 400, { error: 'quantity must be positive' });
+        const expectedFill = Number(requested.Expected_fill);
+        if (!Number.isFinite(expectedFill) || expectedFill <= 0) return sendJson(res, 400, { error: 'Expected_fill must be positive' });
+        const row = {
+          user_id: String(requested.user_id),
+          family_member_id: requested.family_member_id ? String(requested.family_member_id) : null,
+          security_id: String(requested.security_id),
+          strategy_id: String(requested.strategy_id),
+          quantity,
+          trade_side: 'BUY',
+          is_active: true,
+          Status: 'active',
+          avg_fill: null,
+          Expected_fill: expectedFill,
+          transaction_id: requested.transaction_id ? String(requested.transaction_id) : null,
+          market_value: 0,
+          as_of_date: null,
+          strategy_name_snapshot: String(requested.strategy_name_snapshot || ''),
+          created_at: requested.created_at || now,
+          updated_at: now,
+        };
+        const inserted = await requestSupabaseJson('/rest/v1/stock_holdings_c?select=id,quantity,Expected_fill', {
+          method: 'POST', body: row, extraHeaders: { Prefer: 'return=representation' },
+        });
+        return sendJson(res, 200, { ok: true, row: Array.isArray(inserted) ? inserted[0] : inserted });
+      }
+
+      const holdingId = String(body.holdingId || '').trim();
+      if (!holdingId) return sendJson(res, 400, { error: 'holdingId required' });
+      const existingRows = await fetchSupabaseJson(
+        `/rest/v1/stock_holdings_c?id=eq.${encodeURIComponent(holdingId)}&select=id,avg_fill,quantity,is_active`
+      );
+      const existing = Array.isArray(existingRows) ? existingRows[0] : null;
+      if (!existing) return sendJson(res, 404, { error: 'Holding not found' });
+      if (Number(existing.avg_fill || 0) > 0) {
+        return sendJson(res, 409, { error: 'Pending-order endpoint cannot mutate a filled holding' });
+      }
+
+      if (operation === 'delete') {
+        const deleted = await requestSupabaseJson(
+          `/rest/v1/stock_holdings_c?id=eq.${encodeURIComponent(holdingId)}&avg_fill=is.null&select=id`,
+          { method: 'DELETE', extraHeaders: { Prefer: 'return=representation' } }
+        );
+        if (!Array.isArray(deleted) || !deleted.length) return sendJson(res, 409, { error: 'Pending holding was not deleted' });
+        return sendJson(res, 200, { ok: true, holdingId });
+      }
+
+      if (operation === 'update') {
+        const requestedPatch = body.patch && typeof body.patch === 'object' && !Array.isArray(body.patch) ? body.patch : {};
+        const patch = Object.fromEntries(Object.entries(requestedPatch).filter(([field]) => allowedPatchFields.has(field)));
+        if (!Object.keys(patch).length) return sendJson(res, 400, { error: 'No allowed pending-holding fields supplied' });
+        if ('quantity' in patch && (!Number.isFinite(Number(patch.quantity)) || Number(patch.quantity) < 0)) {
+          return sendJson(res, 400, { error: 'quantity must be non-negative' });
+        }
+        patch.updated_at = now;
+        const updated = await requestSupabaseJson(
+          `/rest/v1/stock_holdings_c?id=eq.${encodeURIComponent(holdingId)}&avg_fill=is.null&select=id,quantity,Expected_fill,is_active`,
+          { method: 'PATCH', body: patch, extraHeaders: { Prefer: 'return=representation' } }
+        );
+        if (!Array.isArray(updated) || !updated.length) return sendJson(res, 409, { error: 'Pending holding was not updated' });
+        return sendJson(res, 200, { ok: true, row: updated[0] });
+      }
+
+      return sendJson(res, 400, { error: 'operation must be insert, update or delete' });
+    }
+
+    if (action === 'rebalance-pending-audit-write') {
+      if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const operation = String(body.operation || '').trim().toLowerCase();
+      const batchId = String(body.batchId || '').trim();
+      if (!batchId) return sendJson(res, 400, { error: 'batchId required' });
+      if (operation === 'delete') {
+        await requestSupabaseJson(`/rest/v1/transactions?store_reference=like.PENDING-REBALANCE-${encodeURIComponent(batchId)}-*`, { method: 'DELETE' });
+        return sendJson(res, 200, { ok: true });
+      }
+      const row = body.row && typeof body.row === 'object' && !Array.isArray(body.row) ? body.row : null;
+      if (operation !== 'insert' || !row) return sendJson(res, 400, { error: 'insert row required' });
+      const reference = String(row.store_reference || '');
+      if (!reference.startsWith(`PENDING-REBALANCE-${batchId}-`)) return sendJson(res, 400, { error: 'Invalid pending-rebalance reference' });
+      await requestSupabaseJson('/rest/v1/transactions', { method: 'POST', body: row });
+      return sendJson(res, 200, { ok: true });
+    }
+
+    if (action === 'rebalance-pending-batch-holdings-cleanup') {
+      if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const batchId = String(body.batchId || '').trim();
+      if (!batchId) return sendJson(res, 400, { error: 'batchId required' });
+      const batches = await fetchSupabaseJson(
+        `/rest/v1/rebalance_batch?id=eq.${encodeURIComponent(batchId)}&status=eq.PENDING&select=id`
+      );
+      if (!Array.isArray(batches) || !batches.length) {
+        return sendJson(res, 409, { error: 'Only a pending rebalance batch can be cleaned up' });
+      }
+      const deleted = await requestSupabaseJson(
+        `/rest/v1/stock_holdings_c?rebalance_batch_id=eq.${encodeURIComponent(batchId)}&select=id`,
+        { method: 'DELETE', extraHeaders: { Prefer: 'return=representation' } }
+      );
+      return sendJson(res, 200, { ok: true, deleted: Array.isArray(deleted) ? deleted.length : 0 });
+    }
+
     // Strategy composition changes are admin writes. Keep them behind the same
     // permission gate as the rebalance commit instead of relying on browser RLS.
     if (action === 'rebalance-update-strategy-holdings') {
