@@ -14,10 +14,20 @@ assert.match(dashboard, /pendingOnlyParticipants[\s\S]*rebalance_batch_id: rebal
   'buy-only must materialise a reversible pending leg for pending-only owners');
 assert.match(dashboard, /predecessor_batch_id: predecessorBatch\?\.id \|\| null/,
   'a secondary buy-only batch must record its predecessor');
+const buyOnlySource = dashboard.slice(
+  dashboard.indexOf('async function rebPersistWalletOnlyBuy'),
+  dashboard.indexOf('async function rebAddOrIncreaseStrategyHolding'),
+);
+assert.match(buyOnlySource, /const predecessorBatch = [\s\S]*predecessor_batch_id: predecessorBatch\?\.id \|\| null/,
+  'buy-only must define its predecessor before writing the dependency');
 assert.doesNotMatch(
-  dashboard.slice(dashboard.indexOf('async function rebPersistWalletOnlyBuy'), dashboard.indexOf('async function rebAddOrIncreaseStrategyHolding')),
+  buyOnlySource,
   /Settle or reverse it first\./,
   'buy-only must not retain the old blanket pending-batch rejection');
+assert.match(dashboard, /Only buy-only additions[\s\S]*Settle or reverse it before committing another sell\/switch/,
+  'sell/switch must remain blocked while an earlier batch is pending');
+assert.match(dashboard, /only buy-only additions support[\s\S]*Settle or reverse it before committing a liquidation/,
+  'liquidation must remain blocked while an earlier batch is pending');
 assert.match(api, /This is a parked secondary rebalance[\s\S]*predecessorStatus/,
   'server settlement claim must enforce predecessor completion');
 assert.match(api, /Pending buy-only holding must reference a PENDING batch for the same strategy/,
@@ -28,7 +38,11 @@ assert.match(orderbook, /Parked after[\s\S]*isParkedSecondary \? 'not-allowed'/,
   'the orderbook must visibly park and disable a dependent batch');
 assert.match(orderbook, /pending-row fill[\s\S]*evtResumeErr/,
   'settlement must promote the pre-created pending row instead of duplicating it');
+assert.match(orderbook, /data-download-rebalance-csv[\s\S]*Download CSV/,
+  'pending rebalance actions must expose CSV download before settlement');
+assert.match(orderbook, /const downloadRebalanceBatchCsv[\s\S]*rebalance_event[\s\S]*downloadCsv\(rows/,
+  'rebalance CSV must be built from committed batch events');
 assert.match(migration, /foreign key \(predecessor_batch_id\)[\s\S]*references public\.rebalance_batch\(id\)/,
   'database must enforce valid predecessor links');
 
-console.log('sequential buy-only rebalance: 11/11 green');
+console.log('sequential buy-only rebalance: 16/16 green');

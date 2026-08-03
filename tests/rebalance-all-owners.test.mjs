@@ -46,13 +46,13 @@ check(
   'All-owner commits do not stamp one global family-member ID',
 );
 check(
-  dashboard.includes("select('user_id, family_member_id, security_id, trade_side, quantity, closed_reason')") &&
-    dashboard.includes('pendingEventsForSelected = rebPendingRebalance'),
+  dashboard.includes("select('batch_id, user_id, family_member_id, security_id, trade_side, quantity, closed_reason')") &&
+    dashboard.includes('pendingEventsForSelected = rebPendingRebalances.flatMap'),
   'Pending events still resolve the selected security and owner data',
 );
 check(
   dashboard.includes('${selectedCode} ${pendingSide}') &&
-    dashboard.includes('${normalizeSymbol(rebPendingRebalance.sellCode || isin.code)} SELL'),
+    dashboard.includes('rebPendingRebalances.some(pb => String(pb.sellCode || "") === selectedCode)'),
   'Pending labels show the actual security and trade side',
 );
 check(

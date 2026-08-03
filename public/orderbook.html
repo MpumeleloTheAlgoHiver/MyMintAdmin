@@ -5512,6 +5512,8 @@
           ? `<span style="display:inline-flex;gap:6px;align-items:center;">
               <button title="Fill &amp; Settle Batch" data-fill-settle-batch data-batch-id="${escapeHtml(sb.id || '')}"
                 ${isProcessing || isParkedSecondary ? 'disabled' : ''} style="background:${isProcessing || isParkedSecondary ? '#94a3b8' : '#059669'};color:white;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;border:none;cursor:${isProcessing || isParkedSecondary ? 'not-allowed' : 'pointer'};white-space:nowrap;">${settleLabel}</button>
+              <button title="Download Batch CSV" data-download-rebalance-csv data-batch-id="${escapeHtml(sb.id || '')}"
+                style="background:#2563eb;color:white;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;">Download CSV</button>
               <button title="Reverse Batch" data-reverse-batch data-batch-id="${escapeHtml(sb.id || '')}"
                 style="background:#dc2626;color:white;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;">Reverse</button>
             </span>`
@@ -6183,6 +6185,9 @@
               <button title="Fill &amp; Settle Batch" data-fill-settle-batch data-batch-id="${escapeHtml(row.rebalanceBatchId || '')}" data-line="${lineKey}"
                 style="background:#059669;color:white;border-radius:8px;padding:5px 14px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;letter-spacing:.02em;box-shadow:0 1px 3px rgba(5,150,105,.25);transition:background .15s;"
                 onmouseover="this.style.background='#047857'" onmouseout="this.style.background='#059669'">Fill &amp; Settle</button>
+              <button title="Download Batch CSV" data-download-rebalance-csv data-batch-id="${escapeHtml(row.rebalanceBatchId || '')}" data-line="${lineKey}"
+                style="background:#2563eb;color:white;border-radius:8px;padding:5px 14px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;letter-spacing:.02em;box-shadow:0 1px 3px rgba(37,99,235,.25);transition:background .15s;"
+                onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">Download CSV</button>
               <button title="Reverse Batch" data-reverse-batch data-batch-id="${escapeHtml(row.rebalanceBatchId || '')}" data-line="${lineKey}"
                 style="background:#dc2626;color:white;border-radius:8px;padding:5px 14px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;letter-spacing:.02em;box-shadow:0 1px 3px rgba(220,38,38,.25);transition:background .15s;"
                 onmouseover="this.style.background='#b91c1c'" onmouseout="this.style.background='#dc2626'">Reverse</button>
@@ -7232,6 +7237,40 @@
       try { return new Date(iso).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return iso; }
     };
 
+
+      /* Download the committed broker instructions before any fill is entered.
+         The CSV deliberately contains only the three market-book columns and
+         aggregates client events into one security/side instruction. */
+      const downloadRebalanceBatchCsv = async (batchId) => {
+        if (!batchId) throw new Error('Missing rebalance batch ID.');
+        const { data: events, error: eventsError } = await supabaseClient
+          .from('rebalance_event')
+          .select('security_id, trade_side, quantity')
+          .eq('batch_id', batchId);
+        if (eventsError) throw new Error(eventsError.message || 'Could not load rebalance events.');
+        if (!events?.length) throw new Error('This rebalance has no downloadable instructions.');
+
+        const securityIds = [...new Set(events.map((event) => event.security_id).filter(Boolean))];
+        const { data: securities, error: securitiesError } = securityIds.length
+          ? await supabaseClient.from('securities_c').select('id, symbol').in('id', securityIds)
+          : { data: [], error: null };
+        if (securitiesError) throw new Error(securitiesError.message || 'Could not resolve rebalance tickers.');
+        const symbolBySecurity = Object.fromEntries((securities || []).map((security) => [String(security.id), security.symbol]));
+        const instructions = new Map();
+        events.forEach((event) => {
+          const side = String(event.trade_side || '').toUpperCase();
+          const ticker = String(symbolBySecurity[String(event.security_id)] || '').trim();
+          const quantity = Number(event.quantity || 0);
+          if (!ticker || !['BUY', 'SELL'].includes(side) || !(quantity > 0)) return;
+          const key = `${side}|${ticker}`;
+          const current = instructions.get(key) || { side, ticker, totalQuantity: 0 };
+          current.totalQuantity += quantity;
+          instructions.set(key, current);
+        });
+        const rows = [...instructions.values()];
+        if (!rows.length) throw new Error('This rebalance has no valid market instructions to download.');
+        downloadCsv(rows, `rebalance-${String(batchId).slice(0, 8)}-${new Date().toISOString().slice(0, 10)}.csv`);
+      };
 
       /* Ã¢&rdquo;â‚¬Ã¢&rdquo;â‚¬ Fill & Settle Modal (inline, dynamic) Ã¢&rdquo;â‚¬Ã¢&rdquo;â‚¬ */
       const openFillSettleModal = async (batchId) => {
@@ -9168,6 +9207,15 @@
 
     if (rebalanceBooksList) {
       rebalanceBooksList.addEventListener('click', (event) => {
+        const downloadBtn = event.target.closest('[data-download-rebalance-csv]');
+        if (downloadBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          const batchId = downloadBtn.dataset.batchId;
+          if (batchId) downloadRebalanceBatchCsv(batchId).catch((err) => alert('Download error: ' + err.message));
+          return;
+        }
+
         const fillSettleBtn = event.target.closest('[data-fill-settle-batch]');
         if (fillSettleBtn) {
           event.preventDefault();
@@ -9687,6 +9735,14 @@
 
     if (orderbookTableBody) {
       orderbookTableBody.addEventListener('click', async (event) => {
+        const downloadBtn = event.target.closest('[data-download-rebalance-csv]');
+        if (downloadBtn) {
+          event.stopPropagation();
+          const batchId = downloadBtn.dataset.batchId;
+          if (batchId) downloadRebalanceBatchCsv(batchId).catch((err) => alert('Download error: ' + err.message));
+          return;
+        }
+
         const editBtn = event.target.closest('[data-edit-price]');
         if (editBtn) {
           event.stopPropagation();

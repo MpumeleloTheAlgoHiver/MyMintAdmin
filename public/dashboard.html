@@ -11185,6 +11185,27 @@
 
         const batchFamilyMemberIdForTrade = rebScopeIsAll() ? null : (rebSelectedFamilyMemberId || null);
 
+        /* A second sell/switch cannot be calculated safely until the first
+           batch has produced its broker positions. Only buy-only additions
+           may be parked as dependent batches. */
+        let pendingBatchesQuery1 = supabaseClient
+          .from("rebalance_batch")
+          .select("id, status, sell_isin_code, buy_isin_code, created_at")
+          .eq("strategy_id", strategyId)
+          .eq("status", "PENDING");
+        pendingBatchesQuery1 = batchFamilyMemberIdForTrade
+          ? pendingBatchesQuery1.eq("family_member_id", batchFamilyMemberIdForTrade)
+          : pendingBatchesQuery1.is("family_member_id", null);
+        const { data: pendingBatches, error: pendingErr } = await pendingBatchesQuery1;
+        if (pendingErr) throw new Error(pendingErr.message || "Failed to check pending batches.");
+        if (pendingBatches?.length) {
+          const existing = pendingBatches[0];
+          throw new Error(
+            `A pending rebalance already exists for this strategy (batch ${existing.id.slice(0, 8)}&hellip; created ${new Date(existing.created_at).toLocaleString()}). ` +
+            "Settle or reverse it before committing another sell/switch."
+          );
+        }
+
         /* ── Resolve security IDs ── */
 
         const symbolsToResolve = [
@@ -12007,6 +12028,27 @@
 
         const batchFamilyMemberId = rebScopeIsAll() ? null : (rebSelectedFamilyMemberId || null);
 
+        /* Liquidation depends on the currently settled position. Do not let it
+           overtake an earlier parked batch; only buy-only additions support a
+           predecessor link and ordered settlement. */
+        let pendingBatchesQuery2 = supabaseClient
+          .from("rebalance_batch")
+          .select("id, status, created_at")
+          .eq("strategy_id", strategyId)
+          .eq("status", "PENDING");
+        pendingBatchesQuery2 = batchFamilyMemberId
+          ? pendingBatchesQuery2.eq("family_member_id", batchFamilyMemberId)
+          : pendingBatchesQuery2.is("family_member_id", null);
+        const { data: pendingLiquidationBatches, error: pendingLiquidationErr } = await pendingBatchesQuery2;
+        if (pendingLiquidationErr) throw new Error(pendingLiquidationErr.message || "Failed to check pending batches.");
+        if (pendingLiquidationBatches?.length) {
+          const existing = pendingLiquidationBatches[0];
+          throw new Error(
+            `A pending rebalance already exists for this strategy (batch ${existing.id.slice(0, 8)}&hellip; created ${new Date(existing.created_at).toLocaleString()}). ` +
+            "Settle or reverse it before committing a liquidation."
+          );
+        }
+
         /* Resolve sell security ID */
         const { data: secRows, error: secErr } = await supabaseClient
           .from("securities_c")
@@ -12577,6 +12619,25 @@
         if (buyQtyPerLot <= 0) throw new Error("Buy per lot must be ≥ 1.");
         if (!(pricePerShare > 0)) throw new Error("Buy security has no live price.");
         const strategyId = rebSelectedStrategyId;
+
+        /* Buy-only is the one safe operation to queue. Link it to the newest
+           pending batch so the orderbook cannot settle it out of sequence. */
+        const rebGuardFmId3 = rebScopeIsAll() ? null : (rebSelectedFamilyMemberId || null);
+        let pendingBatchesQuery3 = supabaseClient
+          .from("rebalance_batch")
+          .select("id, created_at, status, settlement_state")
+          .eq("strategy_id", strategyId)
+          .eq("status", "PENDING");
+        pendingBatchesQuery3 = rebGuardFmId3
+          ? pendingBatchesQuery3.eq("family_member_id", rebGuardFmId3)
+          : pendingBatchesQuery3.is("family_member_id", null);
+        const { data: pendingBuyOnlyBatches, error: pendingBuyOnlyErr } = await pendingBatchesQuery3;
+        if (pendingBuyOnlyErr) throw new Error(pendingBuyOnlyErr.message || "Failed to check pending batches.");
+        const predecessorBatch = [...(pendingBuyOnlyBatches || [])]
+          .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0] || null;
+        if (predecessorBatch && String(predecessorBatch.settlement_state || "PENDING").toUpperCase() !== "PENDING") {
+          throw new Error("The existing rebalance has already started settlement. Finish it before parking another buy-only rebalance.");
+        }
 
         /* Uniformity check &mdash; every funded client must afford their allocation */
         const blocked = (perUserPlan || []).filter((p) => p.sharesNeeded > 0 && !p.afford);
