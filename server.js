@@ -263,7 +263,7 @@ const syncAllSecuritiesFromYahoo = async () => {
 
   let securities;
   try {
-    securities = await fetchSupabaseJson('/rest/v1/securities?select=id,symbol,name&is_active=eq.true', null);
+    securities = await fetchSupabaseJson('/rest/v1/securities_c?select=id,symbol,name&is_active=eq.true', null);
   } catch (err) {
     console.error('[MarketSync] Failed to load securities:', err.message);
     return;
@@ -364,7 +364,7 @@ const syncAllSecuritiesFromYahoo = async () => {
 
       if (Object.keys(updatePayload).length > 0) {
         await mutateSupabaseJson(
-          `/rest/v1/securities?id=eq.${encodeURIComponent(sec.id)}`,
+          `/rest/v1/securities_c?id=eq.${encodeURIComponent(sec.id)}`,
           updatePayload,
           null,
           'PATCH'
