@@ -4,6 +4,7 @@ import fs from 'node:fs';
 const dashboard = fs.readFileSync('public/dashboard.html', 'utf8');
 const orderbook = fs.readFileSync('public/orderbook.html', 'utf8');
 const endpoint = fs.readFileSync('api/orderbook/send-csv.js', 'utf8');
+const cashEventMigration = fs.readFileSync('sql/2026-08-03_rebalance_pending_cash_event_types.sql', 'utf8');
 
 assert.match(endpoint, /action === 'rebalance-pending-holding-write'[\s\S]*?requirePermission\(req, res, 'dashboard', 'commit_rebalance'\)/,
   'pending holding writes must require rebalance permission');
@@ -23,6 +24,15 @@ assert.match(dashboard, /rebEnsurePendingSwapSnapshotSchema\(\); \/\/ liquidatio
   'liquidation must verify reversal-ledger schema before any batch write');
 assert.match(dashboard, /settlement_state: "REVERSED"[\s\S]{0,180}reversed_reason: `Commit rolled back:/,
   'automatic rollback must close both business and technical settlement state');
+for (const eventType of [
+  'PENDING_REBALANCE_RESIDUAL',
+  'PENDING_REBALANCE_RESIDUAL_ROLLBACK',
+  'PENDING_LIQUIDATION_PRINCIPAL',
+  'PENDING_LIQUIDATION_PRINCIPAL_ROLLBACK',
+  'PENDING_ADJUSTMENT_REVERSAL',
+]) {
+  assert.match(cashEventMigration, new RegExp(`'${eventType}'`), `${eventType} must be accepted by the CA ledger`);
+}
 
 const pendingCommit = dashboard.slice(
   dashboard.indexOf('UNFILLED-ORDER SWAP'),
@@ -55,4 +65,4 @@ const reversal = orderbook.slice(
 assert.match(reversal, /rebalance-pending-holding-write/, 'reversal must restore pending holdings through the server bridge');
 assert.match(reversal, /rebalance-pending-batch-holdings-cleanup/, 'reversal cleanup must bypass browser RLS safely');
 
-console.log('rebalance pre-fill RLS safety: 22/22 green');
+console.log('rebalance pre-fill RLS safety: 27/27 green');

@@ -15,7 +15,10 @@ create table if not exists public.strategy_rebalance_cash_events_c (
   family_member_id uuid,
   event_type text not null check (event_type in (
     'LIQUIDATION_PROCEEDS', 'REBALANCE_RESIDUAL', 'WALLET_BUY',
-    'REVERSAL', 'MANUAL_CORRECTION'
+    'REVERSAL', 'MANUAL_CORRECTION',
+    'PENDING_REBALANCE_RESIDUAL', 'PENDING_REBALANCE_RESIDUAL_ROLLBACK',
+    'PENDING_LIQUIDATION_PRINCIPAL', 'PENDING_LIQUIDATION_PRINCIPAL_ROLLBACK',
+    'PENDING_ADJUSTMENT_REVERSAL'
   )),
   opening_balance_cents bigint not null check (opening_balance_cents >= 0),
   amount_cents bigint not null,
