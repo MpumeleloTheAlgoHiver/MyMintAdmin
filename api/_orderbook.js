@@ -563,6 +563,27 @@ const handleSendTradeConfirmation = async (req, res, token) => {
         token
       );
 
+      // --- 5-DAY MINIMUM TENURE FILTER ---
+      // Don't send a rebalance notification to investors who first filled into this
+      // strategy within the last 5 days. Find the user's absolute earliest Fill_date
+      // in the strategy; if it's ≤ 5 days ago they're too new to notify.
+      const strategyId = holding.strategy_id || (batchHoldings && batchHoldings[0] && batchHoldings[0].strategy_id);
+      if (strategyId) {
+        const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10);
+        const earliestRows = await fetchSupabaseJson(
+          `/rest/v1/stock_holdings_c?user_id=eq.${encodeURIComponent(holding.user_id)}&strategy_id=eq.${encodeURIComponent(strategyId)}&select=Fill_date&order=Fill_date.asc&limit=1`,
+          token
+        ).catch(() => null);
+        const earliestFill = earliestRows && earliestRows[0] && earliestRows[0].Fill_date;
+        const earliestFillDay = earliestFill ? earliestFill.substring(0, 10) : null;
+        if (!earliestFillDay || earliestFillDay >= fiveDaysAgo) {
+          // New investor — filled within the last 5 days; skip rebalance notification.
+          console.log(`[rebalance-email] Skipping user ${holding.user_id} — earliest fill ${earliestFillDay || 'none'} is within 5 days (threshold ${fiveDaysAgo})`);
+          return sendJson(res, 200, { ok: true, skipped: true, reason: 'User has been in the strategy for fewer than 5 days — rebalance notification not sent.' });
+        }
+      }
+      // --- END 5-DAY FILTER ---
+
       const strategyName = holding.strategy_name_snapshot || 'Mint';
       const batchRef = `BND-${holding.rebalance_batch_id.substring(0, 8).toUpperCase()}`;
       const batchDate = holding.Fill_date
