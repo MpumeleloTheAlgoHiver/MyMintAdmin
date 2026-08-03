@@ -8478,7 +8478,7 @@
             .eq('batch_id', batchId);
           if (evtErr) throw new Error('Events: ' + evtErr.message);
           const { data: reversedRows, error: rErr } = await supabaseClient.from('rebalance_batch').update({
-            status: 'REVERSED', is_reversed: true, reversed_at: nowIso,
+            status: 'REVERSED', is_reversed: true, settlement_state: 'REVERSED', settlement_error: null, reversed_at: nowIso,
             reversed_reason: reason.trim() || 'Manual reversal', updated_at: nowIso,
           }).eq('id', batchId).eq('status', 'PENDING').select('id');
           if (rErr || !reversedRows?.length) throw new Error(rErr?.message || 'Batch could not be finalized as reversed.');

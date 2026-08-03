@@ -9209,6 +9209,17 @@
         operation: "delete", holdingId,
       });
 
+      async function rebEnsurePendingSwapSnapshotSchema() {
+        try {
+          await rebServerWrite("rebalance-pending-snapshot-capability", {});
+        } catch (error) {
+          throw new Error(
+            `Rebalance blocked before any writes: the reversible pending-swap ledger is unavailable. ` +
+            `Run sql/2026-08-03_rebalance_pending_swap_snapshot.sql, then retry. ${error.message}`
+          );
+        }
+      }
+
       const REB_ALL_OWNERS = "__all__";
       const rebOwnerKey = (userId, familyMemberId = null) =>
         `${String(userId || "")}|${familyMemberId ? String(familyMemberId) : ""}`;
@@ -11102,6 +11113,7 @@
 
       async function rebPersistCommittedTradeSequence() {
         await rebEnsureFeesLoaded(); // no write may proceed on unloaded/fallback fees
+        await rebEnsurePendingSwapSnapshotSchema(); // fail before creating a batch if reversal ledger support is absent
         /* ── Validation ── */
         const buyModal = document.getElementById("rebBuyModal");
         const buySelection = buyModal?._buySelection;
@@ -11830,6 +11842,8 @@
           const { error: batchRollbackErr } = await supabaseClient.from("rebalance_batch").update({
             status: "REVERSED",
             is_reversed: true,
+            settlement_state: "REVERSED",
+            settlement_error: `Commit rolled back: ${swapErr?.message || swapErr}`.slice(0, 4000),
             reversed_at: new Date().toISOString(),
             reversed_reason: `Commit rolled back: ${swapErr?.message || swapErr}`.slice(0, 1000),
             updated_at: new Date().toISOString(),
@@ -11966,6 +11980,7 @@
          to each user's rebalance_residual wallet (added on top of existing balance). */
       async function rebPersistLiquidationToCash() {
         await rebEnsureFeesLoaded(); // no write may proceed on unloaded/fallback fees
+        await rebEnsurePendingSwapSnapshotSchema(); // liquidation of pending orders must remain reversible
         if (!rebSelectedIsin || !rebSelectedStep) throw new Error("Missing sell selection.");
         const strategyId = rebSelectedStrategyId;
         if (!strategyId) throw new Error("Strategy context missing.");
@@ -12283,6 +12298,8 @@
           const { error: batchRollbackErr } = await supabaseClient.from("rebalance_batch").update({
             status: "REVERSED",
             is_reversed: true,
+            settlement_state: "REVERSED",
+            settlement_error: `Commit rolled back: ${commitErr?.message || commitErr}`.slice(0, 4000),
             reversed_at: new Date().toISOString(),
             reversed_reason: `Commit rolled back: ${commitErr?.message || commitErr}`.slice(0, 1000),
             updated_at: new Date().toISOString(),

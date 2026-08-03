@@ -560,6 +560,12 @@ module.exports = async (req, res) => {
       return sendJson(res, 200, { ok: true, upserted });
     }
 
+    if (action === 'rebalance-pending-snapshot-capability') {
+      if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
+      await fetchSupabaseJson('/rest/v1/rebalance_batch?select=pending_swap_snapshot&limit=1');
+      return sendJson(res, 200, { ok: true, pendingSwapSnapshot: true });
+    }
+
     // Pending-order adjustments are privileged accounting writes. Browser RLS
     // intentionally blocks stock_holdings_c mutations, so rebalance commit and
     // reversal must use this narrow, permission-gated service path.

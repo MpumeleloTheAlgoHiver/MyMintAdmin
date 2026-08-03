@@ -15,6 +15,14 @@ assert.match(endpoint, /operation === 'insert'[\s\S]*?avg_fill: null/,
   'new replacement holdings must remain pending');
 assert.match(endpoint, /action === 'rebalance-pending-batch-holdings-cleanup'[\s\S]*?status=eq\.PENDING/,
   'batch cleanup must be restricted to pending batches');
+assert.match(endpoint, /action === 'rebalance-pending-snapshot-capability'[\s\S]*?select=pending_swap_snapshot/,
+  'the API must expose a fail-fast pending-snapshot capability check');
+assert.match(dashboard, /rebEnsurePendingSwapSnapshotSchema\(\); \/\/ fail before creating a batch/,
+  'ordinary rebalance must verify reversal-ledger schema before any batch write');
+assert.match(dashboard, /rebEnsurePendingSwapSnapshotSchema\(\); \/\/ liquidation of pending orders must remain reversible/,
+  'liquidation must verify reversal-ledger schema before any batch write');
+assert.match(dashboard, /settlement_state: "REVERSED"[\s\S]{0,180}reversed_reason: `Commit rolled back:/,
+  'automatic rollback must close both business and technical settlement state');
 
 const pendingCommit = dashboard.slice(
   dashboard.indexOf('UNFILLED-ORDER SWAP'),
@@ -47,4 +55,4 @@ const reversal = orderbook.slice(
 assert.match(reversal, /rebalance-pending-holding-write/, 'reversal must restore pending holdings through the server bridge');
 assert.match(reversal, /rebalance-pending-batch-holdings-cleanup/, 'reversal cleanup must bypass browser RLS safely');
 
-console.log('rebalance pre-fill RLS safety: 18/18 green');
+console.log('rebalance pre-fill RLS safety: 22/22 green');
