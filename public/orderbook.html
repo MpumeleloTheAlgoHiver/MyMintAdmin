@@ -8346,6 +8346,9 @@
           .eq('id', strategyId)
           .single();
         if (settledStrategyErr) errors.push(`Post-settlement composition snapshot: ${settledStrategyErr.message}`);
+        const boundaryHoldings = Array.isArray(batch.holdings_snapshot_planned)
+          ? batch.holdings_snapshot_planned
+          : (settledStrategy?.holdings || []);
 
         // A batch is not SETTLED until its immutable return boundary exists.
         // This preserves the prior YTD chain while rebasing tomorrow's return
@@ -8360,7 +8363,7 @@
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
               body: JSON.stringify({
                 batchId: batch.id,
-                holdingsSnapshot: settledStrategy?.holdings || [],
+                holdingsSnapshot: boundaryHoldings,
                 fillBySecId,
                 effectiveAt: nowIso,
               }),
@@ -8388,7 +8391,7 @@
           status: 'SETTLED',
           settled_at: nowIso,
           settlement_effective_at: nowIso,
-          holdings_snapshot_after: settledStrategy?.holdings || null,
+          holdings_snapshot_after: boundaryHoldings.length ? boundaryHoldings : null,
           settlement_state: 'COMPLETE',
           settlement_error: null,
           updated_at: nowIso,

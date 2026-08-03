@@ -109,6 +109,14 @@ begin
       select distinct e.user_id, e.family_member_id
         from public.rebalance_event e
        where e.batch_id = p_batch_id
+      union
+      -- Pending-only owners are swapped at commit time and intentionally have
+      -- no executable rebalance_event. Their immutable cash event is still a
+      -- real batch effect and must participate in the owner reconciliation.
+      select distinct c.user_id, c.family_member_id
+        from public.strategy_rebalance_cash_events_c c
+       where c.batch_id = p_batch_id
+         and c.strategy_id = v_batch.strategy_id
     ) owners;
 
   if exists (
@@ -117,6 +125,11 @@ begin
         select distinct e.user_id, e.family_member_id
           from public.rebalance_event e
          where e.batch_id = p_batch_id
+        union
+        select distinct c.user_id, c.family_member_id
+          from public.strategy_rebalance_cash_events_c c
+         where c.batch_id = p_batch_id
+           and c.strategy_id = v_batch.strategy_id
       ) owner
      where not exists (
        select 1
@@ -133,20 +146,34 @@ begin
   if exists (
     select 1
       from (
-        select distinct on (c.user_id, c.family_member_id)
-               c.strategy_id, c.user_id, c.family_member_id,
-               c.closing_balance_cents
+        select distinct e.user_id, e.family_member_id
+          from public.rebalance_event e
+         where e.batch_id = p_batch_id
+        union
+        select distinct c.user_id, c.family_member_id
           from public.strategy_rebalance_cash_events_c c
          where c.batch_id = p_batch_id
            and c.strategy_id = v_batch.strategy_id
-         order by c.user_id, c.family_member_id, c.created_at desc, c.id desc
-      ) cash
+      ) owner
+      left join lateral (
+        -- A later independent sibling may already have moved the same owner's
+        -- residual. Compare with the newest strategy ledger closing balance,
+        -- not this batch's now-historical closing balance.
+        select c.strategy_id, c.user_id, c.family_member_id, c.closing_balance_cents
+          from public.strategy_rebalance_cash_events_c c
+         where c.strategy_id = v_batch.strategy_id
+           and c.user_id = owner.user_id
+           and c.family_member_id is not distinct from owner.family_member_id
+         order by c.created_at desc, c.id desc
+         limit 1
+      ) cash on true
       left join public.strategy_rebalance_residuals residual
         on residual.strategy_id = cash.strategy_id
        and residual.user_id = cash.user_id
        and residual.family_member_id is not distinct from cash.family_member_id
      where (
-         residual.user_id is null
+         cash.user_id is null
+         or residual.user_id is null
          or residual.balance_cents <> cash.closing_balance_cents
        )
   ) then

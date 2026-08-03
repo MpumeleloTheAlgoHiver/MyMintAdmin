@@ -24,8 +24,8 @@ assert.doesNotMatch(
   buyOnlySource,
   /Settle or reverse it first\./,
   'buy-only must not retain the old blanket pending-batch rejection');
-assert.match(dashboard, /Only buy-only additions[\s\S]*Settle or reverse it before committing another sell\/switch/,
-  'sell/switch must remain blocked while an earlier batch is pending');
+assert.match(dashboard, /Independent sell\/buy instructions may coexist[\s\S]*const conflictingBatch[\s\S]*overlaps this sell\/buy security/,
+  'disjoint sell/switch books may coexist while overlapping securities remain blocked');
 assert.match(dashboard, /only buy-only additions support[\s\S]*Settle or reverse it before committing a liquidation/,
   'liquidation must remain blocked while an earlier batch is pending');
 assert.match(api, /This is a parked secondary rebalance[\s\S]*predecessorStatus/,

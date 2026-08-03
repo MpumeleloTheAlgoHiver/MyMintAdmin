@@ -742,6 +742,38 @@ module.exports = async (req, res) => {
       if (!batchId || !holdings) return sendJson(res, 400, { error: 'batchId and holdingsSnapshot required' });
       if (!authUser?.id) return sendJson(res, 401, { error: 'Authenticated actor is required' });
 
+      /* Concurrent, disjoint rebalance books for the same strategy/effective
+         date may settle in either order. Build the valuation price evidence
+         from every sibling that has an actual fill, then let this request's
+         fills win for the current book. The final sibling therefore publishes
+         one deterministic boundary containing all actual execution prices. */
+      const batchRows = await fetchSupabaseJson(
+        `/rest/v1/rebalance_batch?id=eq.${encodeURIComponent(batchId)}&select=id,strategy_id,effective_date&limit=1`
+      );
+      const boundaryBatch = Array.isArray(batchRows) ? batchRows[0] : null;
+      if (!boundaryBatch?.strategy_id) return sendJson(res, 404, { error: 'Rebalance batch not found' });
+      const siblingBatches = await fetchSupabaseJson(
+        `/rest/v1/rebalance_batch?strategy_id=eq.${encodeURIComponent(boundaryBatch.strategy_id)}` +
+        `&effective_date=eq.${encodeURIComponent(boundaryBatch.effective_date)}` +
+        '&status=in.(PENDING,SETTLED)&select=id'
+      );
+      const siblingBatchIds = (siblingBatches || []).map((row) => row.id).filter(Boolean);
+      const siblingFillEvents = siblingBatchIds.length
+        ? await fetchSupabaseJson(
+            `/rest/v1/rebalance_event?batch_id=in.(${buildInFilter(siblingBatchIds)})` +
+            '&avg_fill=not.is.null&select=batch_id,security_id,avg_fill,updated_at&order=updated_at.asc'
+          )
+        : [];
+      const combinedFillBySecId = {};
+      (siblingFillEvents || []).forEach((event) => {
+        const price = Math.round(Number(event.avg_fill) || 0);
+        if (event.security_id && price > 0) combinedFillBySecId[event.security_id] = price;
+      });
+      Object.entries(fillBySecId).forEach(([securityId, price]) => {
+        const cents = Math.round(Number(price) || 0);
+        if (securityId && cents > 0) combinedFillBySecId[securityId] = cents;
+      });
+
       const symbols = [...new Set(holdings.map((h) => String(h?.symbol || h?.ticker || '').trim().toUpperCase()).filter(Boolean))];
       const querySymbols = [...new Set([...symbols, ...symbols.map((s) => s.endsWith('.JO') ? s.slice(0, -3) : `${s}.JO`)])];
       const securityRows = querySymbols.length ? await fetchSupabaseJson(
@@ -775,7 +807,7 @@ module.exports = async (req, res) => {
         const shares = Number(holding?.shares ?? holding?.quantity);
         const security = securityBySymbol.get(norm(symbol));
         const live = liveBySymbol.get(norm(symbol));
-        const actualFill = security?.id ? Number(fillBySecId[security.id]) : 0;
+        const actualFill = security?.id ? Number(combinedFillBySecId[security.id]) : 0;
         const reference = Number(live?.current_price || security?.last_price || 0);
         if (!symbol || !Number.isFinite(shares) || shares <= 0 || !(actualFill > 0 || reference > 0)) {
           return sendJson(res, 409, { error: `Boundary valuation incomplete for ${symbol || 'unknown holding'}` });
@@ -820,7 +852,13 @@ module.exports = async (req, res) => {
           p_actor: authUser.id,
         },
       });
-      return sendJson(res, 200, { ok: true, boundary: result, caReconciliation, valuation });
+      return sendJson(res, 200, {
+        ok: true,
+        boundary: result,
+        caReconciliation,
+        valuation,
+        combinedFillBatchIds: siblingBatchIds,
+      });
     }
 
     // Rebalance settlement creates immutable holding/audit rows and an activity

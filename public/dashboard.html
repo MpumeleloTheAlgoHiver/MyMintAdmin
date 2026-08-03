@@ -11141,6 +11141,7 @@
             min_investment: minInvestment,
           };
         });
+        return { holdings, minInvestment };
       }
 
       async function rebPersistCommittedTradeSequence() {
@@ -11185,12 +11186,13 @@
 
         const batchFamilyMemberIdForTrade = rebScopeIsAll() ? null : (rebSelectedFamilyMemberId || null);
 
-        /* A second sell/switch cannot be calculated safely until the first
-           batch has produced its broker positions. Only buy-only additions
-           may be parked as dependent batches. */
+        /* Independent sell/buy instructions may coexist for the same strategy,
+           but they must not touch any of the same securities. Disjoint books
+           can settle in either order; overlapping books would compete for the
+           same live holding and remain blocked. */
         let pendingBatchesQuery1 = supabaseClient
           .from("rebalance_batch")
-          .select("id, status, sell_isin_code, buy_isin_code, created_at")
+          .select("id, status, sell_isin_code, buy_isin_code, extra_buy_isin_code, created_at")
           .eq("strategy_id", strategyId)
           .eq("status", "PENDING");
         pendingBatchesQuery1 = batchFamilyMemberIdForTrade
@@ -11198,11 +11200,21 @@
           : pendingBatchesQuery1.is("family_member_id", null);
         const { data: pendingBatches, error: pendingErr } = await pendingBatchesQuery1;
         if (pendingErr) throw new Error(pendingErr.message || "Failed to check pending batches.");
-        if (pendingBatches?.length) {
-          const existing = pendingBatches[0];
+        const proposedCodes = new Set([
+          rebSelectedIsin?.code,
+          buySelection.instrument?.code,
+          extraBuySelection?.instrument?.code,
+        ].map(normalizeSymbol).filter(Boolean));
+        const conflictingBatch = (pendingBatches || []).find((batch) => {
+          const existingCodes = [batch.sell_isin_code, batch.buy_isin_code, batch.extra_buy_isin_code]
+            .map(normalizeSymbol).filter(Boolean);
+          return existingCodes.some((code) => proposedCodes.has(code));
+        });
+        if (conflictingBatch) {
+          const existing = conflictingBatch;
           throw new Error(
             `A pending rebalance already exists for this strategy (batch ${existing.id.slice(0, 8)}&hellip; created ${new Date(existing.created_at).toLocaleString()}). ` +
-            "Settle or reverse it before committing another sell/switch."
+            "It overlaps this sell/buy security. Settle or reverse it before committing the overlapping trade."
           );
         }
 
@@ -11811,13 +11823,28 @@
           }
           /* Publish the model composition only after every filled event,
              pending-order rewrite, reversal ledger and CA movement succeeded. */
-          await rebReplaceStrategyHoldingAfterBuy({
+          const publishedPlan = await rebReplaceStrategyHoldingAfterBuy({
             strategyId,
             soldIsin: rebSelectedIsin,
             sellStep: rebSelectedStep,
             buySelection,
             buyExec,
           });
+          if (!publishedPlan?.holdings || !(Number(publishedPlan.minInvestment) >= 0)) {
+            throw new Error("The committed rebalance did not produce a durable planned composition.");
+          }
+          const { error: plannedSnapshotErr } = await supabaseClient
+            .from("rebalance_batch")
+            .update({
+              holdings_snapshot_planned: publishedPlan.holdings,
+              min_investment_planned: publishedPlan.minInvestment,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("strategy_id", strategyId)
+            .eq("effective_date", effectiveDateStr)
+            .eq("status", "PENDING")
+            .is("predecessor_batch_id", null);
+          if (plannedSnapshotErr) throw new Error(`Independent-book composition checkpoint failed: ${plannedSnapshotErr.message}`);
         } catch (swapErr) {
           const rollbackErrors = [];
           if (pendingSwapCashApplied) {
