@@ -1172,6 +1172,33 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── PATCH /api/strategies/:id ─────────────────────────────────────────────
+  // Update a strategy row. Uses service-role key to bypass RLS.
+  const strategyPatchMatch = req.url.match(/^\/api\/strategies\/([^/?]+)(\?.*)?$/);
+  if (strategyPatchMatch && req.method === 'PATCH') {
+    const token = parseBearerToken(req.headers.authorization);
+    if (!token) { sendJson(res, 401, { error: 'Missing Authorization bearer token' }); return; }
+    (async () => {
+      try {
+        const id = decodeURIComponent(strategyPatchMatch[1]);
+        const body = await readJsonBody(req).catch(() => ({}));
+        // Whitelist allowed fields
+        const ALLOWED = ['short_name','description','risk_level','sector','investor_environment','is_public','is_featured','is_kid_strategy'];
+        const patch = {};
+        for (const k of ALLOWED) { if (Object.prototype.hasOwnProperty.call(body, k)) patch[k] = body[k]; }
+        if (!Object.keys(patch).length) { sendJson(res, 400, { error: 'No valid fields to update' }); return; }
+        const result = await mutateSupabaseJson(
+          `/rest/v1/strategies_c?id=eq.${encodeURIComponent(id)}`,
+          patch, token, 'PATCH', true
+        );
+        sendJson(res, 200, { data: result });
+      } catch (err) {
+        sendJson(res, 500, { error: err.message });
+      }
+    })();
+    return;
+  }
+
   if (req.url.startsWith('/api/gifting')) {
     (async () => {
       try {

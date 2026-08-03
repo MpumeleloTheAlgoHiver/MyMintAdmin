@@ -7640,15 +7640,17 @@
             is_kid_strategy: overlay.querySelector("#_sdIsKid").checked,
           };
 
-          const { error } = await supabaseClient
-            .from("strategies_c")
-            .update(payload)
-            .eq("id", strategy.id);
-
-          if (error) {
+          const saveResp = await fetch(`/api/strategies/${encodeURIComponent(strategy.id)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+            body: JSON.stringify(payload)
+          });
+          if (!saveResp.ok) {
+            let msg = 'Save failed';
+            try { const j = await saveResp.json(); msg = j.error || msg; } catch {}
             saveBtn.textContent = "Save changes";
             saveBtn.disabled = false;
-            alert("Could not save: " + error.message);
+            alert("Could not save: " + msg);
             return;
           }
 
