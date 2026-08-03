@@ -11168,6 +11168,8 @@
         const extraBuySelection = buySelection.extraBuy || null;
         const extraBuyExec = extraBuySelection?.exec || null;
 
+        const batchFamilyMemberIdForTrade = rebScopeIsAll() ? null : (rebSelectedFamilyMemberId || null);
+
         /* ── Resolve security IDs ── */
 
         const symbolsToResolve = [
@@ -11987,6 +11989,8 @@
           ...cachedUnfilledRows.map((row) => rebOwnerKey(row.userId, row.familyMemberId)),
         ]);
         if (!targetOwnerKeys.size) throw new Error("No client holdings or pending orders are available for this instrument.");
+
+        const batchFamilyMemberId = rebScopeIsAll() ? null : (rebSelectedFamilyMemberId || null);
 
         /* Resolve sell security ID */
         const { data: secRows, error: secErr } = await supabaseClient
