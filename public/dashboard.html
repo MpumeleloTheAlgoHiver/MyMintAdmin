@@ -7626,8 +7626,9 @@
         /* Save */
         overlay.querySelector("#_sdSave").addEventListener("click", async () => {
           const saveBtn = overlay.querySelector("#_sdSave");
-          saveBtn.textContent = "Saving&hellip;";
+          saveBtn.textContent = "Saving\u2026";
           saveBtn.disabled = true;
+          try {
 
           const payload = {
             short_name:  (overlay.querySelector("#_sdShortName").value.trim()) || null,
@@ -7705,6 +7706,13 @@
 
           closeModal();
           await loadStrategies();
+
+          } catch (err) {
+            console.error('[StrategySave] unexpected error:', err);
+            alert("Could not save: " + (err.message || String(err)));
+            saveBtn.textContent = "Save changes";
+            saveBtn.disabled = false;
+          }
         });
       };
 
