@@ -1,0 +1,40 @@
+-- Pre-fill rebalance swaps (the "UNFILLED-ORDER SWAP" step in dashboard.html)
+-- rewrite an unfilled client's PENDING order in place instead of raising a
+-- SELL/BUY rebalance_event. That is correct — an unfilled client has no broker
+-- position, so for them the strategy has simply been edited: no fees, no 8%
+-- execution-reserve draw, no realised P&L.
+--
+-- The gap this column closes: because those clients produce NO rebalance_event
+-- rows, the batch-reversal routine (orderbook.html) could not find them. It
+-- reverses events, restores residuals from a user list derived from
+-- rebalance_event, and deletes holdings by rebalance_batch_id — and swap rows
+-- match none of those. A reversed batch therefore left swapped clients holding
+-- pending orders for the NEW security plus phantom residual cash.
+--
+-- Stamping rebalance_batch_id on the swap rows is NOT a safe alternative:
+--   * index.html excludes rows carrying one from the open-orders notification
+--   * api/_orderbook.js routes trade confirmations on it (isBatch)
+--   * the reversal's blanket DELETE ... WHERE rebalance_batch_id = batch would
+--     permanently destroy the deactivated ORIGINAL holding, which is far worse
+--     than the bug being fixed.
+--
+-- So the batch carries its own explicit, reversible ledger of what the swap
+-- did. Shape: a JSON array, one entry per swapped holding:
+--   [{
+--      "oldHoldingId":   uuid,     -- deactivated (closed_reason REBALANCE_PENDING_SWAP)
+--      "newHoldingId":   uuid|null,-- inserted replacement (null when merged into
+--                                  --   an existing pending row, or when newQty = 0)
+--      "mergedIntoId":   uuid|null,-- set instead of newHoldingId when merged
+--      "mergedAddedQty": number,   -- qty added to that existing row (to back out)
+--      "userId":         uuid,
+--      "familyMemberId": uuid|null,
+--      "sellQty":        number,   -- original pending qty that was swapped out
+--      "newQty":         number,   -- replacement qty bought
+--      "leftover":       number    -- rands added to the strategy residual
+--   }]
+--
+-- Mirrors the existing snapshot columns on this table
+-- (holdings_snapshot_before / _planned / _after, wallet_snapshot_before).
+
+ALTER TABLE rebalance_batch
+  ADD COLUMN IF NOT EXISTS pending_swap_snapshot jsonb;

@@ -5349,6 +5349,7 @@
                   <span>${escapeHtml(book.dateLabel || '-')}</span>
                   ${(!isTestBook && book.sentAt) ? `<span>Sent: ${escapeHtml(new Date(book.sentAt).toLocaleString())}</span>` : ''}
                   ${isTestBook ? '' : `<span data-book-id="${escapeHtml(String(book.id || ''))}">${emailStatusChip(book.emailStatus)}</span>`}
+                  <button type="button" class="orderbook-export-btn" data-view-active-book style="padding:4px 10px;height:26px;font-size:11px;" title="Open this order book and view captured execution details">View details</button>
                   ${moveToClosedBtn}
                 </span>
               </summary>
@@ -8229,7 +8230,7 @@
       /* Ã¢&rdquo;â¬Ã¢&rdquo;â¬ Reverse Rebalance Batch Ã¢&rdquo;â¬Ã¢&rdquo;â¬ */
       const executeReverseRebalanceBatch = async (batchId) => {
         const reason = prompt(
-          'Reverse this pending rebalance batch?\n\nThis will:\n&bull; Mark all events as REVERSED\n&bull; Restore the strategy composition to its pre-rebalance state\n&bull; Restore wallet balances to their pre-rebalance values\n\nEnter a reason (optional):',
+          'Reverse this pending rebalance batch?\n\nThis will:\n&bull; Mark all events as REVERSED\n&bull; Restore the strategy composition to its pre-rebalance state\n&bull; Restore wallet balances to their pre-rebalance values\n&bull; Restore any unfilled orders that were swapped in place (pre-fill swap)\n\nEnter a reason (optional):',
           ''
         );
         if (reason === null) return;
@@ -8237,7 +8238,7 @@
           const nowIso = new Date().toISOString();
           const { data: batch, error: bErr } = await supabaseClient
             .from('rebalance_batch')
-            .select('id, strategy_id, holdings_snapshot_before, wallet_snapshot_before')
+            .select('id, strategy_id, holdings_snapshot_before, wallet_snapshot_before, pending_swap_snapshot')
             .eq('id', batchId).single();
           if (bErr) throw new Error(bErr.message);
 
@@ -8302,6 +8303,17 @@
                 if (!byScope.has(fm)) byScope.set(fm, {});
                 byScope.get(fm)[uid] = Number(snap[uid] || 0); // rands; 0 = had no prior residual
               });
+              /* Pre-fill swapped clients raise NO rebalance_event, so they were
+                 absent from evRows above and their leftover cash survived the
+                 reversal as phantom residual. Fold them in from the batch's own
+                 swap ledger. */
+              (Array.isArray(batch.pending_swap_snapshot) ? batch.pending_swap_snapshot : []).forEach((s) => {
+                const uid = s?.userId ? String(s.userId) : '';
+                if (!uid) return;
+                const fm = s.familyMemberId ? String(s.familyMemberId) : '';
+                if (!byScope.has(fm)) byScope.set(fm, {});
+                byScope.get(fm)[uid] = Number(snap[uid] || 0);
+              });
               if (byScope.size) {
                 const { data: { session } } = await supabaseClient.auth.getSession();
                 const token = session?.access_token;
@@ -8326,6 +8338,50 @@
             .delete()
             .eq('rebalance_batch_id', batchId);
           if (holdingsDelErr) errors.push('Holdings cleanup: ' + holdingsDelErr.message);
+
+          // 5b. Undo pre-fill swaps.
+          //     Unfilled clients are rewritten in place at commit and raise NO
+          //     rebalance_event, and their rows deliberately carry no
+          //     rebalance_batch_id (stamping one would make step 5's blanket
+          //     DELETE destroy the client's ORIGINAL pending order). So they are
+          //     undone here from the batch's own ledger: restore the original
+          //     pending holding, then remove the replacement.
+          const swapLedger = Array.isArray(batch.pending_swap_snapshot) ? batch.pending_swap_snapshot : [];
+          for (const s of swapLedger) {
+            if (s?.oldHoldingId) {
+              const { error: reErr } = await supabaseClient
+                .from('stock_holdings_c')
+                .update({
+                  is_active: true,
+                  Status: 'active',
+                  closed_reason: null,
+                  closed_at: null,
+                  updated_at: nowIso,
+                })
+                .eq('id', s.oldHoldingId);
+              if (reErr) errors.push(`Swap restore ${String(s.oldHoldingId).slice(0, 8)}: ${reErr.message}`);
+            }
+            if (s?.newHoldingId) {
+              const { error: delErr } = await supabaseClient
+                .from('stock_holdings_c')
+                .delete()
+                .eq('id', s.newHoldingId);
+              if (delErr) errors.push(`Swap cleanup ${String(s.newHoldingId).slice(0, 8)}: ${delErr.message}`);
+            } else if (s?.mergedIntoId && Number(s.mergedAddedQty) > 0) {
+              // The replacement was merged into a pre-existing pending row —
+              // subtract only what this swap added, never delete the whole row.
+              const { data: cur } = await supabaseClient
+                .from('stock_holdings_c').select('quantity').eq('id', s.mergedIntoId).maybeSingle();
+              if (cur) {
+                const restored = Math.max(0, Number(cur.quantity || 0) - Number(s.mergedAddedQty));
+                const { error: unmergeErr } = await supabaseClient
+                  .from('stock_holdings_c')
+                  .update({ quantity: restored, updated_at: nowIso })
+                  .eq('id', s.mergedIntoId);
+                if (unmergeErr) errors.push(`Swap unmerge ${String(s.mergedIntoId).slice(0, 8)}: ${unmergeErr.message}`);
+              }
+            }
+          }
 
           loadOrderbook().catch(console.error);
 
@@ -8866,6 +8922,19 @@
       filledOrderbooksList.addEventListener('click', async (event) => {
         if (event.target.closest('[data-cleanup-delete]')) return;
         if (event.target.closest('[data-move-to-closed]')) return;
+
+        const viewActiveBookBtn = event.target.closest('[data-view-active-book]');
+        if (viewActiveBookBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          const details = viewActiveBookBtn.closest('details');
+          if (details) {
+            details.open = true;
+            const table = details.querySelector('.filled-orderbook-details');
+            if (table) table.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+          return;
+        }
 
         const toggleFilledColumn = event.target.closest('[data-toggle-filled-col]');
         if (toggleFilledColumn) {

@@ -11360,12 +11360,37 @@
           const { data: unfilledSellRows, error: unfilledErr } = await unfilledQuery;
           if (unfilledErr) throw new Error(unfilledErr.message || "Failed to load unfilled orders for swap.");
 
-          const swapRows = (unfilledSellRows || []).filter(
-            (r) => !Number(r.avg_fill)
-              && Number(r.quantity || 0) > 0
-              && clients.some((client) =>
-                client.ownerKey === rebOwnerKey(r.user_id, r.family_member_id))
-          );
+          /* Environment gate.
+             This protection used to arrive INDIRECTLY via `clients.some(...)`.
+             That was wrong: `clients` comes from rebClientsForIsin() →
+             rebRawHoldings, which only ever receives rows with avg_fill > 0
+             (unfilled rows are diverted into rebUnfilledHoldings above). So a
+             client whose position is ENTIRELY unfilled — precisely the case
+             this swap exists to serve, e.g. a gift claimed but never filled —
+             was never in `clients`, and their pending order was silently left
+             on the OLD composition. They would then fill into a basket the
+             strategy no longer holds.
+             Gate on the strategy's investor environment directly instead: the
+             UAT-vs-LIVE separation is preserved, without excluding the very
+             clients the swap is for. */
+          const unfilledOwnerIds = [...new Set((unfilledSellRows || [])
+            .map((r) => r.user_id).filter(Boolean).map(String))];
+          const { data: unfilledProfiles, error: unfilledProfilesErr } = unfilledOwnerIds.length
+            ? await supabaseClient.from("profiles").select("id, is_test").in("id", unfilledOwnerIds)
+            : { data: [], error: null };
+          if (unfilledProfilesErr) {
+            throw new Error(unfilledProfilesErr.message || "Failed to verify unfilled-order owners.");
+          }
+          const unfilledIsTest = new Map((unfilledProfiles || [])
+            .map((profile) => [String(profile.id), profile.is_test === true]));
+          const swapEnvironment = String(strategyRef?.investor_environment || "LIVE").toUpperCase();
+
+          const swapRows = (unfilledSellRows || []).filter((r) => {
+            if (Number(r.avg_fill)) return false;
+            if (!(Number(r.quantity || 0) > 0)) return false;
+            const isTest = unfilledIsTest.get(String(r.user_id)) === true;
+            return swapEnvironment === "UAT" ? isTest : !isTest;
+          });
 
           if (swapRows.length) {
             const sellLive = Number(rebSelectedIsin.currentPrice) || 0;   // rands
@@ -11399,21 +11424,17 @@
               console.warn("⟦REB SWAP DRY-RUN⟧ residual totals it would SET (rands):", residualTotalsByOwner);
             } else {
               const swapErrors = [];
+              const swapSnapshot = [];
               for (const p of swapPlan) {
-                /* 1. Deactivate the old pending holding */
-                const { error: deErr } = await supabaseClient
-                  .from("stock_holdings_c")
-                  .update({
-                    is_active: false,
-                    Status: "inactive",
-                    closed_reason: "REBALANCE_PENDING_SWAP",
-                    closed_at: nowIso,
-                    updated_at: nowIso,
-                  })
-                  .eq("id", p.row.id);
-                if (deErr) { swapErrors.push(`deactivate ${p.row.id}: ${deErr.message}`); continue; }
-
-                /* 2. Add the new pending buy holding (merge if one already exists) */
+                /* 1. Create the replacement FIRST.
+                      Deactivating first meant a failed insert left the client
+                      with NO active holding at all — their pending order simply
+                      vanished, and the only trace was a console line the admin
+                      never saw. Build the new position before retiring the old
+                      one so that failure mode is impossible. */
+                let newHoldingId = null;
+                let mergedIntoId = null;
+                let mergedAddedQty = 0;
                 if (p.newQty > 0) {
                   let existsQ = supabaseClient
                     .from("stock_holdings_c")
@@ -11434,9 +11455,11 @@
                       .from("stock_holdings_c")
                       .update({ quantity: Number(existingBuy.quantity || 0) + p.newQty, updated_at: nowIso })
                       .eq("id", existingBuy.id);
-                    if (upErr) swapErrors.push(`merge buy ${p.uid}: ${upErr.message}`);
+                    if (upErr) { swapErrors.push(`merge buy ${p.uid}: ${upErr.message}`); continue; }
+                    mergedIntoId = existingBuy.id;
+                    mergedAddedQty = p.newQty;
                   } else {
-                    const { error: insErr } = await supabaseClient
+                    const { data: insertedBuy, error: insErr } = await supabaseClient
                       .from("stock_holdings_c")
                       .insert({
                         user_id: p.uid,
@@ -11454,10 +11477,57 @@
                         strategy_name_snapshot: strategyNameSnapshot,
                         created_at: nowIso,
                         updated_at: nowIso,
-                      });
-                    if (insErr) swapErrors.push(`insert buy ${p.uid}: ${insErr.message}`);
+                      })
+                      .select("id")
+                      .maybeSingle();
+                    if (insErr) { swapErrors.push(`insert buy ${p.uid}: ${insErr.message}`); continue; }
+                    newHoldingId = insertedBuy?.id || null;
                   }
                 }
+
+                /* 2. Only now retire the old pending holding. If this fails,
+                      roll the replacement back — otherwise the client would
+                      hold BOTH the old and the new position. */
+                const { error: deErr } = await supabaseClient
+                  .from("stock_holdings_c")
+                  .update({
+                    is_active: false,
+                    Status: "inactive",
+                    closed_reason: "REBALANCE_PENDING_SWAP",
+                    closed_at: nowIso,
+                    updated_at: nowIso,
+                  })
+                  .eq("id", p.row.id);
+                if (deErr) {
+                  swapErrors.push(`deactivate ${p.row.id}: ${deErr.message}`);
+                  if (newHoldingId) {
+                    await supabaseClient.from("stock_holdings_c").delete().eq("id", newHoldingId);
+                  } else if (mergedIntoId) {
+                    const { data: cur } = await supabaseClient
+                      .from("stock_holdings_c").select("quantity").eq("id", mergedIntoId).maybeSingle();
+                    if (cur) {
+                      await supabaseClient.from("stock_holdings_c")
+                        .update({ quantity: Math.max(0, Number(cur.quantity || 0) - mergedAddedQty), updated_at: nowIso })
+                        .eq("id", mergedIntoId);
+                    }
+                  }
+                  continue;
+                }
+
+                /* Reversal ledger — a pre-fill swap raises NO rebalance_event,
+                   so without this the reverse routine cannot find these rows.
+                   See sql/2026-08-03_rebalance_pending_swap_snapshot.sql. */
+                swapSnapshot.push({
+                  oldHoldingId: p.row.id,
+                  newHoldingId,
+                  mergedIntoId,
+                  mergedAddedQty,
+                  userId: p.uid,
+                  familyMemberId: p.fmId,
+                  sellQty: p.qty,
+                  newQty: p.newQty,
+                  leftover: p.leftover,
+                });
 
                 /* 3. Audit txn (mirrors the filled rebalance history entry; R0, informational) */
                 const { error: txErr } = await supabaseClient.from("transactions").insert({
@@ -11475,23 +11545,73 @@
                 if (txErr) swapErrors.push(`audit txn ${p.uid}: ${txErr.message}`);
               }
 
-              /* 4. Residual upsert — SETs the new total (existing + leftover) per user */
-              if (Object.keys(residualTotalsByOwner).length) {
+              /* 4. Residual upsert — SETs the new total (existing + leftover).
+                    Built from swapSnapshot (SUCCESSFUL swaps only) rather than
+                    from swapPlan, so a swap that failed or was rolled back above
+                    never credits the client phantom cash. */
+              const appliedResidualByOwner = {};
+              swapSnapshot.forEach((s) => {
+                const ownerKey = rebOwnerKey(s.userId, s.familyMemberId);
+                const base = appliedResidualByOwner[ownerKey] != null
+                  ? appliedResidualByOwner[ownerKey]
+                  : Number(rebWalletByClient[ownerKey] || 0);
+                appliedResidualByOwner[ownerKey] = rebRoundMoney(base + s.leftover);
+              });
+              if (Object.keys(appliedResidualByOwner).length) {
                 await rebUpsertWalletBalances(
                   strategyId,
-                  residualTotalsByOwner,
+                  appliedResidualByOwner,
                   rebScopeIsAll() ? REB_ALL_OWNERS : (rebSelectedFamilyMemberId || null),
                 );
               }
 
-              if (swapErrors.length) console.error("⟦REB SWAP⟧ completed WITH ERRORS:", swapErrors);
-              else console.info(`⟦REB SWAP⟧ swapped ${swapPlan.length} unfilled order(s): ${sellIsinCode} → ${buyIsinCode}`);
+              /* 5. Persist the swap ledger on the batch so Reverse can undo it. */
+              if (swapSnapshot.length) {
+                const { error: snapErr } = await supabaseClient
+                  .from("rebalance_batch")
+                  .update({ pending_swap_snapshot: swapSnapshot, updated_at: nowIso })
+                  .eq("id", rebalanceBatchId);
+                if (snapErr) swapErrors.push(`swap snapshot: ${snapErr.message}`);
+              }
+
+              /* 6. Tell the admin. These used to be console-only, so a swap that
+                    silently failed — or that left a client with no securities at
+                    all — looked like a clean commit. */
+              const wipeouts = swapSnapshot.filter((s) => s.newQty <= 0);
+              const notes = [];
+              if (wipeouts.length) {
+                notes.push(
+                  `${wipeouts.length} unfilled order${wipeouts.length === 1 ? "" : "s"} could not afford a single ` +
+                  `${buyIsinCode} share at R${buyLive.toFixed(2)}. Those clients now hold NO ` +
+                  `${strategyNameSnapshot || "strategy"} securities — their whole slice became residual cash:\n` +
+                  wipeouts.map((s) =>
+                    `  • ${String(s.userId).slice(0, 8)}${s.familyMemberId ? " / child " + String(s.familyMemberId).slice(0, 8) : ""}` +
+                    ` — ${s.sellQty} × ${sellIsinCode} → R${Number(s.leftover).toFixed(2)} cash`
+                  ).join("\n") +
+                  `\n\nTheir 8% execution reserve and CA were NOT touched (they were never filled).`
+                );
+              }
+              if (swapErrors.length) {
+                notes.push(`Pre-fill swap errors (these clients were NOT swapped):\n  • ${swapErrors.join("\n  • ")}`);
+              }
+              if (notes.length) {
+                console.error("⟦REB SWAP⟧ completed WITH NOTES:", { wipeouts, swapErrors });
+                alert(`Rebalance committed, but the pre-fill swap needs your attention:\n\n${notes.join("\n\n")}`);
+              } else {
+                console.info(`⟦REB SWAP⟧ swapped ${swapSnapshot.length} unfilled order(s): ${sellIsinCode} → ${buyIsinCode}`);
+              }
             }
           }
         } catch (swapErr) {
           /* The filled batch already committed; surface the swap problem without
-             unwinding the filled rebalance. */
+             unwinding the filled rebalance. Alert as well as log — a silent
+             console error here previously looked like a clean commit. */
           console.error("⟦REB SWAP⟧ failed:", swapErr?.message || swapErr);
+          alert(
+            "Rebalance committed, but the pre-fill swap of unfilled orders FAILED:\n\n" +
+            (swapErr?.message || swapErr) +
+            "\n\nUnfilled clients may still be on the OLD composition — check the order book before filling."
+          );
         }
 
         /* ── stock_holdings_c is NOT touched ──
