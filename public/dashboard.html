@@ -12458,7 +12458,7 @@
                         return `
                         <tr class="${selectedInstrument && !p.afford && p.sharesNeeded > 0 ? 'bg-red-50' : 'hover:bg-slate-50'}">
                           <td class="px-3 py-2 text-slate-800 truncate max-w-[180px]" title="${p.client.id}">
-                            ${p.client.name}${isTest ? ' <span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:0.04em;background:#fef3c7;color:#d97706;vertical-align:middle;">TEST</span>' : ''}
+                            ${p.client.name}${p.client.hasPendingHolding && !p.client.hasFilledHolding ? ' <span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:0.04em;background:#eff6ff;color:#1d4ed8;vertical-align:middle;">PENDING INITIAL FILL</span>' : ''}${isTest ? ' <span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:0.04em;background:#fef3c7;color:#d97706;vertical-align:middle;">TEST</span>' : ''}
                           </td>
                           <td class="px-3 py-2 text-right font-mono text-slate-500">${p.lots.toLocaleString()}</td>
                           <td class="px-3 py-2 text-right font-mono ${p.walletR > 0 ? 'text-violet-700 font-semibold' : 'text-slate-400'}">${rebFmtZAR(p.walletR)}</td>

@@ -8,6 +8,8 @@ const migration = fs.readFileSync(new URL('../sql/2026-08-03_rebalance_sequentia
 
 assert.match(dashboard, /collectRows\(rebRawHoldings, false\);[\s\S]*collectRows\(rebUnfilledHoldings, true\);/,
   'buy-only participants must include filled and pending holdings');
+assert.match(dashboard, /PENDING INITIAL FILL/,
+  'pending-only strategy members must be visibly identifiable before commit');
 assert.match(dashboard, /predecessor_batch_id: predecessorBatch\?\.id \|\| null/,
   'a secondary buy-only batch must record its predecessor');
 assert.doesNotMatch(
@@ -23,4 +25,4 @@ assert.match(orderbook, /Parked after[\s\S]*isParkedSecondary \? 'not-allowed'/,
 assert.match(migration, /foreign key \(predecessor_batch_id\)[\s\S]*references public\.rebalance_batch\(id\)/,
   'database must enforce valid predecessor links');
 
-console.log('sequential buy-only rebalance: 7/7 green');
+console.log('sequential buy-only rebalance: 8/8 green');
