@@ -5502,13 +5502,16 @@
         const operationLabel = isLiquidation ? 'Liquidation' : 'Rebalance';
         const destinationLabel = isLiquidation ? 'Cash' : sb.buyIsin;
         const isPending = String(sb.batchStatus || '').toUpperCase() === 'PENDING';
+        const isParkedSecondary = isPending && sb.predecessorBatchId && !sb.predecessorSettled;
         const checkpoint = String(sb.settlementState || 'PENDING').toUpperCase();
         const isProcessing = checkpoint === 'PROCESSING';
-        const settleLabel = checkpoint === 'PAUSED' ? 'Resume Settlement' : 'Fill &amp; Settle';
+        const settleLabel = isParkedSecondary
+          ? `Parked after ${escapeHtml(String(sb.predecessorBatchId).slice(0, 8))}`
+          : checkpoint === 'PAUSED' ? 'Resume Settlement' : 'Fill &amp; Settle';
         const actionHtml = isPending
           ? `<span style="display:inline-flex;gap:6px;align-items:center;">
               <button title="Fill &amp; Settle Batch" data-fill-settle-batch data-batch-id="${escapeHtml(sb.id || '')}"
-                ${isProcessing ? 'disabled' : ''} style="background:${isProcessing ? '#94a3b8' : '#059669'};color:white;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;border:none;cursor:${isProcessing ? 'not-allowed' : 'pointer'};white-space:nowrap;">${settleLabel}</button>
+                ${isProcessing || isParkedSecondary ? 'disabled' : ''} style="background:${isProcessing || isParkedSecondary ? '#94a3b8' : '#059669'};color:white;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;border:none;cursor:${isProcessing || isParkedSecondary ? 'not-allowed' : 'pointer'};white-space:nowrap;">${settleLabel}</button>
               <button title="Reverse Batch" data-reverse-batch data-batch-id="${escapeHtml(sb.id || '')}"
                 style="background:#dc2626;color:white;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;">Reverse</button>
             </span>`
@@ -6358,7 +6361,7 @@
           .order('created_at', { ascending: false }),
         supabaseClient
           .from('rebalance_batch')
-          .select('id, strategy_id, status, settlement_state, settlement_error, settlement_started_at, effective_date, sell_security_id, buy_security_id, sell_isin_code, buy_isin_code, extra_buy_isin_code, net_proceeds, strategy_name_snapshot, created_at, created_by, settled_at, updated_at, is_reversed, reversed_at, reversed_reason, holdings_snapshot_before, holdings_snapshot_planned, min_investment_planned, wallet_snapshot_before')
+          .select('id, strategy_id, status, settlement_state, settlement_error, settlement_started_at, effective_date, sell_security_id, buy_security_id, sell_isin_code, buy_isin_code, extra_buy_isin_code, net_proceeds, strategy_name_snapshot, created_at, created_by, settled_at, updated_at, is_reversed, reversed_at, reversed_reason, holdings_snapshot_before, holdings_snapshot_planned, min_investment_planned, wallet_snapshot_before, predecessor_batch_id')
           .order('created_at', { ascending: false }),
       ]);
 
@@ -7059,6 +7062,9 @@
           return {
             id: b.id,
             batchStatus: b.status,
+            predecessorBatchId: b.predecessor_batch_id || null,
+            predecessorSettled: !b.predecessor_batch_id
+              || String(batchById[b.predecessor_batch_id]?.status || '').toUpperCase() === 'SETTLED',
             settlementState: b.settlement_state || (String(b.status || '').toUpperCase() === 'SETTLED' ? 'COMPLETE' : 'PENDING'),
             settlementError: b.settlement_error || null,
             strategyName: b.strategy_name_snapshot || strategy?.name || 'Unknown Strategy',
@@ -8344,6 +8350,20 @@
           if (bErr) throw new Error(bErr.message);
           if (String(batch.status || '').toUpperCase() !== 'PENDING') {
             throw new Error('Only a pending, unexecuted rebalance can be reversed from this control.');
+          }
+
+          const { data: dependentBatches, error: dependentErr } = await supabaseClient
+            .from('rebalance_batch')
+            .select('id, status')
+            .eq('predecessor_batch_id', batchId)
+            .eq('status', 'PENDING')
+            .limit(1);
+          if (dependentErr) throw new Error('Could not verify dependent rebalances: ' + dependentErr.message);
+          if (dependentBatches?.length) {
+            throw new Error(
+              `Reverse the newer parked rebalance ${String(dependentBatches[0].id).slice(0, 8)} first. ` +
+              'The earlier batch cannot be reversed while a dependent instruction is still pending.'
+            );
           }
 
           const errors = [];

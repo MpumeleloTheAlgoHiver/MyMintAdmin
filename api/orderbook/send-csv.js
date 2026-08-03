@@ -562,8 +562,8 @@ module.exports = async (req, res) => {
 
     if (action === 'rebalance-pending-snapshot-capability') {
       if (!(await requirePermission(req, res, 'dashboard', 'commit_rebalance'))) return;
-      await fetchSupabaseJson('/rest/v1/rebalance_batch?select=pending_swap_snapshot&limit=1');
-      return sendJson(res, 200, { ok: true, pendingSwapSnapshot: true });
+      await fetchSupabaseJson('/rest/v1/rebalance_batch?select=pending_swap_snapshot,predecessor_batch_id&limit=1');
+      return sendJson(res, 200, { ok: true, pendingSwapSnapshot: true, sequentialBatches: true });
     }
 
     // Pending-order adjustments are privileged accounting writes. Browser RLS
@@ -824,6 +824,24 @@ module.exports = async (req, res) => {
       if (!batchId) return sendJson(res, 400, { error: 'batchId required' });
       if (!['PENDING', 'PAUSED'].includes(priorState)) {
         return sendJson(res, 400, { error: 'priorState must be PENDING or PAUSED' });
+      }
+      const targetRows = await fetchSupabaseJson(
+        `/rest/v1/rebalance_batch?id=eq.${encodeURIComponent(batchId)}&select=id,predecessor_batch_id&limit=1`
+      );
+      const target = Array.isArray(targetRows) ? targetRows[0] : null;
+      if (!target) return sendJson(res, 404, { error: 'Rebalance batch not found' });
+      if (target.predecessor_batch_id) {
+        const predecessorRows = await fetchSupabaseJson(
+          `/rest/v1/rebalance_batch?id=eq.${encodeURIComponent(target.predecessor_batch_id)}&select=id,status,settlement_state&limit=1`
+        );
+        const predecessor = Array.isArray(predecessorRows) ? predecessorRows[0] : null;
+        if (!predecessor || String(predecessor.status || '').toUpperCase() !== 'SETTLED') {
+          return sendJson(res, 409, {
+            error: `This is a parked secondary rebalance. Settle predecessor ${String(target.predecessor_batch_id).slice(0, 8)} first.`,
+            predecessorBatchId: target.predecessor_batch_id,
+            predecessorStatus: predecessor?.status || 'MISSING',
+          });
+        }
       }
       const now = new Date().toISOString();
       const claimed = await requestSupabaseJson(

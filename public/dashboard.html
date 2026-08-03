@@ -9436,7 +9436,7 @@
 
       function rebClientsForStrategy() {
         const byClient = {};
-        Object.entries(rebRawHoldings || {}).forEach(([code, rows]) => {
+        const collectRows = (source, pending) => Object.entries(source || {}).forEach(([code, rows]) => {
           (rows || []).forEach((r) => {
             const qty = Number(r.quantity) || 0;
             if (qty <= 0) return;
@@ -9449,12 +9449,21 @@
                 name: r.name,
                 instruments: new Set(),
                 totalCurrentHolding: 0,
+                hasFilledHolding: false,
+                hasPendingHolding: false,
               };
             }
             byClient[ownerKey].instruments.add(code);
             byClient[ownerKey].totalCurrentHolding += qty;
+            if (pending) byClient[ownerKey].hasPendingHolding = true;
+            else byClient[ownerKey].hasFilledHolding = true;
           });
         });
+        /* Pending-only owners are still strategy members. A model-wide
+           buy-only rebalance must include them even before their initial
+           broker fill; previously only avg_fill > 0 rows were collected. */
+        collectRows(rebRawHoldings, false);
+        collectRows(rebUnfilledHoldings, true);
         return Object.values(byClient)
           .map((c) => ({
             id: c.id,
@@ -9463,6 +9472,8 @@
             name: c.name,
             instrumentCount: c.instruments.size,
             totalCurrentHolding: c.totalCurrentHolding,
+            hasFilledHolding: c.hasFilledHolding,
+            hasPendingHolding: c.hasPendingHolding,
           }))
           .sort((a, b) => a.name.localeCompare(b.name));
       }
@@ -9801,7 +9812,11 @@
                     holdingId: r.id,
                     securityId: r.security_id,
                     userId: uid,
+                    ownerKey: rebOwnerKey(uid, fmId),
                     familyMemberId: fmId,
+                    name: fmId
+                      ? (fmLabelsById[fmId] || `Child ${fmId.slice(0, 8)}`)
+                      : (nameById[uid] || uid),
                     quantity: qty,
                     expectedFill: Number(r.expected_fill) || 0,
                   });
@@ -12575,18 +12590,20 @@
          updated to add or increase the bought security. */
       async function rebPersistWalletOnlyBuy({ instrument, buyPerLot, perUserPlan, pricePerShare }) {
         await rebEnsureFeesLoaded(); // no write may proceed on unloaded/fallback fees
+        await rebEnsurePendingSwapSnapshotSchema(); // also verifies sequential predecessor support
         if (!instrument || !rebSelectedStrategyId) throw new Error("Missing strategy or buy instrument.");
         const buyQtyPerLot = Math.max(0, Math.floor(Number(buyPerLot) || 0));
         if (buyQtyPerLot <= 0) throw new Error("Buy per lot must be ≥ 1.");
         if (!(pricePerShare > 0)) throw new Error("Buy security has no live price.");
         const strategyId = rebSelectedStrategyId;
 
-        /* Block if a PENDING batch already exists for THIS owner on this
-           strategy — scoped by family_member_id (see buy-commit path above). */
-        const rebGuardFmId3 = rebSelectedFamilyMemberId || null;
+        /* A buy-only model addition can queue behind the newest PENDING batch
+           for this owner scope. The predecessor link below makes settlement
+           oldest-first; a batch already PROCESSING/PAUSED cannot be extended. */
+        const rebGuardFmId3 = rebScopeIsAll() ? null : (rebSelectedFamilyMemberId || null);
         let pendingBatchesQuery3 = supabaseClient
           .from("rebalance_batch")
-          .select("id, created_at, status")
+          .select("id, created_at, status, settlement_state")
           .eq("strategy_id", strategyId)
           .eq("status", "PENDING");
         pendingBatchesQuery3 = rebGuardFmId3
@@ -12594,9 +12611,15 @@
           : pendingBatchesQuery3.is("family_member_id", null);
         const { data: pendingBatches, error: pendingErr } = await pendingBatchesQuery3;
         if (pendingErr) throw new Error(pendingErr.message || "Failed to check pending batches.");
-        if (pendingBatches && pendingBatches.length > 0) {
-          const existing = pendingBatches[0];
-          throw new Error(`A pending rebalance already exists for this strategy (batch ${existing.id.slice(0, 8)}&hellip;). Settle or reverse it first.`);
+        const orderedPendingBatches = (pendingBatches || []).slice().sort((a, b) =>
+          String(b.created_at || "").localeCompare(String(a.created_at || ""))
+        );
+        const predecessorBatch = orderedPendingBatches[0] || null;
+        if (predecessorBatch && String(predecessorBatch.settlement_state || "PENDING").toUpperCase() !== "PENDING") {
+          throw new Error(
+            `The existing rebalance ${predecessorBatch.id.slice(0, 8)}&hellip; is already processing or paused. ` +
+            "Finish or reverse it before parking another buy."
+          );
         }
 
         /* Uniformity check &mdash; every funded client must afford their allocation */
@@ -12665,7 +12688,7 @@
           .insert({
             id: rebalanceBatchId,
             strategy_id: strategyId,
-            family_member_id: rebSelectedFamilyMemberId || null,
+            family_member_id: rebScopeIsAll() ? null : (rebSelectedFamilyMemberId || null),
             status: "PENDING",
             effective_date: effectiveDateStr,
             holdings_snapshot_before: holdingsSnapshotBefore,
@@ -12684,6 +12707,7 @@
             net_proceeds: 0,
             strategy_name_snapshot: strategyNameSnapshot,
             created_by: currentUserId,
+            predecessor_batch_id: predecessorBatch?.id || null,
             created_at: nowIso,
             updated_at: nowIso,
           });
@@ -12702,6 +12726,7 @@
 
         return {
           batchId: rebalanceBatchId,
+          predecessorBatchId: predecessorBatch?.id || null,
           rows: totalBuyQty > 0 ? [{ side: "BUY", code: buyIsinCode, nominal: totalBuyQty }] : [],
         };
       }
