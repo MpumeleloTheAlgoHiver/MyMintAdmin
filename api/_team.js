@@ -146,12 +146,32 @@ const requireMasterAdmin = async (req, res) => {
   return result;
 };
 
+// team.html's permission editor has two field types: 'toggle' (boolean —
+// granted only by `true`) and 'tristate' (false / an intermediate value /
+// this top grant value). The top value differs per field ('direct' for
+// commit_rebalance/edit_fill_price/change_visibility, 'full' for
+// send_confirmation) — see the `options` arrays in team.html's field
+// definitions, which are the source of truth for these strings.
+//
+// Bug this fixes: requirePermission previously checked `sec[field] !== true`
+// unconditionally, which no tri-state string can ever satisfy. Every
+// non-dev/non-master account configured with e.g. commit_rebalance: 'direct'
+// was silently 403'd on every one of the 16+ call sites that gate on it —
+// the tri-state UI looked like it granted access, but only the dev/master
+// bypass above was ever actually letting anyone through.
+const TRISTATE_GRANT_VALUE = {
+  commit_rebalance: 'direct',
+  edit_fill_price: 'direct',
+  change_visibility: 'direct',
+  send_confirmation: 'full',
+};
+
 const requirePermission = async (req, res, section, field) => {
   const result = await requireAuth(req, res);
   if (!result) return null;
-  
+
   const { member } = result;
-  
+
   // Devs and Master Admins bypass fine-grained checks
   if (member.approver_tier === 'dev' || member.role === 'master_admin' || member.approver_tier === 'master') {
     // Fire off an audit email for sensitive actions asynchronously
@@ -159,14 +179,16 @@ const requirePermission = async (req, res, section, field) => {
     auditMasterAction(member, section, field, details).catch(() => {});
     return result;
   }
-  
+
   const permissions = member.permissions || {};
   const sec = permissions[section] || {};
-  if (sec[field] !== true) {
+  const grantValue = TRISTATE_GRANT_VALUE[field];
+  const granted = sec[field] === true || (grantValue !== undefined && sec[field] === grantValue);
+  if (!granted) {
     sendJson(res, 403, { error: `Permission denied: Requires ${section}.${field}` });
     return null;
   }
-  
+
   return result;
 };
 
