@@ -40,9 +40,13 @@ assert.match(orderbook, /pending-row fill[\s\S]*evtResumeErr/,
   'settlement must promote the pre-created pending row instead of duplicating it');
 assert.match(orderbook, /data-download-rebalance-csv[\s\S]*Download CSV/,
   'pending rebalance actions must expose CSV download before settlement');
-assert.match(orderbook, /const downloadRebalanceBatchCsv[\s\S]*rebalance_event[\s\S]*downloadCsv\(rows/,
+assert.match(orderbook, /const downloadRebalanceBatchCsv[\s\S]*rebalance_event[\s\S]*\['Side', 'Ticker', 'Quantity'\][\s\S]*downloadCsvContent\(csvContent/,
   'rebalance CSV must be built from committed batch events');
+assert.doesNotMatch(
+  orderbook.slice(orderbook.indexOf('const downloadRebalanceBatchCsv'), orderbook.indexOf('const openFillSettleModal')),
+  /fill_price|avg_fill|price_at_commit|Fill Date/,
+  'pre-settlement rebalance CSV must not include fill or price fields');
 assert.match(migration, /foreign key \(predecessor_batch_id\)[\s\S]*references public\.rebalance_batch\(id\)/,
   'database must enforce valid predecessor links');
 
-console.log('sequential buy-only rebalance: 16/16 green');
+console.log('sequential buy-only rebalance: 17/17 green');

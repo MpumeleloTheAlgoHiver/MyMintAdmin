@@ -3325,8 +3325,8 @@
       return csvLines.join('\n');
     };
 
-    const downloadCsv = (rows, fileName) => {
-      const blob = new Blob([toCsvContent(rows)], { type: 'text/csv;charset=utf-8;' });
+    const downloadCsvContent = (csvContent, fileName) => {
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -3335,6 +3335,10 @@
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
+    };
+
+    const downloadCsv = (rows, fileName) => {
+      downloadCsvContent(toCsvContent(rows), fileName);
     };
 
     const sanitizePipeField = (value) => String(value ?? '')
@@ -7269,7 +7273,16 @@
         });
         const rows = [...instructions.values()];
         if (!rows.length) throw new Error('This rebalance has no valid market instructions to download.');
-        downloadCsv(rows, `rebalance-${String(batchId).slice(0, 8)}-${new Date().toISOString().slice(0, 10)}.csv`);
+        const csvLines = [
+          ['Side', 'Ticker', 'Quantity'],
+          ...rows.map((row) => [
+            row.side,
+            String(row.ticker || '').replace(/\.JO\b/gi, '').trim(),
+            row.totalQuantity,
+          ]),
+        ];
+        const csvContent = csvLines.map((line) => line.map(normalizeCsv).join(',')).join('\n');
+        downloadCsvContent(csvContent, `rebalance-${String(batchId).slice(0, 8)}-${new Date().toISOString().slice(0, 10)}.csv`);
       };
 
       /* Ã¢&rdquo;â‚¬Ã¢&rdquo;â‚¬ Fill & Settle Modal (inline, dynamic) Ã¢&rdquo;â‚¬Ã¢&rdquo;â‚¬ */
