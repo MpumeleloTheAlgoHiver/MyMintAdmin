@@ -29,8 +29,9 @@ check(
   'Commit-time holdings query preserves family-member ownership',
 );
 check(
-  dashboard.includes('name: fmId') &&
-    dashboard.includes('(fmLabelsById[fmId] || `Child ${fmId.slice(0, 8)}`)'),
+  dashboard.includes('const displayName = fmId') &&
+    dashboard.includes('(fmLabelsById[fmId] || `Child ${fmId.slice(0, 8)}`)') &&
+    dashboard.includes('name: displayName,'),
   'Child-owned impact rows use the child name instead of the parent profile',
 );
 check(

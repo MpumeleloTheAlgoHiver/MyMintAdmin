@@ -1792,6 +1792,9 @@
     // the live list. Loaded from orderbook_pins via the send-csv api.
     let orderbookPins = new Set();
     let allOrderbookRawRows = [];
+    // Display-only client residual cash, keyed by strategy|user|family member.
+    // This is never written into strategies_c.holdings and excludes execution reserve.
+    let strategyResidualCashByOwner = new Map();
     let allBirSourceRows = [];
     // userId / familyMemberId -> Computershare number (e.g. "MP003"). Populated on
     // every orderbook load so BOTH the live table and archived/sent snapshots can
@@ -2494,7 +2497,7 @@
           return h.isActive !== false && !h.rebalanceBatchId && !!h.isPendingSell;
         };
         const liveHoldings = holdings.filter(isLive);
-        const totalMV = liveHoldings.reduce((s, h) => s + (h.marketValueNumber || 0), 0);
+        let totalMV = liveHoldings.reduce((s, h) => s + (h.marketValueNumber || 0), 0);
         const totalQty = liveHoldings.reduce((s, h) => s + (h.quantityValue || 0), 0);
         const totalPnl = liveHoldings.reduce((s, h) => s + (h.unrealizedPnlNumber || 0), 0);
         /* Strategy-level Actual Fill = ÃÂ£(Expected_fill &times; qty) across all
@@ -2615,6 +2618,40 @@
           }
         });
 
+        /* Residual CA belongs to an owner + strategy, not to a purchase bucket.
+           Add it once to the owner's first row so repeat buys never duplicate cash. */
+        let strategyCashValue = 0;
+        ownerFirstKey.forEach((firstKey, ownerKey) => {
+          const cash = Number(strategyResidualCashByOwner.get(`${strategyId}|${ownerKey}`) || 0);
+          if (!(cash > 0)) return;
+          strategyCashValue += cash;
+          const ownerRow = userMap.get(firstKey);
+          if (ownerRow) {
+            ownerRow.cashAssetValue = cash;
+            ownerRow.totalMarketValue += cash;
+          }
+        });
+        totalMV += strategyCashValue;
+        const displayHoldings = strategyCashValue > 0
+          ? [...holdings, {
+              isCashAsset: true,
+              instrumentName: 'Cash asset',
+              ticker: 'CA',
+              side: '-',
+              tradeSide: '-',
+              totalQuantity: '-',
+              quantityValue: 0,
+              avgFill: '-',
+              actualFill: '-',
+              marketValueNumber: strategyCashValue,
+              marketValue: `R ${strategyCashValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+              unrealizedPnlNumber: null,
+              unrealizedPnl: '-',
+              isActive: true,
+              sourceIds: [],
+            }]
+          : holdings;
+
         const hasPendingRebalance = holdings.some((h) => !!h.isPendingRebalance);
         const pendingBatchId = hasPendingRebalance
           ? (holdings.find((h) => h.isPendingRebalance && h.rebalanceBatchId) || {}).rebalanceBatchId || null
@@ -2627,7 +2664,7 @@
           strategyName: first.strategyName || 'Unknown Strategy',
           strategyShortName: first.strategyShortName || '',
           strategySlug: first.strategySlug || '',
-          strategyHoldings: holdings.map((h, i) => ({ ...h, line: i + 1 })),
+          strategyHoldings: displayHoldings.map((h, i) => ({ ...h, line: i + 1 })),
           strategyUsers: Array.from(userMap.values()),
           securityId: '',
           instrumentName: first.strategyName || 'Unknown Strategy',
@@ -2835,7 +2872,7 @@
        belonging to the selected user|fmId|created_at-bucket. Returns synthetic
        holding objects that carry the user's specific sourceId, avg_fill, qty,
        PnL so renderEditableAvgFill edits only that user's stock_holdings_c rows. */
-    const buildHoldingsForSelectedInvestor = (strategyId, userId, familyMemberId, createdAtFrom, createdAtTo, transactionId) => {
+    const buildHoldingsForSelectedInvestor = (strategyId, userId, familyMemberId, createdAtFrom, createdAtTo, transactionId, cashAssetValue = 0) => {
       if (!strategyId || !userId) return [];
       const targetFm = familyMemberId || '';
       const fromMs = createdAtFrom ? new Date(createdAtFrom).getTime() - 5000 : null;
@@ -2860,9 +2897,30 @@
         }
         return true;
       });
-      return rows
+      const holdings = rows
         .sort((a, b) => String(a.instrumentName || '').localeCompare(String(b.instrumentName || '')))
         .map((r, i) => ({ ...r, line: i + 1 }));
+      if (Number(cashAssetValue) > 0) {
+        holdings.push({
+          line: holdings.length + 1,
+          isCashAsset: true,
+          instrumentName: 'Cash asset',
+          ticker: 'CA',
+          side: '-',
+          tradeSide: '-',
+          totalQuantity: '-',
+          quantityValue: 0,
+          avgFill: '-',
+          actualFill: '-',
+          marketValueNumber: Number(cashAssetValue),
+          marketValue: `R ${Number(cashAssetValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          unrealizedPnlNumber: null,
+          unrealizedPnl: '-',
+          isActive: true,
+          sourceIds: [],
+        });
+      }
+      return holdings;
     };
 
     /* Render the Holdings panel (top of the strategy detail). When an investor
@@ -2891,7 +2949,8 @@
             sel.familyMemberId,
             sel.createdAtFrom,
             sel.createdAtTo,
-            sel.transactionId
+            sel.transactionId,
+            sel.cashAssetValue || 0
           );
           if (userHoldings.length) {
             holdings = userHoldings;
@@ -2903,6 +2962,18 @@
       }
 
       const hBody = holdings.map((h) => {
+        if (h.isCashAsset) {
+          return `
+        <tr>
+          <td>${escapeHtml(String(h.line))}</td>
+          <td><span style="display:inline-flex;align-items:center;gap:7px;color:#15803d;font-weight:700;"><span style="display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#dcfce7;color:#16a34a;">R</span>Cash asset</span></td>
+          <td class="orderbook-cell-muted" style="color:#16a34a;font-weight:800;">CA</td>
+          <td><span class="side-badge side-badge-neutral">-</span></td>
+          <td>-</td><td>-</td><td>-</td>
+          <td>${escapeHtml(asRandValue(h.marketValue))}</td>
+          <td>-</td><td>-</td>
+        </tr>`;
+        }
         const hRebBadge = h.rebalanceBatchId
           ? ' <span style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;margin-left:3px;letter-spacing:.03em;">REB</span>'
           : '';
@@ -6375,6 +6446,8 @@
         ...rebBatches.map((b) => b.strategy_id),
       ].filter(Boolean))];
 
+      strategyResidualCashByOwner = new Map();
+
       const parallelQueries = [];
 
       if (securityIds.length) {
@@ -6490,6 +6563,34 @@
       }
 
       if (strategyIds.length) {
+        const { data: residualSessionData } = await supabaseClient.auth.getSession();
+        const residualToken = residualSessionData?.session?.access_token;
+        if (residualToken) {
+          strategyIds.forEach((strategyId) => {
+            const residualUserIds = [...new Set(holdings
+              .filter((row) => String(row.strategy_id || '') === String(strategyId))
+              .map((row) => String(row.user_id || ''))
+              .filter(Boolean))];
+            if (!residualUserIds.length) return;
+            parallelQueries.push(
+              fetch('/api/orderbook/send-csv?action=rebalance-load-residuals', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${residualToken}` },
+                body: JSON.stringify({ strategyId, userIds: residualUserIds, familyMemberId: '__all__' }),
+              })
+                .then(async (response) => {
+                  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                  return response.json();
+                })
+                .then((payload) => {
+                  Object.entries(payload.balancesByOwner || {}).forEach(([ownerKey, rands]) => {
+                    strategyResidualCashByOwner.set(`${strategyId}|${ownerKey}`, Number(rands) || 0);
+                  });
+                })
+                .catch((error) => console.error(`Residual CA load failed for strategy ${strategyId}:`, error?.message || error))
+            );
+          });
+        }
         const chunkSize = 150;
         for (let i = 0; i < strategyIds.length; i += chunkSize) {
           const chunk = strategyIds.slice(i, i + chunkSize);
@@ -8354,6 +8455,7 @@
                 .update({
                   is_active: true,
                   Status: 'active',
+                  ...(s.originalQuantity != null ? { quantity: Number(s.originalQuantity) } : {}),
                   closed_reason: null,
                   closed_at: null,
                   updated_at: nowIso,

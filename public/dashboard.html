@@ -10999,14 +10999,14 @@
            or this specific child) on this strategy — scoped by family_member_id
            so one owner's pending batch never blocks a different owner sharing
            the same strategy. ── */
-        const rebGuardFmId1 = rebSelectedFamilyMemberId || null;
+        const batchFamilyMemberIdForTrade = rebScopeIsAll() ? null : (rebSelectedFamilyMemberId || null);
         let pendingBatchesQuery1 = supabaseClient
           .from("rebalance_batch")
           .select("id, status, sell_isin_code, buy_isin_code, created_at")
           .eq("strategy_id", strategyId)
           .eq("status", "PENDING");
-        pendingBatchesQuery1 = rebGuardFmId1
-          ? pendingBatchesQuery1.eq("family_member_id", rebGuardFmId1)
+        pendingBatchesQuery1 = batchFamilyMemberIdForTrade
+          ? pendingBatchesQuery1.eq("family_member_id", batchFamilyMemberIdForTrade)
           : pendingBatchesQuery1.is("family_member_id", null);
         const { data: pendingBatches, error: pendingErr } = await pendingBatchesQuery1;
         if (pendingErr) throw new Error(pendingErr.message || "Failed to check pending batches.");
@@ -11300,7 +11300,7 @@
           .insert({
             id: rebalanceBatchId,
             strategy_id: strategyId,
-            family_member_id: familyMemberIdForEvents,
+            family_member_id: batchFamilyMemberIdForTrade,
             status: "PENDING",
             effective_date: effectiveDateStr,
             holdings_snapshot_before: holdingsSnapshotBefore,
@@ -11744,18 +11744,23 @@
         if (!strategyId) throw new Error("Strategy context missing.");
 
         const clients = rebClientsForIsin(rebSelectedIsin);
-        if (!clients.length) throw new Error("No client holdings available for this instrument.");
+        const cachedUnfilledRows = rebUnfilledHoldings[String(rebSelectedIsin.code || "")] || [];
+        const targetOwnerKeys = new Set([
+          ...clients.map((client) => rebOwnerKey(client.id, client.familyMemberId)),
+          ...cachedUnfilledRows.map((row) => rebOwnerKey(row.userId, row.familyMemberId)),
+        ]);
+        if (!targetOwnerKeys.size) throw new Error("No client holdings or pending orders are available for this instrument.");
 
         /* Guard: block if a PENDING batch already exists for THIS owner on this
            strategy — scoped by family_member_id (see buy-commit path above). */
-        const rebGuardFmId2 = rebSelectedFamilyMemberId || null;
+        const batchFamilyMemberId = rebScopeIsAll() ? null : (rebSelectedFamilyMemberId || null);
         let pendingBatchesQuery2 = supabaseClient
           .from("rebalance_batch")
           .select("id, status, sell_isin_code, buy_isin_code, created_at")
           .eq("strategy_id", strategyId)
           .eq("status", "PENDING");
-        pendingBatchesQuery2 = rebGuardFmId2
-          ? pendingBatchesQuery2.eq("family_member_id", rebGuardFmId2)
+        pendingBatchesQuery2 = batchFamilyMemberId
+          ? pendingBatchesQuery2.eq("family_member_id", batchFamilyMemberId)
           : pendingBatchesQuery2.is("family_member_id", null);
         const { data: pendingBatches, error: pendingErr } = await pendingBatchesQuery2;
         if (pendingErr) throw new Error(pendingErr.message || "Failed to check pending batches.");
@@ -11773,12 +11778,6 @@
         const sellSecurityId = String(secRows?.[0]?.id || "");
         if (!sellSecurityId) throw new Error("Could not resolve sell security ID.");
 
-        /* Compute sell execution &rarr; net proceeds */
-        const totalLots = clients.reduce((sum, c) => sum + (Number(c.lots) || 0), 0);
-        const sellExec = rebComputeSellExecution(rebSelectedIsin, rebSelectedStep.reductionUnits, totalLots, clients.length, clients);
-        const netProceeds = Number(sellExec.netProceeds || 0);
-        if (netProceeds <= 0) throw new Error("No net proceeds available.");
-
         /* Snapshots for reversal */
         const strategyRef = (allStrategiesFullData || []).find((s) => String(s.id) === String(strategyId));
         const holdingsSnapshotBefore = strategyRef?.holdings ? JSON.parse(JSON.stringify(strategyRef.holdings)) : null;
@@ -11794,10 +11793,13 @@
         const effectiveDateStr = rebEffectiveDate || nowIso.slice(0, 10);
 
         /* Read existing active positions for the sell security */
-        const userIds = [...new Set(clients.map((c) => String(c.id)))];
+        const userIds = [...new Set([
+          ...clients.map((c) => String(c.id)),
+          ...cachedUnfilledRows.map((row) => String(row.userId)),
+        ].filter(Boolean))];
         const { data: existingRows, error: existingErr } = await supabaseClient
           .from("stock_holdings_c")
-          .select("id, user_id, family_member_id, security_id, quantity, trade_side, is_active, fill_date:\"Fill_date\"")
+          .select("id, user_id, family_member_id, security_id, quantity, avg_fill, trade_side, is_active, fill_date:\"Fill_date\"")
           .eq("strategy_id", strategyId)
           .eq("is_active", true)
           .eq("trade_side", "BUY")
@@ -11807,21 +11809,42 @@
 
         /* Effective-date eligibility gate (workbook 05/08): skip positions
            bought after the effective date; null Fill_date = legacy, kept. */
-        const activeSellRows = (existingRows || []).filter((row) => {
+        const eligibleRows = (existingRows || []).filter((row) => {
           if (Number(row.quantity || 0) <= 0) return false;
-          if (!clients.some((client) =>
-            rebOwnerKey(client.id, client.familyMemberId) === rebOwnerKey(row.user_id, row.family_member_id)
-          )) return false;
+          if (!targetOwnerKeys.has(rebOwnerKey(row.user_id, row.family_member_id))) return false;
           const fd = row.fill_date ? String(row.fill_date).slice(0, 10) : null;
           return !fd || fd <= effectiveDateStr;
         });
-        if (!activeSellRows.length) throw new Error("No active position found for the selected sell instrument that is eligible on the effective date (" + effectiveDateStr + ").");
+        const activeSellRows = eligibleRows.filter((row) => Number(row.avg_fill || 0) > 0);
+        const unfilledSellRows = eligibleRows.filter((row) => Number(row.avg_fill || 0) <= 0);
+        if (!activeSellRows.length && !unfilledSellRows.length) {
+          throw new Error("No active position or pending order is eligible on the effective date (" + effectiveDateStr + ").");
+        }
+
+        /* Estimated proceeds apply only to broker-filled positions. Pending
+           orders have no sellable position and therefore contribute R0. */
+        const totalLots = clients.reduce((sum, c) => sum + (Number(c.lots) || 0), 0);
+        const sellExec = activeSellRows.length
+          ? rebComputeSellExecution(rebSelectedIsin, rebSelectedStep.reductionUnits, totalLots, clients.length, clients)
+          : { netProceeds: 0 };
+        const netProceeds = Number(sellExec.netProceeds || 0);
+        if (activeSellRows.length && netProceeds <= 0) throw new Error("No net proceeds available for the filled positions.");
 
         const reductionUnits = Number(rebSelectedStep.reductionUnits || 0);
         const unitsPerLot = Math.max(1, Number(rebSelectedIsin.unitsPerLot || 1));
         const sellFraction = reductionUnits / unitsPerLot;
         const isFullExit = sellFraction >= 1 || Number(rebSelectedStep.reductionPercent || 0) >= 100;
         const sellIsinCode = String(rebSelectedIsin.code || "");
+        const unfilledLiquidationPlan = unfilledSellRows.map((row) => {
+          const originalQuantity = Math.abs(Number(row.quantity || 0));
+          const soldQty = isFullExit ? originalQuantity : Math.max(0, Math.round(originalQuantity * sellFraction));
+          return {
+            row,
+            originalQuantity,
+            soldQty,
+            remainingQuantity: Math.max(0, originalQuantity - soldQty),
+          };
+        }).filter((item) => item.soldQty > 0);
 
         const _sellRowMeta = activeSellRows.map((row) => {
           const totalQty = Math.abs(Number(row.quantity || 0));
@@ -11863,10 +11886,7 @@
             updated_at: nowIso,
           }));
         const totalSellQty = sellEventRows.reduce((s, r) => s + Number(r.quantity || 0), 0);
-        if (totalSellQty <= 0) throw new Error("No eligible units are available to liquidate.");
-
-        /* Only change the strategy after all holding/effective-date checks pass. */
-        await rebRemoveStrategyHoldingForLiquidation({ strategyId, soldIsin: rebSelectedIsin, sellStep: rebSelectedStep });
+        if (totalSellQty <= 0 && !unfilledLiquidationPlan.length) throw new Error("No eligible units are available to liquidate.");
 
         const { data: sessionData } = await supabaseClient.auth.getSession();
         const currentUserId = sessionData?.session?.user?.id || null;
@@ -11877,7 +11897,7 @@
           .insert({
             id: rebalanceBatchId,
             strategy_id: strategyId,
-            family_member_id: familyMemberIdForLiquidateEvents,
+            family_member_id: batchFamilyMemberId,
             status: "PENDING",
             effective_date: effectiveDateStr,
             holdings_snapshot_before: holdingsSnapshotBefore,
@@ -11904,6 +11924,70 @@
             .from("rebalance_event")
             .insert(sellEventRows);
           if (eventsErr) throw new Error(eventsErr.message || "Failed to insert rebalance events.");
+        }
+
+        /* Pending orders are not broker positions. Retire them without a SELL
+           event or proceeds, and persist their ids in the reversible swap ledger.
+           Strategy composition changes only after every order write succeeds. */
+        const pendingLiquidationSnapshot = [];
+        try {
+          for (const plan of unfilledLiquidationPlan) {
+            const row = plan.row;
+            const pendingUpdate = plan.remainingQuantity > 0
+              ? { quantity: plan.remainingQuantity, updated_at: nowIso }
+              : {
+                  is_active: false,
+                  Status: "inactive",
+                  closed_reason: "REBALANCE_PENDING_LIQUIDATION",
+                  closed_at: nowIso,
+                  updated_at: nowIso,
+                };
+            const { error: closeErr } = await supabaseClient
+              .from("stock_holdings_c")
+              .update(pendingUpdate)
+              .eq("id", row.id);
+            if (closeErr) throw new Error(closeErr.message || `Failed to retire pending order ${row.id}.`);
+            pendingLiquidationSnapshot.push({
+              oldHoldingId: row.id,
+              newHoldingId: null,
+              mergedIntoId: null,
+              mergedAddedQty: 0,
+              userId: String(row.user_id),
+              familyMemberId: row.family_member_id || null,
+              sellQty: plan.soldQty,
+              originalQuantity: plan.originalQuantity,
+              remainingQuantity: plan.remainingQuantity,
+              newQty: 0,
+              leftover: 0,
+              liquidationToCash: true,
+            });
+          }
+
+          if (pendingLiquidationSnapshot.length) {
+            const { error: ledgerErr } = await supabaseClient
+              .from("rebalance_batch")
+              .update({ pending_swap_snapshot: pendingLiquidationSnapshot, updated_at: nowIso })
+              .eq("id", rebalanceBatchId);
+            if (ledgerErr) throw new Error(ledgerErr.message || "Failed to save pending-order liquidation ledger.");
+          }
+
+          await rebRemoveStrategyHoldingForLiquidation({ strategyId, soldIsin: rebSelectedIsin, sellStep: rebSelectedStep });
+        } catch (commitErr) {
+          /* Best-effort compensation keeps a failed commit retryable and avoids
+             leaving clients with vanished pending orders. */
+          for (const snapshot of pendingLiquidationSnapshot) {
+            await supabaseClient.from("stock_holdings_c").update({
+              is_active: true,
+              Status: "active",
+              ...(snapshot.originalQuantity != null ? { quantity: snapshot.originalQuantity } : {}),
+              closed_reason: null,
+              closed_at: null,
+              updated_at: new Date().toISOString(),
+            }).eq("id", snapshot.oldHoldingId);
+          }
+          await supabaseClient.from("rebalance_event").delete().eq("batch_id", rebalanceBatchId);
+          await supabaseClient.from("rebalance_batch").delete().eq("id", rebalanceBatchId);
+          throw commitErr;
         }
 
         /* Do not credit estimated proceeds yet. The batch keeps the pre-trade
