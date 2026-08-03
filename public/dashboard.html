@@ -7480,52 +7480,58 @@
                 <div style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.45;">Where the <b id="_sdSectorOrderName">this category</b> section appears in the app — lower shows first. Applies to <b>every basket</b> in this sector. Leave blank to leave it unordered (shows last).</div>
               </div>
 
-              <!-- Toggles -->
-             <div style="display:flex;gap:0;border:1.5px solid #e2e8f0;border-radius:11px;overflow:hidden;margin-bottom:22px;">
-               <label style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 12px;cursor:pointer;gap:8px;border-right:1.5px solid #e2e8f0;min-width:0;">
-                  <div>
-                    <div style="font-size:13px;font-weight:600;color:#1e293b;">Public</div>
-                    <div style="font-size:11px;color:#94a3b8;margin-top:1px;">Visible to clients</div>
-                  </div>
-                  <div id="_sdPublicToggle" style="position:relative;width:40px;height:22px;flex-shrink:0;">
-                    <input id="_sdIsPublic" type="checkbox" ${strategy.is_public?"checked":""} style="opacity:0;position:absolute;inset:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1;" />
-                    <div id="_sdPublicTrack" style="position:absolute;inset:0;border-radius:11px;transition:background 0.2s;background:${strategy.is_public?"#7c3aed":"#e2e8f0"};"></div>
-                    <div id="_sdPublicThumb" style="position:absolute;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);transition:left 0.2s;left:${strategy.is_public?"21px":"3px"};"></div>
-                  </div>
-                </label>
-               <label style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 12px;cursor:pointer;gap:8px;border-right:1.5px solid #e2e8f0;min-width:0;">
-                  <div>
-                    <div style="font-size:13px;font-weight:600;color:#1e293b;">Featured</div>
-                    <div style="font-size:11px;color:#94a3b8;margin-top:1px;">Show on homepage</div>
-                  </div>
-                  <div id="_sdFeaturedToggle" style="position:relative;width:40px;height:22px;flex-shrink:0;">
-                    <input id="_sdIsFeatured" type="checkbox" ${strategy.is_featured?"checked":""} style="opacity:0;position:absolute;inset:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1;" />
-                    <div id="_sdFeaturedTrack" style="position:absolute;inset:0;border-radius:11px;transition:background 0.2s;background:${strategy.is_featured?"#7c3aed":"#e2e8f0"};"></div>
-                    <div id="_sdFeaturedThumb" style="position:absolute;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);transition:left 0.2s;left:${strategy.is_featured?"21px":"3px"};"></div>
-                  </div>
-                </label>
-               <label style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 12px;cursor:pointer;gap:8px;border-right:1.5px solid #e2e8f0;min-width:0;">
-                 <div>
-                   <div style="font-size:13px;font-weight:600;color:#1e293b;">Child friendly</div>
-                   <div style="font-size:11px;color:#94a3b8;margin-top:1px;">Show on child dashboard</div>
-                 </div>
-                 <div id="_sdKidToggle" style="position:relative;width:40px;height:22px;flex-shrink:0;">
-                   <input id="_sdIsKid" type="checkbox" ${strategy.is_kid_strategy?"checked":""} style="opacity:0;position:absolute;inset:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1;" />
-                   <div id="_sdKidTrack" style="position:absolute;inset:0;border-radius:11px;transition:background 0.2s;background:${strategy.is_kid_strategy?"#7c3aed":"#e2e8f0"};"></div>
-                   <div id="_sdKidThumb" style="position:absolute;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);transition:left 0.2s;left:${strategy.is_kid_strategy?"21px":"3px"};"></div>
-                 </div>
-               </label>
-               <label style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 12px;cursor:pointer;gap:8px;min-width:0;">
-                 <div>
-                   <div style="font-size:13px;font-weight:600;color:#1e293b;">Test strategy</div>
-                   <div style="font-size:11px;color:#94a3b8;margin-top:1px;">UAT — test investors only</div>
-                 </div>
-                 <div id="_sdTestToggle" style="position:relative;width:40px;height:22px;flex-shrink:0;">
-                   <input id="_sdIsTest" type="checkbox" ${String(strategy.investor_environment||'LIVE').toUpperCase()==='UAT'?"checked":""} style="opacity:0;position:absolute;inset:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1;" />
-                   <div id="_sdTestTrack" style="position:absolute;inset:0;border-radius:11px;transition:background 0.2s;background:${String(strategy.investor_environment||'LIVE').toUpperCase()==='UAT'?"#f59e0b":"#e2e8f0"};"></div>
-                   <div id="_sdTestThumb" style="position:absolute;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);transition:left 0.2s;left:${String(strategy.investor_environment||'LIVE').toUpperCase()==='UAT'?"21px":"3px"};"></div>
-                 </div>
-               </label>
+              <!-- Toggles — 2×2 grid so nothing gets clipped -->
+              <div style="border:1.5px solid #e2e8f0;border-radius:11px;overflow:hidden;margin-bottom:22px;">
+                <!-- Row 1: Public + Featured -->
+                <div style="display:flex;">
+                  <label style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 14px;cursor:pointer;gap:8px;border-right:1.5px solid #e2e8f0;border-bottom:1.5px solid #e2e8f0;">
+                    <div>
+                      <div style="font-size:13px;font-weight:600;color:#1e293b;">Public</div>
+                      <div style="font-size:11px;color:#94a3b8;margin-top:1px;">Visible to clients</div>
+                    </div>
+                    <div id="_sdPublicToggle" style="position:relative;width:40px;height:22px;flex-shrink:0;">
+                      <input id="_sdIsPublic" type="checkbox" ${strategy.is_public?"checked":""} style="opacity:0;position:absolute;inset:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1;" />
+                      <div id="_sdPublicTrack" style="position:absolute;inset:0;border-radius:11px;transition:background 0.2s;background:${strategy.is_public?"#7c3aed":"#e2e8f0"};"></div>
+                      <div id="_sdPublicThumb" style="position:absolute;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);transition:left 0.2s;left:${strategy.is_public?"21px":"3px"};"></div>
+                    </div>
+                  </label>
+                  <label style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 14px;cursor:pointer;gap:8px;border-bottom:1.5px solid #e2e8f0;">
+                    <div>
+                      <div style="font-size:13px;font-weight:600;color:#1e293b;">Featured</div>
+                      <div style="font-size:11px;color:#94a3b8;margin-top:1px;">Show on homepage</div>
+                    </div>
+                    <div id="_sdFeaturedToggle" style="position:relative;width:40px;height:22px;flex-shrink:0;">
+                      <input id="_sdIsFeatured" type="checkbox" ${strategy.is_featured?"checked":""} style="opacity:0;position:absolute;inset:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1;" />
+                      <div id="_sdFeaturedTrack" style="position:absolute;inset:0;border-radius:11px;transition:background 0.2s;background:${strategy.is_featured?"#7c3aed":"#e2e8f0"};"></div>
+                      <div id="_sdFeaturedThumb" style="position:absolute;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);transition:left 0.2s;left:${strategy.is_featured?"21px":"3px"};"></div>
+                    </div>
+                  </label>
+                </div>
+                <!-- Row 2: Child friendly + Test strategy -->
+                <div style="display:flex;">
+                  <label style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 14px;cursor:pointer;gap:8px;border-right:1.5px solid #e2e8f0;">
+                    <div>
+                      <div style="font-size:13px;font-weight:600;color:#1e293b;">Child friendly</div>
+                      <div style="font-size:11px;color:#94a3b8;margin-top:1px;">Show on child dashboard</div>
+                    </div>
+                    <div id="_sdKidToggle" style="position:relative;width:40px;height:22px;flex-shrink:0;">
+                      <input id="_sdIsKid" type="checkbox" ${strategy.is_kid_strategy?"checked":""} style="opacity:0;position:absolute;inset:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1;" />
+                      <div id="_sdKidTrack" style="position:absolute;inset:0;border-radius:11px;transition:background 0.2s;background:${strategy.is_kid_strategy?"#7c3aed":"#e2e8f0"};"></div>
+                      <div id="_sdKidThumb" style="position:absolute;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);transition:left 0.2s;left:${strategy.is_kid_strategy?"21px":"3px"};"></div>
+                    </div>
+                  </label>
+                  <label style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:11px 14px;cursor:pointer;gap:8px;">
+                    <div>
+                      <div style="font-size:13px;font-weight:600;color:#1e293b;">Test strategy</div>
+                      <div style="font-size:11px;color:#94a3b8;margin-top:1px;">UAT — test investors only</div>
+                    </div>
+                    <div id="_sdTestToggle" style="position:relative;width:40px;height:22px;flex-shrink:0;">
+                      <input id="_sdIsTest" type="checkbox" ${String(strategy.investor_environment||'LIVE').toUpperCase()==='UAT'?"checked":""} style="opacity:0;position:absolute;inset:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1;" />
+                      <div id="_sdTestTrack" style="position:absolute;inset:0;border-radius:11px;transition:background 0.2s;background:${String(strategy.investor_environment||'LIVE').toUpperCase()==='UAT'?"#f59e0b":"#e2e8f0"};"></div>
+                      <div id="_sdTestThumb" style="position:absolute;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);transition:left 0.2s;left:${String(strategy.investor_environment||'LIVE').toUpperCase()==='UAT'?"21px":"3px"};"></div>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
 
