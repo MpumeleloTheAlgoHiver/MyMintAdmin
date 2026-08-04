@@ -11600,7 +11600,23 @@
                 throw new Error(`Pending order ${row.id} has no authoritative Expected_fill. Rebalance stopped before changing that client.`);
               }
               const committedCents = Math.round(soldQty * expectedSellRands * 100);
-              const newQty = Math.floor(committedCents / buyPriceCents);
+              /* Size the replacement the SAME way filled clients are sized:
+                 buyPerLot × their own lots (rebComputeBuyExecution, rebClientsForIsin),
+                 not an independent floor(their cash / price). Two clients holding the
+                 same number of lots must land on the same new-instrument quantity,
+                 whether their order was filled or still pending — only the remainder
+                 (whatever doesn't divide into a whole lot) should ever differ, and
+                 that already flows to residual cash below via leftoverCents. */
+              const swapUnitsPerLot = Math.max(1, Number(rebSelectedIsin.unitsPerLot || 1));
+              const swapLots = Math.floor(soldQty / swapUnitsPerLot);
+              const lotSizedQty = Math.max(0, Number(buyExec.buyPerLot || 0) * swapLots);
+              // Never exceed what this client's own committed cash can actually
+              // afford — the pool-wide buyPerLot is bounded by aggregate capital,
+              // not any one client's, so an unfilled client with below-average
+              // proceeds-per-lot must still fall back to their own affordable max
+              // rather than throwing the reconciliation check below negative.
+              const affordableQty = Math.floor(committedCents / buyPriceCents);
+              const newQty = Math.min(lotSizedQty, affordableQty);
               const leftoverCents = committedCents - (newQty * buyPriceCents);
               if (committedCents !== (newQty * buyPriceCents) + leftoverCents || leftoverCents < 0) {
                 throw new Error(`Pending-order funding does not reconcile for ${row.id}.`);
