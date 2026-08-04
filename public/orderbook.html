@@ -6405,26 +6405,60 @@
         </tr>`;
     };
 
+    // Same "active" classification renderFilledOrderbooks uses for the Active
+    // Order Books panel (respects the Live/UAT toggle, excludes manually-closed
+    // books) — Compute needs the exact same set, just flattened to rows.
+    const getActiveOrderbookArchiveBooks = () => {
+      const modeBooks = filledOrderbooksArchive.filter((b) => orderbookUatMode ? bookIsTestBook(b) : !bookIsTestBook(b));
+      return modeBooks.filter((book) => !getManualCloseDate(book.id));
+    };
+
+    const computeFilledValue = (row) => {
+      const sideValue = String(row.side || '-').toUpperCase();
+      const qty = Math.abs(Number(row.quantityValue) || 0);
+      const fillPrice = sideValue === 'SELL' ? Number(row.avgExitNumber) : Number(row.avgFillNumber);
+      return (qty > 0 && Number.isFinite(fillPrice) && fillPrice > 0) ? qty * fillPrice : null;
+    };
+
     const renderComputeRows = () => {
       if (!computeTableBody || !computeCount) return;
-      const rows = allOrderbookRows || [];
-      computeCount.textContent = `${rows.length} record${rows.length === 1 ? '' : 's'}`;
-      if (!rows.length) {
+      const liveRows = allOrderbookRows || [];
+      const activeBooks = getActiveOrderbookArchiveBooks();
+      const totalRecords = liveRows.length + activeBooks.reduce((sum, book) => sum + (book.rows || []).length, 0);
+      computeCount.textContent = `${totalRecords} record${totalRecords === 1 ? '' : 's'}`;
+
+      if (!totalRecords) {
         computeTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="8">No orderbook records found.</td></tr>';
         return;
       }
-      const totalFilledValue = rows.reduce((sum, row) => {
-        const sideValue = String(row.side || '-').toUpperCase();
-        const qty = Math.abs(Number(row.quantityValue) || 0);
-        const fillPrice = sideValue === 'SELL' ? Number(row.avgExitNumber) : Number(row.avgFillNumber);
-        return (qty > 0 && Number.isFinite(fillPrice) && fillPrice > 0) ? sum + qty * fillPrice : sum;
-      }, 0);
+
+      let totalFilledValue = 0;
+      const sections = [];
+
+      // Active Order Books (settled/captured books) — same set shown in the
+      // "Active Order Books" panel on the Active Books tab.
+      activeBooks.forEach((book) => {
+        const bookRows = Array.isArray(book.rows) ? book.rows : [];
+        if (!bookRows.length) return;
+        bookRows.forEach((row) => { totalFilledValue += computeFilledValue(row) || 0; });
+        sections.push(
+          renderSectionHeaderRow(formatBookTitle(book))
+          + bookRows.map(buildComputeRowHtml).join('')
+        );
+      });
+
+      // Still-pending lines that haven't been captured into a book yet.
+      if (liveRows.length) {
+        liveRows.forEach((row) => { totalFilledValue += computeFilledValue(row) || 0; });
+        sections.push(renderSectionHeaderRow('Live (not yet in a book)') + liveRows.map(buildComputeRowHtml).join(''));
+      }
+
       const totalRowHtml = `
         <tr style="font-weight:700;border-top:2px solid #e5e7eb;">
           <td colspan="7" style="text-align:right;">Total filled value</td>
           <td style="text-align:right;">${escapeHtml(asRandValue(totalFilledValue))}</td>
         </tr>`;
-      computeTableBody.innerHTML = rows.map(buildComputeRowHtml).join('') + totalRowHtml;
+      computeTableBody.innerHTML = sections.join('') + totalRowHtml;
     };
 
     const applySearchFilter = () => {
