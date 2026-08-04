@@ -1403,6 +1403,7 @@
         <button class="orderbook-tab-btn" id="pendingRebalancesTab" type="button" role="tab" aria-selected="false" aria-controls="pendingRebalancesPanel">Rebalances</button>
         <button class="orderbook-tab-btn" id="strateBirTab" type="button" role="tab" aria-selected="false" aria-controls="strateBirPanel">Strate BIR</button>
         <button class="orderbook-tab-btn" id="giftsTab" type="button" role="tab" aria-selected="false" aria-controls="giftsPanel">Gifts<span id="giftsTabBadge" style="display:none;background:#ef4444;color:#fff;font-size:9px;font-weight:700;min-width:15px;height:15px;border-radius:999px;padding:0 3px;line-height:15px;text-align:center;margin-left:5px;vertical-align:middle;"></span></button>
+        <button class="orderbook-tab-btn" id="computeTab" type="button" role="tab" aria-selected="false" aria-controls="computePanel" title="Quantity &times; the price each line was actually filled at">Compute</button>
         <div class="orderbook-tab-search">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13 11a5 5 0 10-1.41 1.41l3.54 3.55 1.41-1.42L13 11zm-5 1a4 4 0 110-8 4 4 0 010 8z"/></svg>
           <input id="orderbookSearch" type="search" placeholder="Search instrument, ticker, side&hellip;" aria-label="Search orderbook">
@@ -1646,6 +1647,40 @@
         </div>
       </div>
 
+      <div class="orderbook-tab-panel" id="computePanel" role="tabpanel" aria-labelledby="computeTab">
+        <div class="orderbook-card">
+          <div class="orderbook-title-row">
+            <h1 class="orderbook-title">Compute</h1>
+          </div>
+          <p class="orderbook-subtitle">Same book as Active Books &mdash; quantity &times; the price each line was actually filled at (not the live/current price).</p>
+          <div class="orderbook-toolbar">
+            <div class="orderbook-count" id="computeCount">0 records</div>
+            <div class="orderbook-toolbar-actions">
+              <button class="orderbook-export-btn" id="computeRefreshBtn" type="button">&#8635; Refresh</button>
+            </div>
+          </div>
+          <div class="orderbook-table-wrap">
+            <table class="orderbook-table">
+              <thead>
+                <tr>
+                  <th>Line</th>
+                  <th>Instrument</th>
+                  <th>Ticker</th>
+                  <th>Side</th>
+                  <th>Client</th>
+                  <th style="text-align:right;">Qty</th>
+                  <th style="text-align:right;">Filled At</th>
+                  <th style="text-align:right;">Filled Value (Qty &times; Fill)</th>
+                </tr>
+              </thead>
+              <tbody id="computeTableBody">
+                <tr><td class="orderbook-empty-row" colspan="8">Select the Compute tab to load data.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </section>
   </main>
 
@@ -1706,6 +1741,11 @@
     const strateBirPreviewBody = document.getElementById('strateBirPreviewBody');
     const giftsTab = document.getElementById('giftsTab');
     const giftsPanel = document.getElementById('giftsPanel');
+    const computeTab = document.getElementById('computeTab');
+    const computePanel = document.getElementById('computePanel');
+    const computeTableBody = document.getElementById('computeTableBody');
+    const computeCount = document.getElementById('computeCount');
+    const computeRefreshBtn = document.getElementById('computeRefreshBtn');
     let allOrderbookRows = [];
     // ── UAT mode ──────────────────────────────────────────────────────────────
     // The live orderbook hides orders owned by dedicated TEST accounts
@@ -4624,13 +4664,14 @@
     };
 
     const setActiveTab = (tabName) => {
-      const validTabs = ['closed', 'strate-bir', 'pending-rebalances', 'gifts'];
+      const validTabs = ['closed', 'strate-bir', 'pending-rebalances', 'gifts', 'compute'];
       const normalizedTab = validTabs.includes(tabName) ? tabName : 'active';
       const isActiveBooks = normalizedTab === 'active';
       const isClosedBooks = normalizedTab === 'closed';
       const isStrateBir = normalizedTab === 'strate-bir';
       const isPendingRebalances = normalizedTab === 'pending-rebalances';
       const isGifts = normalizedTab === 'gifts';
+      const isCompute = normalizedTab === 'compute';
 
       if (activeBooksTab) {
         activeBooksTab.classList.toggle('active', isActiveBooks);
@@ -4652,6 +4693,10 @@
         giftsTab.classList.toggle('active', isGifts);
         giftsTab.setAttribute('aria-selected', isGifts ? 'true' : 'false');
       }
+      if (computeTab) {
+        computeTab.classList.toggle('active', isCompute);
+        computeTab.setAttribute('aria-selected', isCompute ? 'true' : 'false');
+      }
       if (activeBooksPanel) {
         activeBooksPanel.classList.toggle('active', isActiveBooks);
       }
@@ -4666,6 +4711,9 @@
       }
       if (giftsPanel) {
         giftsPanel.classList.toggle('active', isGifts);
+      }
+      if (computePanel) {
+        computePanel.classList.toggle('active', isCompute);
       }
     };
 
@@ -6325,6 +6373,60 @@
       orderbookTableBody.innerHTML = pinnedHtml + liveHtml;
     };
 
+    // "Compute" tab: same live book as Active Books, but the value column is
+    // qty × the price the line was ACTUALLY filled at (avgFillNumber for buys,
+    // avgExitNumber for sells) instead of Mkt Value's live/current price.
+    const buildComputeRowHtml = (row) => {
+      const sideValue = String(row.side || '-').toUpperCase();
+      const sideClass = sideValue === 'BUY'
+        ? 'side-badge-buy'
+        : sideValue === 'SELL'
+          ? 'side-badge-sell'
+          : 'side-badge-neutral';
+      const qty = Math.abs(Number(row.quantityValue) || 0);
+      const fillPrice = sideValue === 'SELL'
+        ? Number(row.avgExitNumber)
+        : Number(row.avgFillNumber);
+      const hasFillPrice = Number.isFinite(fillPrice) && fillPrice > 0;
+      const filledValue = (qty > 0 && hasFillPrice) ? qty * fillPrice : null;
+      const clientLabel = row.isStrategy
+        ? (row.strategyShortName || row.strategyName || 'Strategy')
+        : (row.clientName || '-');
+      return `
+        <tr>
+          <td>${escapeHtml(String(row.line ?? '-'))}</td>
+          <td>${escapeHtml(row.instrumentName || '-')}</td>
+          <td class="orderbook-cell-muted">${escapeHtml(row.ticker || '-')}</td>
+          <td><span class="side-badge ${sideClass}">${escapeHtml(sideValue || '-')}</span></td>
+          <td>${escapeHtml(clientLabel)}</td>
+          <td style="text-align:right;">${escapeHtml(row.totalQuantity != null ? String(row.totalQuantity) : '-')}</td>
+          <td style="text-align:right;">${hasFillPrice ? escapeHtml(asRandValue(fillPrice)) : '-'}</td>
+          <td style="text-align:right;font-weight:600;">${filledValue != null ? escapeHtml(asRandValue(filledValue)) : '-'}</td>
+        </tr>`;
+    };
+
+    const renderComputeRows = () => {
+      if (!computeTableBody || !computeCount) return;
+      const rows = allOrderbookRows || [];
+      computeCount.textContent = `${rows.length} record${rows.length === 1 ? '' : 's'}`;
+      if (!rows.length) {
+        computeTableBody.innerHTML = '<tr><td class="orderbook-empty-row" colspan="8">No orderbook records found.</td></tr>';
+        return;
+      }
+      const totalFilledValue = rows.reduce((sum, row) => {
+        const sideValue = String(row.side || '-').toUpperCase();
+        const qty = Math.abs(Number(row.quantityValue) || 0);
+        const fillPrice = sideValue === 'SELL' ? Number(row.avgExitNumber) : Number(row.avgFillNumber);
+        return (qty > 0 && Number.isFinite(fillPrice) && fillPrice > 0) ? sum + qty * fillPrice : sum;
+      }, 0);
+      const totalRowHtml = `
+        <tr style="font-weight:700;border-top:2px solid #e5e7eb;">
+          <td colspan="7" style="text-align:right;">Total filled value</td>
+          <td style="text-align:right;">${escapeHtml(asRandValue(totalFilledValue))}</td>
+        </tr>`;
+      computeTableBody.innerHTML = rows.map(buildComputeRowHtml).join('') + totalRowHtml;
+    };
+
     const applySearchFilter = () => {
       // CEO: hide the Live Price column on the live book; show it only in UAT.
       // Body-level class so EVERY orderbook-table (main + Active Order Books + pinned)
@@ -7229,6 +7331,27 @@
       giftsTab.addEventListener('click', () => {
         setActiveTab('gifts');
         if (window.loadGifts) window.loadGifts();
+      });
+    }
+
+    if (computeTab) {
+      computeTab.addEventListener('click', () => {
+        setActiveTab('compute');
+        loadOrderbook()
+          .then(() => renderComputeRows())
+          .catch((error) => {
+            console.error('Orderbook refresh failed:', error?.message || error);
+          });
+      });
+    }
+
+    if (computeRefreshBtn) {
+      computeRefreshBtn.addEventListener('click', () => {
+        loadOrderbook()
+          .then(() => renderComputeRows())
+          .catch((error) => {
+            console.error('Orderbook refresh failed:', error?.message || error);
+          });
       });
     }
 
