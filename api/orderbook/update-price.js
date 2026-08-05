@@ -455,6 +455,33 @@ async function settleSellFills(holdingIds) {
   }
 }
 
+/**
+ * Server-to-server guard for the OEM auto-settlement path (see below): even
+ * though that path skips the human role check, it must NEVER be able to
+ * touch a real client's holding. Refuses the whole batch unless every
+ * targeted holding's owner is a verified test account — same dual check
+ * (profiles.is_test OR a test wallet) used elsewhere in this codebase, e.g.
+ * orderbook.html's getTestUserIdSet.
+ */
+async function assertHoldingsAreTestAccounts(ids) {
+  const holdings = await fetchSupabaseJson(`/rest/v1/stock_holdings_c?id=in.(${buildInFilter(ids)})&select=id,user_id`);
+  const userIds = [...new Set((holdings || []).map((h) => h.user_id).filter(Boolean))];
+  if (!userIds.length) return { ok: false, reason: 'No matching holdings found.' };
+  const [profiles, testWallets] = await Promise.all([
+    fetchSupabaseJson(`/rest/v1/profiles?id=in.(${buildInFilter(userIds)})&select=id,is_test`),
+    fetchSupabaseJson(`/rest/v1/wallets?user_id=in.(${buildInFilter(userIds)})&status=eq.test&select=user_id`),
+  ]);
+  const testIds = new Set([
+    ...(profiles || []).filter((p) => p.is_test === true).map((p) => p.id),
+    ...(testWallets || []).map((w) => w.user_id),
+  ]);
+  const nonTest = userIds.filter((id) => !testIds.has(id));
+  if (nonTest.length) {
+    return { ok: false, reason: `Refusing: ${nonTest.length} targeted holding(s) belong to a non-test account.` };
+  }
+  return { ok: true };
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -467,21 +494,32 @@ module.exports = async (req, res) => {
     return sendJson(res, 401, { error: 'Missing Authorization bearer token' });
   }
 
-  try {
-    const authUser = await fetchSupabaseJson('/auth/v1/user', token, false);
+  // Server-to-server auto-settlement path for OEM UAT self-fills. A distinct,
+  // narrowly-scoped secret (never MINT_CLIENT_ORDER_SECRET) — the ownership
+  // guard below still runs on this path, so even a leaked secret can only
+  // ever touch already-verified test-account holdings, never a live trade.
+  const isOemUatSettlement = !!process.env.OEM_UAT_SETTLEMENT_SECRET && token === process.env.OEM_UAT_SETTLEMENT_SECRET;
 
-    // ── Role check: granular permission check for fill price edits ───────────
-    const authResult = await requirePermission(req, res, 'orderbook', 'edit_fill_price');
-    if (!authResult) return;
-    
-    // Master ★ and Dev accounts bypass the approval queue.
-    if (!isMasterOrDev(authResult.member)) {
-      return sendJson(res, 403, { error: 'Direct edits require Master ★ or Dev. Please submit an approval request.' });
-    }
-    
-    const email = (authUser?.email || '').toLowerCase();
-    if (!email) {
-      return sendJson(res, 401, { error: 'Could not resolve user email from token' });
+  try {
+    let email;
+    if (isOemUatSettlement) {
+      email = 'oem-uat-auto-settlement';
+    } else {
+      const authUser = await fetchSupabaseJson('/auth/v1/user', token, false);
+
+      // ── Role check: granular permission check for fill price edits ───────
+      const authResult = await requirePermission(req, res, 'orderbook', 'edit_fill_price');
+      if (!authResult) return;
+
+      // Master ★ and Dev accounts bypass the approval queue.
+      if (!isMasterOrDev(authResult.member)) {
+        return sendJson(res, 403, { error: 'Direct edits require Master ★ or Dev. Please submit an approval request.' });
+      }
+
+      email = (authUser?.email || '').toLowerCase();
+      if (!email) {
+        return sendJson(res, 401, { error: 'Could not resolve user email from token' });
+      }
     }
 
     const body = req.body && typeof req.body === 'object' ? req.body : {};
@@ -494,6 +532,16 @@ module.exports = async (req, res) => {
 
     if (!payload || !Object.keys(payload).length) {
       return sendJson(res, 400, { error: 'No payload provided' });
+    }
+
+    // The check that actually protects live data on the auto-settlement path
+    // (which has no human permission check at all): refuse outright unless
+    // EVERY targeted holding belongs to a verified test account.
+    if (isOemUatSettlement) {
+      const guard = await assertHoldingsAreTestAccounts(ids);
+      if (!guard.ok) {
+        return sendJson(res, 403, { error: guard.reason });
+      }
     }
 
     // Stamp WHO authorized this fill (and when), server-side from the verified
