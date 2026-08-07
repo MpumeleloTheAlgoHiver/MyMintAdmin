@@ -110,7 +110,7 @@ module.exports = async function dividendsExtractHandler(req, res) {
   let headerRowIndex = 0;
   for (let i = 0; i < Math.min(rawData.length, 20); i++) {
     const rowStr = rawData[i].join(' ').toUpperCase();
-    if (rowStr.includes('CLIENT') && (rowStr.includes('CODE') || rowStr.includes('CASH'))) {
+    if ((rowStr.includes('CLIENT') || rowStr.includes('CLIET')) && (rowStr.includes('CODE') || rowStr.includes('CASH') || rowStr.includes('AMOUNT') || rowStr.includes('NETT'))) {
       headerRowIndex = i;
       break;
     }

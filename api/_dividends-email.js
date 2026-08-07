@@ -34,7 +34,7 @@ async function sendViaResend({ to, subject, html, metadata = {} }) {
 
 function findClientCode(raw_row) {
   const keys = Object.keys(raw_row);
-  const codeKey = keys.find(k => /client.*code/i.test(k)) || keys.find(k => /client/i.test(k));
+  const codeKey = keys.find(k => /client.*code/i.test(k)) || keys.find(k => /client/i.test(k)) || keys.find(k => /cliet/i.test(k));
   return codeKey ? String(raw_row[codeKey]).trim() : null;
 }
 
@@ -135,7 +135,7 @@ function getDividendMeta(paymentDateStr) {
 }
 
 function buildEmailHtml(profile, payouts, securitiesMap, paymentDate) {
-  const name = profile.first_name || 'Valued Client';
+  const name = profile.is_child ? `${profile.parent_name || 'Valued Client'} (for ${profile.first_name}'s portfolio)` : (profile.first_name || 'Valued Client');
   const effectiveDate = findPaymentDate(payouts, paymentDate);
   const { isFuture, formattedDate, subject } = getDividendMeta(effectiveDate);
   let rowsHtml = '';
@@ -358,11 +358,40 @@ module.exports = async function dividendsEmailHandler(req, res) {
       return sendJson(res, 400, { ok: false, error: 'Could not find Client Code in any row' });
     }
 
-    // 3. Fetch profiles
+    // 3. Fetch profiles and family members
     const profilesData = await supabaseRequest('/rest/v1/profiles?select=id,computershare_number,email,first_name&computershare_number=in.(' + clientCodes.map(c => `"${c}"`).join(',') + ')');
+    const fmData = await supabaseRequest('/rest/v1/family_members?select=id,computershare_number,first_name,primary_user_id&computershare_number=in.(' + clientCodes.map(c => `"${c}"`).join(',') + ')');
+    
+    const parentIds = (fmData || []).map(fm => fm.primary_user_id).filter(Boolean);
+    let parentProfiles = [];
+    if (parentIds.length > 0) {
+      parentProfiles = await supabaseRequest('/rest/v1/profiles?select=id,email,first_name&id=in.(' + parentIds.map(id => `"${id}"`).join(',') + ')');
+    }
+    
     const profileMap = {};
     (profilesData || []).forEach(p => {
-      if (p.computershare_number) profileMap[p.computershare_number] = p;
+      if (p.computershare_number) {
+        profileMap[p.computershare_number] = { ...p, is_child: false };
+      }
+    });
+
+    const parentProfileMap = {};
+    (parentProfiles || []).forEach(p => {
+      parentProfileMap[p.id] = p;
+    });
+
+    (fmData || []).forEach(fm => {
+      if (fm.computershare_number && fm.primary_user_id) {
+        const parent = parentProfileMap[fm.primary_user_id];
+        if (parent) {
+          profileMap[fm.computershare_number] = {
+            first_name: fm.first_name,
+            email: parent.email,
+            is_child: true,
+            parent_name: parent.first_name
+          };
+        }
+      }
     });
 
     // 4. Fetch logos
