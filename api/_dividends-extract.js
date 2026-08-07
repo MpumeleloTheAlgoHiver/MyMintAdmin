@@ -110,7 +110,7 @@ module.exports = async function dividendsExtractHandler(req, res) {
   let headerRowIndex = 0;
   for (let i = 0; i < Math.min(rawData.length, 20); i++) {
     const rowStr = rawData[i].join(' ').toUpperCase();
-    if (rowStr.includes('CLIENT') && (rowStr.includes('CODE') || rowStr.includes('CASH'))) {
+    if ((rowStr.includes('CLIENT') || rowStr.includes('CLIET')) && (rowStr.includes('CODE') || rowStr.includes('CASH') || rowStr.includes('AMOUNT') || rowStr.includes('NETT'))) {
       headerRowIndex = i;
       break;
     }
@@ -157,6 +157,14 @@ module.exports = async function dividendsExtractHandler(req, res) {
     // Skip TOTAL rows, footer/confidentiality notices, and completely empty rows
     const firstVal = String(row[headers[0]] ?? '').toUpperCase().trim();
     if (firstVal === '' || firstVal.includes('TOTAL') || firstVal.includes('CONFIDENTIAL')) continue;
+
+    // Skip repeating header rows
+    if (firstVal === String(headers[0]).toUpperCase().trim()) continue;
+
+    // Also double check if the client column literally just says "CLIENT"
+    const clientValKey = Object.keys(row).find(k => /client.*code/i.test(k) || /client/i.test(k) || /cliet/i.test(k));
+    const clientVal = clientValKey ? String(row[clientValKey]).toUpperCase().trim() : '';
+    if (clientVal === 'CLIENT' || clientVal === 'CLIET' || clientVal === 'CLIENT CODE') continue;
 
     const n = netCashCol ? parseSaAmount(row[netCashCol]) : NaN;
     if (!isNaN(n)) totalNetCash += n;
