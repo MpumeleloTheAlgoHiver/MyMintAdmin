@@ -5,7 +5,8 @@ const {
   sendOrderbookCsvEmail,
   loadLiveOrderbookRows
 } = require('../_orderbook');
-const { publishEodReturns } = require('../_returns-publish');
+// _returns-publish is intentionally no longer wired in here — strategy return
+// publication moved to the OEM (see the note at its former call site below).
 const { publishClientEodReturns } = require('../_client-returns-publish');
 
 const getNowInTimezoneParts = (date, timeZone) => {
@@ -62,19 +63,24 @@ module.exports = async (req, res) => {
     const localNow = getNowInTimezoneParts(now, timeZone);
     const dateKey = `${String(localNow.year).padStart(4, '0')}-${String(localNow.month).padStart(2, '0')}-${String(localNow.day).padStart(2, '0')}`;
 
-    // ── EOD return publication (Stage 1, rebalance-aware) ──────────────────────
-    // Runs first, independently of the order-book email flow below. Publishes every
-    // active strategy's complete-value return through the guarded RPC, chaining from
-    // its own prior publication (rebalance-aware; YTD never resets). Safe by default:
-    // writes only when RETURNS_PUBLISH_APPLY=1, otherwise read-only. Never fatal to
-    // the order-book cron.
-    let returnsPublish = null;
-    try {
-      returnsPublish = await publishEodReturns({ asOfDate: dateKey, apply: process.env.RETURNS_PUBLISH_APPLY === '1' });
-      console.log('[returns-publish]', returnsPublish.apply ? 'APPLIED' : 'dry-run', JSON.stringify(returnsPublish.summary));
-    } catch (e) {
-      console.error('[returns-publish] failed (non-fatal):', e?.message || e);
-    }
+    // ── EOD strategy return publication — MOVED TO THE OEM ────────────────────
+    // Now owned by Wealth Navigator: `/api/cron/returns-publish`
+    // (src/lib/returns/publish-eod-returns.ts), scheduled 17:00 on weekdays.
+    // Two publishers must never both write `strategy_return_publication_audit_c`
+    // for the same (strategy, as_of_date): they disagree on
+    // `composition_effective_from` and manufacture spurious boundary bridges —
+    // see the 5–7 Aug 2026 rows for what that looks like. So this call is
+    // removed rather than left behind an env flag that could be switched back
+    // on by accident.
+    //
+    // The OEM port was verified byte-identical to this implementation before
+    // cutover: 8/8 active strategies agreed to the cent on securities,
+    // continuity cash and complete value, and to 1e-9 on YTD (2026-08-10).
+    //
+    // The OEM also seals the rebalance return boundary at settlement
+    // (src/lib/returns/seal-rebalance-boundary.ts), which this project never
+    // did from its own rebalance flow.
+    const returnsPublish = { skipped: 'moved-to-oem' };
 
     // Client publication runs after strategies and has its own independent
     // apply switch. It values actual owner quantities plus strategy-scoped
