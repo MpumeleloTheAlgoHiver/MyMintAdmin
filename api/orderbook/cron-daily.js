@@ -5,9 +5,9 @@ const {
   sendOrderbookCsvEmail,
   loadLiveOrderbookRows
 } = require('../_orderbook');
-// _returns-publish is intentionally no longer wired in here — strategy return
-// publication moved to the OEM (see the note at its former call site below).
-const { publishClientEodReturns } = require('../_client-returns-publish');
+// _returns-publish and _client-returns-publish are intentionally no longer
+// wired in here — both moved to the OEM (see the notes at their former call
+// sites below).
 
 const getNowInTimezoneParts = (date, timeZone) => {
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -82,22 +82,21 @@ module.exports = async (req, res) => {
     // did from its own rebalance flow.
     const returnsPublish = { skipped: 'moved-to-oem' };
 
-    // Client publication runs after strategies and has its own independent
-    // apply switch. It values actual owner quantities plus strategy-scoped
-    // residual/reserve cash, excludes accrued liabilities from gross TWR, and
-    // refuses unexplained composition changes.
-    let clientReturnsPublish = null;
-    try {
-      clientReturnsPublish = await publishClientEodReturns({
-        asOfDate: dateKey,
-        apply: process.env.CLIENT_RETURNS_PUBLISH_APPLY === '1',
-        includeUat: process.env.CLIENT_RETURNS_INCLUDE_UAT === '1',
-        includeTestUsers: process.env.CLIENT_RETURNS_INCLUDE_TEST === '1'
-      });
-      console.log('[client-returns-publish]', clientReturnsPublish.apply ? 'APPLIED' : 'dry-run', JSON.stringify(clientReturnsPublish.summary));
-    } catch (e) {
-      console.error('[client-returns-publish] failed (non-fatal):', e?.message || e);
-    }
+    // ── Per-client EOD return publication — MOVED TO THE OEM ──────────────────
+    // Now owned by Wealth Navigator: `/api/cron/client-returns-publish`
+    // (src/lib/returns/publish-client-eod-returns.ts), scheduled 17:20 UTC on
+    // weekdays. Same reasoning as the strategy-level handoff above: two
+    // publishers must never both write `client_strategy_return_publication_audit_c`
+    // for the same (owner, as_of_date) — they'd disagree on
+    // composition_effective_from and fork that client's return chain. Removed
+    // rather than left behind an env flag that could be switched back on by
+    // accident (that's exactly what happened to the strategy-level flag before
+    // its own cutover — see the 5-7 Aug 2026 rows).
+    //
+    // Last write from this implementation before cutover: 2026-08-21 (the
+    // weekend of 22-23 Aug had no trading, so its own EOD carry-forward is
+    // expected, not a gap).
+    const clientReturnsPublish = { skipped: 'moved-to-oem' };
 
     const currentMinuteOfDay = (localNow.hour * 60) + localNow.minute;
     const targetMinuteOfDay = (targetHour * 60) + targetMinute;
